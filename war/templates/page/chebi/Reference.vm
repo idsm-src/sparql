@@ -1,0 +1,71 @@
+#parse("common/utils.vm")
+
+
+<style scoped>
+#include("css/chebi.css")
+</style>
+
+
+#sparql($reference)
+SELECT ?NAME ?VALUE ?COMPOUND ?COMPOUND_NAME ?COMPOUND_ID ?LOC ?LABEL ?SOURCE WHERE {
+  $entity rdf:type / rdfs:label ?LABEL.
+  $entity chebi:referenceName ?NAME.
+  $entity chebi:referenceValue ?VALUE.
+  $entity chebi:referencedCompound ?COMPOUND.
+  
+  ?COMPOUND chebi:chebiName / chebi:nameValue ?COMPOUND_NAME.
+  ?COMPOUND chebi:primaryIdentifier ?COMPOUND_ID.
+  
+  OPTIONAL { $entity chebi:locationInReference ?LOC. }
+  OPTIONAL { $entity chebi:source ?SOURCE. }
+}
+#end
+
+
+<div class="VET-Page">
+<div class="VET-BoxedSection">
+  <table class="VET-DataTable">
+    <colgroup>
+      <col style="width:100px"/>
+      <col/>
+    </colgroup>
+    <tbody>
+
+    <tr>
+      <td>Type</td>
+      <td><b>#escapeHTML($reference.LABEL)</b></td>
+    </tr>
+
+    <tr>
+      <td>Value</td>
+      <td><b>#escapeHTML($reference.VALUE)</b></td>
+    </tr>
+
+   #if( $reference.LOC )
+     <tr>
+        <td>Location</td>
+        <td>#escapeHTML($reference.LOC)</td>
+      </tr>
+    #end
+
+    <tr>
+      <td>Name</td>
+      <td>#escapeChEBI($reference.NAME)</td>
+    </tr>
+
+    <tr>
+      <td>Compound</td>
+      <td>#escapeHTML($reference.COMPOUND_NAME) (#url($reference.COMPOUND)CHEBI:#escapeHTML($reference.COMPOUND_ID)#end)</td>
+    </tr>
+
+   #if( $reference.SOURCE )
+     <tr>
+        <td>Source</td>
+        <td>#escapeHTML($reference.SOURCE)</td>
+      </tr>
+    #end
+
+    </tbody>
+  </table>
+</div>
+</div>

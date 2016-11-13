@@ -1,0 +1,21 @@
+#parse("common/utils.vm")
+
+
+#sparql($formula)
+  SELECT ?FORMULA ?SOURCE WHERE
+  {
+    $entity chebi:formulaValue ?FORMULA.
+	$entity chebi:source ?SOURCE.
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr><td>
+      #escapeHTML($formula.FORMULA)
+    </td></tr>
+    <tr><td>
+    <small style="color:gray">Source: #escapeHTML($formula.SOURCE)<small>
+    </td></tr>
+  </tbody>
+</table>

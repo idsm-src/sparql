@@ -1,0 +1,21 @@
+#parse("common/utils.vm")
+
+
+#sparql($mass)
+  SELECT ?MASS ?SOURCE WHERE
+  {
+    $entity chebi:massValue ?MASS.
+	$entity chebi:source ?SOURCE.
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr><td>
+      #escapeHTML($mass.MASS)
+    </td></tr>
+    <tr><td>
+    <small style="color:gray">Source: #escapeHTML($mass.SOURCE)<small>
+    </td></tr>
+  </tbody>
+</table>

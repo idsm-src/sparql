@@ -1,0 +1,59 @@
+#parse("common/utils.vm")
+
+
+#sparql($data)
+  SELECT ?NAME ?ID ?STAR WHERE
+  {
+    $entity chebi:chebiName / chebi:nameValue ?NAME.
+    $entity chebi:primaryIdentifier ?ID.
+    $entity chebi:star ?STAR.
+  }
+#end
+
+#sparql($mol)
+SELECT ?MOL WHERE
+{
+  $entity chebi:defaultMolFile ?MOL.
+}
+#end
+
+
+
+<table style="width:100%">
+  <tr>
+    #if( $mol.count > 0 )
+    <td style="width:90px">
+      <table style="width:80px">
+        <tr>
+          <td>
+            <img src="sources?w=80&id=$data.ID.value" alt="CHEBI:#escapeHTML($data.ID)" height="80" width="80">
+          </td>
+        </tr>
+      </table>
+    </td>
+    #end
+    
+    <td>
+      <table>
+        <tr>
+          <td >
+            <b>CHEBI:#escapeHTML($data.ID)</b>
+            #escapeChEBI($data.NAME)
+          </td>
+        </tr>
+        <tr>
+          <td>
+            Stars:
+            #if($data.STAR.value == "3")
+              <img src="images/chebi/goldenstar.png"><img src="images/chebi/goldenstar.png"><img src="images/chebi/goldenstar.png">
+            #elseif($data.STAR.value == "2")
+              <img src="images/chebi/goldenstar.png"><img src="images/chebi/goldenstar.png"><img src="images/chebi/silverstar.png">
+            #elseif($data.STAR.value == "1")
+              <img src="images/chebi/goldenstar.png"><img src="images/chebi/silverstar.png"><img src="images/chebi/silverstar.png">
+            #end
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

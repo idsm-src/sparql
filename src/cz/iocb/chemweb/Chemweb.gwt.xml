@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  When updating your version of GWT, you should also update this DTD reference,
+  so that your app can take advantage of the latest GWT module capabilities.
+-->
+<!DOCTYPE module PUBLIC "-//Google Inc.//DTD Google Web Toolkit 2.5.0//EN"
+  "http://google-web-toolkit.googlecode.com/svn/tags/2.5.0/distro-source/core/src/gwt-module.dtd">
+<module rename-to='chemweb'>
+  <!-- Inherit the core Web Toolkit stuff.                        -->
+  <inherits name='com.google.gwt.user.User'/>
+
+  <!-- Inherit the default GWT style sheet.  You can change       -->
+  <!-- the theme of your GWT application by uncommenting          -->
+  <!-- any one of the following lines.                            -->
+  <inherits name='com.google.gwt.user.theme.clean.Clean'/>
+  <!-- <inherits name='com.google.gwt.user.theme.standard.Standard'/> -->
+  <!-- <inherits name='com.google.gwt.user.theme.chrome.Chrome'/> -->
+  <!-- <inherits name='com.google.gwt.user.theme.dark.Dark'/> -->
+
+  <!-- Other module inherits                                      -->
+  <inherits name="com.google.gwt.http.HTTP"/>
+
+  <stylesheet src="css/Chemweb.css"/>
+
+
+  <!-- Specify the app entry point class.                         -->
+  <entry-point class='cz.iocb.chemweb.client.Chemweb'/>
+
+  <!-- Specify the paths for translatable code                    -->
+  <source path='client'/>
+  <source path='shared'/>
+  <super-source path="../../../" />
+
+
+  <define-property name="user.agent.trident" values="yes, no" />
+  <property-provider name="user.agent.trident"><![CDATA[
+  {
+    var ua = navigator.userAgent.toLowerCase();
+    if (ua.indexOf('trident') != -1) { return 'yes'; }
+    return 'no';
+  }
+  ]]></property-provider>
+
+  <define-property name="user.agent.chrome" values="yes, no" />
+  <property-provider name="user.agent.chrome"><![CDATA[
+  {
+    var ua = navigator.userAgent.toLowerCase();
+    if (ua.indexOf('chrome') != -1) { return 'yes'; }
+    return 'no';
+  }
+  ]]></property-provider>
+
+
+  <replace-with class="cz.iocb.chemweb.client.services.downloader.FileDownloaderServer">
+    <when-type-is class="cz.iocb.chemweb.client.services.downloader.FileDownloader"/>
+  </replace-with>
+
+  <replace-with class="cz.iocb.chemweb.client.services.downloader.FileDownloaderDataScheme">
+    <when-type-is class="cz.iocb.chemweb.client.services.downloader.FileDownloader"/>
+    <when-property-is name="user.agent" value="gecko1_8" />
+    <when-property-is name="user.agent.trident" value="no" />
+  </replace-with>
+
+  <replace-with class="cz.iocb.chemweb.client.services.downloader.FileDownloaderDataScheme">
+    <when-type-is class="cz.iocb.chemweb.client.services.downloader.FileDownloader"/>
+    <when-property-is name="user.agent" value="safari" />
+    <when-property-is name="user.agent.chrome" value="yes" />
+  </replace-with>
+
+</module>

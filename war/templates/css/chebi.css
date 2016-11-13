@@ -1,0 +1,57 @@
+.VET-Page {
+	padding: 15px;
+}
+
+
+.VET-Section,
+.VET-BoxedSection {
+    margin-bottom: 15px;
+}
+
+.VET-BoxedSection {
+    border: 1px solid #81b0d4;
+    border-collapse: separate;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.VET-DataTable,
+.VET-LabeledDataTable {
+	width: 100%;
+}
+
+.VET-DataTable tr td:first-child,
+.VET-LabeledDataTable tr:first-child td {
+	background-color: #e2eff9;
+    border-radius: 5px;
+    padding: 4px;
+    height: 15px;
+}
+
+
+.VET-date {
+    color: gray;
+    font-size: xx-small;
+}
+
+
+.VET-note {
+	font-size: x-small;
+	margin-left: 15px;
+	margin-right: 5px;
+	margin-bottom: 3px;
+	text-align: justify;
+}
+
+
+hr {
+	border: 0;
+	height: 1px;
+	background: #81b0d4;
+	/*
+	background-image: -webkit-linear-gradient(left, #ccc, #81b0d4, #ccc);
+	background-image: -moz-linear-gradient(left, #ccc, #81b0d4, #ccc);
+	background-image: -ms-linear-gradient(left, #ccc, #81b0d4, #ccc);
+	background-image: -o-linear-gradient(left, #ccc, #81b0d4, #ccc);
+	*/
+}

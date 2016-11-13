@@ -1,0 +1,21 @@
+#parse("common/utils.vm")
+
+
+#sparql($comment)
+  SELECT ?TEXT ?DATE WHERE
+  {
+    $entity chebi:text ?TEXT.
+    $entity chebi:createdOn ?DATE.
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr><td>
+      #escapeChEBI($comment.TEXT)
+    </td></tr>
+    <tr><td>
+    <small style="color:gray">created on: #escapeHTML($comment.DATE)</small>
+    </td></tr>
+  </tbody>
+</table>

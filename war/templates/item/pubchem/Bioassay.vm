@@ -1,0 +1,22 @@
+#set($BAO = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+
+#sparql($title)
+  SELECT ?TITLE  WHERE
+  {
+    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>
+    {
+      $entity dcterms:title ?TITLE
+    }
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr><td>
+      <b>$BAO</b>
+    </td></tr>
+    <tr><td>
+    #escapeHTML($title.TITLE)
+    </td></tr>
+  </tbody>
+</table>

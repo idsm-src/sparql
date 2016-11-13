@@ -1,0 +1,199 @@
+#parse("common/utils.vm")
+
+
+#parse("common/comments.vm")
+
+
+
+#sparql($iupacs)
+  SELECT ?NODE ?NAME ?SOURCE WHERE
+  {
+	$entity chebi:iupacName ?NODE.
+	
+    ?NODE chebi:nameValue ?NAME.
+	?NODE chebi:source ?SOURCE.
+  }
+  ORDER BY ?NAME
+#end
+
+
+
+#if($iupacs.count > 0)
+<div class="VET-Section">
+  <table class="VET-LabeledDataTable">
+    <tbody>
+      <tr>
+        <td>IUPAC Name</td>
+      </tr>
+
+      #foreach($row in $iupacs)
+	  <tr id="SEL-#entityID($row.NODE)">
+        <td>
+          #escapeChEBI($row.NAME)
+          #if($row.NAME.language != "en")
+            <img src="images/chebi/${row.NAME.language}-icon.png">
+          #end
+          #comments($row.NODE)
+        </td>
+      </tr>
+      #end
+
+    </tbody>
+  </table>
+</div>
+#end
+
+
+
+<!------------------------------------------------------------------------------------------------->
+
+
+
+#sparql($inns)
+  SELECT ?NODE ?NAME ?SOURCE WHERE
+  {
+	$entity chebi:internationalNonproprietaryName ?NODE.
+	
+    ?NODE chebi:nameValue ?NAME.
+	?NODE chebi:source ?SOURCE.
+  }
+  ORDER BY ?NAME
+#end
+
+
+
+#if($inns.count > 0)
+<div class="VET-Section">
+  <table class="VET-LabeledDataTable">
+    <colgroup>
+      <col style="width:80%"/>
+      <col style="width:20%"/>
+    </colgroup>
+    <tbody>
+      <tr>
+        <td>INNs</td>
+        <td>Sources</td>
+      </tr>
+
+      #foreach($row in $inns)
+	  <tr id="SEL-#entityID($row.NODE)">
+        <td>
+          #escapeChEBI($row.NAME)
+          #if($row.NAME.language != "en")
+            <img src="images/chebi/${row.NAME.language}-icon.png">
+          #end
+          #comments($row.NODE)
+        </td>
+        <td>
+          #escapeHTML($row.SOURCE)
+        </td>
+      </tr>
+      #end
+
+    </tbody>
+  </table>
+</div>
+#end
+
+
+
+<!------------------------------------------------------------------------------------------------->
+
+
+
+#sparql($synonyms)
+  SELECT ?NODE ?NAME ?SOURCE WHERE
+  {
+    $entity chebi:synonym | chebi:sourceName ?NODE.
+	
+    ?NODE chebi:nameValue ?NAME.
+	?NODE chebi:source ?SOURCE.
+  }
+  ORDER BY ?NAME
+#end
+
+
+#if($synonyms.count > 0)
+<div class="VET-Section">
+  <table class="VET-LabeledDataTable">
+    <colgroup>
+      <col style="width:80%"/>
+      <col style="width:20%"/>
+    </colgroup>
+    <tbody>
+      <tr>
+        <td>Synonyms</td>
+        <td>Sources</td>
+      </tr>
+
+      #foreach($row in $synonyms)
+	  <tr id="SEL-#entityID($row.NODE)">
+        <td>
+          #escapeChEBI($row.NAME)
+          #if($row.NAME.language != "en")
+            <img src="images/chebi/${row.NAME.language}-icon.png">
+          #end
+          #comments($row.NODE)
+        </td>
+        <td>
+          #escapeHTML($row.SOURCE)
+        </td>
+      </tr>
+      #end
+
+    </tbody>
+  </table>
+</div>
+#end
+
+
+
+<!------------------------------------------------------------------------------------------------->
+
+
+
+#sparql($brands)
+  SELECT ?NODE ?NAME ?SOURCE WHERE
+  {
+	$entity chebi:brandName ?NODE.
+	
+    ?NODE chebi:nameValue ?NAME.
+	?NODE chebi:source ?SOURCE.
+  }
+  ORDER BY ?NAME
+#end
+
+
+
+#if($brands.count > 0)
+<div class="VET-Section">
+  <table class="VET-LabeledDataTable">
+    <colgroup>
+      <col style="width:80%"/>
+      <col style="width:20%"/>
+    </colgroup>
+    <tbody>
+      <tr>
+        <td>Brand Names</td>
+        <td>Sources</td>
+      </tr>
+
+      #foreach($row in $brands)
+	  <tr id="SEL-#entityID($row.NODE)">
+        <td>
+          #escapeChEBI($row.NAME)
+          #if($row.NAME.language != "en")
+            <img src="images/chebi/${row.NAME.language}-icon.png">
+          #end
+          #comments($row.NODE)
+        </td>
+        <td>
+          #escapeHTML($row.SOURCE)
+        </td>
+      </tr>
+      #end
+
+    </tbody>
+  </table>
+</div>
+#end

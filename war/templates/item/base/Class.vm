@@ -1,0 +1,14 @@
+#parse("common/utils.vm")
+#parse("common/label.vm")
+
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td>#label($entity)</td>
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

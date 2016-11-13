@@ -1,0 +1,134 @@
+#parse("common/utils.vm")
+
+
+#set($types = {
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasFunctionalParent": "has functional parent",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isTautomerOf": "is tautomer of",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isSubstituentGroupFrom": "is substituent group from",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isConjugateBaseOf": "is conjugate base of",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isConjugateAcidOf": "is conjugate acid of",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isEnantiomerOf": "is enantiomer of",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#isA": "is a",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasRole": "has role",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasParentHydride": "has parent hydride",
+    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasPart": "has part"
+})
+
+
+#sparql($base)
+  SELECT ?ID ?NAME WHERE
+  {
+    $entity chebi:primaryIdentifier ?ID.
+    $entity chebi:chebiName / chebi:nameValue ?NAME.
+  }
+#end
+
+
+#sparql($outgoing)
+  SELECT ?NODE ?TO ?REL ?ID ?NAME FROM <http://bioinfo.uochb.cas.cz/data/chebi#> WHERE
+  {
+    $entity ?REL ?NODE.
+    ##?R rdf:type chebi:CompoundRelation.
+
+    ?NODE chebi:inRelationWithValue ?TO.
+    ?TO chebi:primaryIdentifier ?ID.
+    ?TO chebi:chebiName / chebi:nameValue ?NAME.
+  }
+  ORDER BY ?REL ?NAME
+#end
+
+
+#sparql($incoming)
+  SELECT ?REL ?FROM ?ID ?NAME FROM <http://bioinfo.uochb.cas.cz/data/chebi#> WHERE
+  {
+    ?R chebi:inRelationWithValue $entity .
+    ?FROM ?REL ?R.
+    
+    ?FROM chebi:primaryIdentifier ?ID.
+    ?FROM chebi:chebiName / chebi:nameValue ?NAME.
+  }
+  ORDER BY ?REL ?NAME
+#end
+
+
+
+#if($outgoing.count > 0 || $incoming.count > 0)
+<div class="VET-Section">
+  <table class="VET-LabeledDataTable">
+    <colgroup>
+      <col style="width:110px"/>
+      <col/>
+    </colgroup>
+    <tbody>
+      <tr>
+        <td colspan="2">ChEBI Ontology</td>
+      </tr>
+
+      #if($outgoing.count > 0 || $infered)
+      <tr>
+        <td>
+          Outgoing
+        </td>
+        <td>
+        #foreach( $out in $outgoing )
+          <span id="SEL-#entityID($out.NODE)">
+            #escapeChEBI($base.NAME)
+            (#url($entity)CHEBI:#escapeHTML($base.ID)#end)
+            <font style="font-weight:bold;">$types.get($out.REL.value)</font>
+            #escapeChEBI($out.NAME)
+            (#url($out.TO)CHEBI:#escapeHTML($out.ID)#end)
+		  </span>
+          <br/>
+        #end
+        
+        #if($infered)
+          #sparql($details)
+            SELECT ?TO ?REL ?ID ?NAME WHERE
+            {
+              $entity ?REL $infered.
+
+              $infered chebi:inRelationWithValue ?TO.
+              ?TO chebi:primaryIdentifier ?ID.
+              ?TO chebi:chebiName / chebi:nameValue ?NAME.
+            }
+          #end
+
+          <span id="SEL-#entityID($infered)">
+            #escapeChEBI($base.NAME)
+            (#url($entity)CHEBI:#escapeHTML($base.ID)#end)
+            <font style="font-weight:bold;">$types.get($details.REL.value)</font>
+            #escapeChEBI($details.NAME)
+            (#url($details.TO)CHEBI:#escapeHTML($details.ID)#end) <i>(inferred)</i>
+		  </span>
+          <br/>
+        #end
+        
+        </td>
+      </tr>
+      #end
+
+      #if($outgoing.count > 0 && $incoming.count > 0)
+      <tr><td colspan="2" style="border-bottom :1px solid #999999;"></td></tr>
+      #end
+
+      #if($incoming.count > 0)   
+      <tr>
+        <td>
+          Incoming
+        </td>
+        <td>
+        #foreach( $in in $incoming )
+          #escapeChEBI($in.NAME)
+          (#url($in.FROM)CHEBI:#escapeHTML($in.ID)#end)
+          <font style="font-weight:bold;">$types.get($in.REL.value)</font>
+          #escapeChEBI($base.NAME)
+          (#url($entity)CHEBI:#escapeHTML($base.ID)#end)
+          <br/>
+        #end
+        </td>
+      </tr>
+      #end
+    </tbody>
+  </table>
+</div>
+#end

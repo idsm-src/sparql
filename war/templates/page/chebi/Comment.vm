@@ -1,0 +1,37 @@
+#parse("common/utils.vm")
+
+
+#sparql($owner)
+  SELECT ?OWNER WHERE
+  {
+    {
+      ?OWNER chebi:comment $entity .
+      ?OWNER rdf:type chebi:Compound.
+    }
+    union
+    {
+      ?NODE chebi:comment $entity .
+      ?OWNER ?P ?NODE .
+      ?OWNER rdf:type chebi:Compound.
+    }
+  }
+#end
+
+
+
+<style scoped>
+#SEL-#entityID($entity) span,
+#SEL-#entityID($entity) a,
+#SEL-#entityID($entity) {
+	color: red !important;
+	font-weight:bold !important;
+}
+
+#SEL-#entityID($entity) a {
+	color: #808 !important;
+}
+</style>
+
+
+#set($entity = $owner.OWNER)
+#parse("page/chebi/Compound.vm")

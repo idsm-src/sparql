@@ -1,0 +1,109 @@
+#parse("common/utils.vm")
+
+
+#macro(label $classPar)
+#set($class = $classPar)
+#sparql($info)
+  SELECT ?LABEL FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class rdfs:label ?LABEL.
+  }
+#end
+#if($info.LABEL)
+#escapeHTML($info.LABEL)## xxx
+#else
+#sparql($union)
+  SELECT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class owl:unionOf / rdf:rest* / rdf:first ?CLASS.
+  }
+#end
+#if( $union.count > 0 )
+#foreach($u in $union)#if($velocityCount > 1) | #end#label($u.CLASS)#end##
+#else
+#sparql($intersection)
+  SELECT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class owl:intersectionOf / rdf:rest* / rdf:first ?CLASS.
+  }
+#end
+#if( $intersection.count > 0 )
+#foreach($u in $intersection)#if($velocityCount > 1) & #end#label($u.CLASS)#end##
+#else
+#sparql($complement)
+  SELECT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class owl:complementOf ?CLASS.
+  }
+#end
+#if( $complement.count == 1 )
+!#label($complement.CLASS)##
+#elseif( $complement.count > 1 )
+!{#foreach($c in $complement)#if($velocityCount > 1) & #end#label($c.CLASS)#end}##
+#else
+#sparql($restriction)
+  SELECT ?PROPERTY ?TYPE ?VALUE FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class owl:onProperty ?PROPERTY.
+    $class ?TYPE ?VALUE.
+    filter (?TYPE in (owl:allValuesFrom, owl:hasValue, owl:someValuesFrom, owl:cardinality, owl:hasSelf, owl:minCardinality, owl:maxCardinality, owl:qualifiedCardinality, owl:maxQualifiedCardinality, owl:minQualifiedCardinality))
+  }
+#end
+#if( $restriction.count == 1 )
+#if($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#allValuesFrom")
+#escapeIRI($restriction.PROPERTY): all values from '#label($restriction.VALUE)'
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#hasValue")
+#if($restriction.VALUE.isLiteral())
+#escapeIRI($restriction.PROPERTY): has value #escapeVal($restriction.VALUE)
+#else
+#escapeIRI($restriction.PROPERTY): has value #escapeIRI($restriction.VALUE)
+#end
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#someValuesFrom")
+#escapeIRI($restriction.PROPERTY): some values from '#label($restriction.VALUE)'
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#cardinality")
+#escapeIRI($restriction.PROPERTY): cardinality $restriction.VALUE.value
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#hasSelf")
+#escapeIRI($restriction.PROPERTY): linked to itself'## VALUE shlould be true
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#minCardinality")
+#escapeIRI($restriction.PROPERTY): minimal cardinality $restriction.VALUE.value
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#maxCardinality")
+#escapeIRI($restriction.PROPERTY): maximal cardinality $restriction.VALUE.value
+#else
+#sparql($qualified)
+  SELECT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    {
+      $class owl:onClass ?CLASS.
+    }
+    UNION
+    {
+      $class owl:onDataRange ?CLASS.
+    }
+  }
+#end
+#if($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#qualifiedCardinality")
+#escapeIRI($restriction.PROPERTY): cardinality $restriction.VALUE.value for '#label($qualified.CLASS)'
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#maxQualifiedCardinality")
+#escapeIRI($restriction.PROPERTY): maximal cardinality $restriction.VALUE.value for '#label($qualified.CLASS)'
+#elseif($restriction.TYPE.value == "http://www.w3.org/2002/07/owl#minQualifiedCardinality")
+#escapeIRI($restriction.PROPERTY): minimal cardinality $restriction.VALUE.value for '#label($qualified.CLASS)'
+#end
+#end
+#else
+#sparql($data)
+  SELECT ?VALUE FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  {
+    $class owl:oneOf / rdf:rest* / rdf:first ?VALUE.
+  }
+#end
+#if( $data.count > 0 )
+values: #foreach($d in $data)#if($velocityCount > 1), #end#if($velocityCount == $data.count)and #end#escapeHTML($d.VALUE)#end##
+#else
+#escapeIRI($class)
+#end
+#end
+#end
+#end
+#end
+#end
+#end

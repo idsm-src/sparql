@@ -1,0 +1,23 @@
+.cm-s-chemweb span.cm-meta {color: #FF1717;}
+.cm-s-chemweb span.cm-keyword { line-height: 1em; font-weight: bold; color: #7F0055; }
+.cm-s-chemweb span.cm-atom {color: #860e0e;}
+.cm-s-chemweb span.cm-number {color: #164;}
+.cm-s-chemweb span.cm-def {color: #00f;}
+.cm-s-chemweb span.cm-variable {color: #164;}
+.cm-s-chemweb span.cm-variable-2 {color: #0000C0;}
+.cm-s-chemweb span.cm-variable-3 {color: #0000C0;}
+.cm-s-chemweb span.cm-property {color: black;}
+.cm-s-chemweb span.cm-operator {color: black;}
+.cm-s-chemweb span.cm-comment {color: #ea0000;}
+.cm-s-chemweb span.cm-string {color: #164;}
+.cm-s-chemweb span.cm-string-2 {color: #164;}
+.cm-s-chemweb span.cm-qualifier {color: #555;}
+.cm-s-chemweb span.cm-builtin {color: #7F0055;}
+.cm-s-chemweb span.cm-bracket {color: black;}
+.cm-s-chemweb span.cm-tag {color: #170;}
+.cm-s-chemweb span.cm-attribute {color: #00c;}
+.cm-s-chemweb span.cm-link {color: #219;}
+.cm-s-chemweb span.cm-error {color: #f00;}
+
+.cm-s-chemweb .CodeMirror-activeline-background {background: #e8f2ff !important;}
+.cm-s-chemweb .CodeMirror-matchingbracket {outline:1px solid grey; color:black !important;}

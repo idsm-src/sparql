@@ -1,0 +1,41 @@
+#parse("common/utils.vm")
+
+
+<div lang="en" style="-webkit-hyphens: auto; -moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;">
+#if($entity)
+  #if(!$entity.isLiteral())
+    #sparql($type)
+      SELECT ?TEMPLATE WHERE
+      {
+        $entity rdf:type / rdfs:subClassOf* ?TYPE.
+		?TYPE template:itemTemplate ?TEMPLATE.
+	  }
+    #end
+    
+    #if($type.TEMPLATE)
+      #parse("item/$type.TEMPLATE.value")
+	#else
+	  #escapeIRI($entity)
+	#end
+  #else
+    <table style="width:100%">
+      <tbody>
+        <tr><td>
+		  <div style="white-space: pre-wrap;">#escapeHTML($entity)</div>
+        </td></tr>
+  	    #if($entity.getLanguage())
+        <tr><td>
+		  <small style="color:gray">Lang: $entity.getLanguage()</small>
+        </td></tr>
+  	    #elseif($entity.getDatatype())
+        <tr><td>
+		  <small style="color:gray">Datatype: #escapeIRI($entity.getDatatype())</small>
+        </td></tr>
+	    #end
+      </tbody>
+    </table>
+  #end
+#else
+	null
+#end
+</div>

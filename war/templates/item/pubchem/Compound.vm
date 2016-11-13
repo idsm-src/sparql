@@ -1,0 +1,26 @@
+#set($CID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+
+
+<table style="width:100%">
+  <tr>
+    <td style="width:90px">
+      <table style="width:80px">
+        <tr>
+          <td>
+            <img src="compound/image?w=160&id=$CID" alt="$CID" height="80" width="80">
+          </td>
+        </tr>
+      </table>
+    </td>
+    
+    <td>
+      <table>
+        <tr>
+          <td >
+            <b>$CID</b>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

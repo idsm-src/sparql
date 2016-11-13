@@ -1,0 +1,81 @@
+#set($uri = $entity.toString().replaceAll("[<>]",""))
+#set($AID = $uri.replaceAll(".*AID",""))
+
+#sparql($title)
+  SELECT ?TITLE  WHERE
+  {
+    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>
+    {
+      $entity dcterms:title ?TITLE
+    }
+  }
+#end
+
+#sparql($description)
+SELECT ?VALUE WHERE
+{
+  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  {
+    <${uri}_Description> sio:has-value ?VALUE
+  }
+}
+#end
+
+#sparql($protocol)
+SELECT ?VALUE WHERE
+{
+  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  {
+    <${uri}_Protocol> sio:has-value ?VALUE
+  }
+}
+#end
+
+#sparql($comment)
+SELECT ?VALUE WHERE
+{
+  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  {
+    <${uri}_Comment> sio:has-value ?VALUE
+  }
+}
+#end
+
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">bioassay:AID$AID</span> 
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/bioassay/$AID" target="_blank">open in pubchem</a>)
+  </div>
+
+  <div class="VET-BoxedSection">
+    <div>#escapeHTML($title.TITLE)</div>
+  </div>
+
+  #if($description.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Description</div>
+    <div style="white-space: pre-wrap">$description.VALUE.value.trim()</div>
+  </div>
+  #end
+
+  #if($protocol.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Protocol</div>
+    <div style="white-space: pre-wrap">$protocol.VALUE.value.trim()</div>
+  </div>
+  #end
+
+  #if($comment.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Comment</div>
+    <div style="white-space: pre-wrap">$comment.VALUE.value.trim()</div>
+  </div>
+  #end
+  
+</div>

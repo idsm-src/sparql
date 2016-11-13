@@ -1,0 +1,24 @@
+#parse("common/utils.vm")
+
+
+#sparql($label)
+SELECT ?LABEL WHERE
+{
+  GRAPH <http://bioinfo.uochb.cas.cz/rdf/ontology>
+  {
+    $entity rdfs:label ?LABEL
+  }
+}
+#end
+
+
+<table style="width:100%">
+  <tbody>
+    <tr><td>
+      #escapeHTML($label.LABEL)
+    </td></tr>
+    <tr><td>
+    <small style="color:gray">#escapeIRI($entity)<small>
+    </td></tr>
+  </tbody>
+</table>

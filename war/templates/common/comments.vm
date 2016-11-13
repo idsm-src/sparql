@@ -1,0 +1,22 @@
+#parse("common/utils.vm")
+
+
+#macro( comments $entity )
+  #sparql($comments)
+    SELECT ?COMMENT ?TEXT ?DATE WHERE
+    {
+      $entity chebi:comment ?COMMENT.
+      ?COMMENT chebi:text ?TEXT.
+      ?COMMENT chebi:createdOn ?DATE.
+    }
+  #end
+
+  #if($comments.count > 0)
+    #foreach( $comment in $comments )
+      <div class="VET-note" id="SEL-#entityID($comment.COMMENT)">
+        Note: #escapeChEBI($comment.TEXT)
+        <span class="VET-date">(created on: #escapeHTML($comment.DATE))</span>
+      </div>
+    #end
+  #end
+#end

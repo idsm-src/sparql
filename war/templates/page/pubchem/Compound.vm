@@ -1,0 +1,55 @@
+#set($CID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+
+  <div class="VET-TitleBox">
+    <span class="VET-Title">compound:$CID</span> 
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/$CID" target="_blank">open in pubchem</a>)
+  </div>
+
+
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;"><img src="compound/image?w=400&id=$CID" alt="$CID" height="400" width="400"></td>
+      </tr>
+    </table>
+  </div>
+
+  #sparql($synonyms)
+    SELECT ?NAME WHERE
+    {
+      graph <http://rdf.ncbi.nlm.nih.gov/pubchem/synonym>
+      {
+        ?ATTR sio:is-attribute-of $entity.
+        ?ATTR sio:has-value ?NAME.
+      }
+    }
+  #end
+
+  #if($synonyms.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Synonyms</div>
+    <div>
+      <table>
+      #foreach($synonym in $synonyms)
+        <tr>
+          <td>
+            #escapeHTML($synonym.NAME)
+          </td>
+        </tr>
+      #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>
+
+
+
