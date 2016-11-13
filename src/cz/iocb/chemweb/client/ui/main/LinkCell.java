@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.client;
+package cz.iocb.chemweb.client.ui.main;
 
 import com.google.gwt.cell.client.AbstractCell;
 import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
@@ -15,24 +15,15 @@ public class LinkCell extends AbstractCell<DataGridNode>
         super("click", "keypress");
     }
 
+
     @Override
     public void render(Context context, DataGridNode value, SafeHtmlBuilder sb)
     {
-        /*
-         * Always do a null check on the value. Cell widgets can pass null to
-         * cells if the underlying data contains a null, or if the data arrives
-         * out of order.
-         */
         if(value == null)
         {
             return;
         }
 
-        // If the value comes from the user, we escape it to avoid XSS attacks.
-        //SafeHtml safeValue = SafeHtmlUtils.fromString(value.name.substring(1, 4));
-
-        // Use the template to create the Cell's html.
-        //SafeStyles styles = SafeStylesUtils.fromTrustedString("color: red;");
 
         String htmlCode = value.html;
 

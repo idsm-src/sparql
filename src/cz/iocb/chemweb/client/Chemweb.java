@@ -2,6 +2,7 @@ package cz.iocb.chemweb.client;
 
 import com.google.gwt.core.client.EntryPoint;
 import com.google.gwt.user.client.ui.RootLayoutPanel;
+import cz.iocb.chemweb.client.ui.main.MainPage;
 
 
 

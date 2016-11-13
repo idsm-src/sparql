@@ -1,0 +1,58 @@
+<!DOCTYPE ui:UiBinder SYSTEM "http://dl.google.com/gwt/DTD/xhtml.ent">
+<ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder"
+             xmlns:g="urn:import:com.google.gwt.user.client.ui"
+             xmlns:c="urn:import:com.google.gwt.user.cellview.client">
+
+  <ui:style>
+    .Toolbar {
+      border-bottom: 1px solid gray;
+      padding: 2px;
+      min-width: 400px;
+    }
+
+    .Pager {
+      border-top: 1px solid gray;
+      padding: 2px;
+      min-width: 400px;
+    }
+
+    .full-size {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+    }
+  </ui:style>
+
+  <g:DockLayoutPanel>
+    <g:north size="52">
+      <g:LayoutPanel addStyleNames="{style.Toolbar}">
+        <g:layer left="7px" right="176px" top="11px" height="30px">
+          <g:TextBox ui:field="searchTextBox" addStyleNames="{style.full-size}"></g:TextBox>
+        </g:layer>
+        <g:layer right="13px" width="150px" top="11px" height="30px">
+          <g:ListBox ui:field="searchListBox" addStyleNames="{style.full-size}">
+            <g:item value='1'>
+              any
+            </g:item>
+          </g:ListBox>
+        </g:layer>
+      </g:LayoutPanel>
+    </g:north>
+
+    <g:south size="34">
+      <g:LayoutPanel addStyleNames="{style.Pager}">
+        <g:layer left="7px" right="7px" top="2px" bottom="0px">
+          <c:SimplePager ui:field="resultsPager"></c:SimplePager>
+        </g:layer>
+      </g:LayoutPanel>
+    </g:south>
+
+    <g:center>
+      <g:ResizeLayoutPanel height="100%" width="100%">
+        <c:DataGrid ui:field="resultsDataGrid" />
+      </g:ResizeLayoutPanel>
+    </g:center>
+  </g:DockLayoutPanel>
+</ui:UiBinder>
