@@ -107,12 +107,12 @@ public class ExpressionTranslator extends ElementVisitor<String>
         if(translateFlags.contains(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS))
         {
             Pair<String, Boolean> specialRelOperator = mapSpecialRelOperator(operator);
-        
+
             strBuf.append(specialRelOperator.getKey());
-        
+
             String leftOp = leftOperand;
             String rightOp = rightOperand;
-        
+
             if(specialRelOperator.getValue()) // switch operand order
             {
                 leftOp = rightOperand;

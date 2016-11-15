@@ -1,62 +1,62 @@
 ul.hierarchy li {
-    display: inline;
-    list-style: none outside none;
+  display: inline;
+  list-style: none outside none;
 }
 
 ul.hierarchy li ul.hierarchy {
-    margin-left: 15px;
-    padding-left: 0px;
-    padding-top: 1px;
+  margin-left: 15px;
+  padding-left: 0px;
+  padding-top: 1px;
 }
 ul.hierarchy {
-    margin: 0;
-    padding: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .VET-Page {
-	padding: 15px;
+  padding: 15px;
 }
 
 .VET-BoxedSection {
-    margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 
 .VET-BoxedSection {
-    border: 1px solid #81b0d4;
-    border-collapse: separate;
-    border-radius: 5px;
-    /*padding: 5px;*/
-    
-    overflow: hidden;
+  border: 1px solid #81b0d4;
+  border-collapse: separate;
+  border-radius: 5px;
+  /*padding: 5px;*/
+
+  overflow: hidden;
 }
 
 .VET-BoxedSection div {
-	padding: 5px;
+  padding: 5px;
 }
 
 .VET-Header {
-	font-weight: bold;
-	padding-bottom: 7px;
-	
-	border-bottom: 1px solid #81b0d4;
-	background: #e3eaef;
+  font-weight: bold;
+  padding-bottom: 7px;
+
+  border-bottom: 1px solid #81b0d4;
+  background: #e3eaef;
 }
 
 hr {
-	border: 0;
-	height: 1px;
-	background: #81b0d4;
-	background-image: -webkit-linear-gradient(left, #ccc, #81b0d4, #ccc);
-	background-image: -moz-linear-gradient(left, #ccc, #81b0d4, #ccc);
-	background-image: -ms-linear-gradient(left, #ccc, #81b0d4, #ccc);
-	background-image: -o-linear-gradient(left, #ccc, #81b0d4, #ccc);
+  border: 0;
+  height: 1px;
+  background: #81b0d4;
+  background-image: -webkit-linear-gradient(left, #ccc, #81b0d4, #ccc);
+  background-image: -moz-linear-gradient(left, #ccc, #81b0d4, #ccc);
+  background-image: -ms-linear-gradient(left, #ccc, #81b0d4, #ccc);
+  background-image: -o-linear-gradient(left, #ccc, #81b0d4, #ccc);
 }
 
 .VET-TitleBox {
-	margin-bottom: 15px
+  margin-bottom: 15px
 }
 
 .VET-Title {
-	font-weight: bold;
-	font-size: x-large;
+  font-weight: bold;
+  font-size: x-large;
 }

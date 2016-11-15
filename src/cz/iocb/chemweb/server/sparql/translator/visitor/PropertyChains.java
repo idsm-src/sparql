@@ -33,30 +33,30 @@ public class PropertyChains
 
             /*
             String query = "sparql SELECT ?CHEBIX ?LIST WHERE { ?CHEBIX owl:propertyChainAxiom ?LIST. }";
-            
+
             VirtuosoDatabase database = new VirtuosoDatabase();
             Result result = database.query(query);
-            
+
             for(Row row : result)
             {
                 RdfNode chebix = row.get("CHEBIX");
                 RdfNode list = row.get("LIST");
-            
+
                 List<String> chain = new LinkedList<String>();
-            
+
                 while(!list.getValue().equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"))
                 {
                     String subquery = "sparql SELECT ?FIRST ?REST WHERE { " + list.toString()
                             + " rdf:first ?FIRST; rdf:rest ?REST. }";
                     Result subresult = database.query(subquery);
-            
+
                     RdfNode first = subresult.get("FIRST");
                     RdfNode rest = subresult.get("REST");
-            
+
                     chain.add(first.toString());
                     list = rest;
                 }
-            
+
                 propertyChainsLoaded.put(chebix.toString(), chain);
             }
             */

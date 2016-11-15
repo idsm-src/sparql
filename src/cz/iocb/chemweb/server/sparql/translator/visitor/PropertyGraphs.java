@@ -29,15 +29,15 @@ public class PropertyGraphs
 
             /* TODO: use other way
             String query = "SELECT property, max(graph) as graph FROM property_graphs GROUP BY property HAVING (count(*) = 1)";
-            
+
             VirtuosoDatabase database = new VirtuosoDatabase();
             Result result = database.query(query);
-            
+
             for(Row row : result)
             {
                 RdfNode property = row.get("property");
                 RdfNode graph = row.get("graph");
-            
+
                 System.out.println(property.toString() + " -> " + graph.toString());
                 propertyGraphsLoaded.put(property.toString(), graph.toString());
             }

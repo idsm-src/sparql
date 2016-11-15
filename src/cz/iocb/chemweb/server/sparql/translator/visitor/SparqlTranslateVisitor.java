@@ -636,12 +636,12 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         /**
          * Verb predicate = triple.getPredicate();
-         * 
+         *
          * if(predicate instanceof IRI) { String def = ((IRI) predicate).toString(prologue, true, false);
-         * 
+         *
          * if(def.equals("<http://semanticscience.org/resource/has-value>")) code.append( " option (table_option
          * \"loop\")"); }
-         * 
+         *
          **/
 
         code.append(" .");
@@ -1849,27 +1849,27 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             /* SELECT */
             /*
             String retVar = getNewTmpVarName();
-            
+
             StringBuilder strBuf = new StringBuilder();
             newLine(strBuf);
             strBuf.append("SELECT ");
-            
+
             strBuf.append(fakeCallTranslation.sqlTableName + ".\"" + retVar + "\"");
-            
-            
+
+
             // FROM
             newLine(strBuf);
             strBuf.append("FROM");
-            
+
             queryDepth++;
             newLine(strBuf);
             strBuf.append("\"").append(currProcConfig.getMappedProcName()).append("_store").append("\"(");
-            
+
             List<String> inputParams = new ArrayList<>();
-            
+
             String inputGraphParam = getNewTmpVarName();
             strBuf.append("\"").append(inputGraphParam).append("\"");
-            
+
             for(int i = 0; i < parameterCalls.getArr().size(); ++i)
             {
                 String inputParam = getNewTmpVarName();
@@ -1877,52 +1877,52 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
                 strBuf.append("\"").append(inputParam).append("\"");
                 inputParams.add(inputParam);
             }
-            
+
             strBuf.append(")(");
             strBuf.append("\"").append(retVar).append("\" integer");
             strBuf.append(") ").append(fakeCallTranslation.sqlTableName);
-            
-            
+
+
             if(procedureCallContext.str != null)
             {
                 strBuf.append(",");
                 strBuf.append(indentBlock(procedureCallContext.str, queryDepth));
             }
-            
+
             queryDepth--;
-            
-            
+
+
             // WHERE
             newLine(strBuf);
             strBuf.append("WHERE ( ");
-            
+
             // passing the parameters to the delegate function
             strBuf.append("\"").append(inputGraphParam).append("\"");
             strBuf.append(" = ");
             strBuf.append("\"echo\"(");
             strBuf.append(graphID);
             strBuf.append(")");
-            
+
             for(int i = 0; i < inputParams.size(); ++i)
             {
                 strBuf.append(" AND ");
-            
+
                 strBuf.append("\"").append(inputParams.get(i)).append("\"");
                 strBuf.append(" = ");
-            
+
                 ParameterCall par = parameterCalls.getArr().get(i);
-            
+
                 //NOTE: workaround for https://github.com/openlink/virtuoso-opensource/issues/433
                 strBuf.append("\"echo\"(");
-            
+
                 if(par.getVar() != null)
                     strBuf.append(procedureCallContext.sqlTableName).append(".\"").append(par.getVar()).append("\"");
                 else
                     strBuf.append(par.getLiteralVal());
-            
+
                 strBuf.append(")");
             }
-            
+
             strBuf.append(" )");
             */
 
@@ -1934,7 +1934,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
             ?AMG (<http://bioinfo.uochb.cas.cz/0.9/chebi#hasRole>/ <http://bioinfo.uochb.cas.cz/0.9/chebi#inRelationWithValue>) / <http://bioinfo.uochb.cas.cz/0.9/chebi#identifier> "73190" .
             ?__tmpVar08 ^(<http://bioinfo.uochb.cas.cz/0.9/chebi#molFile>/ <http://bioinfo.uochb.cas.cz/0.9/chebi#molFileValue>) ?AMG .
-            
+
             BIND (sql:simsearch_store(300, ?__tmpVar08, 'MOL', 0.95, -1) as ?_COUNT)
             };
              */
@@ -2053,8 +2053,8 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
                 strBuf2.append(pair.getKey());
                 strBuf2.append(" = ");
                 strBuf2.append(pair.getValue());
-                
-                
+
+
                 strBuf2.append(" || ?");
                 strBuf2.append(pair.getKey());
                 strBuf2.append(" = str(");
@@ -2115,7 +2115,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             /*
             strBuf2.append("\nGRAPH <http://localhost/result").append(graphID++).append("> ");
             strBuf2.append("\n{\n");
-            
+
             if(procedureCallBase instanceof ProcedureCall)
             {
                 ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
@@ -2124,58 +2124,58 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             else
             {
                 strBuf2.append("  [");
-            
+
                 MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
-            
-            
+
+
                 boolean first = true;
-            
+
                 for(Parameter par : multiProcedureCall.getResults())
                 {
                     if(par.getValue() != null)
                     {
                         if(!first)
                             strBuf2.append("; ");
-            
+
                         strBuf2.append(par.getName().toString());
                         strBuf2.append(" ");
                         strBuf2.append(par.getValue().toString());
-            
+
                         first = false;
                     }
                 }
-            
+
                 strBuf2.append(" ] ");
             }
-            
+
             strBuf2.append(procedureCallBase.getProcedure().toString());
-            
+
             strBuf2.append("  [");
-            
-            
+
+
             boolean first = true;
-            
+
             for(ProcedureCall.Parameter par : procedureCallBase.getParameters())
             {
                 if(par.getValue() instanceof Variable || par.getValue() instanceof BlankNode)
                 {
                     if(!first)
                         strBuf2.append("; ");
-            
+
                     strBuf2.append(par.getName().toString());
                     strBuf2.append(" ");
-            
+
                     if(par.getValue() instanceof BlankNode)
                         strBuf2.append("?").append(getTmpVarNameForBlankNode(((BlankNode) par.getValue()).getName()));
                     else
                         strBuf2.append(par.getValue().toString());
-            
+
                     first = false;
                 }
             }
-            
+
             strBuf2.append(" ] ");
-            
+
             strBuf2.append("\n}");
             */
 
@@ -3070,75 +3070,75 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     private TranslatedSegment wrapSparqlContext(TranslatedSegment translatedGraphPattern, LinkedHashSet<String> parVars)
     {
         // e.g. ?X ?P ?Y --> sparql SELECT * WHERE { ?X ?P ?Y . }
-    
+
         LinkedHashSet<String> usedVars = new LinkedHashSet<>();
         usedVars.addAll(translatedGraphPattern.subqueryVars);
-    
+
         StringBuilder strBuf = new StringBuilder();
-    
+
         newLine(strBuf);
         strBuf.append("sparql");
-    
+
         for(Define def : prologue.getDefines())
         {
             strBuf.append(" ");
             strBuf.append(def.toString());
         }
-    
+
         strBuf.append(" SELECT DISTINCT ");
-    
+
         for(String var : parVars)
             strBuf.append("?").append(var).append(" ");
-    
-    
+
+
         for(DataSet dataSet : selectDatasets.peek())
         {
             strBuf.append(" ");
             strBuf.append(dataSet.toString());
         }
-    
+
         strBuf.append(" WHERE");
         newLine(strBuf);
         strBuf.append("{");
-    
+
         int blockIndent = 2;
-    
+
         if(!graphOrServiceRestrictions.isEmpty())
         {
             // NOTE: The pattern should contain all restrictions, but we used virtuoso semantics.
             GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-    
+
             if(restriction.getVarOrIri() instanceof Variable)
                 usedVars.add(((Variable) restriction.getVarOrIri()).getName());
-    
+
             blockIndent++;
             queryDepth++;
             newLine(strBuf);
-    
+
             if(restriction.isRestrictionType(GraphOrServiceRestriction.RestrictionType.GRAPH_RESTRICTION))
                 strBuf.append("GRAPH ");
             else if(restriction.isSilent())
                 strBuf.append("SERVICE SILENT ");
             else
                 strBuf.append("SERVICE ");
-    
+
             strBuf.append(restriction.getVarOrIri().toString());
             newLine(strBuf);
             strBuf.append("{");
         }
-    
+
         strBuf.append(indentBlock(translatedGraphPattern.str, blockIndent));
-    
+
         if(!graphOrServiceRestrictions.isEmpty())
         {
             newLine(strBuf);
             strBuf.append("}");
             queryDepth--;
         }
-    
+
         newLine(strBuf);
         strBuf.append("}");
-    
+
         return new TranslatedSegment(strBuf.toString(), false, usedVars, translatedGraphPattern.possibleUnboundVars);
     }
     */
@@ -3470,7 +3470,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     private String translateLiteralNodeExpression(Expression expression, EnumSet<ExpressionTranslateFlag> translateModes)
     {
         ExpressionTranslator exprTranslator = new ExpressionTranslator(exceptions, warnings, translateModes);
-    
+
         return exprTranslator.translate(expression);
     }
     */

@@ -32,7 +32,7 @@ LIMIT 100
         ]]></description>
         <code><![CDATA[
 DEFINE input:inference "ontology"
-        
+
 SELECT ?SOURCE (count(?COMPOUND) as ?COUNT) WHERE
 {
   ?COMPOUND rdf:type chebi:Compound.
@@ -57,7 +57,7 @@ DEFINE input:inference "ontology"
 SELECT DISTINCT ?COMPOUND WHERE
 {
   ?COMPOUND chebix:name ?NAME.
-   FILTER regex(?NAME, "penicillin", "i" ) 
+   FILTER regex(?NAME, "penicillin", "i" )
 }
         ]]></code>
   </example>
@@ -74,7 +74,7 @@ DEFINE input:inference "ontology"
 
 SELECT DISTINCT ?COMPOUND WHERE
 {
-  ?COMPOUND chebix:isA / chebi:identifier "17334". 
+  ?COMPOUND chebix:isA / chebi:identifier "17334".
 }
         ]]></code>
   </example>
@@ -113,7 +113,7 @@ SELECT ?COMPOUND ?BY_NAME ?BY_ANNOTATION ?BY_STRUCTURE WHERE
 {
   {
     ?COMPOUND chebix:name ?NAME.
-    FILTER regex(?NAME, "penicillin", "i" ) 
+    FILTER regex(?NAME, "penicillin", "i" )
   }
   UNION
   {
@@ -129,16 +129,16 @@ SELECT ?COMPOUND ?BY_NAME ?BY_ANNOTATION ?BY_STRUCTURE WHERE
   OPTIONAL
   {
     ?COMPOUND chebix:name ?NAME.
-    FILTER regex(?NAME, "penicillin", "i" ) 
+    FILTER regex(?NAME, "penicillin", "i" )
     BIND ("yes" as ?BY_NAME)
   }
-  
+
   OPTIONAL
   {
     ?COMPOUND chebix:isA / chebi:identifier "17334".
     BIND ("yes" as ?BY_ANNOTATION)
-  }  
-  
+  }
+
   OPTIONAL
   {
     ?COMPOUND orchem:substructureSearch [
@@ -167,7 +167,7 @@ SELECT ?COMPOUND ?ATB ?SCORE WHERE
 {
   # ?ATB is a penicillin antibiotic
   ?ATB chebix:isA / chebi:identifier "17334".
-  
+
   # ?COMPOUND is similar to ?ATB structure
   [ orchem:compound ?COMPOUND; orchem:score ?SCORE ]
         orchem:similaritySearch [
@@ -251,7 +251,7 @@ SELECT ?COMPOUND ?ATB ?AMG ?SCORE WHERE
   {
     # ?ATB is an antimicrobial agent
     ?ATB chebix:hasRole / chebi:identifier "33281".
-  
+
     # ?COMPOUND is similar to ?ATB
     [ orchem:compound ?COMPOUND; orchem:score ?SCORE_ATB ]
         orchem:similaritySearch [
@@ -263,7 +263,7 @@ SELECT ?COMPOUND ?ATB ?AMG ?SCORE WHERE
   {
     # ?AMG is an antimutagen
     ?AMG chebix:hasRole / chebi:identifier "73190".
-  
+
     # ?COMPOUND is similar to ?AMG
     [ orchem:compound ?COMPOUND; orchem:score ?SCORE_AMG ]
         orchem:similaritySearch [
@@ -271,7 +271,7 @@ SELECT ?COMPOUND ?ATB ?AMG ?SCORE WHERE
             orchem:queryType "MOL";
             orchem:cutoff 0.95 ].
   }
-  
+
   # the total score is the product of the similarity scores
   BIND((?SCORE_ATB * ?SCORE_AMG) as ?SCORE)
 }
@@ -295,7 +295,7 @@ SELECT * WHERE
 {
   # incorrect
   ?COMPOUND chebi:Identifier "33282".
-  
+
   # correct
   ?COMPOUND chebi:identifier "33282".
 }
@@ -317,19 +317,19 @@ SELECT * WHERE
 {
   # incorrect
   ?COMPOUND chebi:identifier 33282.
-  
+
   # correct
   ?COMPOUND chebi:identifier "33282".
-  
+
   # correct
   ?COMPOUND chebi:identifier "33282"^^xsd:string.
-  
+
   # incorrect
   ?COMPOUND chebi:star "3".
-  
+
   # correct
   ?COMPOUND chebi:star 3.
-  
+
   # correct
   ?COMPOUND chebi:star "3"^^xsd:integer.
 }
@@ -380,22 +380,22 @@ SELECT * WHERE
   {
     # ?X is chebi:Compound
     #    or chebi:CompoundProperty
-	?X chebi:source ?SOURCE.    
+    ?X chebi:source ?SOURCE.
   }
   UNION
   {
     # ?X is chebi:Compound
     ?X chebi:name ?NAME.
   }
-  
+
   # ?X is chebi:CompoundProperty
   ?X rdf:type chebi:CompoundProperty.
-  
+
   #------------------------------------#
-  
+
   # ?Y is chebi:Comment
   ?Y chebi:text ?TEXT.
-  
+
   OPTIONAL
   {
     # ?Y is chebi:Compound

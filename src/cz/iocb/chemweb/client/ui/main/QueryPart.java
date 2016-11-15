@@ -113,7 +113,7 @@ public class QueryPart extends Composite implements HasHandlers
     @UiField TextArea queryTextArea;
 
     private CodeMirror codemirror;
-    private final HandlerManager handlerManager = new HandlerManager(this);;
+    private final HandlerManager handlerManager = new HandlerManager(this);
     private final SelectExampleDialog exampleDialog;
     private final SearchQueryWizardDialog wizardDialog;
     private final String defaultQuery;

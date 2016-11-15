@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee
               http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
          version="2.5"
          xmlns="http://java.sun.com/xml/ns/javaee">
@@ -105,7 +105,7 @@
     <servlet-name>CompoundImage</servlet-name>
     <url-pattern>/compound/image</url-pattern>
   </servlet-mapping>
-  
+
   <servlet>
     <servlet-name>Config</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.config.GenerateConfig</servlet-class>
@@ -114,7 +114,7 @@
     <servlet-name>Config</servlet-name>
     <url-pattern>/chemweb/js/config.js</url-pattern>
   </servlet-mapping>
-  
+
   <servlet>
     <servlet-name>Hints</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.hints.GenerateHints</servlet-class>
@@ -132,7 +132,7 @@
     <servlet-name>Examples</servlet-name>
     <url-pattern>/chemweb/js/examples-data.js</url-pattern>
   </servlet-mapping>
-  
+
   <servlet>
     <servlet-name>DownloadServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.download.DownloadServlet</servlet-class>
@@ -141,9 +141,9 @@
     <servlet-name>DownloadServlet</servlet-name>
     <url-pattern>/download/helper/query.sparql</url-pattern>
   </servlet-mapping>
-  
-  
-  
+
+
+
   <!-- Default page to serve -->
   <welcome-file-list>
     <welcome-file>Chemweb.html</welcome-file>
