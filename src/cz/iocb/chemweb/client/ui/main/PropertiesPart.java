@@ -20,7 +20,6 @@ import com.google.gwt.user.cellview.client.SimplePager;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HeaderPanel;
-import com.google.gwt.user.client.ui.PushButton;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
@@ -30,6 +29,7 @@ import com.google.gwt.view.client.Range;
 import cz.iocb.chemweb.client.resources.datagrid.DataGridBundle;
 import cz.iocb.chemweb.client.resources.pager.PagerResources;
 import cz.iocb.chemweb.client.services.query.QueryServiceStub;
+import cz.iocb.chemweb.client.widgets.button.ImageButton;
 import cz.iocb.chemweb.shared.services.query.DataGridNode;
 import cz.iocb.chemweb.shared.services.query.QueryResult;
 
@@ -125,10 +125,10 @@ public class PropertiesPart extends Composite
     private static PropertiesPartUiBinder uiBinder = GWT.create(PropertiesPartUiBinder.class);
     private static PagerResources pagerIcons = GWT.create(PagerResources.class);
 
-    @UiField PushButton prevButton;
-    @UiField PushButton nextButton;
-    @UiField PushButton reloadButton;
-    @UiField PushButton stopButton;
+    @UiField ImageButton prevButton;
+    @UiField ImageButton nextButton;
+    @UiField ImageButton reloadButton;
+    @UiField ImageButton stopButton;
     @UiField TextBox iriTextBox;
     @UiField(provided = true) DataGrid<DataGridNode[]> propertiesDataGrid;
     @UiField(provided = true) SimplePager pager;

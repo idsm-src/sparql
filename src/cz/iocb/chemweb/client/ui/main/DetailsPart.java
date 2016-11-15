@@ -13,10 +13,10 @@ import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HTML;
-import com.google.gwt.user.client.ui.PushButton;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
+import cz.iocb.chemweb.client.widgets.button.ImageButton;
 import cz.iocb.chemweb.shared.services.details.DetailsPageService;
 import cz.iocb.chemweb.shared.services.details.DetailsPageServiceAsync;
 import cz.iocb.chemweb.shared.utils.Encode;
@@ -34,10 +34,10 @@ public class DetailsPart extends Composite
     private static DetailsPageServiceAsync detailsService = (DetailsPageServiceAsync) GWT
             .create(DetailsPageService.class);
 
-    @UiField PushButton prevButton;
-    @UiField PushButton nextButton;
-    @UiField PushButton reloadButton;
-    @UiField PushButton stopButton;
+    @UiField ImageButton prevButton;
+    @UiField ImageButton nextButton;
+    @UiField ImageButton reloadButton;
+    @UiField ImageButton stopButton;
     @UiField TextBox iriTextBox;
     @UiField ScrollPanel pageScrollPanel;
     @UiField HTML pageHTML;

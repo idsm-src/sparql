@@ -37,15 +37,6 @@ public interface Icons extends ClientBundle
     @Source("view-refresh.gif")
     ImageResource loading();
 
-    @Source("document-open-disabled.png")
-    ImageResource openDisabled();
-
-    @Source("document-open-remote-disabled.png")
-    ImageResource remoteOpenDisabled();
-
-    @Source("document-save-disabled.png")
-    ImageResource saveDisabled();
-
     @Source("arrow-right-disabled.png")
     ImageResource runDisabled();
 
@@ -54,9 +45,6 @@ public interface Icons extends ClientBundle
 
     @Source("go-next-disabled.png")
     ImageResource nextDisabled();
-
-    @Source("view-refresh-disabled.png")
-    ImageResource reloadDisabled();
 
     @Source("quickopen-class.png")
     ImageResource wizard();

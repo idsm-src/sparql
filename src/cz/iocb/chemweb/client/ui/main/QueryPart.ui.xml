@@ -1,6 +1,7 @@
 <!DOCTYPE ui:UiBinder SYSTEM "http://dl.google.com/gwt/DTD/xhtml.ent">
 <ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder"
-             xmlns:g="urn:import:com.google.gwt.user.client.ui">
+             xmlns:g="urn:import:com.google.gwt.user.client.ui"
+             xmlns:i="urn:import:cz.iocb.chemweb.client.widgets.button">
 
   <ui:with field="res" type="cz.iocb.chemweb.client.resources.icons.Icons" />
 
@@ -18,24 +19,6 @@
       display: inline-block;
     }
 
-    .fileUpload {
-      position: relative;
-      height: 100%;
-      width: 100%;
-    }
-
-    .upload {
-      position: absolute;
-      top: 0;
-      right: 0;
-      margin: 0;
-      padding: 0;
-      font-size: 50px;
-      cursor: pointer;
-      opacity: 0;
-      filter: alpha(opacity = 0);
-    }
-
     .textArea {
       display: none;
     }
@@ -45,65 +28,24 @@
     <g:north size="52">
       <g:FlowPanel addStyleNames="{style.Toolbar}">
 
-        <g:PushButton ui:field="openButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}">
-          <g:upFace>
-            <div class="{style.fileUpload}">
-              <img src="{res.open.getSafeUri}" style="padding-top: 2px" /><br/>
-              Open
-              <form>
-                <input id="fileUpload" type="file" name="somename" class="{style.upload}" size="chars" />
-              </form>
-            </div>
-          </g:upFace>
-          <g:upDisabledFace>
-            <img src="{res.openDisabled.getSafeUri}" style="padding-top: 2px" /><br/>
-            Open
-          </g:upDisabledFace>
-        </g:PushButton>
-        <g:PushButton ui:field="examplesButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}" visible="false">
-          <g:upFace>
-            <img src="{res.remoteOpen.getSafeUri}" style="padding-top: 2px" /><br/>
-            Examples
-          </g:upFace>
-          <g:upDisabledFace>
-            <img src="{res.remoteOpenDisabled.getSafeUri}" style="padding-top: 2px" /><br/>
-            Examples
-          </g:upDisabledFace>
-        </g:PushButton>
-        <g:PushButton ui:field="wizardButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}">
-          <g:upFace>
-            <img src="{res.wizard.getSafeUri}" style="padding-top: 2px" /><br/>
-            Wizard
-          </g:upFace>
-        </g:PushButton>
-        <g:PushButton ui:field="saveButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}">
-          <g:upFace>
-            <img src="{res.save.getSafeUri}" style="padding-top: 2px" /><br/>
-            Save
-          </g:upFace>
-          <g:upDisabledFace>
-            <img src="{res.saveDisabled.getSafeUri}" style="padding-top: 2px" /><br/>
-            Save
-          </g:upDisabledFace>
-        </g:PushButton>
-
-        <g:PushButton ui:field="runButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}">
-          <g:upFace>
-            <img src="{res.run.getSafeUri}" style="padding-top: 2px" /><br/>
-            Run
-          </g:upFace>
-          <g:upDisabledFace>
-            <img src="{res.runDisabled.getSafeUri}" style="padding-top: 2px" /><br/>
-            Run
-          </g:upDisabledFace>
-        </g:PushButton>
-
-        <g:PushButton ui:field="cancelButton" enabled="true" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton}" visible="false">
-          <g:upFace>
-            <img src="{res.cancel.getSafeUri}" style="padding-top: 2px" /><br/>
-            Cancel
-          </g:upFace>
-        </g:PushButton>
+        <i:FileUploadImageButton ui:field="openButton" src="{res.open.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
+          Open
+        </i:FileUploadImageButton>
+        <i:ImageButton ui:field="examplesButton" src="{res.remoteOpen.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}" visible="false">
+          Examples
+        </i:ImageButton>
+        <i:ImageButton ui:field="wizardButton" src="{res.wizard.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
+          Wizard
+        </i:ImageButton>
+        <i:ImageButton ui:field="saveButton" src="{res.save.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
+          Save
+        </i:ImageButton>
+        <i:ImageButton ui:field="runButton" src="{res.run.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
+          Run
+        </i:ImageButton>
+        <i:ImageButton ui:field="cancelButton" src="{res.cancel.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}" visible="false">
+          Cancel
+        </i:ImageButton>
 
       </g:FlowPanel>
     </g:north>

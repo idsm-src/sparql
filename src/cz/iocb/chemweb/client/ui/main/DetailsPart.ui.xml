@@ -1,5 +1,7 @@
 <!DOCTYPE ui:UiBinder SYSTEM "http://dl.google.com/gwt/DTD/xhtml.ent">
-<ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder" xmlns:g="urn:import:com.google.gwt.user.client.ui">
+<ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder"
+             xmlns:g="urn:import:com.google.gwt.user.client.ui"
+             xmlns:i="urn:import:cz.iocb.chemweb.client.widgets.button">
 
   <ui:with field="res" type="cz.iocb.chemweb.client.resources.icons.Icons" />
 
@@ -14,7 +16,7 @@
       min-width: 400px;
     }
 
-    .ToolbarButton-small {
+    .ToolbarButton {
       width: 24px;
       height: 24px;
       display: inline-block;
@@ -34,41 +36,16 @@
     <g:north size="52">
       <g:LayoutPanel addStyleNames="{style.Toolbar}">
         <g:layer left="7px" width="26px" top="13px" height="26px">
-          <g:PushButton ui:field="prevButton" enabled="false" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton-small}">
-            <g:upFace>
-              <img src="{res.prev.getSafeUri}" style="padding-top: 2px" />
-            </g:upFace>
-            <g:upDisabledFace>
-              <img src="{res.prevDisabled.getSafeUri}" style="padding-top: 2px" />
-            </g:upDisabledFace>
-          </g:PushButton>
+          <i:ImageButton ui:field="prevButton" enabled="false" src="{res.prev.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}"/>
         </g:layer>
         <g:layer left="35px" width="26px" top="13px" height="26px">
-          <g:PushButton ui:field="nextButton" enabled="false" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton-small}">
-            <g:upFace>
-              <img src="{res.next.getSafeUri}" style="padding-top: 2px" />
-            </g:upFace>
-            <g:upDisabledFace>
-              <img src="{res.nextDisabled.getSafeUri}" style="padding-top: 2px" />
-            </g:upDisabledFace>
-          </g:PushButton>
+          <i:ImageButton ui:field="nextButton" enabled="false" src="{res.next.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}"/>
         </g:layer>
         <g:layer left="63px" width="26px" top="13px" height="26px">
-          <g:PushButton ui:field="stopButton" enabled="false" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton-small}" visible="false">
-            <g:upFace>
-              <img src="{res.loading.getSafeUri}" style="padding-top: 1px" />
-            </g:upFace>
-          </g:PushButton>
+          <i:ImageButton ui:field="stopButton" enabled="true" src="{res.loading.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton}" visible="false"/>
         </g:layer>
         <g:layer left="63px" width="26px" top="13px" height="26px">
-          <g:PushButton ui:field="reloadButton" enabled="false" styleName="gwt-Toolbar-PushButton" addStyleNames="{style.ToolbarButton-small}">
-            <g:upFace>
-              <img src="{res.reload.getSafeUri}" style="padding-top: 1px" />
-            </g:upFace>
-            <g:upDisabledFace>
-              <img src="{res.reloadDisabled.getSafeUri}" style="padding-top: 1px" />
-            </g:upDisabledFace>
-          </g:PushButton>
+          <i:ImageButton ui:field="reloadButton" enabled="false" src="{res.reload.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton}"/>
         </g:layer>
         <g:layer left="93px" right="13px" top="11px" height="30px">
           <g:TextBox ui:field="iriTextBox" addStyleNames="{style.full-size}"></g:TextBox>

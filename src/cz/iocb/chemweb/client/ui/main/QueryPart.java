@@ -4,6 +4,8 @@ import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.core.client.JsArray;
 import com.google.gwt.core.client.Scheduler;
+import com.google.gwt.event.dom.client.ChangeEvent;
+import com.google.gwt.event.dom.client.ChangeHandler;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.shared.EventHandler;
 import com.google.gwt.event.shared.GwtEvent;
@@ -15,10 +17,11 @@ import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.PushButton;
 import com.google.gwt.user.client.ui.TextArea;
 import com.google.gwt.user.client.ui.Widget;
 import cz.iocb.chemweb.client.services.downloader.FileDownloader;
+import cz.iocb.chemweb.client.widgets.button.FileUploadImageButton;
+import cz.iocb.chemweb.client.widgets.button.ImageButton;
 import cz.iocb.chemweb.client.widgets.codemirror.CodeMirror;
 import cz.iocb.chemweb.client.widgets.dialog.SearchQueryWizardDialog;
 import cz.iocb.chemweb.client.widgets.dialog.SelectExampleDialog;
@@ -101,12 +104,12 @@ public class QueryPart extends Composite implements HasHandlers
     private static CheckServiceAsync checkService = (CheckServiceAsync) GWT.create(CheckService.class);
     private static FileDownloader fileDownloader = GWT.create(FileDownloader.class);
 
-    @UiField PushButton openButton;
-    @UiField PushButton examplesButton;
-    @UiField PushButton wizardButton;
-    @UiField PushButton saveButton;
-    @UiField PushButton runButton;
-    @UiField PushButton cancelButton;
+    @UiField FileUploadImageButton openButton;
+    @UiField ImageButton examplesButton;
+    @UiField ImageButton wizardButton;
+    @UiField ImageButton saveButton;
+    @UiField ImageButton runButton;
+    @UiField ImageButton cancelButton;
     @UiField TextArea queryTextArea;
 
     private CodeMirror codemirror;
@@ -123,6 +126,16 @@ public class QueryPart extends Composite implements HasHandlers
         exampleDialog = new SelectExampleDialog();
         wizardDialog = new SearchQueryWizardDialog();
         defaultQuery = query;
+
+
+        openButton.getUploadFile().addChangeHandler(new ChangeHandler()
+        {
+            @Override
+            public void onChange(ChangeEvent event)
+            {
+                handleFileSelect(openButton.getUploadFile().getElement());
+            }
+        });
     }
 
 
@@ -149,8 +162,6 @@ public class QueryPart extends Composite implements HasHandlers
                 codemirror.setValue(code);
             }
         });
-
-        ((PushButton) e.getSource()).setHovering(false);
     }
 
 
@@ -165,8 +176,6 @@ public class QueryPart extends Composite implements HasHandlers
                 codemirror.setValue(code);
             }
         });
-
-        ((PushButton) e.getSource()).setHovering(false);
     }
 
 
@@ -305,36 +314,36 @@ public class QueryPart extends Composite implements HasHandlers
 
     private native void initJS()
     /*-{
-        var self = this;
-
-        function handleFileSelect(evt) {
-            var file = evt.target.files[0];
-
-            //if (!file.type.match('text.*'))
-            //  return;
-
-            if (!$wnd.File || !$wnd.FileReader || !$wnd.FileList || !$wnd.Blob)
-                $wnd
-                        .alert("The File APIs are not fully supported by your browser.");
-
-            var reader = new $wnd.FileReader();
-
-            reader.onload = (function(theFile) {
-                return function(e) {
-                    self.@cz.iocb.chemweb.client.ui.main.QueryPart::openClick(Ljava/lang/String;)(e.target.result);
-                };
-            })(file);
-
-            reader.readAsText(file);
-        }
+        var that = this;
 
         function handlingMsg(e) {
-            self.@cz.iocb.chemweb.client.ui.main.MainPage::visitIri(Ljava/lang/String;)(e.data);
+            that.@cz.iocb.chemweb.client.ui.main.MainPage::visitIri(Ljava/lang/String;)(e.data);
         }
 
-        $wnd.document.getElementById("fileUpload").addEventListener("change",
-                handleFileSelect, false);
-
         $wnd.addEventListener("message", handlingMsg, true);
+    }-*/;
+
+
+    private native void handleFileSelect(@SuppressWarnings("deprecation") com.google.gwt.user.client.Element evt)
+    /*-{
+        var file = evt.files[0];
+
+        //if (!file.type.match('text.*'))
+        //  return;
+
+        if (!$wnd.File || !$wnd.FileReader || !$wnd.FileList || !$wnd.Blob)
+            $wnd
+                    .alert("The File APIs are not fully supported by your browser.");
+
+        var reader = new $wnd.FileReader();
+        var that = this;
+
+        reader.onload = (function(theFile) {
+            return function(e) {
+                that.@cz.iocb.chemweb.client.ui.main.QueryPart::openClick(Ljava/lang/String;)(e.target.result);
+            };
+        })(file);
+
+        reader.readAsText(file);
     }-*/;
 }
