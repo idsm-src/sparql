@@ -37,15 +37,6 @@ public interface Icons extends ClientBundle
     @Source("view-refresh.gif")
     ImageResource loading();
 
-    @Source("arrow-right-disabled.png")
-    ImageResource runDisabled();
-
-    @Source("go-previous-disabled.png")
-    ImageResource prevDisabled();
-
-    @Source("go-next-disabled.png")
-    ImageResource nextDisabled();
-
     @Source("quickopen-class.png")
     ImageResource wizard();
 }
