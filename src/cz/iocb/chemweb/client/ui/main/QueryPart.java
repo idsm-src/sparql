@@ -304,26 +304,6 @@ public class QueryPart extends Composite implements HasHandlers
     }
 
 
-    @Override
-    protected void onAttach()
-    {
-        super.onAttach();
-        initJS();
-    }
-
-
-    private native void initJS()
-    /*-{
-        var that = this;
-
-        function handlingMsg(e) {
-            that.@cz.iocb.chemweb.client.ui.main.MainPage::visitIri(Ljava/lang/String;)(e.data);
-        }
-
-        $wnd.addEventListener("message", handlingMsg, true);
-    }-*/;
-
-
     private native void handleFileSelect(@SuppressWarnings("deprecation") com.google.gwt.user.client.Element evt)
     /*-{
         var file = evt.files[0];

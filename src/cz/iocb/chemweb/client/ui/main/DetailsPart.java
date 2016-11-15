@@ -201,4 +201,30 @@ public class DetailsPart extends Composite
         showedDetails = null;
         pageHTML.setHTML("");
     }
+
+
+    private void linkClickHandler(String iri)
+    {
+        visit(iri);
+    }
+
+
+    @Override
+    protected void onAttach()
+    {
+        super.onAttach();
+        initJS();
+    }
+
+
+    private native void initJS()
+    /*-{
+        var that = this;
+
+        function handlingMsg(e) {
+            that.@cz.iocb.chemweb.client.ui.main.DetailsPart::linkClickHandler(Ljava/lang/String;)(e.data);
+        }
+
+        $wnd.addEventListener("message", handlingMsg, true);
+    }-*/;
 }
