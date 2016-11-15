@@ -11,6 +11,11 @@ import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.KeyCodes;
 import com.google.gwt.event.dom.client.KeyPressEvent;
 import com.google.gwt.event.dom.client.KeyUpEvent;
+import com.google.gwt.event.logical.shared.HasSelectionHandlers;
+import com.google.gwt.event.logical.shared.SelectionEvent;
+import com.google.gwt.event.logical.shared.SelectionHandler;
+import com.google.gwt.event.shared.HandlerManager;
+import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
@@ -35,7 +40,7 @@ import cz.iocb.chemweb.shared.services.query.QueryResult;
 
 
 
-public class PropertiesPart extends Composite
+public class PropertiesPart extends Composite implements HasSelectionHandlers<String>
 {
     interface PropertiesPartUiBinder extends UiBinder<Widget, PropertiesPart>
     {
@@ -134,6 +139,7 @@ public class PropertiesPart extends Composite
     @UiField(provided = true) SimplePager pager;
 
     private final AsyncPropertiesProvider propertiesAsyncProvider = new AsyncPropertiesProvider();
+    private final HandlerManager handlerManager = new HandlerManager(this);
     private final VisitingHistory history;
     private String showedProperties;
     private int requestedPropertiesCounter = 0;
@@ -194,17 +200,24 @@ public class PropertiesPart extends Composite
     }
 
 
+    @Override
+    public HandlerRegistration addSelectionHandler(SelectionHandler<String> handler)
+    {
+        return handlerManager.addHandler(SelectionEvent.getType(), handler);
+    }
+
+
     @UiHandler("prevButton")
     void prevButtonClick(ClickEvent e)
     {
-        show(history.prev());
+        show(history.prev(), true);
     }
 
 
     @UiHandler("nextButton")
     void nextButtonClick(ClickEvent e)
     {
-        show(history.next());
+        show(history.next(), true);
     }
 
 
@@ -251,7 +264,7 @@ public class PropertiesPart extends Composite
             return;
 
         history.visit(iri);
-        show(iri);
+        show(iri, true);
     }
 
 
@@ -260,11 +273,11 @@ public class PropertiesPart extends Composite
         if(history.getCurrent() == null)
             return;
 
-        show(history.getCurrent());
+        show(history.getCurrent(), false);
     }
 
 
-    private void show(String iri)
+    private void show(String iri, boolean emitEvent)
     {
         prevButton.setEnabled(history.hasPrev());
         nextButton.setEnabled(history.hasNext());
@@ -274,6 +287,11 @@ public class PropertiesPart extends Composite
         iriTextBox.removeStyleDependentName("error");
 
         showProperties(iri);
+
+        if(emitEvent)
+            handlerManager.fireEvent(new SelectionEvent<String>(iri)
+            {
+            });
     }
 
 

@@ -138,6 +138,20 @@ public class MainPage extends Composite
         });
 
 
+        SelectionHandler<String> selectionHandler = new SelectionHandler<String>()
+        {
+            @Override
+            public void onSelection(SelectionEvent<String> event)
+            {
+                styleOfSelected.setInnerText(".BOX-NODE_" + Encode.base32m(event.getSelectedItem())
+                        + " { border-left: 2px solid #aaa !important; }");
+            }
+        };
+
+        detailsPart.addSelectionHandler(selectionHandler);
+        propertiesPart.addSelectionHandler(selectionHandler);
+
+
         styleOfSelected = DOM.createElement("style");
         Document.get().getHead().appendChild(styleOfSelected);
 
@@ -168,9 +182,6 @@ public class MainPage extends Composite
 
     private void visitIri(String iri)
     {
-        styleOfSelected
-                .setInnerText(".BOX-NODE_" + Encode.base32m(iri) + " { border-left: 2px solid #aaa !important; }");
-
         if(infoTabPanel.getWidget(infoTabPanel.getSelectedIndex()) == detailsPart)
             detailsPart.visit(iri);
         else if(infoTabPanel.getWidget(infoTabPanel.getSelectedIndex()) == propertiesPart)

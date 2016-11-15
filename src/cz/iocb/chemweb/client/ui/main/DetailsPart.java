@@ -6,6 +6,11 @@ import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.KeyCodes;
 import com.google.gwt.event.dom.client.KeyPressEvent;
 import com.google.gwt.event.dom.client.KeyUpEvent;
+import com.google.gwt.event.logical.shared.HasSelectionHandlers;
+import com.google.gwt.event.logical.shared.SelectionEvent;
+import com.google.gwt.event.logical.shared.SelectionHandler;
+import com.google.gwt.event.shared.HandlerManager;
+import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
@@ -23,7 +28,7 @@ import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
-public class DetailsPart extends Composite
+public class DetailsPart extends Composite implements HasSelectionHandlers<String>
 {
     interface DetailsPanelUiBinder extends UiBinder<Widget, DetailsPart>
     {
@@ -42,6 +47,7 @@ public class DetailsPart extends Composite
     @UiField ScrollPanel pageScrollPanel;
     @UiField HTML pageHTML;
 
+    private final HandlerManager handlerManager = new HandlerManager(this);
     private final VisitingHistory history;
     private String showedDetails;
     private int requestedDetailsCounter = 0;
@@ -57,17 +63,24 @@ public class DetailsPart extends Composite
     }
 
 
+    @Override
+    public HandlerRegistration addSelectionHandler(SelectionHandler<String> handler)
+    {
+        return handlerManager.addHandler(SelectionEvent.getType(), handler);
+    }
+
+
     @UiHandler("prevButton")
     void prevButtonClick(ClickEvent e)
     {
-        show(history.prev());
+        show(history.prev(), true);
     }
 
 
     @UiHandler("nextButton")
     void nextButtonClick(ClickEvent e)
     {
-        show(history.next());
+        show(history.next(), true);
     }
 
 
@@ -114,7 +127,7 @@ public class DetailsPart extends Composite
             return;
 
         history.visit(iri);
-        show(iri);
+        show(iri, true);
     }
 
 
@@ -123,11 +136,11 @@ public class DetailsPart extends Composite
         if(history.getCurrent() == null)
             return;
 
-        show(history.getCurrent());
+        show(history.getCurrent(), false);
     }
 
 
-    private void show(String iri)
+    private void show(String iri, boolean emitEvent)
     {
         prevButton.setEnabled(history.hasPrev());
         nextButton.setEnabled(history.hasNext());
@@ -137,6 +150,11 @@ public class DetailsPart extends Composite
         iriTextBox.removeStyleDependentName("error");
 
         showDetails(iri);
+
+        if(emitEvent)
+            handlerManager.fireEvent(new SelectionEvent<String>(iri)
+            {
+            });
     }
 
 
@@ -203,12 +221,6 @@ public class DetailsPart extends Composite
     }
 
 
-    private void linkClickHandler(String iri)
-    {
-        visit(iri);
-    }
-
-
     @Override
     protected void onAttach()
     {
@@ -222,7 +234,7 @@ public class DetailsPart extends Composite
         var that = this;
 
         function handlingMsg(e) {
-            that.@cz.iocb.chemweb.client.ui.main.DetailsPart::linkClickHandler(Ljava/lang/String;)(e.data);
+            that.@cz.iocb.chemweb.client.ui.main.DetailsPart::visit(Ljava/lang/String;)(e.data);
         }
 
         $wnd.addEventListener("message", handlingMsg, true);
