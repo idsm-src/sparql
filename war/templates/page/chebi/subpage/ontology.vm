@@ -2,16 +2,16 @@
 
 
 #set($types = {
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasFunctionalParent": "has functional parent",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isTautomerOf": "is tautomer of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isSubstituentGroupFrom": "is substituent group from",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isConjugateBaseOf": "is conjugate base of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isConjugateAcidOf": "is conjugate acid of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isEnantiomerOf": "is enantiomer of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#isA": "is a",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasRole": "has role",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasParentHydride": "has parent hydride",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#hasPart": "has part"
+    "http://bioinfo.iocb.cz/0.9/chebi#hasFunctionalParent": "has functional parent",
+    "http://bioinfo.iocb.cz/0.9/chebi#isTautomerOf": "is tautomer of",
+    "http://bioinfo.iocb.cz/0.9/chebi#isSubstituentGroupFrom": "is substituent group from",
+    "http://bioinfo.iocb.cz/0.9/chebi#isConjugateBaseOf": "is conjugate base of",
+    "http://bioinfo.iocb.cz/0.9/chebi#isConjugateAcidOf": "is conjugate acid of",
+    "http://bioinfo.iocb.cz/0.9/chebi#isEnantiomerOf": "is enantiomer of",
+    "http://bioinfo.iocb.cz/0.9/chebi#isA": "is a",
+    "http://bioinfo.iocb.cz/0.9/chebi#hasRole": "has role",
+    "http://bioinfo.iocb.cz/0.9/chebi#hasParentHydride": "has parent hydride",
+    "http://bioinfo.iocb.cz/0.9/chebi#hasPart": "has part"
 })
 
 
@@ -25,7 +25,7 @@
 
 
 #sparql($outgoing)
-  SELECT ?NODE ?TO ?REL ?ID ?NAME FROM <http://bioinfo.uochb.cas.cz/data/chebi#> WHERE
+  SELECT ?NODE ?TO ?REL ?ID ?NAME FROM <http://bioinfo.iocb.cz/data/chebi#> WHERE
   {
     $entity ?REL ?NODE.
     ##?R rdf:type chebi:CompoundRelation.
@@ -39,7 +39,7 @@
 
 
 #sparql($incoming)
-  SELECT ?REL ?FROM ?ID ?NAME FROM <http://bioinfo.uochb.cas.cz/data/chebi#> WHERE
+  SELECT ?REL ?FROM ?ID ?NAME FROM <http://bioinfo.iocb.cz/data/chebi#> WHERE
   {
     ?R chebi:inRelationWithValue $entity .
     ?FROM ?REL ?R.

@@ -4,7 +4,7 @@
 #sparql($label)
 SELECT ?LABEL WHERE
 {
-  GRAPH <http://bioinfo.uochb.cas.cz/rdf/ontology>
+  GRAPH <http://bioinfo.iocb.cz/rdf/ontologies>
   {
     $entity rdfs:label ?LABEL
   }

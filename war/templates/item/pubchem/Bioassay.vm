@@ -3,7 +3,7 @@
 #sparql($title)
   SELECT ?TITLE  WHERE
   {
-    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>
+    GRAPH pubchem:bioassay
     {
       $entity dcterms:title ?TITLE
     }

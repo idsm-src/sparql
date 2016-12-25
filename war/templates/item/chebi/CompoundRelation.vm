@@ -2,16 +2,16 @@
 
 
 #set($types = {
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#HasFunctionalParent": "has functional parent",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsTautomerOf": "is tautomer of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsSubstituentGroupFrom": "is substituent group from",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsConjugateBaseOf": "is conjugate base of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsConjugateAcidOf": "is conjugate acid of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsEnantiomerOf": "is enantiomer of",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#IsA": "is a",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#HasRole": "has role",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#HasParentHydride": "has parent hydride",
-    "http://bioinfo.uochb.cas.cz/0.9/chebi#HasPart": "has part"
+    "http://bioinfo.iocb.cz/0.9/chebi#HasFunctionalParent": "has functional parent",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsTautomerOf": "is tautomer of",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsSubstituentGroupFrom": "is substituent group from",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsConjugateBaseOf": "is conjugate base of",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsConjugateAcidOf": "is conjugate acid of",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsEnantiomerOf": "is enantiomer of",
+    "http://bioinfo.iocb.cz/0.9/chebi#IsA": "is a",
+    "http://bioinfo.iocb.cz/0.9/chebi#HasRole": "has role",
+    "http://bioinfo.iocb.cz/0.9/chebi#HasParentHydride": "has parent hydride",
+    "http://bioinfo.iocb.cz/0.9/chebi#HasPart": "has part"
 })
 
 

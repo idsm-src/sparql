@@ -2,7 +2,7 @@
 
 
 #sparql($info)
-  SELECT ?LABEL FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+  SELECT ?LABEL FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
   {
     $entity rdfs:label ?LABEL.
   }

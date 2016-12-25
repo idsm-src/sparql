@@ -7,8 +7,7 @@
     #sparql($type)
       SELECT ?TEMPLATE WHERE
       {
-        $entity rdf:type / rdfs:subClassOf* ?TYPE.
-		?TYPE template:itemTemplate ?TEMPLATE.
+        $entity template:itemTemplate ?TEMPLATE.
 	  }
     #end
     

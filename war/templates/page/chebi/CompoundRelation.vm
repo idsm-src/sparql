@@ -14,7 +14,7 @@
 #end
 
 
-#if($owner.G.value != "http://bioinfo.uochb.cas.cz/data/chebi#" )
+#if($owner.G.value != "http://bioinfo.iocb.cz/data/chebi#" )
 #set($infered = $entity)
 #end
 

@@ -13,7 +13,7 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($info)
-    SELECT ?LABEL FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+    SELECT ?LABEL FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
     {
       $entity rdfs:label ?LABEL.
     }
@@ -28,14 +28,14 @@
 
 
       #sparql($domains)
-        SELECT DISTINCT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+        SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
         {
           $entity rdfs:domain ?CLASS .
         }
       #end
 
       #sparql($ranges)
-        SELECT DISTINCT ?CLASS FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+        SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
         {
           $entity rdfs:range ?CLASS .
         }
@@ -68,13 +68,13 @@
 
   #macro( superlevel $property )
     #sparql($info)
-      SELECT ?LABEL FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+      SELECT ?LABEL FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
       {
         $property rdfs:label ?LABEL.
       }
     #end
     #sparql($super)
-      SELECT ?PROPERTY FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+      SELECT ?PROPERTY FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
       {
         $property rdfs:subPropertyOf ?PROPERTY.
       }
@@ -103,13 +103,13 @@
 
   #macro( sublevel $property )
     #sparql($info)
-      SELECT ?LABEL FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+      SELECT ?LABEL FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
       {
         $property rdfs:label ?LABEL.
       }
     #end
     #sparql($super)
-      SELECT ?PROPERTY FROM <http://bioinfo.uochb.cas.cz/rdf/ontology> WHERE
+      SELECT ?PROPERTY FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
       {
         ?PROPERTY rdfs:subPropertyOf $property.
       }

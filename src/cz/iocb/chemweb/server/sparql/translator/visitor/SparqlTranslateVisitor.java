@@ -192,7 +192,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(translatedSelectClause.isSparql)
         {
             newLine(strBuf);
-            strBuf.append("sparql");
+            strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage");
 
             for(Define def : prologue.getDefines())
             {
@@ -2002,15 +2002,15 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             StringBuilder strBuf2 = new StringBuilder();
             String callVar = getNewTmpVarName();
 
-            String graphBase = "http://bioinfo.uochb.cas.cz/rdf/procedures/" + currProcConfig.getMappedProcName();
+            String graph = "http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#" + currProcConfig.getMappedProcName();
 
             strBuf2.append("\n");
-            strBuf2.append("GRAPH <").append(graphBase).append("#parameters_graph>\n");
+            strBuf2.append("GRAPH <").append(graph).append(">\n");
             strBuf2.append("{\n");
 
 
             strBuf2.append("  ?").append(callVar).append("\n");
-            strBuf2.append("    <").append(graphBase).append("#context> ").append(graphID);
+            strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#context> ").append(graphID);
 
 
             LinkedHashMap<String, String> filterMap = new LinkedHashMap<String, String>();
@@ -2075,17 +2075,17 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
             /* result graph */
             strBuf2.append("\n");
-            strBuf2.append("GRAPH <").append(graphBase).append("#results_graph>\n");
+            strBuf2.append("GRAPH <").append(graph).append(">\n");
             strBuf2.append("{\n");
 
 
             strBuf2.append("  ?").append(getNewTmpVarName()).append("\n");
-            strBuf2.append("    <").append(graphBase).append("#call> ?").append(callVar);
+            strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#call> ?").append(callVar);
 
             if(procedureCallBase instanceof ProcedureCall)
             {
                 strBuf2.append(";\n");
-                strBuf2.append("    <").append(graphBase).append("#result> ");
+                strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#result> ");
                 ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
                 strBuf2.append(" ").append(procedureCall.getResult().toString());
                 strBuf2.append(" .\n");

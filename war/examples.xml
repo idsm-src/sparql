@@ -10,31 +10,41 @@
         <code><![CDATA[
 SELECT ?ENTITY ?COUNT WHERE
 {
-   {SELECT ("Compounds" AS ?ENTITY) (count(*) AS ?COUNT) WHERE {
-       GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#compound_sdfile> {
-         ?SDF rdf:type sio:SIO_011120 .
-   }}}
-   UNION
-  {SELECT ("Substances" AS ?ENTITY) (count(*) AS ?COUNT) WHERE {
-       GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#pubchem-base> {
-         ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND .
-   }}}
-   UNION
-  {SELECT ("BioAssays" AS ?ENTITY) (count(*) AS ?COUNT) WHERE {
-       GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay> {
-         ?BIOASSAY rdf:type bao:BAO_0000015 .
-   }}}
-   UNION
-  {SELECT ("Tested Compounds" AS ?ENTITY) (count(DISTINCT ?COMPOUND) AS ?COUNT) WHERE {
-       GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#pubchem-base> {
-         ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE .
-         ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND .
-   }}}
-   UNION
-  {SELECT ("Tested Substances" AS ?ENTITY) (count(DISTINCT ?SUBSTANCE) as ?COUNT) WHERE {
-       GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#pubchem-base> {
-         ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE .
-  }}}
+  {
+    SELECT ("Compounds" AS ?ENTITY) (count(*) AS ?COUNT) WHERE
+    {
+      GRAPH pubchem:compound {[] rdf:type sio:SIO_011120 }
+    }
+  }
+  UNION
+  {
+    SELECT ("Substances" AS ?ENTITY) (count(*) AS ?COUNT) WHERE
+    {
+       GRAPH pubchem:substance { [] sio:CHEMINF_000477 [] }
+    }
+  }
+  UNION
+  {
+    SELECT ("BioAssays" AS ?ENTITY) (count(*) AS ?COUNT) WHERE
+    {
+       GRAPH pubchem:bioassay {[] rdf:type bao:BAO_0000015 }
+    }
+  }
+  UNION
+  {
+    SELECT ("Tested Compounds" AS ?ENTITY) (count(DISTINCT ?COMPOUND) AS ?COUNT) WHERE
+    {
+       GRAPH pubchem:endpoint { [] obo:IAO_0000136 ?SUBSTANCE }
+       GRAPH pubchem:substance { ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND }
+    }
+  }
+  UNION
+  {
+    SELECT ("Tested Substances" AS ?ENTITY) (count(DISTINCT ?SUBSTANCE) as ?COUNT) WHERE
+    {
+       GRAPH pubchem:endpoint { [] obo:IAO_0000136 ?SUBSTANCE }
+    }
+  }
 }
         ]]></code>
   </example>

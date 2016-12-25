@@ -6,16 +6,16 @@
   {
     $entity (chebi:isA / chebi:inRelationWithValue)? ?VIA.
     
-    graph <http://bioinfo.uochb.cas.cz/data/chebi#>
+    graph <http://bioinfo.iocb.cz/data/chebi#>
     {
       ?VIA chebi:hasRole / chebi:inRelationWithValue ?ROLE.
       ?VIA chebi:chebiName / chebi:nameValue ?VIA_NAME.
 	}
 	
     ?ROLE chebi:isA / chebi:inRelationWithValue ?TYPE .
-    filter (!(?TYPE != <http://bioinfo.uochb.cas.cz/0.9/chebi/ids/24432> && ?TYPE != <http://bioinfo.uochb.cas.cz/0.9/chebi/ids/33232> && ?TYPE != <http://bioinfo.uochb.cas.cz/0.9/chebi/ids/51086>))
+    filter (!(?TYPE != <http://bioinfo.iocb.cz/0.9/chebi/ids/24432> && ?TYPE != <http://bioinfo.iocb.cz/0.9/chebi/ids/33232> && ?TYPE != <http://bioinfo.iocb.cz/0.9/chebi/ids/51086>))
 
-    graph <http://bioinfo.uochb.cas.cz/data/chebi#>
+    graph <http://bioinfo.iocb.cz/data/chebi#>
     {        
       ?ROLE chebi:chebiName / chebi:nameValue ?ROLE_NAME.
       ?ROLE chebi:definition ?DEF.
@@ -28,15 +28,15 @@
 #if($roles.count > 0)
 
   #foreach( $role in $roles )
-    #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/24432")
+    #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/24432")
       #set( $biological = "yes")
     #end
 
-    #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/33232")
+    #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/33232")
       #set( $application = "yes")
     #end
 
-    #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/51086")
+    #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/51086")
       #set( $chemical = "yes")
   #end
 #end
@@ -52,11 +52,11 @@
       #if($chemical)
       <tr>
         <td>
-          #url("http://bioinfo.uochb.cas.cz/0.9/chebi/ids/51086")Chemical Role#end(s):
+          #url("http://bioinfo.iocb.cz/0.9/chebi/ids/51086")Chemical Role#end(s):
         </td>
         <td>
         #foreach( $role in $roles )
-          #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/51086")        
+          #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/51086")        
             #url($role.ROLE)#escapeChEBI($role.ROLE_NAME)#end
             <div>#escapeChEBI($role.DEF)</div>
             #if($role.VIA.value != $entity.value)
@@ -76,11 +76,11 @@
       #if($biological)
       <tr>
         <td>
-          #url("http://bioinfo.uochb.cas.cz/0.9/chebi/ids/24432")Biological Role#end(s):
+          #url("http://bioinfo.iocb.cz/0.9/chebi/ids/24432")Biological Role#end(s):
         </td>
         <td>
         #foreach( $role in $roles )
-          #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/24432")
+          #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/24432")
             #url($role.ROLE)#escapeChEBI($role.ROLE_NAME)#end
             <div>#escapeChEBI($role.DEF)</div>
             #if($role.VIA.value != $entity.value)
@@ -100,11 +100,11 @@
       #if($application)
       <tr>
         <td>
-          #url("http://bioinfo.uochb.cas.cz/0.9/chebi/ids/33232")Application#end(s):
+          #url("http://bioinfo.iocb.cz/0.9/chebi/ids/33232")Application#end(s):
         </td>
         <td>
         #foreach( $role in $roles )
-          #if($role.type.value == "http://bioinfo.uochb.cas.cz/0.9/chebi/ids/33232" )
+          #if($role.type.value == "http://bioinfo.iocb.cz/0.9/chebi/ids/33232" )
             #url($role.ROLE)#escapeChEBI($role.ROLE_NAME)#end
             <div>#escapeChEBI($role.DEF)</div>
             #if($role.VIA.value != $entity.value)

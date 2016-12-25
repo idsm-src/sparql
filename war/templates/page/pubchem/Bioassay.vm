@@ -4,7 +4,7 @@
 #sparql($title)
   SELECT ?TITLE  WHERE
   {
-    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>
+    GRAPH pubchem:bioassay
     {
       $entity dcterms:title ?TITLE
     }
@@ -14,7 +14,7 @@
 #sparql($description)
 SELECT ?VALUE WHERE
 {
-  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  graph pubchem:bioassay
   {
     <${uri}_Description> sio:has-value ?VALUE
   }
@@ -24,7 +24,7 @@ SELECT ?VALUE WHERE
 #sparql($protocol)
 SELECT ?VALUE WHERE
 {
-  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  graph pubchem:bioassay
   {
     <${uri}_Protocol> sio:has-value ?VALUE
   }
@@ -34,7 +34,7 @@ SELECT ?VALUE WHERE
 #sparql($comment)
 SELECT ?VALUE WHERE
 {
-  graph <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>
+  graph pubchem:bioassay
   {
     <${uri}_Comment> sio:has-value ?VALUE
   }

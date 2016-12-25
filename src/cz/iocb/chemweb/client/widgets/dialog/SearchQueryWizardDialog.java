@@ -448,14 +448,22 @@ public class SearchQueryWizardDialog extends DialogBox
 
         if(searchCompounds && searchBioassays)
         {
-            query.append("\n  GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#pubchem-base>");
+            query.append("\n  GRAPH pubchem:substance");
             query.append("\n  {");
             query.append("\n    ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND .");
+            query.append("\n  }\n");
+
+            query.append("\n  GRAPH pubchem:endpoint");
+            query.append("\n  {");
             query.append("\n    ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE .");
+            query.append("\n  }\n");
+
+            query.append("\n  GRAPH pubchem:measuregroup");
+            query.append("\n  {");
             query.append("\n    ?MEASUREGROUP obo:OBI_0000299 ?ENDPOINT .");
             query.append("\n  }\n");
 
-            query.append("\n  GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>");
+            query.append("\n  GRAPH pubchem:bioassay");
             query.append("\n  {");
             query.append("\n    ?BIOASSAY bao:BAO_0000209 ?MEASUREGROUP .");
             query.append("\n  }\n");
@@ -481,7 +489,7 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(statusCount > 0 || statusCheckBox.getValue())
             {
-                query.append("\n  GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#pubchem-base>");
+                query.append("\n  GRAPH pubchem:endpoint");
                 query.append("\n  {");
                 query.append("\n    ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS");
 
@@ -538,7 +546,7 @@ public class SearchQueryWizardDialog extends DialogBox
         if(searchBioassays && !keywords.isEmpty())
         {
             query.append("\n  {");
-            query.append("\n    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay>");
+            query.append("\n    GRAPH pubchem:bioassay");
             query.append("\n    {");
             query.append("\n      ?BIOASSAY dcterms:title ?TITLE .");
             query.append("\n      ?TITLE bif:contains '''");
@@ -549,7 +557,7 @@ public class SearchQueryWizardDialog extends DialogBox
             query.append("\n  UNION");
 
             query.append("\n  {");
-            query.append("\n    GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#bioassay_data>");
+            query.append("\n    GRAPH pubchem:bioassay");
             query.append("\n    {");
             query.append("\n      ?DESCRIPTION sio:is-attribute-of ?BIOASSAY .");
             query.append("\n      ?DESCRIPTION sio:has-value ?TEXT.");

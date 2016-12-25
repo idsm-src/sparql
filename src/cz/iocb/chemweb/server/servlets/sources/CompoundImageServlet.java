@@ -246,9 +246,8 @@ public class CompoundImageServlet extends HttpServlet
         //        .query("sparql SELECT ?SDF WHERE { GRAPH <http://rdf.ncbi.nlm.nih.gov/pubchem/compound/extra> { compound:CID"
         //                + id + "_Molfile sio:has-value ?SDF } }");
 
-        Result result = db
-                .query("sparql SELECT ?SDF WHERE { GRAPH <http://bioinfo.uochb.cas.cz/rdf/graph#compound_sdfile> { compound:CID"
-                        + id + "_SDfile sio:has-value ?SDF } }");
+        Result result = db.query("sparql SELECT ?SDF WHERE { GRAPH pubchem:compound { compound:CID" + id
+                + "_SDfile sio:has-value ?SDF } }");
 
         if(result.getCount() == 1)
         {
