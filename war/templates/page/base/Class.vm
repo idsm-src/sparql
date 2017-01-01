@@ -64,7 +64,7 @@
         ?CLASS rdfs:subClassOf $class.
         
         ##FILTER NOT EXISTS { ?CLASS owl:unionOf ?X }
-        FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
+        ##FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
         FILTER ( ?CLASS != owl:Nothing )
         FILTER (?CLASS != $class) #avoid simple type cycle
       }
@@ -92,9 +92,9 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
     #sparql($properties)
-      SELECT DISTINCT ?PROPERTY FROM pubchem:ontology WHERE
+      SELECT ?PROPERTY FROM pubchem:ontology WHERE
       {
-        $entity rdfs:subClassOf* ?DOMAIN .
+        $entity rdfs:subClassOf ?DOMAIN .
         filter( ?DOMAIN != rdfs:Resource )
         ?PROPERTY rdfs:domain ?DOMAIN .
       }
@@ -110,7 +110,7 @@
 	  
 	  <table style="margin-left: 10px">
         #sparql($domains)
-          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:domain ?CLASS .
           }
@@ -123,7 +123,7 @@
         #end
 
         #sparql($ranges)
-          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:range ?CLASS .
           }
@@ -136,9 +136,9 @@
 	    #end
 	    
 	    #sparql($cardinalities)
-          SELECT DISTINCT ?COUNT FROM pubchem:ontology WHERE
+          SELECT ?COUNT FROM pubchem:ontology WHERE
           {
-            $entity rdfs:subClassOf* ?R.
+            $entity rdfs:subClassOf ?R.
             ?R rdf:type owl:Restriction.
             ?R owl:onProperty $property.PROPERTY.
             ?R owl:cardinality ?COUNT.
@@ -159,7 +159,7 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($properties)
-    SELECT DISTINCT ?PROPERTY FROM pubchem:ontology WHERE
+    SELECT ?PROPERTY FROM pubchem:ontology WHERE
     {
       ##?RANGE rdfs:subClassOf* $entity.
       ##?PROPERTY rdfs:range ?RANGE.
@@ -176,7 +176,7 @@
 	  
 	  <table style="margin-left: 10px">
         #sparql($domains)
-          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:domain ?CLASS .
           }
@@ -189,7 +189,7 @@
         #end
 
         #sparql($ranges)
-          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:range ?CLASS .
           }

@@ -11,24 +11,24 @@
 #end
 #if($info.LABEL)
 #escapeHTML($info.LABEL)## xxx
-#else
-#sparql($union)
-  SELECT ?CLASS FROM pubchem:ontology WHERE
-  {
-    $class owl:unionOf / rdf:rest* / rdf:first ?CLASS.
-  }
-#end
-#if( $union.count > 0 )
-#foreach($u in $union)#if($velocityCount > 1) | #end#label($u.CLASS)#end##
-#else
-#sparql($intersection)
-  SELECT ?CLASS FROM pubchem:ontology WHERE
-  {
-    $class owl:intersectionOf / rdf:rest* / rdf:first ?CLASS.
-  }
-#end
-#if( $intersection.count > 0 )
-#foreach($u in $intersection)#if($velocityCount > 1) & #end#label($u.CLASS)#end##
+###else
+###sparql($union)
+##  SELECT ?CLASS FROM pubchem:ontology WHERE
+##  {
+##    $class owl:unionOf / rdf:rest* / rdf:first ?CLASS.
+##  }
+###end
+###if( $union.count > 0 )
+###foreach($u in $union)#if($velocityCount > 1) | #end#label($u.CLASS)#end##
+###else
+###sparql($intersection)
+##  SELECT ?CLASS FROM pubchem:ontology WHERE
+##  {
+##    $class owl:intersectionOf / rdf:rest* / rdf:first ?CLASS.
+##  }
+###end
+###if( $intersection.count > 0 )
+###foreach($u in $intersection)#if($velocityCount > 1) & #end#label($u.CLASS)#end##
 #else
 #sparql($complement)
   SELECT ?CLASS FROM pubchem:ontology WHERE
@@ -89,21 +89,21 @@
 #escapeIRI($restriction.PROPERTY): minimal cardinality $restriction.VALUE.value for '#label($qualified.CLASS)'
 #end
 #end
-#else
-#sparql($data)
-  SELECT ?VALUE FROM pubchem:ontology WHERE
-  {
-    $class owl:oneOf / rdf:rest* / rdf:first ?VALUE.
-  }
-#end
-#if( $data.count > 0 )
-values: #foreach($d in $data)#if($velocityCount > 1), #end#if($velocityCount == $data.count)and #end#escapeHTML($d.VALUE)#end##
+###else
+###sparql($data)
+##  SELECT ?VALUE FROM pubchem:ontology WHERE
+##  {
+##    $class owl:oneOf / rdf:rest* / rdf:first ?VALUE.
+##  }
+###end
+###if( $data.count > 0 )
+##values: #foreach($d in $data)#if($velocityCount > 1), #end#if($velocityCount == $data.count)and #end#escapeHTML($d.VALUE)#end##
 #else
 #escapeIRI($class)
 #end
 #end
 #end
 #end
-#end
-#end
-#end
+###end
+###end
+###end
