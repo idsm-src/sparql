@@ -27,7 +27,7 @@
   
   #macro( superlevel $class )
     #sparql($super)
-      SELECT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+      SELECT ?CLASS FROM pubchem:ontology WHERE
       {
         $class rdfs:subClassOf ?CLASS.
         ##FILTER NOT EXISTS { ?CLASS owl:unionOf ?X }
@@ -59,7 +59,7 @@
   
   #macro( sublevel $class )
     #sparql($super)
-      SELECT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+      SELECT ?CLASS FROM pubchem:ontology WHERE
       {
         ?CLASS rdfs:subClassOf $class.
         
@@ -92,7 +92,7 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
     #sparql($properties)
-      SELECT DISTINCT ?PROPERTY FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+      SELECT DISTINCT ?PROPERTY FROM pubchem:ontology WHERE
       {
         $entity rdfs:subClassOf* ?DOMAIN .
         filter( ?DOMAIN != rdfs:Resource )
@@ -110,7 +110,7 @@
 	  
 	  <table style="margin-left: 10px">
         #sparql($domains)
-          SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:domain ?CLASS .
           }
@@ -123,7 +123,7 @@
         #end
 
         #sparql($ranges)
-          SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:range ?CLASS .
           }
@@ -136,7 +136,7 @@
 	    #end
 	    
 	    #sparql($cardinalities)
-          SELECT DISTINCT ?COUNT FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+          SELECT DISTINCT ?COUNT FROM pubchem:ontology WHERE
           {
             $entity rdfs:subClassOf* ?R.
             ?R rdf:type owl:Restriction.
@@ -159,7 +159,7 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($properties)
-    SELECT DISTINCT ?PROPERTY FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+    SELECT DISTINCT ?PROPERTY FROM pubchem:ontology WHERE
     {
       ##?RANGE rdfs:subClassOf* $entity.
       ##?PROPERTY rdfs:range ?RANGE.
@@ -176,7 +176,7 @@
 	  
 	  <table style="margin-left: 10px">
         #sparql($domains)
-          SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:domain ?CLASS .
           }
@@ -189,7 +189,7 @@
         #end
 
         #sparql($ranges)
-          SELECT DISTINCT ?CLASS FROM <http://bioinfo.iocb.cz/rdf/ontologies> WHERE
+          SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
           {
             $property.PROPERTY rdfs:range ?CLASS .
           }
