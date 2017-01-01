@@ -1,21 +1,11 @@
 #parse("common/utils.vm")
 
 
-#sparql($label)
-SELECT ?LABEL WHERE
-{
-  GRAPH pubchem:ontology
-  {
-    $entity rdfs:label ?LABEL
-  }
-}
-#end
-
 
 <table style="width:100%">
   <tbody>
     <tr><td>
-      #escapeHTML($label.LABEL)
+      $entity.toString().replaceAll(".*#", "").replaceAll(">","")
     </td></tr>
     <tr><td>
     <small style="color:gray">#escapeIRI($entity)<small>
