@@ -29,7 +29,7 @@ public class ConnectionPool
         connectionPool = new VirtuosoConnectionPoolDataSource();
 
         //connectionPool.setDriverClass(properties.getProperty("driverClass"));
-        //connectionPool.setJdbcUrl(properties.getProperty("jdbcUrl"));
+        connectionPool.setPortNumber(Integer.parseInt(properties.getProperty("port")));
         connectionPool.setUser(properties.getProperty("username"));
         connectionPool.setPassword(properties.getProperty("password"));
         connectionPool.setMaxPoolSize(new Integer(properties.getProperty("maxPoolSize")));
