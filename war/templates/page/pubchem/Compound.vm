@@ -6,10 +6,21 @@
 </style>
 
 <div class="VET-Page">
+  #sparql($iupac)
+    SELECT ?NAME WHERE
+    {
+      descriptor:${CID}_Preferred_IUPAC_Name sio:has-value ?NAME
+    }
+  #end
+
 
   <div class="VET-TitleBox">
     <span class="VET-Title">compound:$CID</span> 
     (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/$CID" target="_blank">open in pubchem</a>)
+    #if($iupac.count > 0)
+      <br/><br/>
+      <span class="VET-Name">#escapeHTML($iupac.NAME)</span>
+    #end
   </div>
 
 
