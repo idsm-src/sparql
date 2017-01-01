@@ -4,6 +4,7 @@
 #sparql($info)
   SELECT ?LABEL FROM pubchem:ontology WHERE
   {
+    $entity rdf:type rdfs:Property.
     $entity rdfs:label ?LABEL.
   }
 #end
