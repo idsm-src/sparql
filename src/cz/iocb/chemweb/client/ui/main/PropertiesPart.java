@@ -90,7 +90,7 @@ public class PropertiesPart extends Composite implements HasSelectionHandlers<St
 
 
             String query = "SELECT distinct ?Property ?Value WHERE { " + "<" + propertiesIri + "> ?Property ?Value. "
-                    + "OPTIONAL { ?Property rdfs:label ?Label. }} ORDER BY ?Label";
+                    + "OPTIONAL { ?Property rdf:type rdfs:Property; rdfs:label ?Label. }} ORDER BY ?Label";
 
             runningQuery = QueryServiceStub.query(query, start, length, new AsyncCallback<QueryResult>()
             {
