@@ -329,6 +329,9 @@ public class PropertiesPart extends ResizeComposite implements HasSelectionHandl
                 if(request != requestedPropertiesCounter)
                     return; // request is not up to date
 
+                stopButton.setVisible(false);
+                reloadButton.setVisible(true);
+
                 propertiesAsyncProvider.setPropertiesIri(iri);
                 propertiesDataGrid.setRowCount(result, true);
                 propertiesDataGrid.setPageSize(0);
@@ -336,8 +339,6 @@ public class PropertiesPart extends ResizeComposite implements HasSelectionHandl
                 propertiesDataGrid.setPageSize(100);
 
                 showedProperties = iri;
-                stopButton.setVisible(false);
-                reloadButton.setVisible(true);
             }
 
             @Override
