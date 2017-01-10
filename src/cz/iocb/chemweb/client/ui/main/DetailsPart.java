@@ -16,8 +16,8 @@ import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HTML;
+import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
@@ -30,7 +30,7 @@ import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
-public class DetailsPart extends Composite implements HasSelectionHandlers<String>
+public class DetailsPart extends ResizeComposite implements HasSelectionHandlers<String>
 {
     interface DetailsPanelUiBinder extends UiBinder<Widget, DetailsPart>
     {

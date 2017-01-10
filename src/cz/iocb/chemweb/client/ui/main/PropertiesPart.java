@@ -24,8 +24,8 @@ import com.google.gwt.user.cellview.client.DataGrid;
 import com.google.gwt.user.cellview.client.SimplePager;
 import com.google.gwt.user.cellview.client.SimplePager.Resources;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HeaderPanel;
+import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
@@ -43,7 +43,7 @@ import cz.iocb.chemweb.shared.services.query.QueryResult;
 
 
 
-public class PropertiesPart extends Composite implements HasSelectionHandlers<String>
+public class PropertiesPart extends ResizeComposite implements HasSelectionHandlers<String>
 {
     interface PropertiesPartUiBinder extends UiBinder<Widget, PropertiesPart>
     {

@@ -12,7 +12,7 @@ import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.Window;
-import com.google.gwt.user.client.ui.Composite;
+import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.SplitLayoutPanel;
 import com.google.gwt.user.client.ui.TabLayoutPanel;
 import com.google.gwt.user.client.ui.Widget;
@@ -29,7 +29,7 @@ import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
-public class MainPage extends Composite
+public class MainPage extends ResizeComposite
 {
     interface MainPageUiBinder extends UiBinder<Widget, MainPage>
     {

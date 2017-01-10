@@ -16,7 +16,7 @@ import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Composite;
+import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.TextArea;
 import com.google.gwt.user.client.ui.Widget;
 import cz.iocb.chemweb.client.resources.icons.Icons;
@@ -35,7 +35,7 @@ import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
-public class QueryPart extends Composite implements HasHandlers
+public class QueryPart extends ResizeComposite implements HasHandlers
 {
     interface QueryPartUiBinder extends UiBinder<Widget, QueryPart>
     {

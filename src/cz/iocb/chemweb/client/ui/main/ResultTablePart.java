@@ -25,9 +25,9 @@ import com.google.gwt.user.cellview.client.SimplePager;
 import com.google.gwt.user.cellview.client.SimplePager.Resources;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HeaderPanel;
 import com.google.gwt.user.client.ui.ListBox;
+import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
@@ -46,7 +46,7 @@ import cz.iocb.chemweb.shared.services.query.QueryResult;
 
 
 
-public class ResultTablePart extends Composite
+public class ResultTablePart extends ResizeComposite
 {
     interface ResultTablePartUiBinder extends UiBinder<Widget, ResultTablePart>
     {
