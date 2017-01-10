@@ -146,7 +146,7 @@ public class CompoundImageServlet extends HttpServlet
         }
 
         //if(size != 80 && size != 200)
-        if(size < 40 || size > 400)
+        if(size < 40 || size > 800)
             throw new ServletException("an invalid value of the 'w' argument");
 
 

@@ -22,6 +22,7 @@ import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.cellview.client.Column;
 import com.google.gwt.user.cellview.client.DataGrid;
 import com.google.gwt.user.cellview.client.SimplePager;
+import com.google.gwt.user.cellview.client.SimplePager.Resources;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
@@ -38,7 +39,7 @@ import com.google.gwt.view.client.RangeChangeEvent;
 import com.google.gwt.view.client.RowCountChangeEvent;
 import com.google.gwt.view.client.SelectionModel;
 import cz.iocb.chemweb.client.resources.datagrid.DataGridBundle;
-import cz.iocb.chemweb.client.resources.pager.PagerResources;
+import cz.iocb.chemweb.client.resources.pager.PagerResourcesFactory;
 import cz.iocb.chemweb.client.services.query.QueryServiceStub;
 import cz.iocb.chemweb.shared.services.query.DataGridNode;
 import cz.iocb.chemweb.shared.services.query.QueryResult;
@@ -424,7 +425,8 @@ public class ResultTablePart extends Composite
     private static final int minimalColumnWidth = 250;
 
     private static ResultTablePartUiBinder uiBinder = GWT.create(ResultTablePartUiBinder.class);
-    private static PagerResources pagerIcons = GWT.create(PagerResources.class);
+    private static PagerResourcesFactory pagerResourcesFactory = GWT.create(PagerResourcesFactory.class);
+    private static Resources pagerIcons = pagerResourcesFactory.create();
 
     @UiField TextBox searchTextBox;
     @UiField ListBox searchListBox;

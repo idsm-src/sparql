@@ -22,6 +22,7 @@ import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.cellview.client.Column;
 import com.google.gwt.user.cellview.client.DataGrid;
 import com.google.gwt.user.cellview.client.SimplePager;
+import com.google.gwt.user.cellview.client.SimplePager.Resources;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HeaderPanel;
@@ -32,7 +33,9 @@ import com.google.gwt.view.client.AsyncDataProvider;
 import com.google.gwt.view.client.HasData;
 import com.google.gwt.view.client.Range;
 import cz.iocb.chemweb.client.resources.datagrid.DataGridBundle;
-import cz.iocb.chemweb.client.resources.pager.PagerResources;
+import cz.iocb.chemweb.client.resources.icons.Icons;
+import cz.iocb.chemweb.client.resources.icons.IconsClientBundleFactory;
+import cz.iocb.chemweb.client.resources.pager.PagerResourcesFactory;
 import cz.iocb.chemweb.client.services.query.QueryServiceStub;
 import cz.iocb.chemweb.client.widgets.button.ImageButton;
 import cz.iocb.chemweb.shared.services.query.DataGridNode;
@@ -128,8 +131,11 @@ public class PropertiesPart extends Composite implements HasSelectionHandlers<St
     private static final int minimalColumnWidth = 250;
 
     private static PropertiesPartUiBinder uiBinder = GWT.create(PropertiesPartUiBinder.class);
-    private static PagerResources pagerIcons = GWT.create(PagerResources.class);
+    private static PagerResourcesFactory pagerResourcesFactory = GWT.create(PagerResourcesFactory.class);
+    private static IconsClientBundleFactory iconsClientBundleFactory = GWT.create(IconsClientBundleFactory.class);
+    private static Resources pagerIcons = pagerResourcesFactory.create();
 
+    @UiField(provided = true) Icons res = iconsClientBundleFactory.create();
     @UiField ImageButton prevButton;
     @UiField ImageButton nextButton;
     @UiField ImageButton reloadButton;

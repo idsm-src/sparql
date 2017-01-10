@@ -21,6 +21,8 @@ import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
+import cz.iocb.chemweb.client.resources.icons.Icons;
+import cz.iocb.chemweb.client.resources.icons.IconsClientBundleFactory;
 import cz.iocb.chemweb.client.widgets.button.ImageButton;
 import cz.iocb.chemweb.shared.services.details.DetailsPageService;
 import cz.iocb.chemweb.shared.services.details.DetailsPageServiceAsync;
@@ -36,9 +38,11 @@ public class DetailsPart extends Composite implements HasSelectionHandlers<Strin
 
 
     private static DetailsPanelUiBinder uiBinder = GWT.create(DetailsPanelUiBinder.class);
+    private static IconsClientBundleFactory iconsClientBundleFactory = GWT.create(IconsClientBundleFactory.class);
     private static DetailsPageServiceAsync detailsService = (DetailsPageServiceAsync) GWT
             .create(DetailsPageService.class);
 
+    @UiField(provided = true) Icons res = iconsClientBundleFactory.create();
     @UiField ImageButton prevButton;
     @UiField ImageButton nextButton;
     @UiField ImageButton reloadButton;

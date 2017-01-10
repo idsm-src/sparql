@@ -19,6 +19,8 @@ import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.TextArea;
 import com.google.gwt.user.client.ui.Widget;
+import cz.iocb.chemweb.client.resources.icons.Icons;
+import cz.iocb.chemweb.client.resources.icons.IconsClientBundleFactory;
 import cz.iocb.chemweb.client.services.downloader.FileDownloader;
 import cz.iocb.chemweb.client.widgets.button.FileUploadImageButton;
 import cz.iocb.chemweb.client.widgets.button.ImageButton;
@@ -101,9 +103,11 @@ public class QueryPart extends Composite implements HasHandlers
 
 
     private static QueryPartUiBinder uiBinder = GWT.create(QueryPartUiBinder.class);
+    private static IconsClientBundleFactory iconsClientBundleFactory = GWT.create(IconsClientBundleFactory.class);
     private static CheckServiceAsync checkService = (CheckServiceAsync) GWT.create(CheckService.class);
     private static FileDownloader fileDownloader = GWT.create(FileDownloader.class);
 
+    @UiField(provided = true) Icons res = iconsClientBundleFactory.create();
     @UiField FileUploadImageButton openButton;
     @UiField ImageButton examplesButton;
     @UiField ImageButton wizardButton;

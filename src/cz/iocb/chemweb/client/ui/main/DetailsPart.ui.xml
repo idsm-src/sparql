@@ -22,6 +22,14 @@
       display: inline-block;
     }
 
+    .background-size22 {
+      background-size: 22px 22px;
+    }
+
+    .background-size24 {
+      background-size: 24px 24px;
+    }
+
     .full-size {
       width: 100%;
       height: 100%;
@@ -36,16 +44,16 @@
     <g:north size="52">
       <g:LayoutPanel addStyleNames="{style.Toolbar}">
         <g:layer left="7px" width="26px" top="13px" height="26px">
-          <i:ImageButton ui:field="prevButton" enabled="false" src="{res.prev.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}"/>
+          <i:ImageButton ui:field="prevButton" enabled="false" src="{res.prev.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton},{style.background-size22}"/>
         </g:layer>
         <g:layer left="35px" width="26px" top="13px" height="26px">
-          <i:ImageButton ui:field="nextButton" enabled="false" src="{res.next.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}"/>
+          <i:ImageButton ui:field="nextButton" enabled="false" src="{res.next.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton},{style.background-size22}"/>
         </g:layer>
         <g:layer left="63px" width="26px" top="13px" height="26px">
-          <i:ImageButton ui:field="stopButton" enabled="true" src="{res.loading.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton}" visible="false"/>
+          <i:ImageButton ui:field="stopButton" enabled="true" src="{res.loading.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton},{style.background-size24}" visible="false"/>
         </g:layer>
         <g:layer left="63px" width="26px" top="13px" height="26px">
-          <i:ImageButton ui:field="reloadButton" enabled="false" src="{res.reload.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton}"/>
+          <i:ImageButton ui:field="reloadButton" enabled="false" src="{res.reload.getSafeUri}" position="top 1px center" addStyleNames="{style.ToolbarButton},{style.background-size24}"/>
         </g:layer>
         <g:layer left="93px" right="13px" top="11px" height="30px">
           <g:TextBox ui:field="iriTextBox" addStyleNames="{style.full-size}"></g:TextBox>

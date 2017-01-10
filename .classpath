@@ -14,5 +14,6 @@
 	<classpathentry kind="lib" path="war/WEB-INF/lib/piwik-java-tracker-1.2.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/antlr4-runtime-4.5.3.jar"/>
 	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-lang-2.6.jar"/>
+	<classpathentry kind="lib" path="gwt/RetinaImages.jar"/>
 	<classpathentry kind="output" path="war/WEB-INF/classes"/>
 </classpath>

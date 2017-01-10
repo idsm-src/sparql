@@ -17,6 +17,7 @@
       padding: 0px 2px;
       height: 44px;
       display: inline-block;
+      background-size: 22px 22px;
     }
 
     .textArea {
