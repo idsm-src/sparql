@@ -1,0 +1,30 @@
+#parse("common/utils.vm")
+
+
+#sparql($data)
+  SELECT ?TYPE ?VALUE WHERE
+  {
+    GRAPH descriptor:compound
+    {
+      $entity rdf:type ?TYPE.
+      $entity sio:has-value ?VALUE.
+    }
+  }
+#end
+
+#sparql($label)
+  SELECT ?LABEL WHERE
+  {
+    GRAPH pubchem:ontology
+    {
+      $data.TYPE rdfs:label ?LABEL.
+    }
+  }
+#end
+
+
+
+
+<span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($data.VALUE)</span>
+<br/>
+<small style="color:gray">#escapeHTML($label.LABEL)<small>
