@@ -400,7 +400,7 @@ public class SearchQueryWizardDialog extends DialogBox
             if(method == Methods.EXACTSEARCH || method == Methods.SUBSEARCH)
                 query.append("orchem:substructureSearch");
             else if(method == Methods.SIMSEARCH)
-                query.append("    orchem:substructureSearch");
+                query.append("    orchem:similaritySearch");
             else /*if(method == Methods.SMARTSEARCH)*/
                 query.append("orchem:smartsSearch");
 
