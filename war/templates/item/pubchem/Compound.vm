@@ -12,7 +12,7 @@
         </tr>
       </table>
     </td>
-    
+
     <td>
       <table>
         <tr>
@@ -20,6 +20,21 @@
             <b>$CID</b>
           </td>
         </tr>
+          #sparql($value)
+            SELECT ?VALUE WHERE
+            {
+              GRAPH descriptor:compound
+              {
+                descriptor:${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
+              }
+            }
+          #end
+
+          #if($value.count > 0)
+            <tr>
+              <td><span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span></td>
+            </tr>
+          #end
       </table>
     </td>
   </tr>

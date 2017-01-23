@@ -6,31 +6,97 @@
 </style>
 
 <div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">compound:$CID</span>
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/$CID" target="_blank">open in pubchem</a>)
+  </div>
+
   #sparql($iupac)
     SELECT ?NAME WHERE
     {
-      descriptor:${CID}_Preferred_IUPAC_Name sio:has-value ?NAME
+      GRAPH descriptor:compound
+      {
+        descriptor:${CID}_Preferred_IUPAC_Name sio:has-value ?NAME
+      }
     }
   #end
 
-
-  <div class="VET-TitleBox">
-    <span class="VET-Title">compound:$CID</span> 
-    (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/$CID" target="_blank">open in pubchem</a>)
-    #if($iupac.count > 0)
-      <br/><br/>
-      <span class="VET-Name">#escapeHTML($iupac.NAME)</span>
-    #end
-  </div>
-
+  #if($iupac.count > 0)
+    <div class="VET-BoxedSection">
+      <div>#escapeHTML($iupac.NAME)</div>
+    </div>
+  #end
 
   <div class="VET-BoxedSection">
     <table style="width:100%;">
       <tr>
-        <td align="center" style="text-align: center;"><img src="compound/image?w=400&id=$CID" alt="$CID" height="400" width="400"></td>
+        <td align="center" style="text-align: center;"><img src="compound/image?w=800&id=$CID" alt="$CID" height="400" width="400"></td>
       </tr>
     </table>
   </div>
+
+  #set( $descriptors = [
+    ["Molecular_Formula",            "molecular formula"],
+    ["Isomeric_SMILES",              "isomeric SMILES"],
+    ["Canonical_SMILES",             "canonical SMILES"],
+    ["IUPAC_InChI",                  "IUPAC InChI"],
+
+    ["Exact_Mass",                   "exact mass"],
+    ["Molecular_Weight",             "molecular weight"],
+    ["Mono_Isotopic_Weight",         "mono isotopic weight"],
+    ["Total_Formal_Charge",          "total formal charge"],
+    ["XLogP3-AA",                    "XLogP3-AA"],
+    ["TPSA",                         "TPSA"],
+
+    ["Structure_Complexity",         "structure complexity"],
+    ["Tautomer_Count",               "tautomer count"],
+    ["Hydrogen_Bond_Acceptor_Count", "hydrogen bond acceptor count"],
+    ["Defined_Atom_Stereo_Count",    "defined atom stereo count"],
+    ["Defined_Bond_Stereo_Count",    "defined bond stereo count"],
+    ["Undefined_Bond_Stereo_Count",  "undefined bond stereo count"],
+    ["Isotope_Atom_Count",           "isotope atom count"],
+    ["Covalent_Unit_Count",          "covalent unit count"],
+    ["Hydrogen_Bond_Donor_Count",    "hydrogen bond donor count"],
+    ["Non-hydrogen_Atom_Count",      "non-hydrogen atom count"],
+    ["Rotatable_Bond_Count",         "rotatable bond count"],
+    ["Undefined_Atom_Stereo_Count",  "undefined atom stereo count"]
+
+  ])
+
+
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach( $descriptor in $descriptors )
+          #sparql($value)
+          SELECT ?VALUE WHERE
+          {
+            GRAPH descriptor:compound
+            {
+              descriptor:${CID}_$descriptor[0] sio:has-value ?VALUE
+            }
+          }
+          #end
+
+          #if($value.count > 0)
+            <tr>
+              <td>$descriptor[1]</td>
+              <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($value.VALUE)</span></td>
+            </tr>
+          #end
+        #end
+
+      </table>
+    </div>
+  </div>
+
+
 
   #sparql($synonyms)
     SELECT ?NAME WHERE
@@ -47,7 +113,7 @@
   <div class="VET-BoxedSection">
     <div class="VET-Header">Synonyms</div>
     <div>
-      <table>
+      <table class="VET-Table">
       #foreach($synonym in $synonyms)
         <tr>
           <td>
@@ -61,6 +127,3 @@
   #end
 
 </div>
-
-
-
