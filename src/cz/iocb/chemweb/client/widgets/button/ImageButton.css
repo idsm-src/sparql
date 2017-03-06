@@ -52,6 +52,11 @@
   border: 1px solid rgba(255, 255, 255, 0);
 }
 
+.imageButtonDisabled:active {
+  border: 1px solid rgba(255, 255, 255, 0);
+  background-color: #ffffff;
+}
+
 
 
 .imageButton .fileUploadImageButtonInner {
