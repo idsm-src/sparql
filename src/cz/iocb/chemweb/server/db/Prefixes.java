@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 
 
@@ -24,7 +25,7 @@ public class Prefixes
         if(prefixes != null)
             return;
 
-        Collection<Prefix> loadPrefixes = new ArrayList<Prefix>();
+        ArrayList<Prefix> loadPrefixes = new ArrayList<Prefix>();
 
         try (Connection connection = ConnectionPool.getConnection())
         {
@@ -43,6 +44,9 @@ public class Prefixes
                 }
             }
         }
+
+        Collections.sort(loadPrefixes,
+                (Prefix arg0, Prefix arg1) -> Integer.compare(arg1.getIri().length(), arg0.getIri().length()));
 
         prefixes = loadPrefixes;
     }
