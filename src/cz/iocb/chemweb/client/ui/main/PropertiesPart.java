@@ -93,7 +93,7 @@ public class PropertiesPart extends ResizeComposite implements HasSelectionHandl
 
 
             String query = "SELECT distinct ?Property ?Value WHERE { " + "<" + propertiesIri + "> ?Property ?Value. "
-                    + "OPTIONAL { ?Property rdf:type rdfs:Property; rdfs:label ?Label. }} ORDER BY ?Label";
+                    + "OPTIONAL { ?Property rdf:type rdf:Property; rdfs:label ?Label. }} ORDER BY ?Label";
 
             runningQuery = QueryServiceStub.query(query, start, length, new AsyncCallback<QueryResult>()
             {
