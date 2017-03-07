@@ -31,33 +31,27 @@ public class PropertiesInfoFromOwl extends PropertiesInfo implements java.io.Ser
     private static final long serialVersionUID = 1L;
 
     /** SPARQL query to obtain properties with their ranges */
-    //private static final String rangeQuery = "sparql " + "DEFINE input:inference \"ontology\" " + "SELECT * WHERE "
-    //        + "{ ?prop rdfs:range ?class }";
-    private static final String rangeQuery = "sparql select distinct ?prop ?class where "
-            + "{ ?prop rdfs:range ?class }";
+    private static final String rangeQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?PROPERTY ?CLASS where { ?PROPERTY rdfs:range ?CLASS }";
 
     /** SPARQL query to obtain properties with their domains */
-    //private static final String domainQuery = "sparql " + "DEFINE input:inference \"ontology\" " + "SELECT * WHERE "
-    //        + "{ ?prop rdfs:domain ?class }";
-    private static final String domainQuery = "sparql select distinct ?prop ?class where "
-            + "{ ?prop rdfs:domain ?class }";
+    private static final String domainQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?PROPERTY ?CLASS where { ?PROPERTY rdfs:domain ?CLASS }";
 
     /** SPARQL query to obtain every property from ontology */
-    //private static final String propertiesQuery = "sparql " + "DEFINE input:inference \"ontology\" "
-    //        + "select ?P where { ?P rdf:type rdf:Property.}";
-    private static final String propertiesQuery = "sparql select distinct ?P where "
-            + "{ ?P rdf:type / rdfs:subClassOf* rdf:Property.}";
-
+    private static final String propertiesQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?PROPERTY where { ?PROPERTY rdf:type rdf:Property.}";
 
     /** Query that obtains information about properties with DataRange domain */
-    private static final String datarangeDomainQuery = "sparql " + "SELECT distinct ?p, ?type where \n"
-            + "{ ?p rdfs:domain ?R.\n" + "  ?R rdf:type owl:DataRange. \n"
-            + "  ?R owl:oneOf / rdf:rest* / rdf:first ?VALUE. \n" + "  bind (datatype(?VALUE) as ?type) }";
+    private static final String datarangeDomainQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "SELECT ?PROPERTY, ?TYPE where { ?PROPERTY rdfs:domain ?R. ?R rdf:type owl:DataRange. "
+            + "?R owl:oneOf / rdf:rest* / rdf:first ?VALUE. bind (datatype(?VALUE) as ?TYPE) }";
 
     /** Query that obtains information about properties with DataRange range */
-    private static final String datarangeRangeQuery = "sparql " + "SELECT distinct ?p, ?type where \n"
-            + "{ ?p rdfs:range ?R.\n" + "  ?R rdf:type owl:DataRange. \n"
-            + "  ?R owl:oneOf / rdf:rest* / rdf:first ?VALUE. \n" + "  bind (datatype(?VALUE) as ?type) }";
+    private static final String datarangeRangeQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "SELECT ?PROPERTY, ?TYPE where { ?PROPERTY rdfs:range ?R. ?R rdf:type owl:DataRange. "
+            + "?R owl:oneOf / rdf:rest* / rdf:first ?VALUE. bind (datatype(?VALUE) as ?TYPE) }";
+
 
     /** Set of property IRIs */
     private final Set<String> properties;

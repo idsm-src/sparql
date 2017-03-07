@@ -69,7 +69,31 @@ public class GenerateHints extends HttpServlet
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);
 
-        String query = "sparql select distinct ?H ?T ?R ?D where { { ?H rdf:type / rdfs:subClassOf* rdf:Property. optional { ?H rdfs:domain ?D. ?H rdfs:range ?R. filter(isIRI(?D) && isIRI(?R))} BIND( \"property\" as ?T)} union { ?H rdf:type / rdfs:subClassOf* rdfs:Class. BIND( \"class\" as ?T) } filter(isIRI(?H))}";
+        String query = "sparql                                                "
+                + "define input:storage virtrdf:PubchemQuadStorage            "
+                + "select ?H ?T ?R ?D where                                   "
+                + "{                                                          "
+                + "  {                                                        "
+                + "    ?H rdf:type rdf:Property.                              "
+                + "    bind( 'property' as ?T)                                "
+                + "                                                           "
+                + "    optional                                               "
+                + "    {                                                      "
+                + "      ?H rdfs:domain ?D. ?H rdfs:range ?R.                 "
+                + "      filter(isIRI(?D) && isIRI(?R))                       "
+                + "      filter (!strstarts(str(?D), 'http://blanknodes/'))   "
+                + "      filter (!strstarts(str(?R), 'http://blanknodes/'))   "
+                + "    }                                                      "
+                + "  }                                                        "
+                + "  union                                                    "
+                + "  {                                                        "
+                + "    ?H rdf:type owl:Class.                                 "
+                + "    bind( 'class' as ?T)                                   "
+                + "  }                                                        "
+                + "                                                           "
+                + "  filter(isIRI(?H))                                        "
+                + "  filter (!strstarts(str(?H), 'http://blanknodes/'))       "
+                + "}                                                          ";
 
         VirtuosoDatabase database = new VirtuosoDatabase();
         Result result = database.query(query);

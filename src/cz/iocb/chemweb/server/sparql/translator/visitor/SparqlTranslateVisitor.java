@@ -1940,7 +1940,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
              */
 
             StringBuilder strBuf = new StringBuilder();
-            strBuf.append("sparql ");
+            strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage ");
 
             for(Define def : prologue.getDefines())
             {
@@ -3005,7 +3005,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         StringBuilder strBuf = new StringBuilder();
 
         newLine(strBuf);
-        strBuf.append("sparql");
+        strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage ");
 
         for(Define def : prologue.getDefines())
         {

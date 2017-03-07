@@ -308,8 +308,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         Result result;
         try
         {
-            result = database.query(
-                    "sparql SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
+            result = database.query("sparql define input:storage virtrdf:PubchemQuadStorage "
+                    + "SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
             if(result.size() != 1)
                 throw new DatabaseException();

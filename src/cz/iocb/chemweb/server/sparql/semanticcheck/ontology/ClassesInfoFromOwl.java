@@ -21,32 +21,23 @@ public class ClassesInfoFromOwl extends ClassesInfo implements java.io.Serializa
     private static final long serialVersionUID = 1L;
 
     /** Query to retrieve all classes from ontology. */
-    //private static final String classesQuery = "sparql DEFINE input:inference \"ontology\" "
-    //        + "select ?C where { ?C rdf:type rdfs:Class.}";
-    private static final String classesQuery = "sparql select distinct ?C where { ?C rdf:type / rdfs:subClassOf* rdfs:Class.}";
+    private static final String classesQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?CLASS where { ?CLASS rdf:type owl:Class. }";
 
     /** Query to retrieve all classes with its transitive subclasses. */
-    //private static final String subClassesQuery = "sparql DEFINE input:inference \"ontology\" "
-    //        + "select ?CLASS ?SUBCLASS " + "where " + " { ?SUBCLASS rdf:type rdfs:Class. "
-    //        + " ?SUBCLASS rdfs:subClassOf* ?CLASS. }";
-    private static final String subClassesQuery = "sparql select distinct ?CLASS ?SUBCLASS where "
-            + "{ ?SUBCLASS rdf:type / rdfs:subClassOf* rdfs:Class. ?SUBCLASS rdfs:subClassOf* ?CLASS. }";
+    private static final String subClassesQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?CLASS ?SUBCLASS where { ?SUBCLASS rdf:type owl:Class. ?SUBCLASS rdfs:subClassOf* ?CLASS. }";
 
-    private static final String disjointClassesQuery = "sparql select distinct ?C1 ?C2 where "
-            + "{ ?C1 rdfs:subClassOf* ?X. ?X owl:disjointWith ?Y. ?C2 rdfs:subClassOf* ?Y. "
-            + "  filter(?X != owl:Nothing) filter(?Y != owl:Nothing) }";
+    private static final String disjointClassesQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?C1 ?C2 where { ?C1 rdfs:subClassOf* ?X. ?X owl:disjointWith ?Y. ?C2 rdfs:subClassOf* ?Y. "
+            + "filter(?X != owl:Nothing) filter(?Y != owl:Nothing) }";
 
-    //private static final String unionSubClassesQuery = "sparql DEFINE input:inference \"ontology\" "
-    //        + "select ?UNION ?SUBCLASS where {" + " ?UNION owl:unionOf / rdf:rest* / rdf:first ?SUBCLASS"
-    //        + " filter(isBlank(?UNION)) }";
-    private static final String unionSubClassesQuery = "sparql select distinct ?UNION ?SUBCLASS where "
-            + "{ ?UNION owl:unionOf / rdf:rest* / rdf:first ?SUBCLASS filter(isBlank(?UNION)) }";
+    private static final String unionSubClassesQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select ?UNION ?SUBCLASS where { " // the outer select is a workround due to a virtuoso issue with the rdf:rest* construction
+            + "select  ?UNION ?SUBCLASS where { ?UNION owl:unionOf / rdf:rest* / rdf:first ?SUBCLASS. filter(isBlank(?UNION)) } }";
 
-
-    //private static final String negatedClassQuery = "sparql DEFINE input:inference \"ontology\" "
-    //        + "select ?NEG ?CLASS where {" + " ?NEG owl:complementOf ?CLASS" + " filter(isBlank(?NEG))}";
-    private static final String negatedClassQuery = "sparql select distinct ?NEG ?CLASS where "
-            + "{ ?NEG owl:complementOf ?CLASS" + " filter(isBlank(?NEG))}";
+    private static final String negatedClassQuery = "sparql define input:storage virtrdf:PubchemQuadStorage "
+            + "select  ?NEG ?CLASS where { ?NEG owl:complementOf ?CLASS. filter(isBlank(?NEG))}";
 
 
     /** Set of classes IRIs */
