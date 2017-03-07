@@ -13,66 +13,37 @@ public class TranslatedSegment
     LinkedHashSet<String> subqueryVars = new LinkedHashSet<String>(); //FIXME:
     LinkedHashSet<String> possibleUnboundVars = new LinkedHashSet<String>(); //FIXME:
     String str = "";
-    String sqlTableName = "";
-    boolean isSparql = false;
 
 
     /**
      * Constructs the translated segment.
      *
      * @param str String of translated subquery.
-     * @param isSparql Is this segment of type SPARQL?
      */
-    public TranslatedSegment(String str, boolean isSparql)
+    public TranslatedSegment(String str)
     {
         this.str = str;
-        this.isSparql = isSparql;
     }
 
     /**
      * Constructs the translated segment.
      *
      * @param str String of translated subquery.
-     * @param isSparql Is this segment of type SPARQL?
      * @param subqueryVars Variables used (or projected) in this segment.
      */
-    public TranslatedSegment(String str, boolean isSparql, LinkedHashSet<String> subqueryVars)
+    public TranslatedSegment(String str, LinkedHashSet<String> subqueryVars)
     {
-        this(str, isSparql);
+        this(str);
         setSubqueryVars(subqueryVars);
         possibleUnboundVars = new LinkedHashSet<>();
     }
 
-    public TranslatedSegment(String str, boolean isSparql, LinkedHashSet<String> subqueryVars,
-            LinkedHashSet<String> possibleUnboundVars)
+    public TranslatedSegment(String str, LinkedHashSet<String> subqueryVars, LinkedHashSet<String> possibleUnboundVars)
     {
-        this(str, isSparql);
+        this(str);
         setSubqueryVars(subqueryVars);
         setPossibleUnboundVars(possibleUnboundVars);
     }
-
-
-    /**
-     * Constructs the translated segment.
-     *
-     * @param str String of translated subquery.
-     * @param isSparql Is this segment of type SPARQL?
-     * @param subqueryVars Variables used (or projected) in this segment.
-     * @param sqlTableName SQL table name of this segment (if of type SQL).
-     */
-    public TranslatedSegment(String str, boolean isSparql, LinkedHashSet<String> subqueryVars,
-            LinkedHashSet<String> possibleUnboundVars, String sqlTableName)
-    {
-        this(str, isSparql, subqueryVars, possibleUnboundVars);
-        this.sqlTableName = sqlTableName;
-    }
-
-    public TranslatedSegment(String str, boolean isSparql, LinkedHashSet<String> subqueryVars, String sqlTableName)
-    {
-        this(str, isSparql, subqueryVars);
-        this.sqlTableName = sqlTableName;
-    }
-
 
     /**
      * Sets variables used (or projected) in this segment.

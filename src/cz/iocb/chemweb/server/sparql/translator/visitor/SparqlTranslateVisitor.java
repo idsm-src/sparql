@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.visitor;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,7 +25,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BuiltInCallExpression;
-import cz.iocb.chemweb.server.sparql.parser.model.expression.ExistsExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
@@ -60,8 +58,6 @@ import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestriction.RestrictionType;
-import cz.iocb.chemweb.server.sparql.translator.visitor.expressions.ExpressionTranslateFlag;
-import cz.iocb.chemweb.server.sparql.translator.visitor.expressions.ExpressionTranslator;
 
 
 
@@ -69,17 +65,12 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 {
     private static final String tempStarFakePrefix = "_star_fake_";
     private static final String tempVarPrefix = "__tmpVar";
-    private static final String tempTabPrefix = "__tmpTab";
-    private static final String sqlSelectSuffix = "OPTION(QUIETCAST)";
-    private static final boolean useCorrectJoin = true;
     private static final int indentMultiplier = 2;
 
-    private boolean fullQueryDecomposition;
     private boolean topLevelSelect = true;
     private int queryDepth = 0;
 
     private int uniqueStarFakeID = 1;
-    private int uniqueTabID = 1;
     private int uniqueVarID = 1;
 
     private Map<String, List<String>> propertyChains = null;
@@ -134,7 +125,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             throws TranslateExceptions
     {
         this.proceduresConfig = proceduresConfig;
-        this.fullQueryDecomposition = fullQueryDecomposition;
 
         String code = visitElement(sparqlQuery).str;
 
@@ -161,7 +151,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             boolean fullQueryDecomposition)
     {
         this.proceduresConfig = proceduresConfig;
-        this.fullQueryDecomposition = fullQueryDecomposition;
 
         TranslatedSegment result = visitElement(sparqlQuery);
         return new TranslateResult(result != null ? result.str : null, exceptions, warnings);
@@ -188,24 +177,16 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         // building the string
         StringBuilder strBuf = new StringBuilder();
+        newLine(strBuf);
+        strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage");
 
-        if(translatedSelectClause.isSparql)
-        {
-            newLine(strBuf);
-            strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage");
+        for(Define def : prologue.getDefines())
+            strBuf.append(" ").append(def.toString());
 
-            for(Define def : prologue.getDefines())
-            {
-                strBuf.append(" ");
-                strBuf.append(def.toString());
-            }
-
-            newLine(strBuf);
-        }
-
+        newLine(strBuf);
         strBuf.append(translatedSelectClause.str);
 
-        return new TranslatedSegment(strBuf.toString(), translatedSelectClause.isSparql);
+        return new TranslatedSegment(strBuf.toString());
     }
 
 
@@ -233,8 +214,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
         queryDepth--;
 
-        // if the translated WHERE clause is of type SPARQL, then translate the
-        // whole SELECT as SPARQL; otherwise translate the whole SELECT as SQL
         TranslatedSegment translatedSelect = null;
 
 
@@ -242,7 +221,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         {
             translatedWhereClause = translateBindInGroupBy(select.getGroupByConditions(), translatedWhereClause);
 
-            if(translatedWhereClause != null && translatedWhereClause.isSparql)
+            if(translatedWhereClause != null)
             {
                 StringBuilder strBuf = new StringBuilder();
 
@@ -254,12 +233,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             }
         }
 
-
-        if((translatedWhereClause == null || translatedWhereClause.isSparql) && !fullQueryDecomposition)
-            translatedSelect = translateSelectAsSparql(select, translatedWhereClause, isTopLevel);
-        else
-            translatedSelect = translateSelectAsSql(select, translatedWhereClause, isTopLevel);
-
+        translatedSelect = translateSelect(select, translatedWhereClause, isTopLevel);
 
         // clear information about datasets of this SELECT (sub)query
         selectDatasets.pop();
@@ -279,7 +253,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     {
         TranslatedSegment translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
 
-        if(translatedGroupGraphPattern != null && translatedGroupGraphPattern.isSparql)
+        if(translatedGroupGraphPattern != null)
         {
             StringBuilder strBuf = new StringBuilder();
 
@@ -314,26 +288,14 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             return null;
 
 
-        /*
-         *  SPARQL GRAPH
-         */
-        if(translatedPattern.isSparql)
-        {
-            StringBuilder strBuf = new StringBuilder();
+        StringBuilder strBuf = new StringBuilder();
 
-            newLine(strBuf);
-            strBuf.append("GRAPH ").append(varOrIri.toString());
-            strBuf.append(translatedPattern.str);
+        newLine(strBuf);
+        strBuf.append("GRAPH ").append(varOrIri.toString());
+        strBuf.append(translatedPattern.str);
 
-            return new TranslatedSegment(strBuf.toString(), true, translatedPattern.subqueryVars,
-                    translatedPattern.possibleUnboundVars);
-        }
-
-
-        /*
-         *  SQL GRAPH
-         */
-        return translatedPattern;
+        return new TranslatedSegment(strBuf.toString(), translatedPattern.subqueryVars,
+                translatedPattern.possibleUnboundVars);
     }
 
 
@@ -356,31 +318,19 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         graphOrServiceRestrictions.pop();
 
 
-        /*
-         *  SPARQL SERVICE
-         */
-        if(translatedPattern.isSparql)
-        {
-            StringBuilder strBuf = new StringBuilder();
-            newLine(strBuf);
+        StringBuilder strBuf = new StringBuilder();
+        newLine(strBuf);
 
-            if(isSilent)
-                strBuf.append("SERVICE SILENT ");
-            else
-                strBuf.append("SERVICE ");
+        if(isSilent)
+            strBuf.append("SERVICE SILENT ");
+        else
+            strBuf.append("SERVICE ");
 
-            strBuf.append(varOrIri.toString());
-            strBuf.append(translatedPattern.str);
+        strBuf.append(varOrIri.toString());
+        strBuf.append(translatedPattern.str);
 
-            return new TranslatedSegment(strBuf.toString(), true, translatedPattern.subqueryVars,
-                    translatedPattern.possibleUnboundVars);
-        }
-
-
-        /*
-         *  SQL SERVICE
-         */
-        return translatedPattern;
+        return new TranslatedSegment(strBuf.toString(), translatedPattern.subqueryVars,
+                translatedPattern.possibleUnboundVars);
     }
 
 
@@ -393,7 +343,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Union union)
     {
-        boolean areAllTranslatedPatternsSparql = true;
         List<TranslatedSegment> translatedPatterns = new ArrayList<>();
         LinkedHashSet<String> allUsedVars = new LinkedHashSet<>();
         LinkedHashSet<String> allPossibleUnboundVars = new LinkedHashSet<>();
@@ -405,7 +354,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             if(translatedPattern == null)
                 continue;
 
-            areAllTranslatedPatternsSparql &= translatedPattern.isSparql;
             translatedPatterns.add(translatedPattern);
             allUsedVars.addAll(translatedPattern.subqueryVars);
             allPossibleUnboundVars.addAll(translatedPattern.possibleUnboundVars);
@@ -422,103 +370,21 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         StringBuilder strBuf = new StringBuilder();
 
 
-        /*
-         * SPARQL UNION
-         */
-        if(areAllTranslatedPatternsSparql && !fullQueryDecomposition)
-        {
-            boolean firstPat = true;
-
-            for(TranslatedSegment translatedPattern : translatedPatterns)
-            {
-                if(!firstPat)
-                {
-                    strBuf.append("\n");
-                    strBuf.append("UNION");
-                }
-                firstPat = false;
-
-                strBuf.append(translatedPattern.str);
-            }
-
-            return new TranslatedSegment(strBuf.toString(), true, allUsedVars, allPossibleUnboundVars);
-        }
-
-
-        /*
-         * SQL UNION
-         */
-        newLine(strBuf);
-        strBuf.append("(");
         boolean firstPat = true;
 
         for(TranslatedSegment translatedPattern : translatedPatterns)
         {
             if(!firstPat)
             {
-                newLine(strBuf);
-                strBuf.append("UNION ALL");
+                strBuf.append("\n");
+                strBuf.append("UNION");
             }
             firstPat = false;
 
-
-            if(translatedPattern.isSparql)
-            {
-                translatedPattern = wrapAndNameTable(wrapSparqlSelect(translatedPattern));
-                translatedPattern.str = indentBlock(translatedPattern.str, 1);
-            }
-
-            queryDepth++;
-            newLine(strBuf);
-            strBuf.append("SELECT ");
-
-            boolean first = true;
-
-            for(String var : allUsedVars)
-            {
-                if(!first)
-                    strBuf.append(", ");
-                else
-                    first = false;
-
-                if(!translatedPattern.subqueryVars.contains(var))
-                    strBuf.append("NULL AS ");
-
-                strBuf.append("\"").append(var).append("\"");
-            }
-
-            newLine(strBuf);
-            strBuf.append("FROM");
-
-            queryDepth++;
-
-            newLine(strBuf);
-            strBuf.append("(");
-            queryDepth++;
-            newLine(strBuf);
-            strBuf.append("SELECT *");
-            newLine(strBuf);
-            strBuf.append("FROM");
-
-            strBuf.append(indentBlock(translatedPattern.str, queryDepth));
-
-            // OPTION(QUIETCAST)
-            newLine(strBuf);
-            strBuf.append(sqlSelectSuffix);
-
-            queryDepth--;
-            newLine(strBuf);
-            strBuf.append(") AS ").append(getNewTmpTabName());
-            queryDepth--;
-            queryDepth--;
+            strBuf.append(translatedPattern.str);
         }
 
-        newLine(strBuf);
-        strBuf.append(") AS ");
-        String unionedTabName = getNewTmpTabName();
-        strBuf.append(unionedTabName);
-
-        return new TranslatedSegment(strBuf.toString(), false, allUsedVars, allPossibleUnboundVars, unionedTabName);
+        return new TranslatedSegment(strBuf.toString(), allUsedVars, allPossibleUnboundVars);
     }
 
 
@@ -531,9 +397,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Values values)
     {
-        /*
-         * SPARQL VALUES
-         */
         LinkedHashSet<String> usedVars = new LinkedHashSet<>();
 
         for(Variable var : values.getVariables())
@@ -547,7 +410,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
                 if(valueList.getValues().get(i) == null)
                     possibleUnboundVars.add(values.getVariables().get(i).getName());
 
-        return new TranslatedSegment("\n" + values.toString(), true, usedVars, possibleUnboundVars);
+        return new TranslatedSegment("\n" + values.toString(), usedVars, possibleUnboundVars);
     }
 
 
@@ -560,9 +423,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Triple triple)
     {
-        /*
-         * SPARQL TRIPLE
-         */
         triple = eliminateBlankNodesFromTriple(triple);
 
         LinkedHashSet<String> usedVars = extractVariblesFromTriple(triple);
@@ -650,7 +510,7 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             code.append("}");
 
 
-        return new TranslatedSegment(code.toString(), true, usedVars);
+        return new TranslatedSegment(code.toString(), usedVars);
     }
 
 
@@ -698,11 +558,11 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
      * @param isTopLevel Is this SPARQL SELECT the top-level one?.
      * @return Translated SELECT pattern as SPARQL.
      */
-    private TranslatedSegment translateSelectAsSparql(Select select, TranslatedSegment translatedWhereClause,
+    private TranslatedSegment translateSelect(Select select, TranslatedSegment translatedWhereClause,
             boolean isTopLevel)
     {
         if(translatedWhereClause == null)
-            translatedWhereClause = new TranslatedSegment("\n{}", true);
+            translatedWhereClause = new TranslatedSegment("\n{}");
 
 
         StringBuilder strBuf = new StringBuilder();
@@ -865,337 +725,9 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             strBuf.append("}");
         }
 
-        return new TranslatedSegment(strBuf.toString(), true, usedVars, possibleUnboundVars);
+        return new TranslatedSegment(strBuf.toString(), usedVars, possibleUnboundVars);
     }
 
-
-    /**
-     * Builds the SELECT query as SQL when we already have translated WHERE clause.
-     *
-     * @param select Details of the SELECT clause.
-     * @param translatedWhereClause Translated WHERE clause of the query.
-     * @param isTopLevel Is this SPARQL SELECT the top-level one?.
-     * @return Translated SELECT pattern as SQL.
-     */
-    private TranslatedSegment translateSelectAsSql(Select select, TranslatedSegment translatedWhereClause,
-            boolean isTopLevel)
-    {
-        if(translatedWhereClause == null)
-            translatedWhereClause = new TranslatedSegment(getDummyTableStr(), false);
-
-        if(translatedWhereClause.isSparql)
-        {
-            translatedWhereClause = wrapAndNameTable(wrapSparqlSelect(translatedWhereClause));
-            translatedWhereClause.str = indentBlock(translatedWhereClause.str, 1);
-        }
-
-        if(select.getValues() == null)
-        {
-            return translateSelectAsSqlNoValues(select, translatedWhereClause, isTopLevel);
-        }
-        else
-        {
-            Select innerSelect = new Select();
-            Select outerSelect = new Select();
-
-            List<Projection> innerProjections = innerSelect.getProjections();
-            List<Projection> outerProjections = outerSelect.getProjections();
-
-            for(Projection projection : select.getProjections())
-            {
-                if(projection.getExpression() != null)
-                {
-                    Variable var = new Variable(getNewTmpVarName());
-
-                    innerProjections.add(new Projection(projection.getExpression(), var));
-                    outerProjections.add(new Projection(var, projection.getVariable()));
-                }
-                else
-                {
-                    outerProjections.add(new Projection(projection.getVariable()));
-                }
-            }
-
-            if(select.getGroupByConditions() != null)
-            {
-                for(GroupCondition groupCond : select.getGroupByConditions())
-                {
-                    if(groupCond.getVariable() != null)
-                        innerProjections.add(new Projection(groupCond.getVariable()));
-                    else if(groupCond.getExpression() instanceof Variable)
-                        innerProjections.add(new Projection((Variable) groupCond.getExpression()));
-                }
-            }
-            else
-            {
-                for(String var : translatedWhereClause.subqueryVars)
-                    innerProjections.add(new Projection(new Variable(var)));
-            }
-
-
-
-            outerSelect.setDistinct(select.isDistinct());
-            outerSelect.setReduced(select.isReduced());
-            outerSelect.setLimit(select.getLimit());
-            outerSelect.setOffset(select.getOffset());
-            outerSelect.getOrderByConditions().addAll(select.getOrderByConditions());
-
-            innerSelect.getDataSets().addAll(select.getDataSets());
-            innerSelect.getGroupByConditions().addAll(select.getGroupByConditions());
-            innerSelect.getHavingConditions().addAll(select.getHavingConditions());
-
-
-
-            TranslatedSegment translatedSelectClause = translateSelectAsSqlNoValues(innerSelect, translatedWhereClause,
-                    false);
-            TranslatedSegment translatedValuesClause = visit(select.getValues());
-
-            translatedSelectClause = translateJoin(translatedSelectClause, translatedValuesClause);
-
-            return translateSelectAsSqlNoValues(outerSelect, translatedSelectClause, isTopLevel);
-        }
-    }
-
-    /**
-     * Builds the SELECT query as SQL when we already have translated WHERE clause.
-     *
-     * @param select Details of the SELECT clause.
-     * @param translatedWhereClause Translated WHERE clause of the query.
-     * @param isTopLevel Is this SPARQL SELECT the top-level one?.
-     * @return Translated SELECT pattern as SQL.
-     */
-    private TranslatedSegment translateSelectAsSqlNoValues(Select select, TranslatedSegment translatedWhereClause,
-            boolean isTopLevel)
-    {
-        StringBuilder strBuf = new StringBuilder();
-        LinkedHashSet<String> usedVars = new LinkedHashSet<>();
-        LinkedHashSet<String> possibleUnboundVars = new LinkedHashSet<>();
-
-
-        if(!isTopLevel)
-        {
-            translatedWhereClause.str = indentBlock(translatedWhereClause.str, 1);
-
-            newLine(strBuf);
-            strBuf.append("(");
-            queryDepth++;
-            newLine(strBuf);
-        }
-
-
-        strBuf.append("SELECT ");
-
-        // translate DISTINCT modifier, ignore REDUCED modifier
-        if(select.isDistinct()/* || select.isReduced() */)
-            strBuf.append("DISTINCT ");
-
-
-        // OFFSET and LIMIT modifiers translates to TOP modifier
-        if(select.getOffset() != null || select.getLimit() != null)
-        {
-            strBuf.append("TOP ");
-
-            boolean offsetWritten = false;
-            if(select.getOffset() != null)
-            {
-                offsetWritten = true;
-                strBuf.append(select.getOffset().toString());
-            }
-
-            if(offsetWritten)
-                strBuf.append(",");
-
-            if(select.getLimit() != null)
-            {
-                strBuf.append(select.getLimit().toString());
-            }
-            else
-            {
-                strBuf.append("-1");
-            }
-
-            strBuf.append(" ");
-        }
-
-
-        // translate projections
-        if(select.getProjections().isEmpty())
-        {
-            if(!translatedWhereClause.subqueryVars.isEmpty())
-            {
-                boolean first = true;
-
-                for(String var : translatedWhereClause.subqueryVars)
-                {
-                    // filter out auxiliary/artificial variables
-                    if(!this.queryVariables.contains(var))
-                        continue;
-
-                    if(!first)
-                        strBuf.append(", ");
-                    else
-                        first = false;
-
-                    strBuf.append('"').append(var).append('"');
-
-                    usedVars.add(var);
-
-                    if(translatedWhereClause.possibleUnboundVars.contains(var))
-                        possibleUnboundVars.add(var);
-                }
-            }
-
-            if(usedVars.isEmpty())
-            {
-                strBuf.append("1 AS \"" + getNewFakeStarName() + "\"");
-            }
-        }
-        else
-        {
-            boolean first = true;
-
-            for(Projection proj : select.getProjections())
-            {
-                String var = proj.getVariable().getName();
-
-                usedVars.add(var);
-
-                if(translatedWhereClause.possibleUnboundVars.contains(var) || proj.getExpression() != null)
-                    possibleUnboundVars.add(var);
-
-                if(!translatedWhereClause.subqueryVars.contains(var) && proj.getExpression() == null)
-                {
-                    warnings.add(new TranslateException(ErrorType.unusedVariable, proj.getVariable().getRange(), var));
-                    possibleUnboundVars.add(var);
-                }
-
-
-                if(!first)
-                    strBuf.append(", ");
-                else
-                    first = false;
-
-                if(proj.getExpression() == null)
-                {
-                    if(!translatedWhereClause.subqueryVars.contains(var))
-                        strBuf.append("NULL AS ");
-                }
-                else
-                {
-                    strBuf.append(translateExpression(proj.getExpression(), EnumSet
-                            .of(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS, ExpressionTranslateFlag.LONG_CAST),
-                            translatedWhereClause));
-                    strBuf.append(" AS ");
-                }
-
-                strBuf.append("\"").append(var).append("\"");
-            }
-        }
-
-        // insert translated WHERE clause
-        newLine(strBuf);
-        strBuf.append("FROM");
-        strBuf.append(translatedWhereClause.str);
-
-
-        // translate GROUP BY clauses
-        if(!select.getGroupByConditions().isEmpty())
-        {
-            newLine(strBuf);
-            strBuf.append("GROUP BY ");
-
-            boolean first = true;
-            List<GroupCondition> groupByConds = select.getGroupByConditions();
-            for(GroupCondition groupByCond : groupByConds)
-            {
-                if(!first)
-                    strBuf.append(", ");
-                else
-                    first = false;
-
-                if(groupByCond.getVariable() == null)
-                    strBuf.append(translateExpression(groupByCond.getExpression(),
-                            EnumSet.of(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS), translatedWhereClause));
-                else
-                    strBuf.append(translateLiteralNodeExpression(groupByCond.getVariable()));
-            }
-        }
-
-
-        // translate HAVING clauses
-        if(!select.getHavingConditions().isEmpty())
-        {
-            newLine(strBuf);
-            strBuf.append("HAVING ");
-
-            boolean first = true;
-            List<Expression> havingConds = select.getHavingConditions();
-            for(Expression havingCond : havingConds)
-            {
-                if(!first)
-                    strBuf.append(", ");
-                else
-                    first = false;
-
-                // translate constraints while checking validity of variables used
-                HashSet<String> variablesToCheck = translatedWhereClause.subqueryVars;
-
-                for(Projection proj : select.getProjections())
-                    variablesToCheck.add(proj.getVariable().getName());
-
-                strBuf.append(translateExpression(havingCond, null, translatedWhereClause));
-            }
-        }
-
-
-        // translate ORDER BY clauses
-        if(!select.getOrderByConditions().isEmpty())
-        {
-            newLine(strBuf);
-            strBuf.append("ORDER BY ");
-
-            boolean first = true;
-            List<OrderCondition> orderByConds = select.getOrderByConditions();
-            for(OrderCondition orderByCond : orderByConds)
-            {
-                OrderCondition.Direction dir = OrderCondition.Direction.Ascending;
-
-                if(orderByCond.getDirection() != OrderCondition.Direction.Unspecified)
-                    dir = orderByCond.getDirection();
-
-                if(!first)
-                    strBuf.append(", ");
-                else
-                    first = false;
-
-                strBuf.append(translateExpression(orderByCond.getExpression(),
-                        EnumSet.of(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS), translatedWhereClause));
-                strBuf.append(" ");
-
-                if(dir == OrderCondition.Direction.Ascending)
-                    strBuf.append("ASC");
-                else
-                    strBuf.append("DESC");
-            }
-        }
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-        String newSqlTableName = "";
-        if(!isTopLevel)
-        {
-            queryDepth--;
-            newLine(strBuf);
-            strBuf.append(") AS ");
-            newSqlTableName = getNewTmpTabName();
-            strBuf.append(newSqlTableName);
-        }
-
-
-        return new TranslatedSegment(strBuf.toString(), false, usedVars, possibleUnboundVars, newSqlTableName);
-    }
 
     /**
      * Translates inner procedure call. Only a group preceding the procedure call is used as a context for the input
@@ -1206,9 +738,8 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
      * @param procedureCall Details of the procedure call.
      * @param procedureCallContext Context preceding the procedure call (while still in the current block),
      * @param wholeContextInSparql true if the whole preceding context is of type SPARQL.
-     * @return Translated inner procedure call as SQL.
+     * @return Translated inner procedure call.
      */
-    @SuppressWarnings("unused")
     private TranslatedSegment translateProcedureCall(ProcedureCallBase procedureCallBase,
             TranslatedSegment procedureCallContext)
     {
@@ -1489,711 +1020,165 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
 
-        if(false)
-        /* SQL variant */
+        TranslatedSegment originalContext = procedureCallContext;
+
+
+        /*
+         * Translate 1st part
+         */
+        LinkedHashSet<String> parameterVars = new LinkedHashSet<String>();
+
+        for(ParameterCall par : parameterCalls.getArr())
+            if(par.getVar() != null)
+                parameterVars.add(par.getVar());
+
+
+        if(procedureCallContext == null)
+            procedureCallContext = new TranslatedSegment(""); // fake context
+
+
+        TranslatedSegment fakeCallTranslation = new TranslatedSegment(null, usedVars, possibleUnboundVars);
+
+
+        StringBuilder strBuf = new StringBuilder();
+        strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage ");
+
+        for(Define def : prologue.getDefines())
         {
-            /*
-             * Translate
-             */
-            if(procedureCallContext != null && procedureCallContext.isSparql)
-            {
-                procedureCallContext = wrapAndNameTable(wrapSparqlSelect(procedureCallContext));
-                procedureCallContext.str = indentBlock(procedureCallContext.str, 1);
-            }
-
-            if(procedureCallContext == null)
-                procedureCallContext = new TranslatedSegment(null, false); // fake context
-
-            TranslatedSegment fakeCallTranslation = new TranslatedSegment(null, false, usedVars, possibleUnboundVars,
-                    getNewTmpTabName());
-
-
-            /* SELECT */
-            StringBuilder strBuf = new StringBuilder();
-            newLine(strBuf);
-            strBuf.append("SELECT ");
-
-            HashMap<String, PropertyDirection> joinVariables = getJoinVariables(fakeCallTranslation,
-                    procedureCallContext);
-
-            LinkedHashSet<String> finalAllUsedVars = new LinkedHashSet<>();
-            finalAllUsedVars.addAll(procedureCallContext.subqueryVars);
-            finalAllUsedVars.addAll(fakeCallTranslation.subqueryVars);
-
-            LinkedHashSet<String> finalPossibleUnboundVars = new LinkedHashSet<>();
-            finalPossibleUnboundVars.addAll(procedureCallContext.possibleUnboundVars);
-            finalPossibleUnboundVars.addAll(fakeCallTranslation.possibleUnboundVars);
-
-            if(!finalAllUsedVars.isEmpty())
-                strBuf.append(buildInnerJoinProjection(finalAllUsedVars, joinVariables,
-                        fakeCallTranslation.sqlTableName, procedureCallContext.sqlTableName));
-            else
-                strBuf.append("1 AS \"" + getNewFakeStarName() + "\"");
-
-
-            /* FROM */
-            newLine(strBuf);
-            strBuf.append("FROM");
-
-            queryDepth++;
-            newLine(strBuf);
-            strBuf.append("\"").append(currProcConfig.getMappedProcName()).append("\"(");
-
-            List<String> inputParams = new ArrayList<>();
-            boolean firstParam = true;
-
-            for(int i = 0; i < parameterCalls.getArr().size(); ++i)
-            {
-                String inputParam = getNewTmpVarName();
-
-                if(!firstParam)
-                    strBuf.append(", ");
-                else
-                    firstParam = false;
-
-                strBuf.append("\"").append(inputParam).append("\"");
-                inputParams.add(inputParam);
-            }
-
-            strBuf.append(")(");
-
-            firstParam = true;
-
-            for(String resultVarName : resultVarList)
-            {
-                if(resultVarName == null)
-                    resultVarName = getNewTmpVarName();
-
-                if(!firstParam)
-                    strBuf.append(", ");
-                else
-                    firstParam = false;
-
-                strBuf.append("\"").append(resultVarName).append("\" any");
-            }
-
-            strBuf.append(") ").append(fakeCallTranslation.sqlTableName);
-
-
-            if(procedureCallContext.str != null)
-            {
-                strBuf.append(",");
-                strBuf.append(indentBlock(procedureCallContext.str, queryDepth + 1));
-            }
-
-            queryDepth--;
-
-
-            /* WHERE */
-            newLine(strBuf);
-            strBuf.append("WHERE (( ");
-
-            // passing the parameters to the delegate function
-            boolean firstInputPar = true;
-
-            for(int i = 0; i < inputParams.size(); ++i)
-            {
-                if(!firstInputPar)
-                    strBuf.append(" AND ");
-                else
-                    firstInputPar = false;
-
-                strBuf.append("\"").append(inputParams.get(i)).append("\"");
-                strBuf.append(" = ");
-
-                ParameterCall par = parameterCalls.getArr().get(i);
-
-                //NOTE: workaround for https://github.com/openlink/virtuoso-opensource/issues/433
-                strBuf.append("\"echo\"(");
-
-                if(par.getVar() != null)
-                    strBuf.append(procedureCallContext.sqlTableName).append(".\"").append(par.getVar()).append("\"");
-                else
-                    strBuf.append(par.getLiteralVal());
-
-                strBuf.append(")");
-            }
-
-            strBuf.append(" ) AND ( ");
-
-            // join condition
-            strBuf.append(buildInnerJoinOnCondition(joinVariables, fakeCallTranslation.sqlTableName,
-                    procedureCallContext.sqlTableName));
-
-
-            // constant result value filter
-            if(!varsToFilter.isEmpty())
-            {
-                strBuf.append(" ) AND ( ");
-
-                for(Pair<String, Node> varToFilter : varsToFilter)
-                {
-                    String var = varToFilter.getKey();
-                    Node filterNode = varToFilter.getValue();
-
-                    strBuf.append(fakeCallTranslation.sqlTableName).append(".\"").append(var).append("\"");
-                    strBuf.append(" = ");
-                    strBuf.append(translateLiteralNodeExpression((Expression) filterNode));
-                }
-            }
-
-            strBuf.append(" ))");
-
-
-            // OPTION(QUIETCAST)
-            newLine(strBuf);
-            strBuf.append(sqlSelectSuffix);
-
-
-            TranslatedSegment translatedSegment = wrapAndNameTable(
-                    new TranslatedSegment(strBuf.toString(), false, finalAllUsedVars, finalPossibleUnboundVars));
-
-
-            // NOTE: it is primitive, but sufficient
-            if(!graphOrServiceRestrictions.isEmpty())
-            {
-                GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-
-                if(restriction.getVarOrIri() instanceof Variable)
-                {
-                    String var = ((Variable) restriction.getVarOrIri()).getName();
-                    String table = getNewTmpTabName();
-
-                    StringBuilder graphStrBuf = new StringBuilder();
-                    newLine(graphStrBuf);
-                    graphStrBuf.append("(SELECT ");
-                    graphStrBuf.append(translateLiteralNodeExpression(procedureName));
-                    graphStrBuf.append(" AS \"");
-                    graphStrBuf.append(var);
-                    graphStrBuf.append("\") AS ");
-                    graphStrBuf.append(table);
-
-                    LinkedHashSet<String> graphVars = new LinkedHashSet<>();
-                    graphVars.add(var);
-
-                    TranslatedSegment graphSegment = new TranslatedSegment(graphStrBuf.toString(), false, graphVars,
-                            new LinkedHashSet<>(), table);
-
-                    translatedSegment = translateJoin(translatedSegment, graphSegment);
-                }
-            }
-
-            return translatedSegment;
+            strBuf.append(" ");
+            strBuf.append(def.toString());
         }
-        else if(false)
-        /* SERVICE variant */
+
+        strBuf.append("\n");
+
+        String countVar = getNewTmpVarName();
+
+        strBuf.append("SELECT (sum(?").append(countVar).append(") as ?SUM)  WHERE\n{\n");
+        strBuf.append(indentBlock(procedureCallContext.str, 1));
+
+        strBuf.append("\n  BIND (");
+
+        strBuf.append("sql:").append(currProcConfig.getMappedProcName()).append("_store(");
+
+        strBuf.append(graphID);
+
+        for(int i = 0; i < parameterCalls.getArr().size(); ++i)
         {
-            //TODO: Jak se chovat uvnitř grafu či service?
+            ParameterCall par = parameterCalls.getArr().get(i);
 
-            StringBuilder strBuf = new StringBuilder();
+            strBuf.append(", ");
 
-            strBuf.append("\nSERVICE <http://localhost:3030/orchem> {"); // FIXME: set IRI
-
-
-            // subject
-
-            if(procedureCallBase instanceof ProcedureCall)
-            {
-                ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
-                Node resultNode = procedureCall.getResult();
-
-                if(resultNode instanceof Variable)
-                    strBuf.append("?").append(((Variable) resultNode).getName());
-                else if(resultNode instanceof BlankNode)
-                    strBuf.append("?").append(getTmpVarNameForBlankNode(((BlankNode) resultNode).getName()));
-                else
-                    strBuf.append(resultNode.toString());
-
-                strBuf.append(" ");
-            }
+            if(par.getVar() != null)
+                strBuf.append('?').append(par.getVar());
             else
+                strBuf.append(par.getLiteralVal());
+        }
+
+
+        strBuf.append(") AS ?").append(countVar).append(")\n}\n");
+
+        codes.add(strBuf.toString());
+
+
+        /*
+         * Translate 2nd part
+         */
+
+        StringBuilder strBuf2 = new StringBuilder();
+        String callVar = getNewTmpVarName();
+
+        String graph = "http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#" + currProcConfig.getMappedProcName();
+
+        strBuf2.append("\n");
+        strBuf2.append("GRAPH <").append(graph).append(">\n");
+        strBuf2.append("{\n");
+
+
+        strBuf2.append("  ?").append(callVar).append("\n");
+        strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#context> ").append(graphID);
+
+
+        LinkedHashMap<String, String> filterMap = new LinkedHashMap<String, String>();
+
+        for(ProcedureCall.Parameter par : procedureCallBase.getParameters())
+        {
+            if(par.getValue() instanceof Variable || par.getValue() instanceof BlankNode)
             {
-                strBuf.append("(");
+                strBuf2.append(";\n    ").append(par.getName().toString());
+                strBuf2.append(" ");
 
-                MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
+                String tmpVar = getNewTmpVarName();
+                strBuf2.append('?').append(tmpVar);
 
-                HashMap<String, Node> actualResultCalls = new HashMap<>();
-
-                for(Parameter par : multiProcedureCall.getResults())
-                    actualResultCalls.put(par.getName().toString(), par.getValue());
-
-                for(ResultDefinition resDef : currProcConfig.getResults())
-                {
-                    String resultParamName = resDef.getParamName();
-                    Node resultNode = actualResultCalls.get(resultParamName);
-                    actualResultCalls.remove(resultParamName);
-
-                    if(resultNode == null)
-                        strBuf.append("[]");
-                    else if(resultNode instanceof Variable)
-                        strBuf.append("?").append(((Variable) resultNode).getName());
-                    else if(resultNode instanceof BlankNode)
-                        strBuf.append("?").append(getTmpVarNameForBlankNode(((BlankNode) resultNode).getName()));
-                    else
-                        strBuf.append(resultNode.toString());
-
-                    strBuf.append(" ");
-                }
-
-                strBuf.append(")");
-            }
-
-
-            // predicate
-            strBuf.append(" <http://bioinfo.uochb.cas.cz/0.9/orchem#").append(currProcConfig.getMappedProcName())
-                    .append("> ");
-
-
-            // FIXME: ////////////////////////////////////////////////////
-            // FIXME: default value in SQL format?
-            // FIXME: no return variable?
-
-            ParameterCalls parameterValues = new ParameterCalls();
-
-            for(ParameterDefinition param : currProcConfig.getParameters())
-            {
-                String paramName = param.getParamName();
-                String defaultVal = param.getDefaultValue();
-                String typeIRI = param.getTypeIRI();
-
-                if(defaultVal.isEmpty())
-                    defaultVal = null;
-
-                parameterValues.getArr().add(new ParameterCall(paramName, null, typeIRI, defaultVal));
-            }
-
-
-            for(ProcedureCall.Parameter par : procedureCallBase.getParameters())
-            {
-                String parName = par.getName().toString();
-                Node paramValue = par.getValue();
-
-                ParameterCall parameterCall = parameterValues.find(parName);
-
-                if(parameterCall == null)
-                    continue;
-
-                if(paramValue instanceof Variable || paramValue instanceof BlankNode)
-                {
-                    String varName;
-
-                    if(paramValue instanceof Variable)
-                        varName = ((Variable) paramValue).getName();
-                    else
-                        varName = getTmpVarNameForBlankNode(((BlankNode) paramValue).getName());
-
-                    parameterCall.setVar(varName);
-                }
-                else if(paramValue instanceof Literal || paramValue instanceof IRI)
-                {
-                    parameterCall.setLiteralVal(paramValue.toString());
-                }
-            }
-            /////////////////////////////////////////////////////////////
-
-
-            // object
-            strBuf.append("(");
-            for(ParameterCall par : parameterValues.getArr())
-            {
-                if(par.getVar() != null)
-                    strBuf.append("?").append(par.getVar());
+                if(par.getValue() instanceof BlankNode)
+                    filterMap.put(tmpVar, "?" + getTmpVarNameForBlankNode(((BlankNode) par.getValue()).getName()));
                 else
-                    strBuf.append(par.getLiteralVal());
-
-                strBuf.append(" ");
+                    filterMap.put(tmpVar, par.getValue().toString());
             }
-            strBuf.append(")");
+        }
 
 
-            strBuf.append("}");
+        strBuf2.append(" .\n");
+        strBuf2.append("}\n");
 
-            TranslatedSegment translatedSegment = new TranslatedSegment(strBuf.toString(), true, usedVars,
-                    possibleUnboundVars);
+        for(Entry<String, String> pair : filterMap.entrySet())
+        {
+            strBuf2.append("filter(");
+            strBuf2.append("str(?");
+            strBuf2.append(pair.getKey());
+            strBuf2.append(") = str(");
+            strBuf2.append(pair.getValue());
+
+            strBuf2.append("))\n");
+        }
 
 
-            translatedSegment = translateJoin(procedureCallContext, translatedSegment);
-            return translatedSegment;
+
+        /* result graph */
+        strBuf2.append("\n");
+        strBuf2.append("GRAPH <").append(graph).append(">\n");
+        strBuf2.append("{\n");
+
+
+        strBuf2.append("  ?").append(getNewTmpVarName()).append("\n");
+        strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#call> ?").append(callVar);
+
+        if(procedureCallBase instanceof ProcedureCall)
+        {
+            strBuf2.append(";\n");
+            strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#result> ");
+            ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
+            strBuf2.append(" ").append(procedureCall.getResult().toString());
+            strBuf2.append(" .\n");
         }
         else
-        /* Store variant */
         {
-            TranslatedSegment originalContext = procedureCallContext;
+            MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
 
-
-            /*
-             * Translate 1st part
-             */
-            LinkedHashSet<String> parameterVars = new LinkedHashSet<String>();
-
-            for(ParameterCall par : parameterCalls.getArr())
-                if(par.getVar() != null)
-                    parameterVars.add(par.getVar());
-
-            /*
-            if(procedureCallContext != null && procedureCallContext.isSparql)
+            for(Parameter par : multiProcedureCall.getResults())
             {
-                procedureCallContext = wrapAndNameTable(wrapSparqlContext(procedureCallContext, parameterVars));
-                procedureCallContext.str = indentBlock(procedureCallContext.str, 1);
-            }
-            */
-
-            if(procedureCallContext == null)
-                procedureCallContext = new TranslatedSegment("", true); // fake context
-
-
-            TranslatedSegment fakeCallTranslation = new TranslatedSegment(null, false, usedVars, possibleUnboundVars,
-                    getNewTmpTabName());
-
-
-            /* SELECT */
-            /*
-            String retVar = getNewTmpVarName();
-
-            StringBuilder strBuf = new StringBuilder();
-            newLine(strBuf);
-            strBuf.append("SELECT ");
-
-            strBuf.append(fakeCallTranslation.sqlTableName + ".\"" + retVar + "\"");
-
-
-            // FROM
-            newLine(strBuf);
-            strBuf.append("FROM");
-
-            queryDepth++;
-            newLine(strBuf);
-            strBuf.append("\"").append(currProcConfig.getMappedProcName()).append("_store").append("\"(");
-
-            List<String> inputParams = new ArrayList<>();
-
-            String inputGraphParam = getNewTmpVarName();
-            strBuf.append("\"").append(inputGraphParam).append("\"");
-
-            for(int i = 0; i < parameterCalls.getArr().size(); ++i)
-            {
-                String inputParam = getNewTmpVarName();
-                strBuf.append(", ");
-                strBuf.append("\"").append(inputParam).append("\"");
-                inputParams.add(inputParam);
-            }
-
-            strBuf.append(")(");
-            strBuf.append("\"").append(retVar).append("\" integer");
-            strBuf.append(") ").append(fakeCallTranslation.sqlTableName);
-
-
-            if(procedureCallContext.str != null)
-            {
-                strBuf.append(",");
-                strBuf.append(indentBlock(procedureCallContext.str, queryDepth));
-            }
-
-            queryDepth--;
-
-
-            // WHERE
-            newLine(strBuf);
-            strBuf.append("WHERE ( ");
-
-            // passing the parameters to the delegate function
-            strBuf.append("\"").append(inputGraphParam).append("\"");
-            strBuf.append(" = ");
-            strBuf.append("\"echo\"(");
-            strBuf.append(graphID);
-            strBuf.append(")");
-
-            for(int i = 0; i < inputParams.size(); ++i)
-            {
-                strBuf.append(" AND ");
-
-                strBuf.append("\"").append(inputParams.get(i)).append("\"");
-                strBuf.append(" = ");
-
-                ParameterCall par = parameterCalls.getArr().get(i);
-
-                //NOTE: workaround for https://github.com/openlink/virtuoso-opensource/issues/433
-                strBuf.append("\"echo\"(");
-
-                if(par.getVar() != null)
-                    strBuf.append(procedureCallContext.sqlTableName).append(".\"").append(par.getVar()).append("\"");
-                else
-                    strBuf.append(par.getLiteralVal());
-
-                strBuf.append(")");
-            }
-
-            strBuf.append(" )");
-            */
-
-
-
-            /*
-            sparql DEFINE input:inference "ontology"
-            SELECT (sum(?_COUNT) as ?SUM)  WHERE
-            {
-            ?AMG (<http://bioinfo.uochb.cas.cz/0.9/chebi#hasRole>/ <http://bioinfo.uochb.cas.cz/0.9/chebi#inRelationWithValue>) / <http://bioinfo.uochb.cas.cz/0.9/chebi#identifier> "73190" .
-            ?__tmpVar08 ^(<http://bioinfo.uochb.cas.cz/0.9/chebi#molFile>/ <http://bioinfo.uochb.cas.cz/0.9/chebi#molFileValue>) ?AMG .
-
-            BIND (sql:simsearch_store(300, ?__tmpVar08, 'MOL', 0.95, -1) as ?_COUNT)
-            };
-             */
-
-            StringBuilder strBuf = new StringBuilder();
-            strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage ");
-
-            for(Define def : prologue.getDefines())
-            {
-                strBuf.append(" ");
-                strBuf.append(def.toString());
-            }
-
-            strBuf.append("\n");
-
-            String countVar = getNewTmpVarName();
-
-            strBuf.append("SELECT (sum(?").append(countVar).append(") as ?SUM)  WHERE\n{\n");
-            strBuf.append(indentBlock(procedureCallContext.str, 1));
-
-            strBuf.append("\n  BIND (");
-
-            strBuf.append("sql:").append(currProcConfig.getMappedProcName()).append("_store(");
-
-            strBuf.append(graphID);
-
-            for(int i = 0; i < parameterCalls.getArr().size(); ++i)
-            {
-                ParameterCall par = parameterCalls.getArr().get(i);
-
-                strBuf.append(", ");
-
-                if(par.getVar() != null)
-                    strBuf.append('?').append(par.getVar());
-                else
-                    strBuf.append(par.getLiteralVal());
-            }
-
-
-            strBuf.append(") AS ?").append(countVar).append(")\n");
-
-
-            strBuf.append("}\n");
-
-
-
-
-            // OPTION(QUIETCAST)
-            //newLine(strBuf);
-            //strBuf.append(sqlSelectSuffix);
-
-
-            //System.out.println("#############################");
-            //System.out.println(strBuf.toString());
-            //System.out.println("#############################");
-
-
-            codes.add(strBuf.toString());
-
-
-            /*
-             * Translate 2nd part
-             */
-
-            StringBuilder strBuf2 = new StringBuilder();
-            String callVar = getNewTmpVarName();
-
-            String graph = "http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#" + currProcConfig.getMappedProcName();
-
-            strBuf2.append("\n");
-            strBuf2.append("GRAPH <").append(graph).append(">\n");
-            strBuf2.append("{\n");
-
-
-            strBuf2.append("  ?").append(callVar).append("\n");
-            strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#context> ").append(graphID);
-
-
-            LinkedHashMap<String, String> filterMap = new LinkedHashMap<String, String>();
-
-            for(ProcedureCall.Parameter par : procedureCallBase.getParameters())
-            {
-                if(par.getValue() instanceof Variable || par.getValue() instanceof BlankNode)
+                if(par.getValue() != null)
                 {
-                    strBuf2.append(";\n    ").append(par.getName().toString());
-                    strBuf2.append(" ");
-
-                    String tmpVar = getNewTmpVarName();
-                    strBuf2.append('?').append(tmpVar);
-
-                    if(par.getValue() instanceof BlankNode)
-                        filterMap.put(tmpVar, "?" + getTmpVarNameForBlankNode(((BlankNode) par.getValue()).getName()));
-                    else
-                        filterMap.put(tmpVar, par.getValue().toString());
-
-                    /*
-                    if(par.getValue() instanceof BlankNode)
-                        strBuf2.append("?").append(getTmpVarNameForBlankNode(((BlankNode) par.getValue()).getName()));
-                    else
-                        strBuf2.append(par.getValue().toString());
-                    */
-
-                }
-            }
-
-
-            strBuf2.append(" .\n");
-            strBuf2.append("}\n");
-
-            for(Entry<String, String> pair : filterMap.entrySet())
-            {
-                strBuf2.append("filter(");
-
-                /*
-                strBuf2.append("?");
-                strBuf2.append(pair.getKey());
-                strBuf2.append(" = ");
-                strBuf2.append(pair.getValue());
-
-
-                strBuf2.append(" || ?");
-                strBuf2.append(pair.getKey());
-                strBuf2.append(" = str(");
-                strBuf2.append(pair.getValue());
-                strBuf2.append(")");
-                */
-
-                strBuf2.append("str(?");
-                strBuf2.append(pair.getKey());
-                strBuf2.append(") = str(");
-                strBuf2.append(pair.getValue());
-
-
-                strBuf2.append("))\n");
-            }
-
-
-
-            /* result graph */
-            strBuf2.append("\n");
-            strBuf2.append("GRAPH <").append(graph).append(">\n");
-            strBuf2.append("{\n");
-
-
-            strBuf2.append("  ?").append(getNewTmpVarName()).append("\n");
-            strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#call> ?").append(callVar);
-
-            if(procedureCallBase instanceof ProcedureCall)
-            {
-                strBuf2.append(";\n");
-                strBuf2.append("    <http://bioinfo.iocb.cz/rdf/0.9/procedure-calls#result> ");
-                ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
-                strBuf2.append(" ").append(procedureCall.getResult().toString());
-                strBuf2.append(" .\n");
-            }
-            else
-            {
-                MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
-
-                for(Parameter par : multiProcedureCall.getResults())
-                {
-                    if(par.getValue() != null)
-                    {
-                        strBuf2.append(";\n    ");
-                        strBuf2.append(par.getName().toString());
-                        strBuf2.append(" ");
-                        strBuf2.append(par.getValue().toString());
-                    }
-                }
-
-                strBuf2.append(" .\n");
-            }
-
-            strBuf2.append("}\n");
-
-
-
-            /*
-            strBuf2.append("\nGRAPH <http://localhost/result").append(graphID++).append("> ");
-            strBuf2.append("\n{\n");
-
-            if(procedureCallBase instanceof ProcedureCall)
-            {
-                ProcedureCall procedureCall = (ProcedureCall) procedureCallBase;
-                strBuf2.append("  ").append(procedureCall.getResult().toString());
-            }
-            else
-            {
-                strBuf2.append("  [");
-
-                MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
-
-
-                boolean first = true;
-
-                for(Parameter par : multiProcedureCall.getResults())
-                {
-                    if(par.getValue() != null)
-                    {
-                        if(!first)
-                            strBuf2.append("; ");
-
-                        strBuf2.append(par.getName().toString());
-                        strBuf2.append(" ");
-                        strBuf2.append(par.getValue().toString());
-
-                        first = false;
-                    }
-                }
-
-                strBuf2.append(" ] ");
-            }
-
-            strBuf2.append(procedureCallBase.getProcedure().toString());
-
-            strBuf2.append("  [");
-
-
-            boolean first = true;
-
-            for(ProcedureCall.Parameter par : procedureCallBase.getParameters())
-            {
-                if(par.getValue() instanceof Variable || par.getValue() instanceof BlankNode)
-                {
-                    if(!first)
-                        strBuf2.append("; ");
-
+                    strBuf2.append(";\n    ");
                     strBuf2.append(par.getName().toString());
                     strBuf2.append(" ");
-
-                    if(par.getValue() instanceof BlankNode)
-                        strBuf2.append("?").append(getTmpVarNameForBlankNode(((BlankNode) par.getValue()).getName()));
-                    else
-                        strBuf2.append(par.getValue().toString());
-
-                    first = false;
+                    strBuf2.append(par.getValue().toString());
                 }
             }
 
-            strBuf2.append(" ] ");
-
-            strBuf2.append("\n}");
-            */
-
-
-
-
-            //TranslatedSegment translatedSegment = wrapAndNameTable(new TranslatedSegment(strBuf.toString(), false,
-            //        finalAllUsedVars, finalPossibleUnboundVars));
-
-            TranslatedSegment procedureGraph = new TranslatedSegment(strBuf2.toString(), true,
-                    fakeCallTranslation.subqueryVars, fakeCallTranslation.possibleUnboundVars);
-
-            TranslatedSegment translatedSegment = translateJoin(originalContext, procedureGraph);
-
-            graphID++;
-
-            return translatedSegment;
+            strBuf2.append(" .\n");
         }
+
+        strBuf2.append("}\n");
+
+        TranslatedSegment procedureGraph = new TranslatedSegment(strBuf2.toString(), fakeCallTranslation.subqueryVars,
+                fakeCallTranslation.possibleUnboundVars);
+
+        TranslatedSegment translatedSegment = translateJoin(originalContext, procedureGraph);
+
+        graphID++;
+
+        return translatedSegment;
     }
 
     private static int graphID = 0;
@@ -2300,123 +1285,24 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
             checkExpressionForUnGroupedSolutions(filter.getConstraint());
 
 
-        LinkedList<Filter> sqlFilters = new LinkedList<Filter>();
-        LinkedList<Filter> sparqlFilters = new LinkedList<Filter>();
-
+        StringBuilder strBuf = new StringBuilder();
+        strBuf.append(prevTranslatedPattern.str);
 
         for(Filter filter : filters)
         {
-            if(containsProcedureCall(filter.getConstraint()))
-                sqlFilters.add(filter);
-            else
-                sparqlFilters.add(filter);
+            strBuf.append("\n");
+            strBuf.append(filter.toString());
         }
 
+        TranslatedSegment result = new TranslatedSegment(strBuf.toString(), prevTranslatedPattern.subqueryVars,
+                prevTranslatedPattern.possibleUnboundVars);
 
-        /*
-         * SPARQL translation
-         */
-        if(prevTranslatedPattern.isSparql && !fullQueryDecomposition)
-        {
-            StringBuilder strBuf = new StringBuilder();
-            strBuf.append(prevTranslatedPattern.str);
-
-            for(Filter filter : sparqlFilters)
-            {
-                strBuf.append("\n");
-                strBuf.append(filter.toString());
-            }
-
-            TranslatedSegment result = new TranslatedSegment(strBuf.toString(), true,
-                    prevTranslatedPattern.subqueryVars, prevTranslatedPattern.possibleUnboundVars);
-
-            if(sqlFilters.isEmpty())
-                return result;
-            else
-                prevTranslatedPattern = result;
-        }
-        else
-        {
-            sqlFilters.addAll(sparqlFilters);
-        }
-
-
-        /*
-         * SQL translation
-         */
-        if(prevTranslatedPattern.isSparql)
-        {
-            prevTranslatedPattern = wrapAndNameTable(wrapSparqlSelect(prevTranslatedPattern));
-            prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 1);
-        }
-
-        StringBuilder strBuf = new StringBuilder();
-        newLine(strBuf);
-        strBuf.append("(");
-
-        queryDepth++;
-        newLine(strBuf);
-        strBuf.append("SELECT ");
-
-
-        if(prevTranslatedPattern.subqueryVars.isEmpty())
-            strBuf.append("TOP 1 1 AS \"").append(getNewTmpVarName()).append("\"");
-
-        boolean first = true;
-        for(String var : prevTranslatedPattern.subqueryVars)
-        {
-            if(!first)
-                strBuf.append(", ");
-            else
-                first = false;
-
-            strBuf.append("\"").append(var).append("\"");
-        }
-
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 2);
-        strBuf.append(prevTranslatedPattern.str);
-
-
-        newLine(strBuf);
-        strBuf.append("WHERE ");
-        strBuf.append("( ");
-
-        boolean firstInWhere = true;
-
-        for(Pattern pat : sqlFilters)
-        {
-            if(!firstInWhere)
-                strBuf.append(" AND ");
-            else
-                firstInWhere = false;
-
-            strBuf.append(translateExpression(((Filter) pat).getConstraint(), null, prevTranslatedPattern));
-        }
-
-        strBuf.append(" )");
-
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-        queryDepth--;
-        newLine(strBuf);
-        strBuf.append(") AS ");
-        String newTabName = getNewTmpTabName();
-        strBuf.append(newTabName);
-
-
-        return new TranslatedSegment(strBuf.toString(), false, prevTranslatedPattern.subqueryVars,
-                prevTranslatedPattern.possibleUnboundVars, newTabName);
+        return result;
     }
 
 
     /**
-     * Processes the BIND clause - move the binded expression to the projection of SQL SELECT.
+     * Processes the BIND clause.
      *
      * @param prevTranslatedPattern Previously translated segment of patterns.
      * @param bindPattern BIND pattern to be processed.
@@ -2449,84 +1335,12 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         StringBuilder strBuf = new StringBuilder();
 
-        /*
-         * SPARQL translation
-         */
-        if((prevTranslatedPattern == null || prevTranslatedPattern.isSparql) && !fullQueryDecomposition)
-        {
-            if(prevTranslatedPattern != null)
-                strBuf.append(prevTranslatedPattern.str);
+        if(prevTranslatedPattern != null)
+            strBuf.append(prevTranslatedPattern.str);
 
-            strBuf.append("\n" + bindPat.toString());
+        strBuf.append("\n" + bindPat.toString());
 
-            return new TranslatedSegment(strBuf.toString(), true, usedVariables, possibleUnboundVars);
-        }
-
-
-        /*
-         * SQL translation
-         */
-        if(prevTranslatedPattern == null)
-            prevTranslatedPattern = new TranslatedSegment(getDummyTableStr(), false);
-
-        if(prevTranslatedPattern.isSparql)
-        {
-            prevTranslatedPattern = wrapAndNameTable(wrapSparqlSelect(prevTranslatedPattern));
-            prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 1);
-        }
-
-
-        newLine(strBuf);
-        strBuf.append("(");
-
-        queryDepth++;
-        newLine(strBuf);
-        strBuf.append("SELECT ");
-
-
-        boolean first = true;
-        for(String var : prevTranslatedPattern.subqueryVars)
-        {
-            if(!first)
-                strBuf.append(", ");
-            else
-                first = false;
-
-            strBuf.append("\"").append(var).append("\"");
-        }
-
-
-        if(!first)
-            strBuf.append(", ");
-
-        strBuf.append("(");
-        strBuf.append(translateExpression(bindPat.getExpression(),
-                EnumSet.of(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS, ExpressionTranslateFlag.LONG_CAST),
-                prevTranslatedPattern));
-        strBuf.append(") AS ");
-
-
-
-        strBuf.append("\"").append(varName).append("\"");
-
-
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 2);
-        strBuf.append(prevTranslatedPattern.str);
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-        queryDepth--;
-        newLine(strBuf);
-        strBuf.append(") AS ");
-        String newTabName = getNewTmpTabName();
-        strBuf.append(newTabName);
-
-        return new TranslatedSegment(strBuf.toString(), false, usedVariables, possibleUnboundVars, newTabName);
+        return new TranslatedSegment(strBuf.toString(), usedVariables, possibleUnboundVars);
     }
 
     /**
@@ -2584,79 +1398,10 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         StringBuilder strBuf = new StringBuilder();
 
-        /*
-         * SPARQL JOIN
-         */
-        if(prevTranslatedPattern.isSparql && translatedPattern.isSparql && !fullQueryDecomposition)
-        {
-            strBuf.append(prevTranslatedPattern.str);
-            strBuf.append(translatedPattern.str);
-
-            return new TranslatedSegment(strBuf.toString(), true, allUsedVars, allPossibleUnboundVars);
-        }
-
-
-        /*
-         * SQL JOIN
-         */
-        if(prevTranslatedPattern.isSparql)
-        {
-            prevTranslatedPattern = wrapAndNameTable(wrapSparqlSelect(prevTranslatedPattern));
-            prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 1);
-        }
-
-        if(translatedPattern.isSparql)
-        {
-            translatedPattern = wrapAndNameTable(wrapSparqlSelect(translatedPattern));
-            translatedPattern.str = indentBlock(translatedPattern.str, 1);
-        }
-
-
-        HashMap<String, PropertyDirection> joinVariables = getJoinVariables(prevTranslatedPattern, translatedPattern);
-
-
-        newLine(strBuf);
-        strBuf.append("(");
-        queryDepth++;
-
-
-        newLine(strBuf);
-        strBuf.append("SELECT ");
-        strBuf.append(buildInnerJoinProjection(allUsedVars, joinVariables, prevTranslatedPattern.sqlTableName,
-                translatedPattern.sqlTableName));
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 2);
         strBuf.append(prevTranslatedPattern.str);
-
-        newLine(strBuf);
-        strBuf.append("INNER JOIN");
-
-        translatedPattern.str = indentBlock(translatedPattern.str, 2);
         strBuf.append(translatedPattern.str);
 
-
-        newLine(strBuf);
-        strBuf.append("ON ( ");
-        strBuf.append(buildInnerJoinOnCondition(joinVariables, prevTranslatedPattern.sqlTableName,
-                translatedPattern.sqlTableName));
-        strBuf.append(" )");
-
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-
-        queryDepth--;
-        newLine(strBuf);
-        strBuf.append(") AS ");
-
-        String joinedTableName = getNewTmpTabName();
-        strBuf.append(joinedTableName);
-
-        return new TranslatedSegment(strBuf.toString(), false, allUsedVars, allPossibleUnboundVars, joinedTableName);
+        return new TranslatedSegment(strBuf.toString(), allUsedVars, allPossibleUnboundVars);
     }
 
 
@@ -2703,163 +1448,27 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
 
-        boolean isSqlFilter = optionalFilters.stream().anyMatch(x -> containsProcedureCall(x.getConstraint()));
         StringBuilder strBuf = new StringBuilder();
 
 
 
-        /*
-         * SPARQL OPTIONAL
-         */
-        if((prevTranslatedPattern == null || prevTranslatedPattern.isSparql)
-                && (translatedPattern == null || translatedPattern.isSparql) && !isSqlFilter && !fullQueryDecomposition)
-        {
-            if(prevTranslatedPattern != null)
-                strBuf.append(prevTranslatedPattern.str);
+        if(prevTranslatedPattern != null)
+            strBuf.append(prevTranslatedPattern.str);
 
-            strBuf.append("\nOPTIONAL\n{");
+        strBuf.append("\nOPTIONAL\n{");
 
-            if(translatedPattern != null)
-                strBuf.append(indentBlock(translatedPattern.str, 1));
-
-            for(Filter filter : optionalFilters)
-            {
-                strBuf.append("\n");
-                strBuf.append(indentBlock(filter.toString(), 1));
-            }
-
-            strBuf.append("\n}");
-
-            return new TranslatedSegment(strBuf.toString(), true, allUsedVars, allPossibleUnboundVars);
-        }
-
-
-        /*
-         * SQL OPTIONAL
-         */
-        if(prevTranslatedPattern == null)
-            prevTranslatedPattern = new TranslatedSegment(getDummyTableStr(), false);
-
-        if(prevTranslatedPattern.isSparql)
-        {
-            prevTranslatedPattern = wrapAndNameTable(wrapSparqlSelect(prevTranslatedPattern));
-            prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 1);
-        }
-
-        if(translatedPattern.isSparql)
-        {
-            translatedPattern = wrapAndNameTable(wrapSparqlSelect(translatedPattern));
-            translatedPattern.str = indentBlock(translatedPattern.str, 1);
-        }
-
-
-        HashMap<String, PropertyDirection> joinVariables = getJoinVariables(prevTranslatedPattern, translatedPattern);
-        HashMap<String, String> variablesMap = new HashMap<>();
-        LinkedHashSet<String> possibleUnboundVars = new LinkedHashSet<>();
-
-        for(String var : allUsedVars)
-        {
-            PropertyDirection unboundProperty = joinVariables.get(var);
-            String leftVar = prevTranslatedPattern.sqlTableName + ".\"" + var + "\"";
-            String rightVar = translatedPattern.sqlTableName + ".\"" + var + "\"";
-
-            if(unboundProperty != null)
-            {
-                if(!useCorrectJoin)
-                {
-                    variablesMap.put(var, rightVar);
-                }
-                else if(unboundProperty == PropertyDirection.BOTH)
-                {
-                    variablesMap.put(var, "COALESCE(" + leftVar + ", " + rightVar + ")");
-                }
-                else if(unboundProperty == PropertyDirection.LEFT)
-                {
-                    variablesMap.put(var, rightVar);
-                }
-                else if(unboundProperty == PropertyDirection.RIGHT || unboundProperty == PropertyDirection.NONE)
-                {
-                    variablesMap.put(var, leftVar);
-                }
-            }
-            else if(prevTranslatedPattern.subqueryVars.contains(var))
-            {
-                variablesMap.put(var, leftVar);
-            }
-            else
-            {
-                variablesMap.put(var, rightVar);
-            }
-
-            if(prevTranslatedPattern.possibleUnboundVars.contains(var)
-                    && translatedPattern.possibleUnboundVars.contains(var))
-                possibleUnboundVars.add(var);
-        }
-
-
-        String filterExpression = null;
+        if(translatedPattern != null)
+            strBuf.append(indentBlock(translatedPattern.str, 1));
 
         for(Filter filter : optionalFilters)
         {
-            String translatedConstraint = "("
-                    + translateExpression(filter.getConstraint(), null, variablesMap, possibleUnboundVars) + ")";
-
-            if(filterExpression == null)
-                filterExpression = translatedConstraint;
-            else
-                filterExpression = filterExpression + " AND " + translatedConstraint;
+            strBuf.append("\n");
+            strBuf.append(indentBlock(filter.toString(), 1));
         }
 
+        strBuf.append("\n}");
 
-        newLine(strBuf);
-        strBuf.append("(");
-        queryDepth++;
-
-
-        newLine(strBuf);
-        strBuf.append("SELECT ");
-        strBuf.append(buildInnerJoinProjection(allUsedVars, joinVariables, prevTranslatedPattern.sqlTableName,
-                translatedPattern.sqlTableName));
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 2);
-        strBuf.append(prevTranslatedPattern.str);
-
-        newLine(strBuf);
-        strBuf.append("LEFT JOIN");
-
-        translatedPattern.str = indentBlock(translatedPattern.str, 2);
-        strBuf.append(translatedPattern.str);
-
-
-        newLine(strBuf);
-        strBuf.append("ON ( ");
-        strBuf.append(buildInnerJoinOnCondition(joinVariables, prevTranslatedPattern.sqlTableName,
-                translatedPattern.sqlTableName));
-
-        if(filterExpression != null)
-        {
-            strBuf.append(" AND ");
-            strBuf.append(filterExpression);
-        }
-
-        strBuf.append(" )");
-
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-
-        queryDepth--;
-        newLine(strBuf);
-        strBuf.append(") AS ");
-
-        String joinedTableName = getNewTmpTabName();
-        strBuf.append(joinedTableName);
-
-        return new TranslatedSegment(strBuf.toString(), false, allUsedVars, allPossibleUnboundVars, joinedTableName);
+        return new TranslatedSegment(strBuf.toString(), allUsedVars, allPossibleUnboundVars);
     }
 
 
@@ -2897,481 +1506,13 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         StringBuilder strBuf = new StringBuilder();
 
 
-        /*
-         * SPARQL MINUS
-         */
-        if(prevTranslatedPattern.isSparql && translatedPattern.isSparql && !fullQueryDecomposition)
-        {
-            strBuf.append(prevTranslatedPattern.str);
-            strBuf.append("\n");
-            strBuf.append("MINUS");
-            strBuf.append(translatedPattern.str);
-
-            return new TranslatedSegment(strBuf.toString(), true, prevTranslatedPattern.subqueryVars,
-                    prevTranslatedPattern.possibleUnboundVars);
-        }
-
-
-        /*
-         * SQL MINUS
-         */
-        if(prevTranslatedPattern.isSparql)
-        {
-            prevTranslatedPattern = wrapAndNameTable(wrapSparqlSelect(prevTranslatedPattern));
-            //prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 1);
-        }
-
-        if(translatedPattern.isSparql)
-        {
-            translatedPattern = wrapAndNameTable(wrapSparqlSelect(translatedPattern));
-            //translatedPattern.str = indentBlock(translatedPattern.str, 1);
-        }
-
-
-        newLine(strBuf);
-        strBuf.append("(");
-        queryDepth++;
-
-        newLine(strBuf);
-        strBuf.append("SELECT *");
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        prevTranslatedPattern.str = indentBlock(prevTranslatedPattern.str, 2);
         strBuf.append(prevTranslatedPattern.str);
-
-        newLine(strBuf);
-        strBuf.append("WHERE ");
-
-
-        strBuf.append("NOT EXISTS (");
-        ++queryDepth;
-        newLine(strBuf);
-
-        // select compatible solution
-        strBuf.append("SELECT TOP 1 1 AS __existsRetVal");
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        translatedPattern.str = indentBlock(translatedPattern.str, 3);
+        strBuf.append("\n");
+        strBuf.append("MINUS");
         strBuf.append(translatedPattern.str);
 
-        newLine(strBuf);
-        strBuf.append("WHERE ( ");
-
-        HashMap<String, PropertyDirection> joinVariables = getJoinVariables(prevTranslatedPattern, translatedPattern);
-
-        if(joinVariables.isEmpty())
-            strBuf.append("0");
-        else
-            strBuf.append(buildInnerJoinOnCondition(joinVariables, prevTranslatedPattern.sqlTableName,
-                    translatedPattern.sqlTableName));
-
-        strBuf.append(" )");
-        --queryDepth;
-        newLine(strBuf);
-        strBuf.append(")");
-
-
-        // OPTION(QUIETCAST)
-        newLine(strBuf);
-        strBuf.append(sqlSelectSuffix);
-
-        --queryDepth;
-        newLine(strBuf);
-        strBuf.append(") AS ");
-
-        String joinedTableName = getNewTmpTabName();
-        strBuf.append(joinedTableName);
-
-        return new TranslatedSegment(strBuf.toString(), false, prevTranslatedPattern.subqueryVars,
-                prevTranslatedPattern.possibleUnboundVars, joinedTableName);
-    }
-
-
-    /**
-     * Constructs a wrapping SPARQL SELECT which can be then used inside the SQL query.
-     *
-     * @param translatedGraphPattern SPARQL subquery to be wrapped.
-     * @return Wrapped SPARQL subquery.
-     */
-    private TranslatedSegment wrapSparqlSelect(TranslatedSegment translatedGraphPattern)
-    {
-        // e.g. ?X ?P ?Y --> sparql SELECT * WHERE { ?X ?P ?Y . }
-
-        LinkedHashSet<String> usedVars = new LinkedHashSet<>();
-        usedVars.addAll(translatedGraphPattern.subqueryVars);
-
-        StringBuilder strBuf = new StringBuilder();
-
-        newLine(strBuf);
-        strBuf.append("sparql define input:storage virtrdf:PubchemQuadStorage ");
-
-        for(Define def : prologue.getDefines())
-        {
-            strBuf.append(" ");
-            strBuf.append(def.toString());
-        }
-
-        strBuf.append(" SELECT *");
-
-        for(DataSet dataSet : selectDatasets.peek())
-        {
-            strBuf.append(" ");
-            strBuf.append(dataSet.toString());
-        }
-
-        strBuf.append(" WHERE");
-        newLine(strBuf);
-        strBuf.append("{");
-
-        int blockIndent = 2;
-
-        if(!graphOrServiceRestrictions.isEmpty())
-        {
-            // NOTE: The pattern should contain all restrictions, but we used virtuoso semantics.
-            GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-
-            if(restriction.getVarOrIri() instanceof Variable)
-                usedVars.add(((Variable) restriction.getVarOrIri()).getName());
-
-            blockIndent++;
-            queryDepth++;
-            newLine(strBuf);
-
-            if(restriction.isRestrictionType(GraphOrServiceRestriction.RestrictionType.GRAPH_RESTRICTION))
-                strBuf.append("GRAPH ");
-            else if(restriction.isSilent())
-                strBuf.append("SERVICE SILENT ");
-            else
-                strBuf.append("SERVICE ");
-
-            strBuf.append(restriction.getVarOrIri().toString());
-            newLine(strBuf);
-            strBuf.append("{");
-        }
-
-        strBuf.append(indentBlock(translatedGraphPattern.str, blockIndent));
-
-        if(!graphOrServiceRestrictions.isEmpty())
-        {
-            newLine(strBuf);
-            strBuf.append("}");
-            queryDepth--;
-        }
-
-        newLine(strBuf);
-        strBuf.append("}");
-
-        return new TranslatedSegment(strBuf.toString(), false, usedVars, translatedGraphPattern.possibleUnboundVars);
-    }
-
-    /*
-    private TranslatedSegment wrapSparqlContext(TranslatedSegment translatedGraphPattern, LinkedHashSet<String> parVars)
-    {
-        // e.g. ?X ?P ?Y --> sparql SELECT * WHERE { ?X ?P ?Y . }
-
-        LinkedHashSet<String> usedVars = new LinkedHashSet<>();
-        usedVars.addAll(translatedGraphPattern.subqueryVars);
-
-        StringBuilder strBuf = new StringBuilder();
-
-        newLine(strBuf);
-        strBuf.append("sparql");
-
-        for(Define def : prologue.getDefines())
-        {
-            strBuf.append(" ");
-            strBuf.append(def.toString());
-        }
-
-        strBuf.append(" SELECT DISTINCT ");
-
-        for(String var : parVars)
-            strBuf.append("?").append(var).append(" ");
-
-
-        for(DataSet dataSet : selectDatasets.peek())
-        {
-            strBuf.append(" ");
-            strBuf.append(dataSet.toString());
-        }
-
-        strBuf.append(" WHERE");
-        newLine(strBuf);
-        strBuf.append("{");
-
-        int blockIndent = 2;
-
-        if(!graphOrServiceRestrictions.isEmpty())
-        {
-            // NOTE: The pattern should contain all restrictions, but we used virtuoso semantics.
-            GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-
-            if(restriction.getVarOrIri() instanceof Variable)
-                usedVars.add(((Variable) restriction.getVarOrIri()).getName());
-
-            blockIndent++;
-            queryDepth++;
-            newLine(strBuf);
-
-            if(restriction.isRestrictionType(GraphOrServiceRestriction.RestrictionType.GRAPH_RESTRICTION))
-                strBuf.append("GRAPH ");
-            else if(restriction.isSilent())
-                strBuf.append("SERVICE SILENT ");
-            else
-                strBuf.append("SERVICE ");
-
-            strBuf.append(restriction.getVarOrIri().toString());
-            newLine(strBuf);
-            strBuf.append("{");
-        }
-
-        strBuf.append(indentBlock(translatedGraphPattern.str, blockIndent));
-
-        if(!graphOrServiceRestrictions.isEmpty())
-        {
-            newLine(strBuf);
-            strBuf.append("}");
-            queryDepth--;
-        }
-
-        newLine(strBuf);
-        strBuf.append("}");
-
-        return new TranslatedSegment(strBuf.toString(), false, usedVars, translatedGraphPattern.possibleUnboundVars);
-    }
-    */
-
-
-    /**
-     * Wraps the SQL table with brackets and name it.
-     *
-     * @param tableResult Translated SQL table.
-     * @return Wrapped and named SQL table.
-     */
-    private TranslatedSegment wrapAndNameTable(TranslatedSegment tableResult)
-    {
-        StringBuilder strBuf = new StringBuilder();
-
-        newLine(strBuf);
-        strBuf.append("(");
-
-        tableResult.str = indentBlock(tableResult.str, 1);
-        strBuf.append(tableResult.str);
-
-        newLine(strBuf);
-        strBuf.append(") AS ");
-        String newSqlTableName = getNewTmpTabName();
-        strBuf.append(newSqlTableName);
-
-        tableResult.str = strBuf.toString();
-        tableResult.sqlTableName = newSqlTableName;
-
-        return tableResult;
-    }
-
-    //-------------------------------------------------------------------------
-
-
-    /**
-     * Constructs the exist-constraint - used for the translation of MINUS and EXISTS SPARQL patterns.
-     *
-     * @param variablesMap Join variables and their table references.
-     * @param existInPattern Pattern by which we will filter.
-     * @param isNegated true if the expression is negated (NOT EXISTS).
-     * @param minusSemantics true if the condition is used for the translation of SPARQL MINUS pattern; false if used
-     *            for the EXIST pattern.
-     * @return Translated exist-constraint.
-     */
-    private String buildFilterExistConstraint(HashMap<String, String> variablesMap,
-            LinkedHashSet<String> possibleUnboundedVars, TranslatedSegment existInPattern, boolean filterMode,
-            boolean isNegated)
-    {
-        StringBuilder strBuf = new StringBuilder();
-
-        if(isNegated)
-        {
-            if(filterMode)
-                strBuf.append("NOT ");
-            else
-                strBuf.append("__not ");
-        }
-
-        if(filterMode)
-            strBuf.append("EXISTS (");
-        else
-            strBuf.append("( COALESCE ( (");
-
-        ++queryDepth;
-        newLine(strBuf);
-        strBuf.append("SELECT TOP 1 1 AS __existsRetVal");
-        newLine(strBuf);
-        strBuf.append("FROM");
-
-        existInPattern.str = indentBlock(existInPattern.str, 3);
-        strBuf.append(existInPattern.str);
-
-        newLine(strBuf);
-        strBuf.append("WHERE ( ");
-        strBuf.append(buildExistsJoinCondition(variablesMap, possibleUnboundedVars, existInPattern));
-        strBuf.append(" )");
-        --queryDepth;
-        newLine(strBuf);
-
-
-        if(filterMode)
-            strBuf.append(")");
-        else
-            strBuf.append("), 0))");
-
-        return strBuf.toString();
-    }
-
-
-    /**
-     * Constructs the condition for the translation of SPARQL EXISTS clause. for the INNER JOINs of two tables.
-     *
-     * @param variablesMap Join variables and their table references.
-     * @param currTmpTableName Name of the second table to be joined.
-     * @param minusSemantics true if the condition is used for the translation of SPARQL MINUS pattern; false if used
-     *            for the EXIST pattern.
-     * @return String with the condition that is to be used inside the SQL WHERE clause.
-     */
-    private String buildExistsJoinCondition(HashMap<String, String> variablesMap,
-            LinkedHashSet<String> possibleUnboundedVars, TranslatedSegment existInPattern)
-    {
-        StringBuilder strBuf = new StringBuilder();
-        boolean first = true;
-
-        for(String varStr : existInPattern.subqueryVars)
-        {
-            String mapValue = variablesMap.get(varStr);
-
-            if(mapValue == null)
-                continue;
-
-            if(!first)
-                strBuf.append(" AND ");
-            else
-                first = false;
-
-            String firstTabVar = mapValue;
-            String secondTabVar = existInPattern.sqlTableName + ".\"" + varStr + "\"";
-
-            if(possibleUnboundedVars.contains(varStr))
-            {
-                strBuf.append("(");
-                strBuf.append(firstTabVar).append(" = ").append(secondTabVar);
-                strBuf.append(" OR ");
-                strBuf.append(firstTabVar).append(" IS NULL");
-                strBuf.append(")");
-            }
-            else
-            {
-                strBuf.append(firstTabVar).append(" = ").append(secondTabVar);
-            }
-        }
-
-        if(first)
-            return "1";
-
-        return strBuf.toString();
-    }
-
-
-    private String buildInnerJoinProjection(LinkedHashSet<String> allUsedVars,
-            HashMap<String, PropertyDirection> joinVariables, String prevTmpTableName, String currTmpTableName)
-    {
-        StringBuilder strBuf = new StringBuilder();
-        boolean firstVar = true;
-
-        for(String var : allUsedVars)
-        {
-            if(!firstVar)
-                strBuf.append(", ");
-            else
-                firstVar = false;
-
-            PropertyDirection unboundProperty = joinVariables.get(var);
-
-            if(unboundProperty != null) // var is shared between the two tables
-            {
-                String leftVar = prevTmpTableName + ".\"" + var + "\"";
-                String rightVar = currTmpTableName + ".\"" + var + "\"";
-
-                if(!useCorrectJoin)
-                {
-                    strBuf.append(leftVar).append(" AS ");
-                }
-                else if(unboundProperty == PropertyDirection.BOTH)
-                {
-                    strBuf.append("COALESCE(").append(leftVar).append(", ").append(rightVar).append(") AS ");
-                }
-                else if(unboundProperty == PropertyDirection.LEFT)
-                {
-                    strBuf.append(rightVar).append(" AS ");
-                }
-                else if(unboundProperty == PropertyDirection.RIGHT || unboundProperty == PropertyDirection.NONE)
-                {
-                    strBuf.append(leftVar).append(" AS ");
-                }
-            }
-
-            strBuf.append("\"").append(var).append("\"");
-        }
-
-        return strBuf.toString();
-    }
-
-
-    /**
-     * Constructs the ON condition for the INNER JOINs of two tables.
-     *
-     * @param joinVariables Shared variables between the two tables.
-     * @param prevTmpTableName Name of the first table to be joined.
-     * @param currTmpTableName Name of the second table to be joined.
-     * @return String with the condition that is used in the SQL WHERE clause.
-     */
-    private String buildInnerJoinOnCondition(HashMap<String, PropertyDirection> joinVariables, String prevTmpTableName,
-            String currTmpTableName)
-    {
-        if(joinVariables.isEmpty())
-            return "1";
-
-        StringBuilder strBuf = new StringBuilder();
-        boolean first = true;
-
-        for(Entry<String, PropertyDirection> joinVar : joinVariables.entrySet())
-        {
-            String varStr = joinVar.getKey();
-            PropertyDirection varUnbound = joinVar.getValue();
-
-            if(!first)
-                strBuf.append(" AND ");
-            else
-                first = false;
-
-            strBuf.append("( ");
-
-            String leftVar = prevTmpTableName + ".\"" + varStr + "\"";
-            String rightVar = currTmpTableName + ".\"" + varStr + "\"";
-
-            strBuf.append(leftVar).append(" = ").append(rightVar);
-
-            if(useCorrectJoin)
-            {
-                if(varUnbound == PropertyDirection.LEFT || varUnbound == PropertyDirection.BOTH)
-                    strBuf.append(" OR ").append(leftVar).append(" IS NULL");
-
-                if(varUnbound == PropertyDirection.RIGHT || varUnbound == PropertyDirection.BOTH)
-                    strBuf.append(" OR ").append(rightVar).append(" IS NULL");
-            }
-
-            strBuf.append(" )");
-        }
-
-        return strBuf.toString();
+        return new TranslatedSegment(strBuf.toString(), prevTranslatedPattern.subqueryVars,
+                prevTranslatedPattern.possibleUnboundVars);
     }
 
     //-------------------------------------------------------------------------
@@ -3452,125 +1593,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     //-------------------------------------------------------------------------
 
 
-    /**
-     * Translates an expression (delegated to the ExpressionTranslatorEx).
-     *
-     * @param expression Expression to be translated.
-     * @return Translated expression.
-     */
-    private String translateLiteralNodeExpression(Expression expression)
-    {
-        ExpressionTranslator exprTranslator = new ExpressionTranslator(exceptions, warnings, null);
-
-        return exprTranslator.translate(expression);
-    }
-
-
-    /*
-    private String translateLiteralNodeExpression(Expression expression, EnumSet<ExpressionTranslateFlag> translateModes)
-    {
-        ExpressionTranslator exprTranslator = new ExpressionTranslator(exceptions, warnings, translateModes);
-
-        return exprTranslator.translate(expression);
-    }
-    */
-
-    private String translateExpression(Expression expression, EnumSet<ExpressionTranslateFlag> translateModes,
-            TranslatedSegment context)
-    {
-        HashMap<String, String> variablesMap = new HashMap<>();
-
-        for(String var : context.subqueryVars)
-            variablesMap.put(var, context.sqlTableName + ".\"" + var + "\"");
-
-        return translateExpression(expression, translateModes, variablesMap, context.possibleUnboundVars);
-    }
-
-
-    private String translateExpression(Expression expression, EnumSet<ExpressionTranslateFlag> translateModes,
-            HashMap<String, String> variablesMap, final LinkedHashSet<String> possibleUnboundedVars)
-    {
-        return new ExpressionTranslator(exceptions, warnings, translateModes)
-        {
-            @Override
-            public String visit(ExistsExpression existsExpression)
-            {
-                TranslatedSegment existInPattern = existsExpression.getPattern().accept(SparqlTranslateVisitor.this);
-
-                if(existInPattern == null)
-                {
-                    if(existsExpression.isNegated())
-                        return "0";
-                    else
-                        return "1";
-                }
-
-                if(existInPattern.isSparql)
-                {
-                    existInPattern = wrapAndNameTable(wrapSparqlSelect(existInPattern));
-                    existInPattern.str = indentBlock(existInPattern.str, 1);
-                }
-
-
-                boolean filterMode = !translateFlags.contains(ExpressionTranslateFlag.SPECIAL_RELATION_OPERATORS);
-
-                return buildFilterExistConstraint(variables, possibleUnboundedVars, existInPattern, filterMode,
-                        existsExpression.isNegated());
-            }
-        }.setVariables(variablesMap).translate(expression);
-    }
-
-    //-------------------------------------------------------------------------
-
-
-    /**
-     * Collects shared variables between the two translated segments, that will be used for a join.
-     *
-     * @param seg1 The first translated segment.
-     * @param seg2 The second translated segment.
-     * @return Collection of variables that are shared between the joining tables.
-     */
-    private HashMap<String, PropertyDirection> getJoinVariables(TranslatedSegment seg1, TranslatedSegment seg2)
-    {
-        HashMap<String, PropertyDirection> listVar = new HashMap<>();
-
-        LinkedHashSet<String> varsFirst = seg1.subqueryVars;
-        LinkedHashSet<String> unboundVarsFirst = seg1.possibleUnboundVars;
-        LinkedHashSet<String> varsSecond = seg2.subqueryVars;
-        LinkedHashSet<String> unboundVarsSecond = seg2.possibleUnboundVars;
-
-        if(varsFirst == null || varsSecond == null || varsFirst.isEmpty() || varsSecond.isEmpty())
-            return listVar;
-
-        for(String var : varsFirst)
-        {
-            if(varsSecond.contains(var))
-            {
-                // var is a shared variable - is it potentially unbound on
-                // either side?
-
-                PropertyDirection property = PropertyDirection.NONE;
-                if(unboundVarsFirst != null && unboundVarsFirst.contains(var))
-                    property = PropertyDirection.LEFT;
-                if(unboundVarsSecond != null && unboundVarsSecond.contains(var))
-                {
-                    if(property == PropertyDirection.LEFT)
-                        property = PropertyDirection.BOTH;
-                    else
-                        property = PropertyDirection.RIGHT;
-                }
-
-                listVar.put(var, property);
-            }
-        }
-
-        return listVar;
-    }
-
-
-
-    //-------------------------------------------------------------------------
-
     private void checkExpressionForGroupedSolutions(Expression expresion, HashSet<String> groupByVars)
     {
         new ElementVisitor<Void>()
@@ -3645,35 +1667,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private boolean containsProcedureCall(Expression expression)
-    {
-        if(expression == null)
-            return false;
-
-        Boolean ret = new ElementVisitor<Boolean>()
-        {
-            @Override
-            public Boolean visit(ProcedureCall par)
-            {
-                return true;
-            }
-
-            @Override
-            public Boolean visit(MultiProcedureCall par)
-            {
-                return true;
-            }
-
-            @Override
-            protected Boolean aggregateResult(List<Boolean> results)
-            {
-                return results.stream().anyMatch(x -> (x != null && x));
-            }
-
-        }.visitElement(expression);
-
-        return ret != null && ret;
-    }
 
     private boolean containsAggregateFunction(Expression expression)
     {
@@ -3802,31 +1795,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
     //-------------------------------------------------------------------------
-
-
-    /**
-     * Constructs SQL dummy table.
-     *
-     * @return String with SQL dummy table.
-     */
-    private String getDummyTableStr()
-    {
-        StringBuilder strBuf = new StringBuilder();
-        newLine(strBuf);
-        strBuf.append("(SELECT 1 AS \"").append(getNewTmpVarName()).append("\") AS ").append(getNewTmpTabName());
-        return strBuf.toString();
-    }
-
-
-    /**
-     * Gets a new temporary table name.
-     *
-     * @return New temp table name.
-     */
-    private String getNewTmpTabName()
-    {
-        return tempTabPrefix + (uniqueTabID <= 9 ? "0" : "") + Integer.toString(uniqueTabID++);
-    }
 
 
     /**
