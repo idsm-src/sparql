@@ -30,6 +30,7 @@ import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
 import cz.iocb.chemweb.shared.services.check.CheckService;
+import cz.iocb.chemweb.shared.services.check.CheckerWarning;
 
 
 
@@ -69,7 +70,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
         if(parseResult.getExceptions() != null)
             for(ParseException err : parseResult.getExceptions())
-                result.warnings.add(CheckerWarningFactory.create(err.getRange(), "error", err.getMessage()));
+                addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getMessage()));
 
         if(parseResult.getResult() == null)
             return result;
@@ -80,7 +81,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
         if(errs != null)
             for(SemanticError err : errs)
-                result.warnings.add(CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
+                addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
 
 
         /* translator */
@@ -88,12 +89,19 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
                 .tryTranslate(parseResult.getResult(), proceduresConfig, false);
 
         for(TranslateException err : translateResult.getExceptions())
-            result.warnings.add(CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));
+            addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));
 
         for(TranslateException err : translateResult.getWarnings())
-            result.warnings.add(CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
+            addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
 
 
         return result;
+    }
+
+
+    private static void addWarning(CheckResult result, CheckerWarning warning)
+    {
+        if(warning != null)
+            result.warnings.add(warning);
     }
 }

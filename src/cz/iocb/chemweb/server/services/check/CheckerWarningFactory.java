@@ -9,6 +9,12 @@ public class CheckerWarningFactory
 {
     public static CheckerWarning create(Range range, String type, String message)
     {
+        if(range == null)
+        {
+            System.err.println("error: warning without range: " + type + ": " + message);
+            return null;
+        }
+
         return new CheckerWarning(range.getStart().getLineNumber() - 1, range.getStart().getPositionInLine(),
                 range.getEnd().getLineNumber() - 1, range.getEnd().getPositionInLine() + 1, type, message);
     }
