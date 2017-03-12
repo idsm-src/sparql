@@ -5,7 +5,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -14,6 +15,7 @@ import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.VirtuosoDatabase;
+import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -24,8 +26,8 @@ public class GenerateHints extends HttpServlet
 
     private static class Item
     {
-        String text;
         String type;
+        String name;
         String info;
     }
 
@@ -71,24 +73,29 @@ public class GenerateHints extends HttpServlet
 
         String query = "sparql                                                "
                 + "define input:storage virtrdf:PubchemQuadStorage            "
-                + "select ?H ?T ?R ?D where                                   "
+                + "select ?H ?T ?R ?D ?L where                                "
                 + "{                                                          "
                 + "  {                                                        "
                 + "    ?H rdf:type rdf:Property.                              "
-                + "    bind( 'property' as ?T)                                "
+                + "    bind( 'P' as ?T)                                       "
                 + "                                                           "
                 + "    optional                                               "
                 + "    {                                                      "
-                + "      ?H rdfs:domain ?D. ?H rdfs:range ?R.                 "
-                + "      filter(isIRI(?D) && isIRI(?R))                       "
-                + "      filter (!strstarts(str(?D), 'http://blanknodes/'))   "
-                + "      filter (!strstarts(str(?R), 'http://blanknodes/'))   "
+                //+ "      ?H rdfs:domain ?D. ?H rdfs:range ?R.                 "
+                //+ "      filter(isIRI(?D) && isIRI(?R))                       "
+                //+ "      filter (!strstarts(str(?D), 'http://blanknodes/'))   "
+                //+ "      filter (!strstarts(str(?R), 'http://blanknodes/'))   "
                 + "    }                                                      "
                 + "  }                                                        "
                 + "  union                                                    "
                 + "  {                                                        "
                 + "    ?H rdf:type owl:Class.                                 "
-                + "    bind( 'class' as ?T)                                   "
+                + "    bind( 'C' as ?T)                                       "
+                + "  }                                                        "
+                + "                                                           "
+                + "  optional                                                 "
+                + "  {                                                        "
+                + "    ?H rdfs:label ?L.                                      "
                 + "  }                                                        "
                 + "                                                           "
                 + "  filter(isIRI(?H))                                        "
@@ -98,47 +105,81 @@ public class GenerateHints extends HttpServlet
         VirtuosoDatabase database = new VirtuosoDatabase();
         Result result = database.query(query);
 
-        ArrayList<Item> hints = new ArrayList<Item>();
+        LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
 
         for(Row row : result)
         {
             RdfNode text = row.get("H");
             RdfNode type = row.get("T");
-            RdfNode domain = row.get("D");
-            RdfNode range = row.get("R");
+            RdfNode label = row.get("L");
+            //RdfNode domain = row.get("D");
+            //RdfNode range = row.get("R");
+
+            PrefixedName iri = NormalizeIRI.decompose(text.getValue());
+
+            if(iri == null)
+                continue;
+
+            ArrayList<Item> list = hints.get(iri.prefix.toLowerCase());
+
+            if(list == null)
+            {
+                list = new ArrayList<Item>();
+                hints.put(iri.prefix.toLowerCase(), list);
+            }
+
 
             Item item = new Item();
-            item.text = NormalizeIRI.normalize(text.getValue());
             item.type = type.getValue();
+            item.name = iri.name;
 
-            if(domain != null && range != null)
-                item.info = NormalizeIRI.normalize(domain.getValue()) + " ➜ "
-                        + NormalizeIRI.normalize(range.getValue());
+            if(label != null)
+                item.info = label.getValue().replaceAll("\"", "\\\"");
 
-            hints.add(item);
+            list.add(item);
         }
 
-        Collections.sort(hints, new Comparator<Item>()
+
+        for(ArrayList<Item> list : hints.values())
+            Collections.sort(list,
+                    (Item item1, Item item2) -> item1.name.toLowerCase().compareTo(item2.name.toLowerCase()));
+
+
+        out.println("var hints = {");
+
+        int i = 0;
+        for(Entry<String, ArrayList<Item>> entry : hints.entrySet())
         {
-            @Override
-            public int compare(Item item1, Item item2)
+            if(i++ > 0)
+                out.println(",");
+
+            out.print(entry.getKey());
+            out.println(": {");
+            out.println("\tprefix: \"" + entry.getKey() + "\",");
+            out.println("\thints: [");
+
+            int j = 0;
+            for(Item hint : entry.getValue())
             {
-                return item1.text.toLowerCase().compareTo(item2.text.toLowerCase());
+                if(j++ > 0)
+                    out.println(",");
+
+                out.print("\t\t{");
+                out.print(" type: \"" + hint.type + "\",");
+                out.print(" name: \"" + hint.name + "\"");
+
+                if(hint.info != null)
+                    out.print(", info: \"" + hint.info + "\"");
+
+                out.print(" }");
             }
-        });
 
-        out.println("var hints = [");
-        for(Item hint : hints)
-        {
-            out.print("  { text: \"" + hint.text + "\"");
-            out.print(", type: \"" + hint.type + "\"");
-
-            if(hint.info != null)
-                out.print(", info: \"" + hint.info + "\"");
-
-            out.println("},");
+            out.print("]");
+            out.print("}");
         }
-        out.println("];");
+
+        out.println("};");
+
 
         out.close();
         hintsJS = stringWriter.toString();

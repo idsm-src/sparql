@@ -21,6 +21,9 @@
   <inherits name="com.google.gwt.http.HTTP"/>
   <inherits name="com.teknonsys.RetinaImages"/>
 
+  <set-configuration-property name="CssResource.enableGss" value="true" />
+  <set-configuration-property name="CssResource.legacy" value="true" />
+
   <stylesheet src="css/Chemweb.css"/>
 
 
@@ -76,6 +79,11 @@
 
   <replace-with class="cz.iocb.chemweb.client.resources.pager.RetinaPagerResourcesFactory">
     <when-type-is class="cz.iocb.chemweb.client.resources.pager.PagerResourcesFactory"/>
+    <when-property-is name="display.type" value="retina"/>
+  </replace-with>
+
+  <replace-with class="cz.iocb.chemweb.client.widgets.codemirror.RetinaCodeMirrorBundle">
+    <when-type-is class="cz.iocb.chemweb.client.widgets.codemirror.CodeMirrorBundle"/>
     <when-property-is name="display.type" value="retina"/>
   </replace-with>
 </module>

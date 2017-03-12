@@ -3,7 +3,12 @@ package cz.iocb.chemweb.client.widgets.codemirror;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.dom.client.Element;
+import com.google.gwt.safehtml.client.SafeHtmlTemplates;
+import com.google.gwt.safehtml.shared.SafeHtml;
+import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.TextArea;
+import cz.iocb.chemweb.client.widgets.codemirror.CodeMirrorBundle.CodeMirrorClientBundle;
+import cz.iocb.chemweb.client.widgets.codemirror.CodeMirrorBundle.CodeMirrorClientBundle.Style;
 import cz.iocb.chemweb.shared.services.check.CheckService;
 import cz.iocb.chemweb.shared.services.check.CheckServiceAsync;
 
@@ -11,6 +16,16 @@ import cz.iocb.chemweb.shared.services.check.CheckServiceAsync;
 
 public class CodeMirror
 {
+    public interface HintTemplate extends SafeHtmlTemplates
+    {
+        @Template("<div class='{0}'></div><div>{1}</div><div>{2}</div>")
+        SafeHtml hint(String img, String text, String info);
+
+        @Template("<div class='{0}'></div><div>{1}</div>")
+        SafeHtml hint(String img, String text);
+    }
+
+
     static public abstract class Validator
     {
         public abstract void validate(String code, JavaScriptObject callbackFunction, JavaScriptObject options,
@@ -18,9 +33,19 @@ public class CodeMirror
     }
 
 
+    private static final HintTemplate template = GWT.create(HintTemplate.class);
+    private static final CodeMirrorBundle factory = GWT.create(CodeMirrorBundle.class);
+    private static final CodeMirrorClientBundle resources = factory.create();
+    private static final Style style = resources.style();
     private static CheckServiceAsync checkService = (CheckServiceAsync) GWT.create(CheckService.class);
 
     private JavaScriptObject codemirror = null;
+
+
+    static
+    {
+        style.ensureInjected();
+    }
 
 
     public CodeMirror(TextArea textArea, boolean readOnly)
@@ -89,72 +114,58 @@ public class CodeMirror
     };
 
 
+    private native static JavaScriptObject getHints(JavaScriptObject cm, JavaScriptObject cb, JavaScriptObject options)
+    /*-{
+        var cur = cm.getCursor();
+        var token = cm.getTokenAt(cur);
+
+        if (token.type == "string")
+            return {};
+
+        var idx = token.string.indexOf(":");
+        var prefix = token.string.substring(0, idx).toLowerCase();
+        var suffix = token.string.substring(idx + 1).toLowerCase();
+
+        var set = $wnd.hints[prefix];
+
+        if (set == null)
+            return {};
+
+        var result = [];
+
+        for ( var i in set.hints) {
+            var hint = set.hints[i];
+
+            if (hint.lname == null)
+                hint.lname = hint.name.toLowerCase();
+
+            if (hint.linfo == null && hint.info != null)
+                hint.linfo = hint.info.replace(/ /g, '').toLowerCase();
+
+            if (hint.lname.includes(suffix)
+                    || (hint.linfo != null && hint.linfo.includes(suffix)))
+                result
+                        .push({
+                            text : set.prefix + ":" + hint.name,
+                            info : hint.info,
+                            type : hint.type,
+                            render : function(element, self, data) {
+                                var hint = @cz.iocb.chemweb.client.widgets.codemirror.CodeMirror::createHint(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)(data.type, data.text, data.info);
+                                element.appendChild(hint);
+                            }
+                        });
+        }
+
+        return {
+            list : result,
+            from : $wnd.CodeMirror.Pos(cur.line, token.start),
+            to : $wnd.CodeMirror.Pos(cur.line, token.end)
+        };
+    }-*/;
+
+
     public native static JavaScriptObject init(Element e, boolean readOnly)
     /*-{
-        var getHints = function (cm, cb, options)
-        {
-            var cur = cm.getCursor();
-            var token = cm.getTokenAt(cur);
-
-            if(token.type == "string")
-                return {};
-
-            var result = [];
-            for(var i in $wnd.hints)
-            {
-                var hint = $wnd.hints[i];
-
-                if( token.string == hint.text.substring(0,token.string.length) )
-                    result.push({text: hint.text, info: hint.info, type: hint.type,
-                    render : function(element, self, data)
-                    {
-                        var div = $wnd.document.createElement("div");
-                        var img = $wnd.document.createElement("img");
-                        var span = $wnd.document.createElement("span");
-
-                        span.style = "display: inline-block; height: 100%; vertical-align: middle;width:10px;";
-                        img.style = "vertical-align: middle;";
-
-
-                        if(data.type == "class")
-                            img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAHxSURBVCiRXdI/SNRxGMfx1+/up156F0LQJf4hEKIphHAJh4s0sIgIa6gxwkFXHaIxocXdzVnSIJeCLBBxaIlAQ4oQxIyywK40/5w/79twZ2EPPNP3+fDwfT/vKITgsKLrUQ73RXoEbSpPqw7MiD0K02Hz7+xhMLoSXZYx7ry8U2IRfmMDXyQ+WRfcDc/Ci7/BqDe65IQptzTKULdbp6uhS2Y/Y+7jnM2NTYpYVpS4GZ6HVxRk3bDmiWBeuLZwLXzY+hAOa+XnSuh73BcMC/oFvdYUZFNyHuiQV0tTucnYmTEpKcNvhw3OD2qoaTBycUR9TT1p1Mur9SCW0i0vtsPt07c11zV7uPzQ6MIo23zf+C7ZSSRJQhm1YindsbI2KiBa0i1g8dsiu9hj8t0k2yjhoIq0rC0lVOltsbW9BVprWivDu3Tlu7Tn2tlHUm2kBKt+VIJvVt8oh7JCviCX5GQPssaujpm5N6Mx3VjZWqrcNha89FWHvHj67bSJ9gl3zt2x1L8kHaU1HW8yNDmk+KPIHvYkeBkpyKr33mnN6oiiyMCFAZ2tnX5t/zK7NOvp66fKO2V2sO+zkrP/BEibclKjGKEK4kDlb3vVLilKVwQ4qlww7pi8GjFVEPsoSQTr0v8pd0TyXffRQ/VMrGJG5qjkfwBUAd94y1T5PQAAAABJRU5ErkJggg=="
-                        else
-                            img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAHFSURBVCiRXdI/SNRhHMfx1+/uZ1gmKYIXFhJE0GARBo4aZEIN6pCbU7OLi1Bbg7U5OTm4ujjYUlAq1uJSBlIQVOYf+nMNaZSnd573NPicHH3hM32eN8/3zycJIajWQJI04n7CrUB7dDYPeZHy+EkIf6pvkyp4J0n66pm+Tu4saYJd/MJ3ylvkA/eehvD8GLydJDdbmB2iqR6FCP2t0Q4+s1Pm7rMQFpIbnG7mwzDncmgaGtI0OKiM4sGBYrHo7cyMd0tLfmOLr3tczl7hYSd958lAS3+/C6OjJIkTzc3aenpcHR62sbzs5/q6EqcOSTMZenOke7GlUhz+/cSE2a4uL8fG1DU0uNTXp4ITpBl60wrt4kxpDXims9PFSkVbdzfY3d52GL0K7WmI0AGyKEazY2REB0IIPi0uejU1pYxy9NPA5jatDRGs/vh6ctLHhQX5tTVfVlcVohf9zTQw/4NruaPej8GNlRVv5uaUsB87iSpjPlNg/Bv57epysllQymQU4k33ovaP5suXGD8OQJbZVppSBBxGHdT8VmInWw1AbeQC0yfJ1R0tWDmCJcqBfPb/yFVrIEka93mAXvFM2MR8PY9qQ/4PScbIYlDpMJQAAAAASUVORK5CYII="
-
-
-                        div.style="height: 20px;"
-
-                        div.appendChild(img);
-                        div.appendChild(span);
-
-                        div.appendChild($wnd.document.createTextNode(data.text));
-
-                        if(data.info)
-                        {
-                            var info = $wnd.document.createElement("span");
-                            info.className = "hint-info";
-                            info.appendChild($wnd.document.createTextNode(" ("));
-                            info.appendChild($wnd.document.createTextNode(data.info));
-                            info.appendChild($wnd.document.createTextNode(")"));
-                            div.appendChild(info);
-                        }
-
-                        element.appendChild(div);
-                    }
-
-                    });
-            }
-
-
-            return {
-
-            list: result,
-               from: $wnd.CodeMirror.Pos(cur.line, token.start),
-               to: $wnd.CodeMirror.Pos(cur.line, token.end)
-          }
-        };
-
-
         var editor = $wnd.CodeMirror.fromTextArea(e, {
             mode : "sparql",
             tabMode : "indent",
@@ -173,13 +184,14 @@ public class CodeMirror
             },
 
             hintOptions : {
-                hint : getHints,
+                hint : @cz.iocb.chemweb.client.widgets.codemirror.CodeMirror::getHints(Lcom/google/gwt/core/client/JavaScriptObject;Lcom/google/gwt/core/client/JavaScriptObject;Lcom/google/gwt/core/client/JavaScriptObject;),
             },
 
-            extraKeys: {"Ctrl-Space": "autocomplete",
+            extraKeys: {
+                "Ctrl-Space": "autocomplete",
                 "':'": function(cm) {
-                setTimeout(function(){cm.execCommand("autocomplete");}, 100);
-                throw CodeMirror.Pass; // tell CodeMirror we didn't handle the key
+                    setTimeout(function(){cm.execCommand("autocomplete");}, 100);
+                    throw CodeMirror.Pass; // tell CodeMirror we didn't handle the key
                 },
             },
 
@@ -188,6 +200,21 @@ public class CodeMirror
 
         return editor;
     }-*/;
+
+
+    static private Element createHint(String type, String text, String info)
+    {
+        String imgClass = "C".equals(type) ? style.classHint() : style.propertyHint();
+
+        SafeHtml html;
+
+        if(info != null)
+            html = template.hint(imgClass, text, info);
+        else
+            html = template.hint(imgClass, text);
+
+        return new HTML(html).getElement();
+    }
 
 
     public native String getValue()
