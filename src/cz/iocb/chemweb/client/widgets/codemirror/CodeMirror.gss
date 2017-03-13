@@ -1,4 +1,4 @@
-@external CodeMirror-hints CodeMirror-hint CodeMirror-hint-active;
+@external CodeMirror-hints CodeMirror-hint CodeMirror-hint-active CodeMirror-lint-marker-error CodeMirror-lint-marker-warning CodeMirror-lint-marker-multiple;
 
 
 .CodeMirror-hints {
@@ -67,4 +67,20 @@
   padding-left: 7px;
   font-size: 90%;
   color: #333333;
+}
+
+
+.CodeMirror-lint-marker-error {
+  background-image: resourceUrl("errorSymbol") !important;
+  background-size: 14px 14px;
+}
+
+.CodeMirror-lint-marker-warning {
+  background-image: resourceUrl("warningSymbol") !important;
+  background-size: 14px 14px;
+}
+
+.CodeMirror-lint-marker-multiple {
+  background-image: resourceUrl("multipleSymbol") !important;
+  background-size: 7px 7px;
 }

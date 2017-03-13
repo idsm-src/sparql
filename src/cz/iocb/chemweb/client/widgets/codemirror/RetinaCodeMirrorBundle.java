@@ -16,6 +16,18 @@ public class RetinaCodeMirrorBundle extends CodeMirrorBundle
         @Override
         @Source("property@2x.png")
         ImageResource propertySymbol();
+
+        @Override
+        @Source("error@2x.png")
+        ImageResource errorSymbol();
+
+        @Override
+        @Source("warning@2x.png")
+        ImageResource warningSymbol();
+
+        @Override
+        @Source("multiple@2x.png")
+        ImageResource multipleSymbol();
     }
 
 

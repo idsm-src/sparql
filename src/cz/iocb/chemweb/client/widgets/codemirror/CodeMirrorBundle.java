@@ -28,6 +28,15 @@ public class CodeMirrorBundle
 
         @Source("property.png")
         ImageResource propertySymbol();
+
+        @Source("error.png")
+        ImageResource errorSymbol();
+
+        @Source("warning.png")
+        ImageResource warningSymbol();
+
+        @Source("multiple.png")
+        ImageResource multipleSymbol();
     }
 
 
