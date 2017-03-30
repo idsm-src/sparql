@@ -208,6 +208,7 @@ public class QueryPart extends ResizeComposite implements HasHandlers
     public void openClick(String code)
     {
         codemirror.setValue(code);
+        openButton.getUploadFile().getElement().setPropertyString("value", "");
     }
 
 
