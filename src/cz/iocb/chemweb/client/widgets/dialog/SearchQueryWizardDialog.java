@@ -448,25 +448,10 @@ public class SearchQueryWizardDialog extends DialogBox
 
         if(searchCompounds && searchBioassays)
         {
-            query.append("\n  GRAPH pubchem:substance");
-            query.append("\n  {");
-            query.append("\n    ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND .");
-            query.append("\n  }\n");
-
-            query.append("\n  GRAPH pubchem:endpoint");
-            query.append("\n  {");
-            query.append("\n    ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE .");
-            query.append("\n  }\n");
-
-            query.append("\n  GRAPH pubchem:measuregroup");
-            query.append("\n  {");
-            query.append("\n    ?MEASUREGROUP obo:OBI_0000299 ?ENDPOINT .");
-            query.append("\n  }\n");
-
-            query.append("\n  GRAPH pubchem:bioassay");
-            query.append("\n  {");
-            query.append("\n    ?BIOASSAY bao:BAO_0000209 ?MEASUREGROUP .");
-            query.append("\n  }\n");
+            query.append("\n  ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND.");
+            query.append("\n  ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE.");
+            query.append("\n  ?MEASUREGROUP obo:OBI_0000299 ?ENDPOINT.");
+            query.append("\n  ?BIOASSAY bao:BAO_0000209 ?MEASUREGROUP.");
 
 
             int statusCount = 0;
@@ -489,13 +474,11 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(statusCount > 0 || statusCheckBox.getValue())
             {
-                query.append("\n  GRAPH pubchem:endpoint");
-                query.append("\n  {");
-                query.append("\n    ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS");
+                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS");
 
                 if(statusCount > 0)
                 {
-                    query.append("\n    FILTER(?STATUS IN (");
+                    query.append("\n  FILTER(?STATUS IN (");
 
                     if(activeStatusCheckBox.getValue())
                     {
@@ -537,7 +520,7 @@ public class SearchQueryWizardDialog extends DialogBox
                     query.append("))");
                 }
 
-                query.append("\n  }\n");
+                query.append("\n");
             }
         }
 
@@ -546,24 +529,20 @@ public class SearchQueryWizardDialog extends DialogBox
         if(searchBioassays && !keywords.isEmpty())
         {
             query.append("\n  {");
-            query.append("\n    GRAPH pubchem:bioassay");
-            query.append("\n    {");
-            query.append("\n      ?BIOASSAY dcterms:title ?TITLE .");
-            query.append("\n      ?TITLE bif:contains '''");
+            query.append("\n    ?BIOASSAY dcterms:title ?TITLE.");
+            query.append("\n    ?TITLE bif:contains '''");
             query.append(keywords.replaceAll("'", "\\\\'"));
-            query.append("''' .\n    }\n");
+            query.append("'''.\n");
             query.append("  }");
 
             query.append("\n  UNION");
 
             query.append("\n  {");
-            query.append("\n    GRAPH pubchem:bioassay");
-            query.append("\n    {");
-            query.append("\n      ?DESCRIPTION sio:is-attribute-of ?BIOASSAY .");
-            query.append("\n      ?DESCRIPTION sio:has-value ?TEXT.");
-            query.append("\n      ?TEXT bif:contains '''");
+            query.append("\n    ?DESCRIPTION sio:is-attribute-of ?BIOASSAY.");
+            query.append("\n    ?DESCRIPTION sio:has-value ?TEXT.");
+            query.append("\n    ?TEXT bif:contains '''");
             query.append(keywords.replaceAll("'", "\\\\'"));
-            query.append("''' .\n    }\n");
+            query.append("'''.\n");
             query.append("  }\n");
         }
 
