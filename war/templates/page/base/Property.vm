@@ -28,14 +28,14 @@
 
 
       #sparql($domains)
-        SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+        SELECT ?CLASS FROM pubchem:ontology WHERE
         {
           $entity rdfs:domain ?CLASS .
         }
       #end
 
       #sparql($ranges)
-        SELECT DISTINCT ?CLASS FROM pubchem:ontology WHERE
+        SELECT ?CLASS FROM pubchem:ontology WHERE
         {
           $entity rdfs:range ?CLASS .
         }
