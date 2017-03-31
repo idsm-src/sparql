@@ -31,7 +31,7 @@
       {
         $class rdfs:subClassOf ?CLASS.
         ##FILTER NOT EXISTS { ?CLASS owl:unionOf ?X }
-        FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
+        ##FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
         FILTER (?CLASS != $class) #avoid simple type cycle
       }
     #end
