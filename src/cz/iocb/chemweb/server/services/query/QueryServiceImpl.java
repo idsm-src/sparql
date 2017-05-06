@@ -40,7 +40,6 @@ import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParseException;
 import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParser;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyChains;
-import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyGraphs;
 import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
 import cz.iocb.chemweb.server.velocity.UrlDirective;
@@ -71,7 +70,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
     private final Config procedures;
     final Map<String, List<String>> propertyChains;
-    final Map<String, String> propertyGraphs;
     private final Parser parser;
     private final VirtuosoDatabase database;
 
@@ -86,7 +84,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
         procedures = ConfigFileParser.parse(Utils.getConfigDirectory() + "/procedureCalls.ini");
         propertyChains = PropertyChains.get();
-        propertyGraphs = PropertyGraphs.get();
         parser = new Parser(procedures, Prefixes.getPrefixes());
     }
 
@@ -126,8 +123,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 syntaxTree.setSelect(limitedSelect);
             }
 
-            final List<String> translatedQuery = new SparqlTranslateVisitor(propertyGraphs, propertyChains)
-                    .translate(syntaxTree, procedures, false);
+            final List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree,
+                    procedures, false);
 
             // TODO: log
             System.err.println(translatedQuery);

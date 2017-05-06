@@ -31,7 +31,6 @@ import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParseException;
 import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParser;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyChains;
-import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyGraphs;
 import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
@@ -43,7 +42,6 @@ public class SparqlDirective extends Directive
 
     private final Config procedures;
     final Map<String, List<String>> propertyChains;
-    final Map<String, String> propertyGraphs;
     private final Parser parser;
     private final VirtuosoDatabase db;
 
@@ -53,7 +51,6 @@ public class SparqlDirective extends Directive
     {
         procedures = ConfigFileParser.parse(Utils.getConfigDirectory() + "/procedureCalls.ini");
         propertyChains = PropertyChains.get();
-        propertyGraphs = PropertyGraphs.get();
         parser = new Parser(procedures, Prefixes.getPrefixes());
 
         db = new VirtuosoDatabase();
@@ -102,8 +99,8 @@ public class SparqlDirective extends Directive
         try
         {
             SelectQuery syntaxTree = parser.parse(query);
-            List<String> translatedQuery = new SparqlTranslateVisitor(propertyGraphs, propertyChains)
-                    .translate(syntaxTree, procedures, false);
+            List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree, procedures,
+                    false);
             Result result = db.query(translatedQuery);
 
             context.put(varName, result);

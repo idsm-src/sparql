@@ -74,7 +74,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
     private int uniqueVarID = 1;
 
     private Map<String, List<String>> propertyChains = null;
-    private Map<String, String> propertyGraphs = null;
 
     private Config proceduresConfig = null;
     private Prologue prologue;
@@ -89,10 +88,9 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
 
-    public SparqlTranslateVisitor(Map<String, String> propertyGraphs, Map<String, List<String>> propertyChains)
+    public SparqlTranslateVisitor(Map<String, List<String>> propertyChains)
     {
         this.propertyChains = propertyChains;
-        this.propertyGraphs = propertyGraphs;
     }
 
 
@@ -427,27 +425,13 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         LinkedHashSet<String> usedVars = extractVariblesFromTriple(triple);
 
-        String graph = null;
-
-        if(graphOrServiceRestrictions.isEmpty())
-        {
-            // TODO: make it more general ...
-            Verb predicate = triple.getPredicate();
-
-            if(predicate instanceof IRI)
-            {
-                String def = ((IRI) predicate).toString(prologue, true, false);
-                graph = propertyGraphs != null ? propertyGraphs.get(def) : null;
-            }
-        }
-        else
+        if(!graphOrServiceRestrictions.isEmpty())
         {
             VarOrIri varOrIri = graphOrServiceRestrictions.peek().getVarOrIri();
 
             if(varOrIri instanceof Variable)
                 usedVars.add(((Variable) varOrIri).getName());
         }
-
 
 
         ToStringVisitor visitor = new ToStringVisitor()
@@ -478,9 +462,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
         StringBuffer code = new StringBuffer();
         code.append("\n");
 
-        if(graph != null)
-            code.append("graph ").append(graph).append(" { ");
-
         code.append(triple.getSubject().toString());
         code.append(" ");
         code.append(visitor.getString());
@@ -505,10 +486,6 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
          **/
 
         code.append(" .");
-
-        if(graph != null)
-            code.append("}");
-
 
         return new TranslatedSegment(code.toString(), usedVars);
     }

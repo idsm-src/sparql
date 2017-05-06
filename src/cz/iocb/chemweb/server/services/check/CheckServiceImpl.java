@@ -25,7 +25,6 @@ import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParseException;
 import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParser;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyChains;
-import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyGraphs;
 import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
@@ -42,7 +41,6 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
     private final Parser parser;
     final Config proceduresConfig;
     final Map<String, List<String>> propertyChains;
-    final Map<String, String> propertyGraphs;
 
 
     public CheckServiceImpl() throws FileNotFoundException, IOException, ClassNotFoundException,
@@ -50,7 +48,6 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
     {
         proceduresConfig = ConfigFileParser.parse(Utils.getConfigDirectory() + "/procedureCalls.ini");
         propertyChains = PropertyChains.get();
-        propertyGraphs = PropertyGraphs.get();
         ClassesInfo classesInfo = ClassesInfoFromOwl.getInstance();
         PropertiesInfo propertiesInfo = PropertiesInfoFromOwl.getInstance();
 
@@ -85,7 +82,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
 
         /* translator */
-        TranslateResult translateResult = new SparqlTranslateVisitor(propertyGraphs, propertyChains)
+        TranslateResult translateResult = new SparqlTranslateVisitor(propertyChains)
                 .tryTranslate(parseResult.getResult(), proceduresConfig, false);
 
         for(TranslateException err : translateResult.getExceptions())
