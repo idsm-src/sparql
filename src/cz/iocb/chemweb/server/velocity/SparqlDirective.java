@@ -99,8 +99,7 @@ public class SparqlDirective extends Directive
         try
         {
             SelectQuery syntaxTree = parser.parse(query);
-            List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree, procedures,
-                    false);
+            List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree, procedures);
             Result result = db.query(translatedQuery);
 
             context.put(varName, result);

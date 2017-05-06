@@ -98,14 +98,12 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
      * Constructs the translator object.
      *
      * @param sparqlQuery SPARQL query.
-     * @param fullQueryDecomposition Specify whether the result query should be consisting of minimal SPARQL chunks
-     *            (otherwise, only necessary decomposition is used).
      * @return String of a translated query.
      * @throws cz.iocb.chemweb.server.sparql.translator.error.TranslateException
      */
-    public List<String> translate(SelectQuery sparqlQuery, boolean fullQueryDecomposition) throws TranslateExceptions
+    public List<String> translate(SelectQuery sparqlQuery) throws TranslateExceptions
     {
-        return translate(sparqlQuery, new Config(), fullQueryDecomposition);
+        return translate(sparqlQuery, new Config());
     }
 
 
@@ -114,13 +112,10 @@ public class SparqlTranslateVisitor extends ElementVisitor<TranslatedSegment>
      *
      * @param sparqlQuery SPARQL query.
      * @param proceduresConfig Inner procedures settings.
-     * @param fullQueryDecomposition Specify whether the result query should be consisting of minimal SPARQL chunks
-     *            (otherwise, only necessary decomposition is used).
      * @return String of a translated query.
      * @throws cz.iocb.chemweb.server.sparql.translator.error.TranslateException
      */
-    public List<String> translate(SelectQuery sparqlQuery, Config proceduresConfig, boolean fullQueryDecomposition)
-            throws TranslateExceptions
+    public List<String> translate(SelectQuery sparqlQuery, Config proceduresConfig) throws TranslateExceptions
     {
         this.proceduresConfig = proceduresConfig;
 

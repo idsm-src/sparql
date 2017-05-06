@@ -124,7 +124,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             }
 
             final List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree,
-                    procedures, false);
+                    procedures);
 
             // TODO: log
             System.err.println(translatedQuery);
