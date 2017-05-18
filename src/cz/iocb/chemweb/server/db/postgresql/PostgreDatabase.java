@@ -7,6 +7,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDeci
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
@@ -131,9 +132,11 @@ public class PostgreDatabase
             }
 
 
+            Connection conn = stmt.getConnection();
+
             rs.close();
             stmt.close();
-            stmt.getConnection().close();
+            conn.close();
 
             time = System.currentTimeMillis() - time;
 
