@@ -77,6 +77,9 @@ public class PostgreDatabase
 
                     int idx = varNames.get(name);
 
+                    if(value == null)
+                        type = ResourceClass.nullTag;
+
                     switch(type)
                     {
                         case IriClass.iriTag:
