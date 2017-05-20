@@ -38,4 +38,22 @@ public class ParametrisedIriMapping extends IriMapping
     {
         return columns.get(i);
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(obj == null || !(obj instanceof ParametrisedIriMapping))
+            return false;
+
+        if(!super.equals(obj))
+            return false;
+
+        ParametrisedIriMapping other = (ParametrisedIriMapping) obj;
+
+        return columns.equals(other.columns);
+    }
 }

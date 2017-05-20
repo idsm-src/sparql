@@ -37,4 +37,22 @@ public class ConstantIriMapping extends IriMapping
     {
         return getIriClass().getInverseFunction(i) + "('" + value + "')";
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(obj == null || !(obj instanceof ConstantIriMapping))
+            return false;
+
+        if(!super.equals(obj))
+            return false;
+
+        ConstantIriMapping other = (ConstantIriMapping) obj;
+
+        return value.equals(other.value);
+    }
 }

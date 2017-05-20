@@ -65,4 +65,22 @@ public class ConstantLiteralMapping extends LiteralMapping
         else
             return value.toString();
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(obj == null || !(obj instanceof ConstantLiteralMapping))
+            return false;
+
+        if(!super.equals(obj))
+            return false;
+
+        ConstantLiteralMapping other = (ConstantLiteralMapping) obj;
+
+        return value.equals(other.value);
+    }
 }

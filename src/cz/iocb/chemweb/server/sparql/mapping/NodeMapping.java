@@ -25,4 +25,19 @@ public abstract class NodeMapping
     {
         return resourceClass;
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(obj == null || !(obj instanceof NodeMapping))
+            return false;
+
+        NodeMapping other = (NodeMapping) obj;
+
+        return resourceClass.equals(other.resourceClass);
+    }
 }
