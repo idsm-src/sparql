@@ -21,7 +21,7 @@ public class LiteralClass extends ResourceClass
     public static final LiteralClass xsdBoolean = new LiteralClass(booleanTag, "boolean", xsd + "boolean");
     public static final LiteralClass xsdInteger = new LiteralClass(integerTag, "integer", xsd + "xsdInteger");
     public static final LiteralClass xsdDecimal = new LiteralClass(decimalTag, "float8", xsd + "decimal");
-    public static final LiteralClass xsdFloat = new LiteralClass(floatTag, "float", xsd + "float");
+    public static final LiteralClass xsdFloat = new LiteralClass(floatTag, "real", xsd + "float");
     public static final LiteralClass xsdDouble = new LiteralClass(doubleTag, "float8", xsd + "double");
     public static final LiteralClass xsdDate = new LiteralClass(dateTag, "date", xsd + "date");
     public static final LiteralClass xsdDateTime = new LiteralClass(dateTimeTag, "timestamptz", xsd + "dateTime");
