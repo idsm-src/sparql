@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
 import static cz.iocb.chemweb.server.sparql.pubchem.Substance.substance;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -17,9 +18,9 @@ class Endpoint extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(endpoint = new IriClass("endpoint", 3,
+        classmap(endpoint = new IriClass("endpoint", Arrays.asList("integer", "integer", "integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/SID[0-9]+_AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
-        classmap(outcome = new IriClass("outcome", 1,
+        classmap(outcome = new IriClass("outcome", Arrays.asList("smallint"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#(active|inactive|inconclusive|unspecified|probe)"));
     }
 

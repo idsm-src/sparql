@@ -5,6 +5,7 @@ import static cz.iocb.chemweb.server.sparql.pubchem.Endpoint.endpoint;
 import static cz.iocb.chemweb.server.sparql.pubchem.Gene.gene;
 import static cz.iocb.chemweb.server.sparql.pubchem.Protein.protein;
 import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -17,7 +18,7 @@ class Measuregroup extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(measuregroup = new IriClass("measuregroup", 2,
+        classmap(measuregroup = new IriClass("measuregroup", Arrays.asList("integer", "integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/measuregroup/AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
     }
 

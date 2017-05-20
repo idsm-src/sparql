@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdStri
 import static cz.iocb.chemweb.server.sparql.pubchem.Compound.compound;
 import static cz.iocb.chemweb.server.sparql.pubchem.Concept.concept;
 import static cz.iocb.chemweb.server.sparql.pubchem.Shared.mesh;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -16,7 +17,8 @@ class Synonym extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(synonym = new IriClass("synonym", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_.*"));
+        classmap(synonym = new IriClass("synonym", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_.*"));
     }
 
 

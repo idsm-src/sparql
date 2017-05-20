@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -13,7 +14,8 @@ class Concept extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(concept = new IriClass("concept", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
+        classmap(concept = new IriClass("concept", Arrays.asList("smallint"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
     }
 
 

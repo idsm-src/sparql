@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -39,39 +40,47 @@ class CompoundDescriptor extends PubChemMapping
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/CID[0-9]+_";
 
-        classmap(descriptorHydrogenBondAcceptorCount = new IriClass("hydrogen_bond_acceptor_count", 1,
-                prefix + "Hydrogen_Bond_Acceptor_Count"));
-        classmap(descriptorTautomerCount = new IriClass("tautomer_count", 1, prefix + "Tautomer_Count"));
-        classmap(descriptorDefinedAtomStereoCount = new IriClass("defined_atom_stereo_count", 1,
+        classmap(descriptorHydrogenBondAcceptorCount = new IriClass("hydrogen_bond_acceptor_count",
+                Arrays.asList("integer"), prefix + "Hydrogen_Bond_Acceptor_Count"));
+        classmap(descriptorTautomerCount = new IriClass("tautomer_count", Arrays.asList("integer"),
+                prefix + "Tautomer_Count"));
+        classmap(descriptorDefinedAtomStereoCount = new IriClass("defined_atom_stereo_count", Arrays.asList("integer"),
                 prefix + "Defined_Atom_Stereo_Count"));
-        classmap(descriptorDefinedBondStereoCount = new IriClass("defined_bond_stereo_count", 1,
+        classmap(descriptorDefinedBondStereoCount = new IriClass("defined_bond_stereo_count", Arrays.asList("integer"),
                 prefix + "Defined_Bond_Stereo_Count"));
-        classmap(descriptorUndefinedBondStereoCount = new IriClass("undefined_bond_stereo_count", 1,
-                prefix + "Undefined_Bond_Stereo_Count"));
-        classmap(descriptorIsotopeAtomCount = new IriClass("isotope_atom_count", 1, prefix + "Isotope_Atom_Count"));
-        classmap(descriptorCovalentUnitCount = new IriClass("covalent_unit_count", 1, prefix + "Covalent_Unit_Count"));
-        classmap(descriptorHydrogenBondDonorCount = new IriClass("hydrogen_bond_donor_count", 1,
+        classmap(descriptorUndefinedBondStereoCount = new IriClass("undefined_bond_stereo_count",
+                Arrays.asList("integer"), prefix + "Undefined_Bond_Stereo_Count"));
+        classmap(descriptorIsotopeAtomCount = new IriClass("isotope_atom_count", Arrays.asList("integer"),
+                prefix + "Isotope_Atom_Count"));
+        classmap(descriptorCovalentUnitCount = new IriClass("covalent_unit_count", Arrays.asList("integer"),
+                prefix + "Covalent_Unit_Count"));
+        classmap(descriptorHydrogenBondDonorCount = new IriClass("hydrogen_bond_donor_count", Arrays.asList("integer"),
                 prefix + "Hydrogen_Bond_Donor_Count"));
-        classmap(descriptorNonHydrogenAtomCount = new IriClass("non_hydrogen_atom_count", 1,
+        classmap(descriptorNonHydrogenAtomCount = new IriClass("non_hydrogen_atom_count", Arrays.asList("integer"),
                 prefix + "Non-hydrogen_Atom_Count"));
-        classmap(descriptorRotatableBondCount = new IriClass("rotatable_bond_count", 1,
+        classmap(descriptorRotatableBondCount = new IriClass("rotatable_bond_count", Arrays.asList("integer"),
                 prefix + "Rotatable_Bond_Count"));
-        classmap(descriptorUndefinedAtomStereoCount = new IriClass("undefined_atom_stereo_count", 1,
-                prefix + "Undefined_Atom_Stereo_Count"));
-        classmap(descriptorTotalFormalCharge = new IriClass("total_formal_charge", 1, prefix + "Total_Formal_Charge"));
-        classmap(descriptorStructureComplexity = new IriClass("structure_complexity", 1,
+        classmap(descriptorUndefinedAtomStereoCount = new IriClass("undefined_atom_stereo_count",
+                Arrays.asList("integer"), prefix + "Undefined_Atom_Stereo_Count"));
+        classmap(descriptorTotalFormalCharge = new IriClass("total_formal_charge", Arrays.asList("integer"),
+                prefix + "Total_Formal_Charge"));
+        classmap(descriptorStructureComplexity = new IriClass("structure_complexity", Arrays.asList("integer"),
                 prefix + "Structure_Complexity"));
-        classmap(descriptorMonoIsotopicWeight = new IriClass("mono_isotopic_weight", 1,
+        classmap(descriptorMonoIsotopicWeight = new IriClass("mono_isotopic_weight", Arrays.asList("integer"),
                 prefix + "Mono_Isotopic_Weight"));
-        classmap(descriptorXLogP3AA = new IriClass("xlogp3_aa", 1, prefix + "XLogP3-AA"));
-        classmap(descriptorExactMass = new IriClass("exact_mass", 1, prefix + "Exact_Mass"));
-        classmap(descriptorMolecularWeight = new IriClass("molecular_weight", 1, prefix + "Molecular_Weight"));
-        classmap(descriptorTPSA = new IriClass("tpsa", 1, prefix + "TPSA"));
-        classmap(descriptorMolecularFormula = new IriClass("molecular_formula", 1, prefix + "Molecular_Formula"));
-        classmap(descriptorIsomericSmiles = new IriClass("isomeric_smiles", 1, prefix + "Isomeric_SMILES"));
-        classmap(descriptorCanonicalSmiles = new IriClass("canonical_smiles", 1, prefix + "Canonical_SMILES"));
-        classmap(descriptorIupacInChI = new IriClass("iupac_inchi", 1, prefix + "IUPAC_InChI"));
-        classmap(descriptorPreferredIupacName = new IriClass("preferred_iupac_name", 1,
+        classmap(descriptorXLogP3AA = new IriClass("xlogp3_aa", Arrays.asList("integer"), prefix + "XLogP3-AA"));
+        classmap(descriptorExactMass = new IriClass("exact_mass", Arrays.asList("integer"), prefix + "Exact_Mass"));
+        classmap(descriptorMolecularWeight = new IriClass("molecular_weight", Arrays.asList("integer"),
+                prefix + "Molecular_Weight"));
+        classmap(descriptorTPSA = new IriClass("tpsa", Arrays.asList("integer"), prefix + "TPSA"));
+        classmap(descriptorMolecularFormula = new IriClass("molecular_formula", Arrays.asList("integer"),
+                prefix + "Molecular_Formula"));
+        classmap(descriptorIsomericSmiles = new IriClass("isomeric_smiles", Arrays.asList("integer"),
+                prefix + "Isomeric_SMILES"));
+        classmap(descriptorCanonicalSmiles = new IriClass("canonical_smiles", Arrays.asList("integer"),
+                prefix + "Canonical_SMILES"));
+        classmap(descriptorIupacInChI = new IriClass("iupac_inchi", Arrays.asList("integer"), prefix + "IUPAC_InChI"));
+        classmap(descriptorPreferredIupacName = new IriClass("preferred_iupac_name", Arrays.asList("integer"),
                 prefix + "Preferred_IUPAC_Name"));
     }
 

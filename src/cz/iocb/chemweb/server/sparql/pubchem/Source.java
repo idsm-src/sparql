@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -13,7 +14,8 @@ class Source extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(source = new IriClass("source", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/source/.*"));
+        classmap(source = new IriClass("source", Arrays.asList("smallint"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/source/.*"));
     }
 
 

@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -14,8 +15,8 @@ class Ontology extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(rdfclass = new IriClass("class", 1, getIriValues("class_bases")));
-        classmap(property = new IriClass("property", 1, getIriValues("property_bases")));
+        classmap(rdfclass = new IriClass("class", Arrays.asList("integer"), getIriValues("class_bases")));
+        classmap(property = new IriClass("property", Arrays.asList("integer"), getIriValues("property_bases")));
     }
 
 

@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdStri
 import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
 import static cz.iocb.chemweb.server.sparql.pubchem.Shared.taxonomy;
 import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -17,8 +18,10 @@ class Biosystem extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(biosystem = new IriClass("biosystem", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID[0-9]+"));
-        classmap(wikipathway = new IriClass("wikipathway", 1, "http://identifiers.org/wikipathways/WP[0-9]+"));
+        classmap(biosystem = new IriClass("biosystem", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID[0-9]+"));
+        classmap(wikipathway = new IriClass("wikipathway", Arrays.asList("integer"),
+                "http://identifiers.org/wikipathways/WP[0-9]+"));
     }
 
 

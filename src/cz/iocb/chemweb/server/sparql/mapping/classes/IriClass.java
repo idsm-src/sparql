@@ -16,34 +16,36 @@ public class IriClass extends ResourceClass
     private final HashSet<String> values;
     private final String function;
     private final List<String> inverseFunction;
+    private final List<String> sqlTypes;
 
 
-    public IriClass(String name, int parametersCount, String pattern, HashSet<String> values)
+    public IriClass(String name, List<String> sqlTypes, String pattern, HashSet<String> values)
     {
         super(name);
         this.pattern = pattern;
         this.values = values;
         this.function = name;
+        this.sqlTypes = sqlTypes;
 
-        this.inverseFunction = new ArrayList<String>(parametersCount);
+        this.inverseFunction = new ArrayList<String>(sqlTypes.size());
 
-        if(parametersCount == 1)
+        if(sqlTypes.size() == 1)
             this.inverseFunction.add(name + "_inverse");
         else
-            for(int i = 0; i < parametersCount; i++)
+            for(int i = 0; i < sqlTypes.size(); i++)
                 this.inverseFunction.add(name + "_inv" + (i + 1));
     }
 
 
-    public IriClass(String name, int parametersCount, String pattern)
+    public IriClass(String name, List<String> types, String pattern)
     {
-        this(name, parametersCount, pattern, null);
+        this(name, types, pattern, null);
     }
 
 
-    public IriClass(String name, int parametersCount, HashSet<String> values)
+    public IriClass(String name, List<String> types, HashSet<String> values)
     {
-        this(name, parametersCount, null, values);
+        this(name, types, null, values);
     }
 
 
@@ -95,6 +97,13 @@ public class IriClass extends ResourceClass
         IRI iri = (IRI) node;
 
         return inverseFunction.get(i) + "('" + iri.getUri().toString() + "')";
+    }
+
+
+    @Override
+    public String getSqlType(int i)
+    {
+        return sqlTypes.get(i);
     }
 
 

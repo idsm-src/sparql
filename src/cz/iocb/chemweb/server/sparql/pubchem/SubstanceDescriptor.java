@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -15,7 +16,8 @@ class SubstanceDescriptor extends PubChemMapping
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID[0-9]+_";
 
-        classmap(descriptorSubstanceVersion = new IriClass("substance_version", 1, prefix + "Substance_Version"));
+        classmap(descriptorSubstanceVersion = new IriClass("substance_version", Arrays.asList("integer"),
+                prefix + "Substance_Version"));
     }
 
 

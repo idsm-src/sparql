@@ -18,21 +18,23 @@ public class LiteralClass extends ResourceClass
     public static final String dateTimeTag = "time";
     public static final String stringTag = "str";
 
-    public static final LiteralClass xsdBoolean = new LiteralClass(booleanTag, xsd + "boolean");
-    public static final LiteralClass xsdInteger = new LiteralClass(integerTag, xsd + "xsdInteger");
-    public static final LiteralClass xsdDecimal = new LiteralClass(decimalTag, xsd + "decimal");
-    public static final LiteralClass xsdFloat = new LiteralClass(floatTag, xsd + "float");
-    public static final LiteralClass xsdDouble = new LiteralClass(doubleTag, xsd + "double");
-    public static final LiteralClass xsdDate = new LiteralClass(dateTag, xsd + "date");
-    public static final LiteralClass xsdDateTime = new LiteralClass(dateTimeTag, xsd + "dateTime");
-    public static final LiteralClass xsdString = new LiteralClass(stringTag, xsd + "string");
+    public static final LiteralClass xsdBoolean = new LiteralClass(booleanTag, "boolean", xsd + "boolean");
+    public static final LiteralClass xsdInteger = new LiteralClass(integerTag, "integer", xsd + "xsdInteger");
+    public static final LiteralClass xsdDecimal = new LiteralClass(decimalTag, "float8", xsd + "decimal");
+    public static final LiteralClass xsdFloat = new LiteralClass(floatTag, "float", xsd + "float");
+    public static final LiteralClass xsdDouble = new LiteralClass(doubleTag, "float8", xsd + "double");
+    public static final LiteralClass xsdDate = new LiteralClass(dateTag, "date", xsd + "date");
+    public static final LiteralClass xsdDateTime = new LiteralClass(dateTimeTag, "timestamptz", xsd + "dateTime");
+    public static final LiteralClass xsdString = new LiteralClass(stringTag, "varchar", xsd + "string");
 
     private final String typeIri;
+    private final String sqlType;
 
 
-    protected LiteralClass(String name, String typeIri)
+    protected LiteralClass(String name, String sqlType, String typeIri)
     {
         super(name);
+        this.sqlType = sqlType;
         this.typeIri = typeIri;
     }
 
@@ -75,6 +77,13 @@ public class LiteralClass extends ResourceClass
             return "'" + value.toString().replaceAll("'", "\\'") + "'";
         else
             return value.toString();
+    }
+
+
+    @Override
+    public String getSqlType(int i)
+    {
+        return sqlType;
     }
 
 

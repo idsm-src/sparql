@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDate
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Shared.dqmesh;
 import static cz.iocb.chemweb.server.sparql.pubchem.Shared.mesh;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -16,7 +17,8 @@ class Reference extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(reference = new IriClass("reference", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID[0-9]+"));
+        classmap(reference = new IriClass("reference", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID[0-9]+"));
     }
 
 

@@ -25,6 +25,7 @@ import static cz.iocb.chemweb.server.sparql.pubchem.CompoundDescriptor.descripto
 import static cz.iocb.chemweb.server.sparql.pubchem.CompoundDescriptor.descriptorUndefinedAtomStereoCount;
 import static cz.iocb.chemweb.server.sparql.pubchem.CompoundDescriptor.descriptorUndefinedBondStereoCount;
 import static cz.iocb.chemweb.server.sparql.pubchem.CompoundDescriptor.descriptorXLogP3AA;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -40,8 +41,8 @@ class Compound extends PubChemMapping
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID[0-9]+";
 
-        classmap(compound = new IriClass("compound", 1, prefix));
-        classmap(compoundSdfile = new IriClass("compound_sdfile", 1, prefix + "_SDfile"));
+        classmap(compound = new IriClass("compound", Arrays.asList("integer"), prefix));
+        classmap(compoundSdfile = new IriClass("compound_sdfile", Arrays.asList("integer"), prefix + "_SDfile"));
     }
 
 

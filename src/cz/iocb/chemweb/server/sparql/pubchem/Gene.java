@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Biosystem.biosystem;
 import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -16,8 +17,10 @@ class Gene extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(gene = new IriClass("gene", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
-        classmap(ensembl = new IriClass("ensembl", 1, "http://rdf.ebi.ac.uk/resource/ensembl/.*"));
+        classmap(gene = new IriClass("gene", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
+        classmap(ensembl = new IriClass("ensembl", Arrays.asList("varchar"),
+                "http://rdf.ebi.ac.uk/resource/ensembl/.*"));
     }
 
 

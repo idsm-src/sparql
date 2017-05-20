@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Compound.compound;
 import static cz.iocb.chemweb.server.sparql.pubchem.Shared.mesh;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -15,7 +16,8 @@ class InchiKey extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(inchikey = new IriClass("inchikey", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*"));
+        classmap(inchikey = new IriClass("inchikey", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*"));
     }
 
 

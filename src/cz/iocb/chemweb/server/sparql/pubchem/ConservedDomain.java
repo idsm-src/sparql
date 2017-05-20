@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -14,7 +15,7 @@ class ConservedDomain extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(conserveddomain = new IriClass("conserveddomain", 1,
+        classmap(conserveddomain = new IriClass("conserveddomain", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/PSSMID[0-9]+"));
     }
 

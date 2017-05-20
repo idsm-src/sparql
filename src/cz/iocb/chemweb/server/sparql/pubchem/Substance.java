@@ -8,6 +8,7 @@ import static cz.iocb.chemweb.server.sparql.pubchem.Shared.pdblink;
 import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
 import static cz.iocb.chemweb.server.sparql.pubchem.SubstanceDescriptor.descriptorSubstanceVersion;
 import static cz.iocb.chemweb.server.sparql.pubchem.Synonym.synonym;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
@@ -22,10 +23,11 @@ class Substance extends PubChemMapping
 
     static void loadClasses()
     {
-        classmap(substance = new IriClass("substance", 1, "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/SID[0-9]+"));
-        classmap(substanceChembl = new IriClass("substance_chembl", 1,
+        classmap(substance = new IriClass("substance", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/SID[0-9]+"));
+        classmap(substanceChembl = new IriClass("substance_chembl", Arrays.asList("integer"),
                 "http://linkedchemistry.info/chembl/chemblid/S?CHEMBL[0-9]+"));
-        classmap(substanceEbiChembl = new IriClass("substance_ebi_chembl", 1,
+        classmap(substanceEbiChembl = new IriClass("substance_ebi_chembl", Arrays.asList("integer"),
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/S?CHEMBL[0-9]+"));
     }
 

@@ -25,6 +25,8 @@ public abstract class ResourceClass
 
     public abstract String getSqlValue(Node node, int i);
 
+    public abstract String getSqlType(int i);
+
 
     public final String getName()
     {

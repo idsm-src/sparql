@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import static cz.iocb.chemweb.server.sparql.pubchem.Measuregroup.measuregroup;
 import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
+import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;;
 
@@ -18,8 +19,9 @@ class Bioassay extends PubChemMapping
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID[0-9]+";
 
-        classmap(bioassay = new IriClass("bioassay", 1, prefix));
-        classmap(bioassayData = new IriClass("bioassay_data", 2, prefix + "_(Description|Protocol|Comment)"));
+        classmap(bioassay = new IriClass("bioassay", Arrays.asList("integer"), prefix));
+        classmap(bioassayData = new IriClass("bioassay_data", Arrays.asList("integer", "smallint"),
+                prefix + "_(Description|Protocol|Comment)"));
     }
 
 
