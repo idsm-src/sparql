@@ -52,15 +52,15 @@ public class PostgreDatabase
                 String var = metadata.getColumnName(i + 1);
                 String name = var.replaceAll("#.*", "");
 
-                varNames.put(var, heads.size());
-
-                if(name.equals(lastName))
-                    continue;
-                else
+                if(!name.equals(lastName))
+                {
                     lastName = name;
 
-                columnNames.put(name, heads.size());
-                heads.add(name);
+                    columnNames.put(name, heads.size());
+                    heads.add(name);
+                }
+
+                varNames.put(var, heads.size() - 1);
             }
 
 
