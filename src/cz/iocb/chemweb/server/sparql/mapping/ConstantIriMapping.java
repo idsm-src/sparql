@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
@@ -36,6 +38,13 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
     public String getSqlValueAccess(int i)
     {
         return getIriClass().getInverseFunction(i) + "('" + value + "')";
+    }
+
+
+    @Override
+    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    {
+        return this;
     }
 
 

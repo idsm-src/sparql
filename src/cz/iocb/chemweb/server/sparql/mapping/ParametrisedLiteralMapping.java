@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
@@ -53,6 +55,15 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
     public String getSqlValueAccess(int i)
     {
         return column;
+    }
+
+
+    @Override
+    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    {
+        String remapped = columnMap.stream().filter(s -> s.getParent().equals(column)).findAny().get().getForeign();
+        assert remapped != null;
+        return new ParametrisedLiteralMapping(getLiteralClass(), remapped);
     }
 
 

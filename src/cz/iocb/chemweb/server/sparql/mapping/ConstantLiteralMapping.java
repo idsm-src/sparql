@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
@@ -64,6 +66,13 @@ public class ConstantLiteralMapping extends LiteralMapping implements ConstantMa
             return "'" + ((String) value.getValue()).replaceAll("'", "\\'") + "'";
         else
             return value.toString();
+    }
+
+
+    @Override
+    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    {
+        return this;
     }
 
 

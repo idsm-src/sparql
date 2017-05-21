@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -19,6 +21,8 @@ public abstract class NodeMapping
     public abstract boolean match(Node node);
 
     public abstract String getSqlValueAccess(int i);
+
+    public abstract NodeMapping remapColumns(List<KeyPair> columnMap);
 
 
     public final ResourceClass getResourceClass()

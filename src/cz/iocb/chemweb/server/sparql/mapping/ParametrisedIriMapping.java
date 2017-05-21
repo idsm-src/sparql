@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.ArrayList;
 import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
@@ -37,6 +39,22 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     public String getSqlValueAccess(int i)
     {
         return columns.get(i);
+    }
+
+
+    @Override
+    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    {
+        ArrayList<String> remappedColumns = new ArrayList<String>();
+
+        for(String col : columns)
+        {
+            String remapped = columnMap.stream().filter(s -> s.getParent().equals(col)).findAny().get().getForeign();
+            assert remapped != null;
+            remappedColumns.add(remapped);
+        }
+
+        return new ParametrisedIriMapping(getIriClass(), remappedColumns);
     }
 
 
