@@ -8,7 +8,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ConstantLiteralMapping extends LiteralMapping
+public class ConstantLiteralMapping extends LiteralMapping implements ConstantMapping
 {
     private final Literal value;
 

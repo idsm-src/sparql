@@ -8,7 +8,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ParametrisedIriMapping extends IriMapping
+public class ParametrisedIriMapping extends IriMapping implements ParametrisedMapping
 {
     private final List<String> columns;
 

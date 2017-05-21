@@ -8,7 +8,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ParametrisedLiteralMapping extends LiteralMapping
+public class ParametrisedLiteralMapping extends LiteralMapping implements ParametrisedMapping
 {
     private final String column;
 

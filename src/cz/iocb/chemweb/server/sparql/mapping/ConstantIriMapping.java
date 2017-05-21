@@ -7,7 +7,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ConstantIriMapping extends IriMapping
+public class ConstantIriMapping extends IriMapping implements ConstantMapping
 {
     private final String value;
 
