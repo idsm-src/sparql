@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.sql;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
@@ -51,6 +52,63 @@ public class UsedPairedVariable
     public void addClasses(ResourceClass l, ResourceClass r)
     {
         classes.add(new PairedClass(l, r));
+    }
+
+
+    public static ArrayList<UsedPairedVariable> getPairs(UsedVariables left, UsedVariables right)
+    {
+        LinkedHashSet<String> varNames = new LinkedHashSet<String>();
+
+        for(UsedVariable variable : left.getValues())
+            varNames.add(variable.getName());
+
+        for(UsedVariable variable : right.getValues())
+            varNames.add(variable.getName());
+
+
+        ArrayList<UsedPairedVariable> pairs = new ArrayList<UsedPairedVariable>();
+
+        for(String varName : varNames)
+        {
+            UsedVariable leftVar = left.get(varName);
+            UsedVariable rightVar = right.get(varName);
+
+
+            UsedPairedVariable paired = new UsedPairedVariable(varName, leftVar, rightVar);
+
+            if(leftVar == null)
+            {
+                for(ResourceClass resClass : rightVar.getClasses())
+                    paired.addClasses(null, resClass);
+            }
+            else if(rightVar == null)
+            {
+                for(ResourceClass resClass : leftVar.getClasses())
+                    paired.addClasses(resClass, null);
+            }
+            else
+            {
+                LinkedHashSet<ResourceClass> classes = new LinkedHashSet<ResourceClass>();
+
+                for(ResourceClass resClass : leftVar.getClasses())
+                    classes.add(resClass);
+
+                for(ResourceClass resClass : rightVar.getClasses())
+                    classes.add(resClass);
+
+                for(ResourceClass resClass : classes)
+                {
+                    ResourceClass l = leftVar.containsClass(resClass) ? resClass : null;
+                    ResourceClass r = rightVar.containsClass(resClass) ? resClass : null;
+
+                    paired.addClasses(l, r);
+                }
+            }
+
+            pairs.add(paired);
+        }
+
+        return pairs;
     }
 
 

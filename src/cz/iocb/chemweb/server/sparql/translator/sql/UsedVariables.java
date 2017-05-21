@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.sql;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
@@ -26,5 +27,16 @@ public class UsedVariables
     public Collection<UsedVariable> getValues()
     {
         return usedVariables.values();
+    }
+
+
+    public boolean contains(String name, ResourceClass resClass)
+    {
+        UsedVariable variable = usedVariables.get(name);
+
+        if(variable == null)
+            return false;
+
+        return variable.getClasses().contains(resClass);
     }
 }
