@@ -1,19 +1,16 @@
 package cz.iocb.chemweb.server.sparql.translator.sql;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
+import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
@@ -41,16 +38,21 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlEmptySolution;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlJoin;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlNoSolution;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlQuery;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlSelect;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlTableAccess;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestriction;
 import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestriction.RestrictionType;
 
 
 
-public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
+public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
-    private int tmpTableIndex = 0;
-
     private final Stack<List<DataSet>> selectDatasets = new Stack<>();
     private final Stack<GraphOrServiceRestriction> graphOrServiceRestrictions = new Stack<>();
 
@@ -58,26 +60,26 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
     private final List<QuadMapping> mappings;
+    private final DatabaseSchema schema;
 
 
-
-    public TranslateVisitor(List<QuadMapping> mappings)
+    public TranslateVisitor(List<QuadMapping> mappings, DatabaseSchema schema)
     {
         this.mappings = mappings;
+        this.schema = schema;
     }
 
 
     @Override
-    public TranslatedSegment visit(SelectQuery selectQuery)
+    public SqlIntercode visit(SelectQuery selectQuery)
     {
-        TranslatedSegment translatedSelectClause = visitElement(selectQuery.getSelect());
-
-        return translateSelectVariables(translatedSelectClause);
+        SqlIntercode translatedSelect = visitElement(selectQuery.getSelect());
+        return new SqlQuery(translatedSelect);
     }
 
 
     @Override
-    public TranslatedSegment visit(Select select)
+    public SqlIntercode visit(Select select)
     {
         checkProjectionVariables(select);
 
@@ -85,36 +87,82 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         selectDatasets.push(select.getDataSets()); // TODO: datasets are not supported
 
         // translate the WHERE clause
-        TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
+        SqlIntercode translatedWhereClause = visitElement(select.getPattern());
 
         if(!select.getGroupByConditions().isEmpty())
             translatedWhereClause = translateBindInGroupBy(select.getGroupByConditions(), translatedWhereClause);
 
-        TranslatedSegment translatedSelect = translateSelect(select, translatedWhereClause);
+
+
+        UsedVariables variables = null;
+
+        if(select.getProjections().isEmpty())
+        {
+            //TODO: check whether star can be used
+
+            variables = translatedWhereClause.getVariables(); //TODO: filter out tmp variables
+        }
+        else
+        {
+            variables = new UsedVariables();
+
+            for(Projection projection : select.getProjections())
+            {
+                String varName = projection.getVariable().getName();
+
+                if(projection.getExpression() != null)
+                {
+                    //TODO: expression translation is not implemented yet
+                }
+                else
+                {
+                    UsedVariable variable = translatedWhereClause.getVariables().get(varName);
+
+                    if(variable == null)
+                        variable = new UsedVariable(varName, true);
+
+                    variables.add(variable);
+                }
+            }
+        }
+
+
+        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause);
+
+
+        if(select.isDistinct())
+            sqlSelect.setDistinct(true);
+
+        if(select.getLimit() != null)
+            sqlSelect.setLimit(select.getLimit());
+
+        if(select.getOffset() != null)
+            sqlSelect.setOffset(select.getOffset());
+
 
         // clear information about datasets of this SELECT (sub)query
         selectDatasets.pop();
 
-        return translatedSelect;
+        return sqlSelect;
     }
 
 
     @Override
-    public TranslatedSegment visit(GroupGraph groupGraph)
+    public SqlIntercode visit(GroupGraph groupGraph)
     {
-        TranslatedSegment translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
+        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
 
         return translatedGroupGraphPattern;
     }
 
 
     @Override
-    public TranslatedSegment visit(Graph graph)
+    public SqlIntercode visit(Graph graph)
     {
         VarOrIri varOrIri = graph.getName();
         graphOrServiceRestrictions.push(new GraphOrServiceRestriction(RestrictionType.GRAPH_RESTRICTION, varOrIri));
 
-        TranslatedSegment translatedPattern = visitElement(graph.getPattern());
+        SqlIntercode translatedPattern = visitElement(graph.getPattern());
 
         graphOrServiceRestrictions.pop();
         return translatedPattern;
@@ -122,28 +170,28 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Service service)
+    public SqlIntercode visit(Service service)
     {
         return null;
     }
 
 
     @Override
-    public TranslatedSegment visit(Union union)
+    public SqlIntercode visit(Union union)
     {
         return null;
     }
 
 
     @Override
-    public TranslatedSegment visit(Values values)
+    public SqlIntercode visit(Values values)
     {
         return null;
     }
 
 
     @Override
-    public TranslatedSegment visit(Triple triple)
+    public SqlIntercode visit(Triple triple)
     {
         if(!(triple.getPredicate() instanceof Node))
             return null; //TODO: paths are not yet implemented
@@ -166,23 +214,78 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
 
-        TranslatedSegment translatedPattern = new NoSolutionSegment();
+        SqlIntercode translatedPattern = null;
 
         for(QuadMapping mapping : mappings)
         {
             if(mapping.match(graph, subject, predicate, object))
             {
-                TranslatedSegment translate = translateTriple(mapping, graph, subject, predicate, object);
-                translatedPattern = translateUnion(translatedPattern, translate);
+                SqlTableAccess translated = new SqlTableAccess(mapping.getTable(), mapping.getCondition());
+
+                processNodeMapping(translated, graph, mapping.getGraph());
+                processNodeMapping(translated, subject, mapping.getSubject());
+                processNodeMapping(translated, predicate, mapping.getPredicate());
+                processNodeMapping(translated, object, mapping.getObject());
+
+                for(UsedVariable usedVariable : translated.getVariables().getValues())
+                    if(usedVariable.getClasses().size() > 1)
+                        continue;
+
+                processNodeCondition(translated, graph, mapping.getGraph());
+                processNodeCondition(translated, subject, mapping.getSubject());
+                processNodeCondition(translated, predicate, mapping.getPredicate());
+                processNodeCondition(translated, object, mapping.getObject());
+
+                if(processNodesCondition(translated, graph, subject, mapping.getGraph(), mapping.getSubject()))
+                    continue;
+
+                if(processNodesCondition(translated, graph, predicate, mapping.getGraph(), mapping.getPredicate()))
+                    continue;
+
+                if(processNodesCondition(translated, graph, object, mapping.getGraph(), mapping.getObject()))
+                    continue;
+
+                if(processNodesCondition(translated, subject, predicate, mapping.getSubject(), mapping.getPredicate()))
+                    continue;
+
+                if(processNodesCondition(translated, subject, object, mapping.getSubject(), mapping.getObject()))
+                    continue;
+
+
+                if(translatedPattern == null)
+                    translatedPattern = translated;
+                else
+                    translatedPattern = SqlUnion.union(translatedPattern, translated);
             }
         }
+
+
+        if(translatedPattern == null)
+        {
+            UsedVariables noSolutionVariables = new UsedVariables();
+
+            if(graph instanceof Variable)
+                noSolutionVariables.add(new UsedVariable(((Variable) graph).getName(), true));
+
+            if(subject instanceof Variable)
+                noSolutionVariables.add(new UsedVariable(((Variable) subject).getName(), true));
+
+            if(predicate instanceof Variable)
+                noSolutionVariables.add(new UsedVariable(((Variable) predicate).getName(), true));
+
+            if(object instanceof Variable)
+                noSolutionVariables.add(new UsedVariable(((Variable) object).getName(), true));
+
+            return new SqlNoSolution(noSolutionVariables);
+        }
+
 
         return translatedPattern;
     }
 
 
     @Override
-    public TranslatedSegment visit(Minus minus)
+    public SqlIntercode visit(Minus minus)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -191,7 +294,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Optional optional)
+    public SqlIntercode visit(Optional optional)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -200,7 +303,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Bind bind)
+    public SqlIntercode visit(Bind bind)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -209,7 +312,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Filter filter)
+    public SqlIntercode visit(Filter filter)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -390,12 +493,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    /**
-     * Checks whether the given function is an aggregate function (according to SPARQL 1.1).
-     *
-     * @param functionName Name of the SPARQL function.
-     * @return true if the given function is an aggregate function.
-     */
     private boolean isAggregateFunction(String functionName)
     {
         functionName = functionName.toUpperCase(Locale.US);
@@ -418,192 +515,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     /**************************************************************************/
 
-    private TranslatedSegment translateSelectVariables(TranslatedSegment translatedSelectClause)
-    {
-        UsedVariables variables = translatedSelectClause.getVariables();
-        StringBuilder builder = new StringBuilder();
-
-        builder.append("SELECT ");
-        boolean hasSelect = false;
-
-        for(UsedVariable variable : variables.getValues())
-        {
-            List<ResourceClass> classes = variable.getClasses();
-
-            if(classes.size() == 0)
-            {
-                appendComma(builder, hasSelect);
-                hasSelect = true;
-
-                builder.append("NULL AS \"");
-                builder.append(variable.getName());
-                builder.append('#');
-                builder.append(ResourceClass.nullTag);
-                builder.append('"');
-            }
-            else
-            {
-                List<ResourceClass> iriClasses = new ArrayList<ResourceClass>();
-                List<ResourceClass> literalClasses = new ArrayList<ResourceClass>();
-
-                for(ResourceClass resClass : classes)
-                {
-                    if(resClass instanceof IriClass)
-                        iriClasses.add(resClass);
-                    else
-                        literalClasses.add(resClass);
-                }
-
-                if(!iriClasses.isEmpty())
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    if(iriClasses.size() > 1)
-                        builder.append("COALESCE(");
-
-                    for(int i = 0; i < iriClasses.size(); i++)
-                    {
-                        appendComma(builder, i > 0);
-
-                        ResourceClass iriClass = iriClasses.get(i);
-                        builder.append(iriClass.getSparqlValue(variable.getName()));
-                    }
-
-                    if(iriClasses.size() > 1)
-                        builder.append(")");
-
-                    builder.append(" AS \"");
-                    builder.append(variable.getName());
-                    builder.append('#');
-                    builder.append(IriClass.iriTag);
-                    builder.append('"');
-                }
-
-                for(ResourceClass literalClass : literalClasses)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    builder.append(literalClass.getSparqlValue(variable.getName()));
-                }
-            }
-        }
-
-        if(!hasSelect)
-        {
-            builder.append("1 AS \"*#");
-            builder.append(ResourceClass.nullTag);
-            builder.append('"');
-        }
-
-
-        builder.append(" FROM (");
-        builder.append(translatedSelectClause.getCode());
-        builder.append(") AS ");
-        builder.append(getTmpTableName());
-
-        return new TranslatedSegment(builder.toString(), null);
-    }
-
-
-    private TranslatedSegment translateSelect(Select select, TranslatedSegment translatedWhereClause)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append("SELECT ");
-
-        if(select.isDistinct())
-            builder.append("DISTINCT ");
-
-
-        UsedVariables variables = null;
-        boolean hasSelect = false;
-
-        if(select.getProjections().isEmpty())
-        {
-            //TODO: check whether star can be used
-
-            variables = translatedWhereClause.getVariables();
-
-            for(UsedVariable variable : variables.getValues())
-            {
-                for(ResourceClass resClass : variable.getClasses())
-                {
-                    for(int i = 0; i < resClass.getPartsCount(); i++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append(resClass.getSqlColumn(variable.getName(), i));
-                    }
-                }
-            }
-        }
-        else
-        {
-            variables = new UsedVariables();
-
-            for(Projection projection : select.getProjections())
-            {
-                String varName = projection.getVariable().getName();
-
-                if(projection.getExpression() != null)
-                {
-                    //TODO: expression translation is not implemented yet
-                }
-                else
-                {
-                    UsedVariable variable = translatedWhereClause.getVariables().get(varName);
-
-                    if(variable == null)
-                        variable = new UsedVariable(varName, true);
-
-                    variables.add(variable);
-
-                    for(ResourceClass resClass : variable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append(resClass.getSqlColumn(varName, i));
-                        }
-                    }
-                }
-            }
-        }
-
-        if(!hasSelect)
-            builder.append("1");
-
-        builder.append(" FROM (");
-        builder.append(translatedWhereClause.getCode());
-        builder.append(" ) AS ");
-        builder.append(getTmpTableName());
-
-
-        if(select.getLimit() != null)
-        {
-            builder.append(" LIMIT ");
-            builder.append(select.getLimit().toString());
-        }
-
-
-        if(select.getOffset() != null)
-        {
-            builder.append(" OFFSET ");
-            builder.append(select.getOffset().toString());
-        }
-
-
-        return new TranslatedSegment(builder.toString(), variables);
-    }
-
-
-    private TranslatedSegment translateBindInGroupBy(List<GroupCondition> groupByList,
-            TranslatedSegment translatedWhereClause)
+    private SqlIntercode translateBindInGroupBy(List<GroupCondition> groupByList, SqlIntercode translatedWhereClause)
     {
         for(GroupCondition groupBy : groupByList)
         {
@@ -623,9 +535,9 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translatePatternList(List<Pattern> patterns)
+    private SqlIntercode translatePatternList(List<Pattern> patterns)
     {
-        TranslatedSegment translatedGroupPattern = EmptySolutionSegment.get();
+        SqlIntercode translatedGroupPattern = new SqlEmptySolution();
 
         LinkedList<Filter> filters = new LinkedList<>();
 
@@ -639,7 +551,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 if(optionalPattern == null) //TODO: this possibility should be eliminated by the parser
                     continue;
 
-                TranslatedSegment translatedPattern = null;
+                SqlIntercode translatedPattern = null;
                 LinkedList<Filter> optionalFilters = new LinkedList<>();
 
 
@@ -682,8 +594,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             }
             else
             {
-                TranslatedSegment translatedPattern = visitElement(pattern);
-                translatedGroupPattern = translateJoin(translatedGroupPattern, translatedPattern);
+                SqlIntercode translatedPattern = visitElement(pattern);
+
+                if(translatedPattern == null)
+                    System.err.println(pattern.getClass().getCanonicalName());
+
+                translatedGroupPattern = SqlJoin.join(schema, translatedGroupPattern, translatedPattern);
             }
         }
 
@@ -691,144 +607,27 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateTriple(QuadMapping mapping, Node graph, Node subject, Node predicate,
-            Node object)
-    {
-        StringBuilder builder = new StringBuilder();
-        UsedVariables variables = new UsedVariables();
-
-
-        builder.append("SELECT ");
-        boolean hasSelect = false;
-
-        hasSelect |= generateNodeSelect(builder, hasSelect, variables, graph, mapping.getGraph());
-        hasSelect |= generateNodeSelect(builder, hasSelect, variables, subject, mapping.getSubject());
-        hasSelect |= generateNodeSelect(builder, hasSelect, variables, predicate, mapping.getPredicate());
-        hasSelect |= generateNodeSelect(builder, hasSelect, variables, object, mapping.getObject());
-
-        if(!hasSelect)
-            builder.append("1");
-
-        for(UsedVariable usedVariable : variables.getValues())
-        {
-            if(usedVariable.getClasses().size() > 1)
-            {
-                UsedVariables noSolutionVariables = new UsedVariables();
-
-                for(UsedVariable variable : variables.getValues())
-                    noSolutionVariables.add(new UsedVariable(variable.getName(), true));
-
-                return new NoSolutionSegment(noSolutionVariables);
-            }
-        }
-
-
-        if(mapping.getTable() != null)
-        {
-            builder.append(" FROM ");
-            builder.append(mapping.getTable());
-        }
-
-
-        builder.append(" WHERE ");
-        boolean hasWhere = false;
-
-        if(mapping.getCondition() != null)
-        {
-            hasWhere = true;
-            builder.append(mapping.getCondition());
-            builder.append(" ");
-        }
-
-        hasWhere |= generateNodeWhere(builder, hasWhere, graph, mapping.getGraph());
-        hasWhere |= generateNodeWhere(builder, hasWhere, subject, mapping.getSubject());
-        hasWhere |= generateNodeWhere(builder, hasWhere, predicate, mapping.getPredicate());
-        hasWhere |= generateNodeWhere(builder, hasWhere, object, mapping.getObject());
-
-        hasWhere |= generateNodesWhere(builder, hasWhere, graph, subject, mapping.getGraph(), mapping.getSubject());
-        hasWhere |= generateNodesWhere(builder, hasWhere, graph, predicate, mapping.getGraph(), mapping.getPredicate());
-        hasWhere |= generateNodesWhere(builder, hasWhere, graph, object, mapping.getGraph(), mapping.getObject());
-        hasWhere |= generateNodesWhere(builder, hasWhere, subject, predicate, mapping.getSubject(),
-                mapping.getPredicate());
-        hasWhere |= generateNodesWhere(builder, hasWhere, subject, object, mapping.getSubject(), mapping.getObject());
-
-        if(!hasWhere)
-            builder.append("true");
-
-
-        return new TranslatedSegment(builder.toString(), variables);
-    }
-
-
-    private boolean generateNodeSelect(StringBuilder builder, boolean hasSelect, UsedVariables variables, Node node,
-            NodeMapping mapping)
+    private void processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
         if(!(node instanceof Variable))
-            return false;
+            return;
 
-
-        Variable variable = (Variable) node;
-        UsedVariable other = variables.get(variable.getName());
-
-        if(other != null && other.containsClass(mapping.getResourceClass()))
-            return false;
-
-        if(other != null)
-            other.addClass(mapping.getResourceClass());
-        else
-            variables.add(new UsedVariable(variable.getName(), mapping.getResourceClass(), false));
-
-        appendComma(builder, hasSelect);
-
-        for(int i = 0; i < mapping.getResourceClass().getPartsCount(); i++)
-        {
-            appendComma(builder, i > 0);
-
-            builder.append(mapping.getSqlValueAccess(i));
-            builder.append(" AS ");
-            builder.append(mapping.getResourceClass().getSqlColumn(variable.getName(), i));
-        }
-
-        return true;
+        translated.addMapping(((Variable) node).getName(), mapping);
     }
 
 
-    private boolean generateNodeWhere(StringBuilder builder, boolean hasWhere, Node node, NodeMapping mapping)
+    private void processNodeCondition(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
-        if(node instanceof Variable && !(mapping instanceof ParametrisedLiteralMapping))
-            return false;
+        if(node instanceof Variable && mapping instanceof ParametrisedLiteralMapping)
+            translated.addNotNullCondition((ParametrisedLiteralMapping) mapping);
 
-        if(mapping instanceof ConstantIriMapping || mapping instanceof ConstantLiteralMapping)
-            return false;
-
-
-        if(hasWhere)
-            builder.append(" AND ");
-
-        for(int i = 0; i < mapping.getResourceClass().getPartsCount(); i++)
-        {
-            if(i > 0)
-                builder.append(" AND ");
-
-            builder.append(mapping.getSqlValueAccess(i));
-
-            if(node instanceof Variable)
-            {
-                builder.append(" IS NOT NULL ");
-            }
-            else
-            {
-                builder.append(" = ");
-                builder.append(mapping.getResourceClass().getSqlValue(node, i));
-            }
-        }
-
-        return true;
+        if(!(node instanceof Variable) && mapping instanceof ParametrisedMapping)
+            translated.addValueCondition(node, (ParametrisedMapping) mapping);
     }
 
 
-    private boolean generateNodesWhere(StringBuilder builder, boolean hasWhere, Node node1, Node node2,
-            NodeMapping map1, NodeMapping map2)
+    private boolean processNodesCondition(SqlTableAccess translated, Node node1, Node node2, NodeMapping map1,
+            NodeMapping map2)
     {
         if(!(node1 instanceof Variable) || !(node2 instanceof Variable))
             return false;
@@ -836,589 +635,53 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(!node1.equals(node2))
             return false;
 
-
-        if(hasWhere)
-            builder.append(" AND ");
-
-        if(map1.getResourceClass() == map2.getResourceClass())
+        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
         {
-            for(int i = 0; i < map1.getResourceClass().getPartsCount(); i++)
-            {
-                if(i > 0)
-                    builder.append(" AND ");
-
-                builder.append(map1.getSqlValueAccess(i));
-                builder.append(" = ");
-                builder.append(map1.getSqlValueAccess(i));
-            }
-        }
-        else
-        {
-            assert false;
-        }
-
-        return true;
-    }
-
-
-    private TranslatedSegment translateUnion(TranslatedSegment left, TranslatedSegment right)
-    {
-        if(left instanceof NoSolutionSegment)
-        {
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                variables.add(variable);
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                if(variables.get(variable.getName()) != null)
-                    variables.add(variable);
-
-            return new TranslatedSegment(right.getCode(), variables);
-        }
-
-        if(right instanceof NoSolutionSegment)
-        {
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                variables.add(variable);
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                if(variables.get(variable.getName()) != null)
-                    variables.add(variable);
-
-            return new TranslatedSegment(left.getCode(), variables);
-        }
-
-        if(left instanceof EmptySolutionSegment)
-            return right;
-
-        if(right instanceof EmptySolutionSegment)
-            return left;
-
-
-        ArrayList<UsedPairedVariable> pairs = pairVariables(left.getVariables(), right.getVariables());
-
-
-        StringBuilder builder = new StringBuilder();
-
-
-        boolean emptySelect = true;
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getLeftVariable();
-
-            if(leftVariable != null && !leftVariable.getClasses().isEmpty()
-                    || rightVariable != null && !rightVariable.getClasses().isEmpty())
-                emptySelect = false;
-        }
-
-
-        builder.append("SELECT ");
-
-        if(!emptySelect)
-        {
-            boolean hasSelect = false;
-
-            for(UsedPairedVariable pair : pairs)
-            {
-                UsedVariable leftVariable = pair.getLeftVariable();
-                UsedVariable rightVariable = pair.getLeftVariable();
-
-                String var = pair.getName();
-
-                if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                        && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                    continue;
-
-                for(PairedClass pairedClass : pair.getClasses())
-                {
-                    ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
-                            : pairedClass.getRightClass();
-
-                    for(int i = 0; i < resClass.getPartsCount(); i++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        if(pairedClass.getLeftClass() == null)
-                            builder.append("NULL AS ");
-
-                        builder.append(resClass.getSqlColumn(var, i));
-                    }
-                }
-            }
-
-            assert hasSelect;
-        }
-        else
-        {
-            builder.append("1");
-        }
-
-        builder.append(" FROM (");
-        builder.append(left.getCode());
-        builder.append(") AS ");
-        builder.append(getTmpTableName());
-
-        builder.append(" UNION ALL ");
-
-
-        builder.append("SELECT ");
-
-        if(!emptySelect)
-        {
-            boolean hasSelect = false;
-
-            for(UsedPairedVariable pair : pairs)
-            {
-                UsedVariable leftVariable = pair.getLeftVariable();
-                UsedVariable rightVariable = pair.getLeftVariable();
-
-                String var = pair.getName();
-
-                if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                        && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                    continue;
-
-                for(PairedClass pairedClass : pair.getClasses())
-                {
-                    ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
-                            : pairedClass.getRightClass();
-
-                    for(int i = 0; i < resClass.getPartsCount(); i++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        if(pairedClass.getRightClass() == null)
-                            builder.append("NULL AS ");
-
-                        builder.append(resClass.getSqlColumn(var, i));
-                    }
-                }
-            }
-
-            assert hasSelect;
-        }
-        else
-        {
-            builder.append("1");
-        }
-
-        builder.append(" FROM (");
-        builder.append(right.getCode());
-        builder.append(") AS ");
-        builder.append(getTmpTableName());
-
-
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            String varName = pair.getName();
-            boolean canBeNull = pair.getLeftVariable() != null && pair.getLeftVariable().canBeNull()
-                    || pair.getRightVariable() != null && pair.getRightVariable().canBeNull();
-
-            UsedVariable newVar = new UsedVariable(varName, canBeNull);
-
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() == null)
-                    newVar.addClass(pairedClass.getRightClass());
-                else
-                    newVar.addClass(pairedClass.getLeftClass());
-            }
-
-            variables.add(newVar);
-        }
-
-
-        return new TranslatedSegment(builder.toString(), variables);
-    }
-
-
-
-    private TranslatedSegment translateJoin(TranslatedSegment left, TranslatedSegment right)
-    {
-        if(left instanceof NoSolutionSegment || right instanceof NoSolutionSegment)
-        {
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                variables.add(new UsedVariable(variable.getName(), true));
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                if(variables.get(variable.getName()) != null)
-                    variables.add(new UsedVariable(variable.getName(), true));
-
-            return new NoSolutionSegment(variables);
-        }
-
-        if(left instanceof EmptySolutionSegment)
-            return right;
-
-        if(right instanceof EmptySolutionSegment)
-            return left;
-
-
-        ArrayList<UsedPairedVariable> pairs = pairVariables(left.getVariables(), right.getVariables());
-        String leftTable = getTmpTableName();
-        String rightTable = getTmpTableName();
-
-        UsedVariables variables = new UsedVariables();
-        StringBuilder builder = new StringBuilder();
-
-
-        builder.append("SELECT ");
-
-        boolean hasSelect = false;
-        boolean noSolution = false;
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-
-            String var = pair.getName();
-            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-            boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
-
-            UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-            variables.add(variable);
-
-            if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                    && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                continue;
-
-
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() == null)
-                {
-                    if(leftVariable != null && !leftVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else if(pairedClass.getRightClass() == null)
-                {
-                    if(rightVariable != null && !rightVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else // it is a join variable ...
-                {
-                    assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-
-
-                ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
-                        : pairedClass.getRightClass();
-
-                for(int i = 0; i < resClass.getPartsCount(); i++)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    generateJoinSelectVarable(builder, leftVariable, rightVariable, leftTable, rightTable,
-                            resClass.getSqlColumn(var, i));
-                }
-            }
-
-            if(variable.getClasses().isEmpty())
-                noSolution = true; //TODO: generate warning?
-        }
-
-        if(noSolution)
-        {
-            UsedVariables noSolutionVariables = new UsedVariables();
-
-            for(UsedVariable variable : variables.getValues())
-                noSolutionVariables.add(new UsedVariable(variable.getName(), true));
-
-            return new NoSolutionSegment(noSolutionVariables);
-        }
-
-
-        builder.append(" FROM ");
-        builder.append("(");
-        builder.append(left.getCode());
-        builder.append(") AS ");
-        builder.append(leftTable);
-
-        builder.append(", (");
-        builder.append(right.getCode());
-        builder.append(") AS ");
-        builder.append(rightTable);
-
-
-        builder.append(" WHERE ");
-
-        boolean hasWhere = false;
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            String var = pair.getName();
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-            if(leftVariable != null && rightVariable != null) // it is a join variable ...
-            {
-                if(leftVariable.getClasses().isEmpty() || rightVariable.getClasses().isEmpty())
-                    continue;
-
-                if(hasWhere)
-                    builder.append(" AND ");
-
-                hasWhere = true;
-
-                builder.append("(");
-                boolean restricted = false;
-
-                if(leftVariable.canBeNull())
-                {
-                    boolean use = false;
-                    builder.append("(");
-
-                    for(ResourceClass resClass : leftVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
-                        {
-                            if(use)
-                                builder.append(" AND ");
-                            else
-                                use = true;
-
-                            builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
-                    builder.append(")");
-
-                    assert use;
-                    restricted = true;
-                }
-
-                if(rightVariable.canBeNull())
-                {
-                    if(restricted)
-                        builder.append(" OR ");
-
-                    boolean use = false;
-                    builder.append("(");
-
-                    for(ResourceClass resClass : rightVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
-                        {
-                            if(use)
-                                builder.append(" AND ");
-                            else
-                                use = true;
-
-                            builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
-                    builder.append(")");
-
-                    assert use;
-                    restricted = true;
-                }
-
-                for(PairedClass pairedClass : pair.getClasses())
-                {
-                    if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                    {
-                        assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        ResourceClass resClass = pairedClass.getLeftClass();
-
-                        if(restricted)
-                            builder.append(" OR ");
-
-                        builder.append("(");
-
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
-                        {
-                            if(i > 0)
-                                builder.append(" AND ");
-
-                            builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" = ");
-                            builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                        }
-
-                        builder.append(")");
-
-                        restricted = true;
-                    }
-                }
-
-                builder.append(")");
-
-                assert restricted;
-            }
-        }
-
-        if(!hasWhere)
-            builder.append("true");
-
-        return new TranslatedSegment(builder.toString(), variables);
-    }
-
-
-    private void generateJoinSelectVarable(StringBuilder builder, UsedVariable leftVariable, UsedVariable rightVariable,
-            String leftTable, String rightTable, String var)
-    {
-        if(leftVariable == null || leftVariable.getClasses().isEmpty())
-        {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else if(rightVariable == null || rightVariable.getClasses().isEmpty())
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!leftVariable.canBeNull())
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!rightVariable.canBeNull())
-        {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else
-        {
-            builder.append("COALESCE(");
-            builder.append(leftTable).append('.').append(var);
-            builder.append(", ");
-            builder.append(rightTable).append('.').append(var);
-            builder.append(")");
-        }
-
-        builder.append(" AS ");
-        builder.append(var);
-    }
-
-
-    private ArrayList<UsedPairedVariable> pairVariables(UsedVariables left, UsedVariables right)
-    {
-        LinkedHashSet<String> varNames = mergeVariableNames(left, right);
-        ArrayList<UsedPairedVariable> pairs = new ArrayList<UsedPairedVariable>();
-
-        for(String varName : varNames)
-        {
-            UsedVariable leftVar = left.get(varName);
-            UsedVariable rightVar = right.get(varName);
-
-
-            UsedPairedVariable paired = new UsedPairedVariable(varName, leftVar, rightVar);
-
-            if(leftVar == null)
-            {
-                for(ResourceClass resClass : rightVar.getClasses())
-                    paired.addClasses(null, resClass);
-            }
-            else if(rightVar == null)
-            {
-                for(ResourceClass resClass : leftVar.getClasses())
-                    paired.addClasses(resClass, null);
-            }
+            if(map1.equals(map2))
+                return false;
             else
-            {
-                LinkedHashSet<ResourceClass> classes = new LinkedHashSet<ResourceClass>();
-
-                for(ResourceClass resClass : leftVar.getClasses())
-                    classes.add(resClass);
-
-                for(ResourceClass resClass : rightVar.getClasses())
-                    classes.add(resClass);
-
-                for(ResourceClass resClass : classes)
-                {
-                    ResourceClass l = leftVar.containsClass(resClass) ? resClass : null;
-                    ResourceClass r = rightVar.containsClass(resClass) ? resClass : null;
-
-                    paired.addClasses(l, r);
-                }
-            }
-
-            pairs.add(paired);
+                return true;
         }
 
-        return pairs;
+        if(!map1.equals(map2))
+            translated.addEqualityCondition(map1, map2);
+
+        return false;
     }
 
 
-    private LinkedHashSet<String> mergeVariableNames(UsedVariables left, UsedVariables right)
+    private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
+            LinkedList<Filter> optionalFilters)
     {
-        LinkedHashSet<String> varNames = new LinkedHashSet<String>();
-
-        for(UsedVariable variable : left.getValues())
-            varNames.add(variable.getName());
-
-        for(UsedVariable variable : right.getValues())
-            varNames.add(variable.getName());
-
-        return varNames;
-    }
-
-
-    private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
-            TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
-    {
-        // TODO Auto-generated method stub
+        // TODO
         return null;
     }
 
 
-    private TranslatedSegment translateMinus(Minus pattern, TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
     {
-        // TODO Auto-generated method stub
+        // TODO
         return null;
     }
 
 
-    private TranslatedSegment translateBind(Bind pattern, TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateBind(Bind pattern, SqlIntercode translatedGroupPattern)
     {
-        // TODO Auto-generated method stub
+        // TODO
         return null;
     }
 
 
-    private TranslatedSegment translateFilters(LinkedList<Filter> filters, TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateFilters(LinkedList<Filter> filters, SqlIntercode translatedGroupPattern)
     {
         // TODO
         return translatedGroupPattern;
     }
 
 
-    private TranslatedSegment translateProcedureCall(ProcedureCallBase pattern,
-            TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateProcedureCall(ProcedureCallBase pattern, SqlIntercode translatedGroupPattern)
     {
-        // TODO Auto-generated method stub
+        // TODO
         return null;
-    }
-
-    /**************************************************************************/
-
-    private static void appendComma(StringBuilder builder, boolean condition)
-    {
-        if(condition)
-            builder.append(", ");
-    }
-
-
-    private String getTmpTableName()
-    {
-        return "tab" + tmpTableIndex++;
     }
 }
