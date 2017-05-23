@@ -19,7 +19,7 @@ public class LiteralClass extends ResourceClass
     public static final String stringTag = "str";
 
     public static final LiteralClass xsdBoolean = new LiteralClass(booleanTag, "boolean", xsd + "boolean");
-    public static final LiteralClass xsdInteger = new LiteralClass(integerTag, "integer", xsd + "xsdInteger");
+    public static final LiteralClass xsdInteger = new LiteralClass(integerTag, "integer", xsd + "integer");
     public static final LiteralClass xsdDecimal = new LiteralClass(decimalTag, "float8", xsd + "decimal");
     public static final LiteralClass xsdFloat = new LiteralClass(floatTag, "real", xsd + "float");
     public static final LiteralClass xsdDouble = new LiteralClass(doubleTag, "float8", xsd + "double");

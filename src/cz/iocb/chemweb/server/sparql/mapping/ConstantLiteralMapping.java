@@ -39,7 +39,7 @@ public class ConstantLiteralMapping extends LiteralMapping implements ConstantMa
 
         //TODO: fix Literal.getTypeIri() to not return null
         IRI iri = literal.getTypeIri();
-        String type = iri != null ? iri.toString() : "http://www.w3.org/2001/XMLSchema#string";
+        String type = iri != null ? iri.getUri().toString() : "http://www.w3.org/2001/XMLSchema#string";
 
         if(!getLiteralClass().getTypeIri().equals(type))
             return false;
