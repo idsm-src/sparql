@@ -4,7 +4,7 @@ import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
-import cz.iocb.chemweb.server.sparql.parser.model.Variable;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -24,7 +24,7 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
     @Override
     public boolean match(Node node)
     {
-        if(node instanceof Variable)
+        if(node instanceof VariableOrBlankNode)
             return true;
 
         if(node instanceof IRI && value.equals(((IRI) node).getUri().toString()))

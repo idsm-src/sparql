@@ -702,7 +702,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
     private static BlankNode getNewBlankNode()
     {
         int id = variableId.incrementAndGet();
-        return new BlankNode("chemwebtmp" + id);
+        return new BlankNode(BlankNode.prefix + id);
     }
 
     @Override

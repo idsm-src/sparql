@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.parser.model.triple;
 
 import cz.iocb.chemweb.server.sparql.parser.BaseComplexNode;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 
 
 
@@ -11,8 +12,10 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
  * <p>
  * Corresponds to the rule [142] BLANK_NODE_LABEL in the SPARQL grammar.
  */
-public final class BlankNode extends BaseComplexNode implements Node
+public final class BlankNode extends BaseComplexNode implements Node, VariableOrBlankNode
 {
+    public static final String prefix = "@bn";
+
     private String name;
 
     public BlankNode(String name)
@@ -20,6 +23,7 @@ public final class BlankNode extends BaseComplexNode implements Node
         setName(name);
     }
 
+    @Override
     public String getName()
     {
         return name;

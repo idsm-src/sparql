@@ -20,6 +20,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BuiltInCallExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
@@ -34,6 +35,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
@@ -100,7 +102,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             //TODO: check whether star can be used
 
-            variables = translatedWhereClause.getVariables(); //TODO: filter out tmp variables
+            variables = new UsedVariables();
+
+            //TODO: use code that add variables in the correct order
+            for(UsedVariable variable : translatedWhereClause.getVariables().getValues())
+                if(!variable.getName().startsWith(BlankNode.prefix))
+                    variables.add(variable);
         }
         else
         {
@@ -264,17 +271,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             UsedVariables noSolutionVariables = new UsedVariables();
 
-            if(graph instanceof Variable)
-                noSolutionVariables.add(new UsedVariable(((Variable) graph).getName(), true));
+            if(graph instanceof VariableOrBlankNode)
+                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) graph).getName(), true));
 
-            if(subject instanceof Variable)
-                noSolutionVariables.add(new UsedVariable(((Variable) subject).getName(), true));
+            if(subject instanceof VariableOrBlankNode)
+                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) subject).getName(), true));
 
-            if(predicate instanceof Variable)
-                noSolutionVariables.add(new UsedVariable(((Variable) predicate).getName(), true));
+            if(predicate instanceof VariableOrBlankNode)
+                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) predicate).getName(), true));
 
-            if(object instanceof Variable)
-                noSolutionVariables.add(new UsedVariable(((Variable) object).getName(), true));
+            if(object instanceof VariableOrBlankNode)
+                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) object).getName(), true));
 
             return new SqlNoSolution(noSolutionVariables);
         }
@@ -335,8 +342,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             if(groupCondition.getVariable() != null)
                 groupVars.add(groupCondition.getVariable().getName());
-            else if(groupCondition.getExpression() instanceof Variable)
-                groupVars.add(((Variable) groupCondition.getExpression()).getName());
+            else if(groupCondition.getExpression() instanceof VariableOrBlankNode)
+                groupVars.add(((VariableOrBlankNode) groupCondition.getExpression()).getName());
         }
 
         for(Expression havingCondition : select.getHavingConditions())
@@ -393,10 +400,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 Expression arg = func.getArguments().get(0);
 
-                if(!(arg instanceof Variable))
+                if(!(arg instanceof VariableOrBlankNode))
                     return null;
 
-                if(groupByVars.contains(((Variable) arg).getName()))
+                if(groupByVars.contains(((VariableOrBlankNode) arg).getName()))
                     exceptions.add(new TranslateException(ErrorType.invalidVariableInAggregate, arg.getRange(),
                             arg.toString()));
 
@@ -609,19 +616,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private void processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
-        if(!(node instanceof Variable))
+        if(!(node instanceof VariableOrBlankNode))
             return;
 
-        translated.addMapping(((Variable) node).getName(), mapping);
+        translated.addMapping(((VariableOrBlankNode) node).getName(), mapping);
     }
 
 
     private void processNodeCondition(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
-        if(node instanceof Variable && mapping instanceof ParametrisedLiteralMapping)
+        if(node instanceof VariableOrBlankNode && mapping instanceof ParametrisedLiteralMapping)
             translated.addNotNullCondition((ParametrisedLiteralMapping) mapping);
 
-        if(!(node instanceof Variable) && mapping instanceof ParametrisedMapping)
+        if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
             translated.addValueCondition(node, (ParametrisedMapping) mapping);
     }
 
@@ -629,7 +636,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private boolean processNodesCondition(SqlTableAccess translated, Node node1, Node node2, NodeMapping map1,
             NodeMapping map2)
     {
-        if(!(node1 instanceof Variable) || !(node2 instanceof Variable))
+        if(!(node1 instanceof VariableOrBlankNode) || !(node2 instanceof VariableOrBlankNode))
             return false;
 
         if(!node1.equals(node2))

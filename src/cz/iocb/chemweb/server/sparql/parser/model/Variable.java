@@ -9,7 +9,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 /**
  * Represents a variable.
  */
-public final class Variable extends BaseComplexNode implements VarOrIri, Verb
+public final class Variable extends BaseComplexNode implements VarOrIri, Verb, VariableOrBlankNode
 {
     private final String name;
 
