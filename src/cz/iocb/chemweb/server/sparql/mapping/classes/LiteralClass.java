@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -64,6 +65,10 @@ public class LiteralClass extends ResourceClass
     @Override
     public String getSqlValue(Node node, int i)
     {
+        if(node instanceof VariableOrBlankNode)
+            return getSqlColumn(((VariableOrBlankNode) node).getName(), i);
+
+
         if(!(node instanceof Literal))
             return null;
 

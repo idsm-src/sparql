@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -91,6 +92,9 @@ public class IriClass extends ResourceClass
     @Override
     public String getSqlValue(Node node, int i)
     {
+        if(node instanceof VariableOrBlankNode)
+            return getSqlColumn(((VariableOrBlankNode) node).getName(), i);
+
         if(!(node instanceof IRI))
             return null;
 
