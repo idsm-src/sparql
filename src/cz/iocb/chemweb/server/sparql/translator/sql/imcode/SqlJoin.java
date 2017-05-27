@@ -171,6 +171,10 @@ public class SqlJoin extends SqlIntercode
 
     private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema)
     {
+        if(schema == null)
+            return join;
+
+
         loop:
         while(true)
         {
