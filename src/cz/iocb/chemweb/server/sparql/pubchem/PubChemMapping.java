@@ -203,6 +203,12 @@ public class PubChemMapping
     }
 
 
+    public static synchronized HashMap<String, String> getPrefixes()
+    {
+        return PubChemMapping.prefixes;
+    }
+
+
     public static synchronized List<IriClass> getClasses()
     {
         return PubChemMapping.classes;
