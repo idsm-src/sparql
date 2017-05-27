@@ -2,9 +2,11 @@ package cz.iocb.chemweb.server.sparql.parser;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ANTLRFileStream;
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -25,7 +27,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.visitor.BaseVisitor;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
-import cz.iocb.chemweb.server.sparql.translator.config.Config;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
 
@@ -34,22 +36,25 @@ import cz.iocb.chemweb.server.sparql.translator.config.Config;
  */
 public class Parser
 {
-    private final Config procedures;
+    private final LinkedHashMap<String, ProcedureDefinition> procedures;
     private final List<Prefix> predefinedPrefixes;
 
     public Parser()
     {
-        procedures = new Config();
+        procedures = new LinkedHashMap<String, ProcedureDefinition>();
         predefinedPrefixes = new ArrayList<>();
     }
 
-    public Parser(Config procedures, Collection<Prefix> predefinedPrefixes)
+    public Parser(LinkedHashMap<String, ProcedureDefinition> procedures, HashMap<String, String> predefinedPrefixes)
     {
         this.procedures = procedures;
-        this.predefinedPrefixes = new ArrayList<>(predefinedPrefixes);
+        this.predefinedPrefixes = new ArrayList<>();
+
+        for(Entry<String, String> entry : predefinedPrefixes.entrySet())
+            this.predefinedPrefixes.add(new Prefix(entry.getKey(), entry.getValue()));
     }
 
-    public Config getProcedures()
+    public LinkedHashMap<String, ProcedureDefinition> getProcedures()
     {
         return procedures;
     }

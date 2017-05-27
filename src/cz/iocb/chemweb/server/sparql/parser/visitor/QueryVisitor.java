@@ -6,6 +6,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,8 +105,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Property;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RdfCollection;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
-import cz.iocb.chemweb.server.sparql.translator.config.Config;
-import cz.iocb.chemweb.server.sparql.translator.config.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
 
@@ -116,7 +116,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     // It needs to be improved if more than one query is to be parsed at the
     // same time on the same thread.
     private static ThreadLocal<Prologue> currentPrologue = new ThreadLocal<>();
-    private static ThreadLocal<Config> currentProcedures = new ThreadLocal<>();
+    private static ThreadLocal<LinkedHashMap<String, ProcedureDefinition>> currentProcedures = new ThreadLocal<>();
     private static ThreadLocal<List<Prefix>> currentPredefinedPrefixes = new ThreadLocal<>();
     private static ThreadLocal<Consumer<ParseException>> currentExceptionConsumer = new ThreadLocal<>();
 
@@ -128,12 +128,12 @@ public class QueryVisitor extends BaseVisitor<Query>
         return currentPrologue.get();
     }
 
-    public static Config getProcedures()
+    public static LinkedHashMap<String, ProcedureDefinition> getProcedures()
     {
         return currentProcedures.get();
     }
 
-    public static void setProcedures(Config procedures)
+    public static void setProcedures(LinkedHashMap<String, ProcedureDefinition> procedures)
     {
         currentProcedures.set(procedures);
     }
@@ -583,7 +583,8 @@ class TripleExpander extends ComplexElementVisitor<Node>
         for(Property property : triple.getProperties())
         {
             Verb verb = property.getVerb();
-            ProcedureDefinition callDefinition = QueryVisitor.getProcedures().getProcedureByName(verb.toString());
+            ProcedureDefinition callDefinition = verb instanceof IRI
+                    ? QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString()) : null;
 
             if(callDefinition != null)
             {
@@ -604,7 +605,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
                     ProcedureCallBase result;
 
-                    if(callDefinition.getRetTypeIRI() == null /* originalSubject instanceof BlankNodePropertyList */)
+                    if(!callDefinition.isSimple() /* originalSubject instanceof BlankNodePropertyList */)
                     {
                         if(!(originalSubject instanceof BlankNodePropertyList))
                             throw new UncheckedParseException(ErrorType.invalidMultiProcedureCallSubject,
@@ -643,7 +644,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        if(QueryVisitor.getProcedures().getProcedureByName(iri.toString()) != null)
+                        if(QueryVisitor.getProcedures().get(iri.getUri().toString()) != null)
                             throw new UncheckedParseException(ErrorType.invalidProcedureCallPropertyPathCombinaion,
                                     iri.getRange());
 
