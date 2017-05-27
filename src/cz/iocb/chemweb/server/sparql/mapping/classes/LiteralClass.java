@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import java.util.Arrays;
+import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -28,6 +30,9 @@ public class LiteralClass extends ResourceClass
     public static final LiteralClass xsdDate = new LiteralClass(dateTag, "date", xsd + "date");
     public static final LiteralClass xsdDateTime = new LiteralClass(dateTimeTag, "timestamptz", xsd + "dateTime");
     public static final LiteralClass xsdString = new LiteralClass(stringTag, "varchar", xsd + "string");
+
+    private static final List<LiteralClass> classes = Arrays.asList(xsdBoolean, xsdInteger, xsdDecimal, xsdFloat,
+            xsdDouble, xsdDate, xsdDateTime, xsdString);
 
     private final String typeIri;
     private final String sqlType;
@@ -83,6 +88,12 @@ public class LiteralClass extends ResourceClass
             return "'" + value.toString().replaceAll("'", "\\'") + "'";
         else
             return value.toString();
+    }
+
+
+    public static List<LiteralClass> getClasses()
+    {
+        return classes;
     }
 
 
