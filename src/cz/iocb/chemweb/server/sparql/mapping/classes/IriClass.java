@@ -107,6 +107,16 @@ public class IriClass extends ResourceClass
     }
 
 
+    @Override
+    public boolean match(Node value)
+    {
+        if(!(value instanceof IRI))
+            return false;
+
+        return match(((IRI) value).getUri().toString());
+    }
+
+
     public boolean match(String iri)
     {
         if(values != null && values.contains(iri))

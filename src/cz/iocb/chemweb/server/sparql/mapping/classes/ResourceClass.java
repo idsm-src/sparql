@@ -27,6 +27,8 @@ public abstract class ResourceClass
 
     public abstract String getSqlType(int i);
 
+    public abstract boolean match(Node value);
+
 
     public final String getName()
     {

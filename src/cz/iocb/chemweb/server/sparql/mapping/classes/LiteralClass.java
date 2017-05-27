@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -84,6 +85,27 @@ public class LiteralClass extends ResourceClass
     public String getSqlType(int i)
     {
         return sqlType;
+    }
+
+
+    @Override
+    public boolean match(Node value)
+    {
+        if(!(value instanceof Literal))
+            return false;
+
+
+        Literal literal = (Literal) value;
+
+        //TODO: fix Literal.getTypeIri() to not return null
+        IRI iri = literal.getTypeIri();
+        String type = iri != null ? iri.getUri().toString() : "http://www.w3.org/2001/XMLSchema#string";
+
+        if(!typeIri.equals(type))
+            return false;
+
+
+        return true;
     }
 
 
