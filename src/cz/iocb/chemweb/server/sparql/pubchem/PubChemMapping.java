@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -17,7 +18,12 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.parser.Xsd;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
+import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
 
 
 
@@ -26,6 +32,7 @@ public class PubChemMapping
     private static HashMap<String, String> prefixes = new HashMap<String, String>();
     private static ArrayList<IriClass> classes = new ArrayList<IriClass>();
     private static List<QuadMapping> mappings = new ArrayList<QuadMapping>();
+    private static LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
 
     static
@@ -33,6 +40,7 @@ public class PubChemMapping
         loadPrefixes();
         loadClasses();
         loadMapping();
+        loadProcedures();
     }
 
 
@@ -84,6 +92,9 @@ public class PubChemMapping
         prefixes.put("pubchem", "http://rdf.ncbi.nlm.nih.gov/pubchem/");
         prefixes.put("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
         prefixes.put("template", "http://bioinfo.iocb.cz/0.9/template#");
+
+        prefixes.put("orchem", "http://bioinfo.iocb.cz/rdf/0.9/orchem#");
+        prefixes.put("fulltext", "http://bioinfo.iocb.cz/rdf/0.9/fulltext#");
     }
 
 
@@ -132,9 +143,81 @@ public class PubChemMapping
     }
 
 
+    private static void loadProcedures()
+    {
+        String orchem = prefixes.get("orchem");
+        String fulltext = prefixes.get("fulltext");
+
+        /* orchem:substructureSearch */
+        ProcedureDefinition subsearch = new ProcedureDefinition(orchem + "substructureSearch", "substructureSearch",
+                null);
+        subsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
+        subsearch.addParameter(
+                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
+        subsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+                new Literal("-1", new IRI(Xsd.INTEGER))));
+        subsearch.addParameter(new ParameterDefinition(orchem + "strictStereo", LiteralClass.xsdBoolean,
+                new Literal("false", new IRI(Xsd.BOOLEAN))));
+        subsearch.addParameter(new ParameterDefinition(orchem + "exact", LiteralClass.xsdBoolean,
+                new Literal("false", new IRI(Xsd.BOOLEAN))));
+        subsearch.addParameter(new ParameterDefinition(orchem + "tautomers", LiteralClass.xsdBoolean,
+                new Literal("false", new IRI(Xsd.BOOLEAN))));
+        subsearch.addResult(new ResultDefinition(Compound.compound));
+        procedures.put(subsearch.getProcedureName(), subsearch);
+
+
+        /* orchem:similaritySearch */
+        ProcedureDefinition simsearch = new ProcedureDefinition(orchem + "similaritySearch", "similaritySearch",
+                "OrChemCompound");
+        simsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
+        simsearch.addParameter(
+                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
+        simsearch.addParameter(new ParameterDefinition(orchem + "cutoff", LiteralClass.xsdFloat,
+                new Literal("0.8", new IRI(Xsd.FLOAT))));
+        simsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simsearch.addResult(new ResultDefinition(orchem + "compound", Compound.compound, "@f1"));
+        simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "@f2"));
+        procedures.put(simsearch.getProcedureName(), simsearch);
+
+        
+        /* orchem:similarCompoundSearch */
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(orchem + "similarCompoundSearch", "similarCompoundSearch",
+                null);
+        simcmpsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
+        simcmpsearch.addParameter(
+                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
+        simcmpsearch.addParameter(new ParameterDefinition(orchem + "cutoff", LiteralClass.xsdFloat,
+                new Literal("0.8", new IRI(Xsd.FLOAT))));
+        simcmpsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simcmpsearch.addResult(new ResultDefinition(Compound.compound));
+        procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
+
+        
+        /* fulltext:bioassaySearch */
+        ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay", null);
+        bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
+        bioassay.addResult(new ResultDefinition(Bioassay.bioassay));
+        procedures.put(bioassay.getProcedureName(), bioassay);
+    }
+
+
+    public static synchronized List<IriClass> getClasses()
+    {
+        return PubChemMapping.classes;
+    }
+
+
     public static synchronized List<QuadMapping> getMappings()
     {
         return PubChemMapping.mappings;
+    }
+
+
+    public static synchronized LinkedHashMap<String, ProcedureDefinition> getProcedures()
+    {
+        return PubChemMapping.procedures;
     }
 
 
