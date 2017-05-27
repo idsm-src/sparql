@@ -1,9 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.sql;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map.Entry;
 import java.util.Stack;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
@@ -11,11 +13,14 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
+import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
@@ -29,21 +34,29 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.Graph;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.GraphPattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.GroupGraph;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Minus;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.MultiProcedureCall;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Optional;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCall;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase.Parameter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
+import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlJoin;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlNoSolution;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall.ClassifiedNode;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlTableAccess;
@@ -61,14 +74,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
+    private final List<ResourceClass> classes;
     private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
+    private final LinkedHashMap<String, ProcedureDefinition> procedures;
+
+    private Prologue prologue;
 
 
-    public TranslateVisitor(List<QuadMapping> mappings, DatabaseSchema schema)
+    public TranslateVisitor(List<ResourceClass> classes, List<QuadMapping> mappings, DatabaseSchema schema,
+            LinkedHashMap<String, ProcedureDefinition> procedures)
     {
+        this.classes = classes;
         this.mappings = mappings;
         this.schema = schema;
+        this.procedures = procedures;
     }
 
 
@@ -686,9 +706,158 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateProcedureCall(ProcedureCallBase pattern, SqlIntercode translatedGroupPattern)
+    private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
-        // TODO
-        return null;
+        IRI procedureName = procedureCallBase.getProcedure();
+        ProcedureDefinition procedureDefinition = procedures.get(procedureName.getUri().toString());
+        UsedVariables contextVariables = context.getVariables();
+
+
+        /* check graph */
+
+        if(!graphOrServiceRestrictions.isEmpty())
+        {
+            GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
+
+            if(restriction.isRestrictionType(RestrictionType.GRAPH_RESTRICTION))
+            {
+                exceptions.add(new TranslateException(ErrorType.procedureCallInsideGraph,
+                        procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
+            }
+        }
+
+
+        /* check paramaters */
+
+        LinkedHashMap<ParameterDefinition, ClassifiedNode> parameterNodes = new LinkedHashMap<ParameterDefinition, ClassifiedNode>();
+
+        for(ParameterDefinition parameter : procedureDefinition.getParameters())
+            parameterNodes.put(parameter, null);
+
+
+        for(ProcedureCall.Parameter parameter : procedureCallBase.getParameters())
+        {
+            String parameterName = parameter.getName().getUri().toString();
+            ParameterDefinition parameterDefinition = procedureDefinition.getParameter(parameterName);
+
+            if(parameterDefinition == null)
+            {
+                exceptions.add(new TranslateException(ErrorType.invalidParameterPredicate,
+                        parameter.getName().getRange(), parameter.getName().toString(prologue),
+                        procedureCallBase.getProcedure().toString(prologue)));
+            }
+            else if(parameterNodes.get(parameterDefinition) != null)
+            {
+                exceptions.add(new TranslateException(ErrorType.repeatOfParameterPredicate,
+                        parameter.getName().getRange(), parameter.getName().toString(prologue)));
+            }
+            else
+            {
+                Node value = parameter.getValue();
+                ResourceClass valueClass = null;
+
+                if(value instanceof VariableOrBlankNode)
+                {
+                    String variableName = ((VariableOrBlankNode) value).getName();
+                    UsedVariable variable = contextVariables.get(variableName);
+
+                    if(variable == null)
+                    {
+                        if(value instanceof Variable)
+                            exceptions.add(new TranslateException(ErrorType.unboundedVariableParameterValue,
+                                    value.getRange(), parameter.getName().toString(prologue), variableName));
+                        else if(value instanceof BlankNode)
+                            exceptions.add(new TranslateException(ErrorType.unboundedBlankNodeParameterValue,
+                                    value.getRange(), parameter.getName().toString(prologue)));
+                    }
+                }
+                else
+                {
+                    valueClass = classes.stream().filter(c -> c.match(value)).findAny().orElse(null);
+                }
+
+                parameterNodes.put(parameterDefinition, new ClassifiedNode(value, valueClass));
+            }
+        }
+
+
+        for(Entry<ParameterDefinition, ClassifiedNode> entry : parameterNodes.entrySet())
+        {
+            ClassifiedNode parameterValue = entry.getValue();
+
+            if(parameterValue == null)
+            {
+                ParameterDefinition parameterDefinition = entry.getKey();
+
+                if(parameterDefinition.getDefaultValue() != null)
+                    entry.setValue(new ClassifiedNode(parameterDefinition.getDefaultValue(),
+                            parameterDefinition.getParameterClass()));
+                else
+                    exceptions.add(new TranslateException(ErrorType.missingParameterPredicate,
+                            procedureCallBase.getProcedure().getRange(),
+                            new IRI(parameterDefinition.getParamName()).toString(prologue),
+                            procedureCallBase.getProcedure().toString(prologue)));
+            }
+        }
+
+
+        /* check results */
+
+        LinkedHashMap<ResultDefinition, ClassifiedNode> resultNodes = new LinkedHashMap<ResultDefinition, ClassifiedNode>();
+
+        for(ResultDefinition result : procedureDefinition.getResults())
+            resultNodes.put(result, null);
+
+
+        if(procedureCallBase instanceof ProcedureCall)
+        {
+            /* single-result procedure call */
+
+            ResultDefinition resultDefinition = procedureDefinition.getResult(null);
+
+            Node result = ((ProcedureCall) procedureCallBase).getResult();
+            ResourceClass resultClass = null;
+
+            if(!(result instanceof VariableOrBlankNode))
+                resultClass = classes.stream().filter(c -> c.match(result)).findAny().orElse(null);
+
+            resultNodes.put(resultDefinition, new ClassifiedNode(result, resultClass));
+        }
+        else
+        {
+            /* multi-result procedure call */
+
+            MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
+
+            for(Parameter result : multiProcedureCall.getResults())
+            {
+                String parameterName = result.getName().getUri().toString();
+                ResultDefinition resultDefinition = procedureDefinition.getResult(parameterName);
+
+                if(resultDefinition == null)
+                {
+                    exceptions.add(new TranslateException(ErrorType.invalidResultPredicate, result.getName().getRange(),
+                            result.getName().toString(prologue), procedureCallBase.getProcedure().toString(prologue)));
+
+                }
+                else if(resultNodes.get(resultDefinition) != null)
+                {
+                    exceptions.add(new TranslateException(ErrorType.repeatOfResultPredicate,
+                            result.getName().getRange(), result.getName().toString(prologue)));
+                }
+                else
+                {
+                    ResourceClass resultClass = null;
+
+                    if(!(result instanceof VariableOrBlankNode))
+                        resultClass = classes.stream().filter(c -> c.match(result.getValue())).findAny().orElse(null);
+
+                    resultNodes.put(resultDefinition, new ClassifiedNode(result.getValue(), resultClass));
+                }
+            }
+        }
+
+
+        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
     }
 }

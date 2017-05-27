@@ -45,7 +45,7 @@ public enum ErrorType
 
     procedureCallInsideService("Procedure call cannot be used inside service."),
 
-    procedureCallInsideGraph("Procedure '%s' cannot be used inside graph '%s'."),
+    procedureCallInsideGraph("Procedure '%s' cannot be used inside graph."),
 
     invalidContextOfAggregate("Aggregates are allowed only in result sets."),
 
