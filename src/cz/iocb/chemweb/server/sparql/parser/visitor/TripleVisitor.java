@@ -263,8 +263,6 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     @Override
     public Stream<Property> visitPropertyListPath(PropertyListPathContext ctx)
     {
-        System.err.println("X2");
-
         if(ctx.propertyListPathNotEmpty() == null)
             return Stream.empty();
 
