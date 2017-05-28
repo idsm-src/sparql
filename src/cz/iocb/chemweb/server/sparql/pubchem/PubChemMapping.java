@@ -198,6 +198,15 @@ public class PubChemMapping
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
+        /* orchem:smartsSearch */
+        ProcedureDefinition smartssearch = new ProcedureDefinition(orchem + "smartsSearch", "smartsSearch", null);
+        smartssearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
+        smartssearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+                new Literal("-1", new IRI(Xsd.INTEGER))));
+        smartssearch.addResult(new ResultDefinition(Compound.compound));
+        procedures.put(smartssearch.getProcedureName(), smartssearch);
+
+
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay", null);
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
