@@ -6,8 +6,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 public class ResultDefinition
 {
-    public static final String singleResultName = "@res";
-
     private final String resultName;
     private final ResourceClass resultClass;
     private final String sqlTypeField;
@@ -25,7 +23,7 @@ public class ResultDefinition
     {
         this.resultName = null;
         this.resultClass = resultClass;
-        this.sqlTypeField = singleResultName;
+        this.sqlTypeField = null;
     }
 
 

@@ -43,6 +43,8 @@ public class SqlProcedureCall extends SqlIntercode
     }
 
 
+    private static final String resultName = "@res";
+
     private final ProcedureDefinition procedure;
     private final LinkedHashMap<ParameterDefinition, ClassifiedNode> parameters;
     private final LinkedHashMap<ResultDefinition, ClassifiedNode> results;
@@ -267,14 +269,30 @@ public class SqlProcedureCall extends SqlIntercode
             ResourceClass resultClass = definition.getResultClass();
             String field = definition.getSqlTypeField();
 
-            for(int i = 0; i < resultClass.getPartsCount(); i++)
+            if(field == null)
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
 
-                builder.append(resultClass.getSqlColumn(field, i));
-                builder.append(" AS ");
-                builder.append(resultClass.getSqlColumn(name, i));
+                builder.append('"');
+                builder.append(resultName);
+                builder.append("\" AS ");
+                builder.append(resultClass.getSqlColumn(name, 0));
+            }
+            else
+            {
+                for(int i = 0; i < resultClass.getPartsCount(); i++)
+                {
+                    appendComma(builder, hasSelect);
+                    hasSelect = true;
+
+                    builder.append("(\"");
+                    builder.append(resultName);
+                    builder.append("\").");
+                    builder.append(resultClass.getSqlColumn(field, i));
+                    builder.append(" AS ");
+                    builder.append(resultClass.getSqlColumn(name, i));
+                }
             }
         }
 
@@ -409,20 +427,16 @@ public class SqlProcedureCall extends SqlIntercode
 
         builder.append(")");
 
-
         if(procedure.getSqlReturnType() != null)
         {
             builder.append("::");
             builder.append(procedure.getSqlReturnType());
-            builder.append(").*");
-        }
-        else
-        {
-            builder.append(" AS ");
-            builder.append(
-                    procedure.getResult(null).getResultClass().getSqlColumn(ResultDefinition.singleResultName, 0));
+            builder.append(") ");
         }
 
+        builder.append(" AS \"");
+        builder.append(resultName);
+        builder.append('"');
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
