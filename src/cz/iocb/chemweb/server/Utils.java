@@ -11,7 +11,7 @@ public class Utils
         if(path == null)
             path = "/home/galgonek/workspace/chemweb/war";
         else
-            path = path + "/webapps/chemweb";
+            path = path + "/webapps/chemweb-devel";
 
         return path;
     }

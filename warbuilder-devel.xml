@@ -1,0 +1,12 @@
+<project name="tmc" basedir="." default="default">
+ 
+    <target name="default" depends="buildwar,deploy"></target>
+ 
+    <target name="buildwar">
+        <war basedir="war" destfile="chemweb-devel.war" webxml="war/WEB-INF/web.xml"/>
+    </target>
+ 
+    <target name="deploy">
+        <copy file="chemweb-devel.war" todir="." />
+    </target>
+</project>
