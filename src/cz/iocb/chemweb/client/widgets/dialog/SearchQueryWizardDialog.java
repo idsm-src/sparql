@@ -472,7 +472,28 @@ public class SearchQueryWizardDialog extends DialogBox
                 statusCount++;
 
 
-            if(statusCount > 0 || statusCheckBox.getValue())
+            if(statusCount == 1 && !statusCheckBox.getValue())
+            {
+                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ");
+
+                if(activeStatusCheckBox.getValue())
+                    query.append("vocab:active");
+
+                if(inactiveStatusCheckBox.getValue())
+                    query.append("vocab:inactive");
+
+                if(inconclusiveStatusCheckBox.getValue())
+                    query.append("vocab:inconclusive");
+
+                if(probeStatusCheckBox.getValue())
+                    query.append("vocab:probe");
+
+                if(unspecifiedStatusCheckBox.getValue())
+                    query.append("vocab:unspecified");
+
+                query.append(".");
+            }
+            else if(statusCount > 0 || statusCheckBox.getValue())
             {
                 query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS");
 
@@ -528,22 +549,9 @@ public class SearchQueryWizardDialog extends DialogBox
 
         if(searchBioassays && !keywords.isEmpty())
         {
-            query.append("\n  {");
-            query.append("\n    ?BIOASSAY dcterms:title ?TITLE.");
-            query.append("\n    ?TITLE bif:contains '''");
+            query.append("\n\n  ?BIOASSAY fulltext:bioassaySearch [fulltext:query '''");
             query.append(keywords.replaceAll("'", "\\\\'"));
-            query.append("'''.\n");
-            query.append("  }");
-
-            query.append("\n  UNION");
-
-            query.append("\n  {");
-            query.append("\n    ?DESCRIPTION sio:is-attribute-of ?BIOASSAY.");
-            query.append("\n    ?DESCRIPTION sio:has-value ?TEXT.");
-            query.append("\n    ?TEXT bif:contains '''");
-            query.append(keywords.replaceAll("'", "\\\\'"));
-            query.append("'''.\n");
-            query.append("  }\n");
+            query.append("'''].\n");
         }
 
         query.append("}\n");

@@ -123,7 +123,7 @@
           </g:layer>
 
           <g:layer left="100px" right="20px" top="20px" height="90px">
-            <g:TextArea ui:field="keywordsTextArea" addStyleNames="{style.textarea},{style.full-size}" enabled="false">'cancer*' or 'carcino*' or 'tumor*'</g:TextArea>
+            <g:TextArea ui:field="keywordsTextArea" addStyleNames="{style.textarea},{style.full-size}" enabled="false">cancer:* | carcino:* | tumor:*</g:TextArea>
           </g:layer>
 
 
