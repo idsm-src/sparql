@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import org.apache.velocity.context.InternalContextAdapter;
@@ -95,7 +94,7 @@ public class SparqlDirective extends Directive
         try
         {
             DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<ResourceClass> classes = PubChemMapping.getClasses();
             List<QuadMapping> mappings = PubChemMapping.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
 

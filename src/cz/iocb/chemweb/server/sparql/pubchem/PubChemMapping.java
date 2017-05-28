@@ -18,6 +18,7 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Xsd;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -30,7 +31,7 @@ import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
 public class PubChemMapping
 {
     private static HashMap<String, String> prefixes = new HashMap<String, String>();
-    private static ArrayList<IriClass> classes = new ArrayList<IriClass>();
+    private static ArrayList<ResourceClass> classes = new ArrayList<ResourceClass>();
     private static List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     private static LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
@@ -100,6 +101,8 @@ public class PubChemMapping
 
     private static void loadClasses()
     {
+        classes.addAll(LiteralClass.getClasses());
+        
         Bioassay.loadClasses();
         Biosystem.loadClasses();
         Compound.loadClasses();
@@ -209,7 +212,7 @@ public class PubChemMapping
     }
 
 
-    public static synchronized List<IriClass> getClasses()
+    public static synchronized List<ResourceClass> getClasses()
     {
         return PubChemMapping.classes;
     }
@@ -255,14 +258,14 @@ public class PubChemMapping
 
         IriClass iriClass = null;
 
-        for(IriClass c : classes)
+        for(ResourceClass c : classes)
         {
-            if(c.match(iri))
+            if(c instanceof IriClass && ((IriClass)c).match(iri))
             {
                 if(iriClass != null)
                     throw new RuntimeException("ambigous iri class for " + value);
 
-                iriClass = c;
+                iriClass = (IriClass)c;
             }
         }
 

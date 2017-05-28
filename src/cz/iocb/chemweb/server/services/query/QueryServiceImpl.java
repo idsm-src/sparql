@@ -9,7 +9,6 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
@@ -120,7 +119,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             }
 
             DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<ResourceClass> classes = PubChemMapping.getClasses();
             List<QuadMapping> mappings = PubChemMapping.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
 
@@ -317,7 +316,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                     .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
             DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<ResourceClass> classes = PubChemMapping.getClasses();
             List<QuadMapping> mappings = PubChemMapping.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
 
