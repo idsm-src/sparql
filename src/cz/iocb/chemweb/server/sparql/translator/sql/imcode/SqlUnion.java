@@ -48,7 +48,7 @@ public class SqlUnion extends SqlIntercode
                     variables.add(variable);
 
             if(right instanceof SqlNoSolution)
-                return new SqlNoSolution(variables);
+                return new SqlNoSolution();
 
             if(!(right instanceof SqlUnion))
                 return new SqlUnion(variables, Lists.newArrayList(right));

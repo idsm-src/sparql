@@ -12,12 +12,6 @@ public class SqlNoSolution extends SqlIntercode
     }
 
 
-    public SqlNoSolution(UsedVariables variables)
-    {
-        super(variables);
-    }
-
-
     @Override
     public String translate()
     {

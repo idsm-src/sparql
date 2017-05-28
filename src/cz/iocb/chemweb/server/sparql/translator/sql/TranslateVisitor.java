@@ -290,23 +290,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         if(translatedPattern == null)
-        {
-            UsedVariables noSolutionVariables = new UsedVariables();
-
-            if(graph instanceof VariableOrBlankNode)
-                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) graph).getName(), true));
-
-            if(subject instanceof VariableOrBlankNode)
-                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) subject).getName(), true));
-
-            if(predicate instanceof VariableOrBlankNode)
-                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) predicate).getName(), true));
-
-            if(object instanceof VariableOrBlankNode)
-                noSolutionVariables.add(new UsedVariable(((VariableOrBlankNode) object).getName(), true));
-
-            return new SqlNoSolution(noSolutionVariables);
-        }
+            return new SqlNoSolution();
 
 
         return translatedPattern;

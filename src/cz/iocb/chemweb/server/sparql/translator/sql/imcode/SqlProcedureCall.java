@@ -143,18 +143,7 @@ public class SqlProcedureCall extends SqlIntercode
 
 
         if(!hasSolution)
-        {
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : callVariables.getValues())
-                variables.add(new UsedVariable(variable.getName(), true));
-
-            for(UsedVariable variable : context.getVariables().getValues())
-                if(variables.get(variable.getName()) == null)
-                    variables.add(new UsedVariable(variable.getName(), true));
-
-            return new SqlNoSolution(variables);
-        }
+            return new SqlNoSolution();
 
 
         SqlIntercode originalContext = null;
@@ -182,10 +171,6 @@ public class SqlProcedureCall extends SqlIntercode
             UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
             variables.add(variable);
 
-            if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                    && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                continue;
-
 
             for(PairedClass pairedClass : pair.getClasses())
             {
@@ -211,14 +196,7 @@ public class SqlProcedureCall extends SqlIntercode
             }
 
             if(variable.getClasses().isEmpty())
-            {
-                UsedVariables noSolutionVariables = new UsedVariables();
-
-                for(UsedVariable usedVar : variables.getValues())
-                    noSolutionVariables.add(new UsedVariable(usedVar.getName(), true));
-
-                return new SqlNoSolution(noSolutionVariables);
-            }
+                return new SqlNoSolution();
         }
 
 

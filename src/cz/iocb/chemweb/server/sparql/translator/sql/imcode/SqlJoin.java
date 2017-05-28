@@ -33,18 +33,7 @@ public class SqlJoin extends SqlIntercode
         /* special cases */
 
         if(left instanceof SqlNoSolution || right instanceof SqlNoSolution)
-        {
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                variables.add(new UsedVariable(variable.getName(), true));
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                if(variables.get(variable.getName()) == null)
-                    variables.add(new UsedVariable(variable.getName(), true));
-
-            return new SqlNoSolution(variables);
-        }
+            return new SqlNoSolution();
 
 
         if(left instanceof SqlEmptySolution)
@@ -110,10 +99,6 @@ public class SqlJoin extends SqlIntercode
             UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
             variables.add(variable);
 
-            if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                    && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                continue;
-
 
             for(PairedClass pairedClass : pair.getClasses())
             {
@@ -139,14 +124,7 @@ public class SqlJoin extends SqlIntercode
             }
 
             if(variable.getClasses().isEmpty())
-            {
-                UsedVariables noSolutionVariables = new UsedVariables();
-
-                for(UsedVariable usedVar : variables.getValues())
-                    noSolutionVariables.add(new UsedVariable(usedVar.getName(), true));
-
-                return new SqlNoSolution(noSolutionVariables);
-            }
+                return new SqlNoSolution();
         }
 
 
@@ -280,10 +258,6 @@ public class SqlJoin extends SqlIntercode
                 UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
                 variables.add(variable);
 
-                if((leftVariable == null || leftVariable.getClasses().isEmpty())
-                        && (rightVariable == null || rightVariable.getClasses().isEmpty()))
-                    continue;
-
 
                 for(PairedClass pairedClass : pair.getClasses())
                 {
@@ -346,9 +320,6 @@ public class SqlJoin extends SqlIntercode
 
                 if(leftVariable != null && rightVariable != null)
                 {
-                    if(leftVariable.getClasses().isEmpty() || rightVariable.getClasses().isEmpty())
-                        continue;
-
                     appendAnd(builder, hasWhere);
                     hasWhere = true;
 
@@ -451,11 +422,11 @@ public class SqlJoin extends SqlIntercode
     private void generateJoinSelectVarable(StringBuilder builder, UsedVariable leftVariable, UsedVariable rightVariable,
             String var)
     {
-        if(leftVariable == null || leftVariable.getClasses().isEmpty())
+        if(leftVariable == null)
         {
             builder.append(rightTable).append('.').append(var);
         }
-        else if(rightVariable == null || rightVariable.getClasses().isEmpty())
+        else if(rightVariable == null)
         {
             builder.append(leftTable).append('.').append(var);
         }
