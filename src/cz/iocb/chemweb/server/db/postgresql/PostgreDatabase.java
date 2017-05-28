@@ -120,7 +120,6 @@ public class PostgreDatabase
                             break;
 
                         case ResourceClass.nullTag:
-                            rowData[idx] = null;
                             break;
 
                         default:
