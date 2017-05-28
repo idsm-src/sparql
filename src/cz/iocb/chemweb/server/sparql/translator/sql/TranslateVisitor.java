@@ -56,6 +56,7 @@ import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlJoin;
+import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlLeftJoin;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall.ClassifiedNode;
@@ -666,8 +667,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
             LinkedList<Filter> optionalFilters)
     {
-        // TODO
-        return null;
+        //TODO: expressions are not yet supported
+        return SqlLeftJoin.leftJoin(translatedGroupPattern, translatedPattern);
     }
 
 
