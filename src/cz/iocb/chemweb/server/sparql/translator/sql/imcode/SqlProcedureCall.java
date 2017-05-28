@@ -150,7 +150,7 @@ public class SqlProcedureCall extends SqlIntercode
                 variables.add(new UsedVariable(variable.getName(), true));
 
             for(UsedVariable variable : context.getVariables().getValues())
-                if(variables.get(variable.getName()) != null)
+                if(variables.get(variable.getName()) == null)
                     variables.add(new UsedVariable(variable.getName(), true));
 
             return new SqlNoSolution(variables);

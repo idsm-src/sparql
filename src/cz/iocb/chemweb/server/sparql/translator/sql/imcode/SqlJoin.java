@@ -40,7 +40,7 @@ public class SqlJoin extends SqlIntercode
                 variables.add(new UsedVariable(variable.getName(), true));
 
             for(UsedVariable variable : right.getVariables().getValues())
-                if(variables.get(variable.getName()) != null)
+                if(variables.get(variable.getName()) == null)
                     variables.add(new UsedVariable(variable.getName(), true));
 
             return new SqlNoSolution(variables);
