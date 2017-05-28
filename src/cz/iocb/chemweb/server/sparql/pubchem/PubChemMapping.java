@@ -102,7 +102,7 @@ public class PubChemMapping
     private static void loadClasses()
     {
         classes.addAll(LiteralClass.getClasses());
-        
+
         Bioassay.loadClasses();
         Biosystem.loadClasses();
         Compound.loadClasses();
@@ -183,10 +183,10 @@ public class PubChemMapping
         simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "@f2"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
-        
+
         /* orchem:similarCompoundSearch */
-        ProcedureDefinition simcmpsearch = new ProcedureDefinition(orchem + "similarCompoundSearch", "similarCompoundSearch",
-                null);
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(orchem + "similarCompoundSearch",
+                "similarCompoundSearch", null);
         simcmpsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         simcmpsearch.addParameter(
                 new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
@@ -197,7 +197,7 @@ public class PubChemMapping
         simcmpsearch.addResult(new ResultDefinition(Compound.compound));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
-        
+
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay", null);
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
@@ -260,12 +260,12 @@ public class PubChemMapping
 
         for(ResourceClass c : classes)
         {
-            if(c instanceof IriClass && ((IriClass)c).match(iri))
+            if(c instanceof IriClass && ((IriClass) c).match(iri))
             {
                 if(iriClass != null)
                     throw new RuntimeException("ambigous iri class for " + value);
 
-                iriClass = (IriClass)c;
+                iriClass = (IriClass) c;
             }
         }
 
