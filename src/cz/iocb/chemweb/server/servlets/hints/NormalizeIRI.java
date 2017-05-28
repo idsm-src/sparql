@@ -1,10 +1,7 @@
 package cz.iocb.chemweb.server.servlets.hints;
 
-import java.beans.PropertyVetoException;
-import java.io.IOException;
-import java.sql.SQLException;
-import cz.iocb.chemweb.server.db.Prefixes;
-import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
+import java.util.Map.Entry;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
 
 
 
@@ -22,20 +19,9 @@ public class NormalizeIRI
         if(iri == null)
             return null;
 
-
-        try
-        {
-            for(Prefix prefix : Prefixes.getPrefixes())
-            {
-                if(iri.startsWith(prefix.getIri()))
-                    return iri.replaceFirst(prefix.getIri(), prefix.getName() + ":");
-            }
-        }
-        catch (SQLException | IOException | PropertyVetoException e)
-        {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
+            if(iri.startsWith(prefix.getValue()))
+                return iri.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
 
         return iri;
     }
@@ -46,22 +32,15 @@ public class NormalizeIRI
         if(iri == null)
             return null;
 
-        try
+        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
         {
-            for(Prefix prefix : Prefixes.getPrefixes())
+            if(iri.startsWith(prefix.getValue()))
             {
-                if(iri.startsWith(prefix.getIri()))
-                {
-                    PrefixedName result = new PrefixedName();
-                    result.prefix = prefix.getName();
-                    result.name = iri.replaceFirst(prefix.getIri(), "");
-                    return result;
-                }
+                PrefixedName result = new PrefixedName();
+                result.prefix = prefix.getKey();
+                result.name = iri.replaceFirst(prefix.getValue(), "");
+                return result;
             }
-        }
-        catch (SQLException | IOException | PropertyVetoException e)
-        {
-            e.printStackTrace();
         }
 
         return null;

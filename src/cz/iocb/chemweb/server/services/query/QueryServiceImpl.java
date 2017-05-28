@@ -9,9 +9,9 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -23,24 +23,25 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import cz.iocb.chemweb.server.Utils;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Literal;
-import cz.iocb.chemweb.server.db.Prefixes;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.VirtuosoDatabase;
-import cz.iocb.chemweb.server.db.VirtuosoHandler;
+import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgreHandler;
+import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.services.SessionData;
+import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.config.Config;
-import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParseException;
-import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParser;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyChains;
-import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.sql.TranslateVisitor;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
 import cz.iocb.chemweb.server.velocity.UrlDirective;
 import cz.iocb.chemweb.shared.services.DatabaseException;
@@ -57,7 +58,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static class QueryState
     {
         Thread thread;
-        VirtuosoHandler handler;
+        PostgreHandler handler;
         QueryResult result;
         Throwable exception;
     }
@@ -68,23 +69,18 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
 
-    private final Config procedures;
-    final Map<String, List<String>> propertyChains;
     private final Parser parser;
-    private final VirtuosoDatabase database;
+    private final PostgreDatabase database;
 
     LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
 
 
 
-    public QueryServiceImpl() throws DatabaseException, FileNotFoundException, IOException, ConfigFileParseException,
-            SQLException, PropertyVetoException
+    public QueryServiceImpl()
+            throws DatabaseException, FileNotFoundException, IOException, SQLException, PropertyVetoException
     {
-        database = new VirtuosoDatabase();
-
-        procedures = ConfigFileParser.parse(Utils.getConfigDirectory() + "/procedureCalls.ini");
-        propertyChains = PropertyChains.get();
-        parser = new Parser(procedures, Prefixes.getPrefixes());
+        database = new PostgreDatabase();
+        parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
     }
 
 
@@ -123,8 +119,13 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 syntaxTree.setSelect(limitedSelect);
             }
 
-            final List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree,
-                    procedures);
+            DatabaseSchema schema = PostgresSchema.get();
+            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<QuadMapping> mappings = PubChemMapping.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+
+            final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
+                    .translate(syntaxTree);
 
             // TODO: log
             System.err.println(translatedQuery);
@@ -165,7 +166,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                         }, timeout);
 
 
-                        Result result = database.query(translatedQuery, queryState.handler);
+                        Result result = database.rawQuery(translatedQuery, queryState.handler);
 
 
                         Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
@@ -233,6 +234,11 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         {
             e.printStackTrace();
             throw new QueryException();
+        }
+        catch (SQLException | IOException e)
+        {
+            e.printStackTrace();
+            throw new DatabaseException(e);
         }
 
         queryState.thread.start();
@@ -305,8 +311,24 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         Result result;
         try
         {
-            result = database.query("sparql define input:storage virtrdf:PubchemQuadStorage "
-                    + "SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
+            Parser parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+
+            final SelectQuery syntaxTree = parser
+                    .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
+
+            DatabaseSchema schema = PostgresSchema.get();
+            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<QuadMapping> mappings = PubChemMapping.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+
+            final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
+                    .translate(syntaxTree);
+
+            //result = database.query("sparql define input:storage virtrdf:PubchemQuadStorage "
+            //        + "SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
+
+            result = database.query("select count(*) as \"C#int\" from (" + translatedQuery + ") as tab");
+
 
             if(result.size() != 1)
                 throw new DatabaseException();
@@ -318,7 +340,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch (URISyntaxException e)
+        catch (URISyntaxException | ParseExceptions | SQLException | IOException | TranslateExceptions e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);

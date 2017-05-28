@@ -1,15 +1,13 @@
 package cz.iocb.chemweb.server.servlets.config;
 
-import java.beans.PropertyVetoException;
 import java.io.IOException;
-import java.sql.SQLException;
+import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import cz.iocb.chemweb.server.db.Prefixes;
-import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
 
 
 
@@ -42,26 +40,18 @@ public class GenerateConfig extends HttpServlet
 
         boolean first = true;
 
-        try
+        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
         {
-            for(Prefix prefix : Prefixes.getPrefixes())
-            {
-                if(!first)
-                    out.println(",");
-                else
-                    first = false;
+            if(!first)
+                out.println(",");
+            else
+                first = false;
 
-                out.print("{ \"name\": \"");
-                out.print(prefix.getName());
-                out.print(":\", \"iri\":\"");
-                out.print(prefix.getIri());
-                out.print("\"}");
-            }
-        }
-        catch (SQLException | PropertyVetoException e)
-        {
-            e.printStackTrace();
-            throw new IOException(e);
+            out.print("{ \"name\": \"");
+            out.print(prefix.getKey());
+            out.print(":\", \"iri\":\"");
+            out.print(prefix.getValue());
+            out.print("\"}");
         }
 
         out.println("];");

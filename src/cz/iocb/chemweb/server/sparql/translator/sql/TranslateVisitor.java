@@ -49,8 +49,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
+import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
+import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlJoin;
@@ -859,5 +861,23 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
+    }
+
+
+    public String translate(SelectQuery sparqlQuery) throws TranslateExceptions
+    {
+        SqlIntercode code = visitElement(sparqlQuery);
+
+        if(!exceptions.isEmpty())
+            throw new TranslateExceptions(exceptions);
+
+        return code.translate();
+    }
+
+
+    public TranslateResult tryTranslate(SelectQuery sparqlQuery)
+    {
+        visitElement(sparqlQuery);
+        return new TranslateResult(null, exceptions, warnings);
     }
 }

@@ -1,13 +1,10 @@
 package cz.iocb.chemweb.server.velocity;
 
-import java.beans.PropertyVetoException;
-import java.io.IOException;
-import java.sql.SQLException;
+import java.util.Map.Entry;
 import org.apache.commons.lang3.StringEscapeUtils;
 import cz.iocb.chemweb.server.db.Literal;
-import cz.iocb.chemweb.server.db.Prefixes;
 import cz.iocb.chemweb.server.db.ReferenceNode;
-import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
 import cz.iocb.chemweb.shared.utils.Encode;
 
 
@@ -27,18 +24,9 @@ public class NodeUtils
     {
         String result = node.getValue();
 
-
-        try
-        {
-            for(Prefix prefix : Prefixes.getPrefixes())
-                if(result.startsWith(prefix.getIri()))
-                    return result.replaceFirst(prefix.getIri().toString(), prefix.getName() + ":");
-        }
-        catch (SQLException | IOException | PropertyVetoException e)
-        {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
+            if(result.startsWith(prefix.getValue()))
+                return result.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
 
         return result;
     }

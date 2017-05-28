@@ -6,8 +6,9 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.velocity.context.InternalContextAdapter;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
@@ -19,19 +20,19 @@ import org.apache.velocity.runtime.log.Log;
 import org.apache.velocity.runtime.parser.node.ASTReference;
 import org.apache.velocity.runtime.parser.node.Node;
 import org.apache.velocity.runtime.parser.node.SimpleNode;
-import cz.iocb.chemweb.server.Utils;
-import cz.iocb.chemweb.server.db.Prefixes;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.VirtuosoDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
+import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.config.Config;
-import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParseException;
-import cz.iocb.chemweb.server.sparql.translator.config.ConfigFileParser;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.server.sparql.translator.visitor.PropertyChains;
-import cz.iocb.chemweb.server.sparql.translator.visitor.SparqlTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.sql.TranslateVisitor;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -40,20 +41,15 @@ public class SparqlDirective extends Directive
 {
     private Log log;
 
-    private final Config procedures;
-    final Map<String, List<String>> propertyChains;
     private final Parser parser;
-    private final VirtuosoDatabase db;
+    private final PostgreDatabase db;
 
 
-    public SparqlDirective() throws FileNotFoundException, IOException, ConfigFileParseException, SQLException,
-            PropertyVetoException, DatabaseException
+    public SparqlDirective()
+            throws FileNotFoundException, IOException, SQLException, PropertyVetoException, DatabaseException
     {
-        procedures = ConfigFileParser.parse(Utils.getConfigDirectory() + "/procedureCalls.ini");
-        propertyChains = PropertyChains.get();
-        parser = new Parser(procedures, Prefixes.getPrefixes());
-
-        db = new VirtuosoDatabase();
+        parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+        db = new PostgreDatabase();
     }
 
     @Override
@@ -98,16 +94,21 @@ public class SparqlDirective extends Directive
 
         try
         {
+            DatabaseSchema schema = PostgresSchema.get();
+            List<ResourceClass> classes = new ArrayList<ResourceClass>();
+            List<QuadMapping> mappings = PubChemMapping.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+
             SelectQuery syntaxTree = parser.parse(query);
-            List<String> translatedQuery = new SparqlTranslateVisitor(propertyChains).translate(syntaxTree, procedures);
-            Result result = db.query(translatedQuery);
+            String code = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
+
+            Result result = db.query(code);
 
             context.put(varName, result);
             return true;
         }
-        catch (DatabaseException | ParseExceptions | TranslateExceptions e)
+        catch (DatabaseException | ParseExceptions | SQLException | TranslateExceptions e)
         {
-
             log.error("sparql directive: " + e.getMessage());
             System.err.println(query);
             e.printStackTrace();

@@ -55,7 +55,7 @@ import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.VirtuosoDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -65,7 +65,7 @@ public class CompoundImageServlet extends HttpServlet
 {
     //private static String compoundQuery = "select molfile from compounds where id=?";
     //private static PGPoolingDataSource connectionPool = null;
-    private final VirtuosoDatabase db;
+    private final PostgreDatabase db;
     //private final Decoder base64Decoder;
 
 
@@ -103,7 +103,7 @@ public class CompoundImageServlet extends HttpServlet
         //generators.add(new BasicSceneGenerator());
         //generators.add(new StandardGenerator(new Font("Verdana", Font.PLAIN, 18)));
 
-        db = new VirtuosoDatabase();
+        db = new PostgreDatabase();
         //base64Decoder = Base64.getDecoder();
     }
 
@@ -246,9 +246,7 @@ public class CompoundImageServlet extends HttpServlet
         //        .query("sparql SELECT ?SDF WHERE { GRAPH <http://rdf.ncbi.nlm.nih.gov/pubchem/compound/extra> { compound:CID"
         //                + id + "_Molfile sio:has-value ?SDF } }");
 
-        Result result = db
-                .query("sparql define input:storage virtrdf:PubchemQuadStorage SELECT ?SDF WHERE { GRAPH pubchem:compound { compound:CID"
-                        + id + "_SDfile sio:has-value ?SDF } }");
+        Result result = db.query("select sdf as \"SDF#str\" from compound_sdfiles where compound = " + id);
 
         if(result.getCount() == 1)
         {
