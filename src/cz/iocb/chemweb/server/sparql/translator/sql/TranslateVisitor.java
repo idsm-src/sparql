@@ -216,7 +216,28 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Union union)
     {
-        return null;
+        TranslatedSegment translatedPattern = null;
+
+        for(GraphPattern pattern : union.getPatterns())
+        {
+            TranslatedSegment translated = visitElement(pattern);
+
+            if(translatedPattern == null)
+            {
+                translatedPattern = translated;
+            }
+            else
+            {
+                SqlIntercode intercode = SqlUnion.union(translatedPattern.getIntercode(), translated.getIntercode());
+                ArrayList<String> variablesInScope = TranslatedSegment
+                        .mergeVariableLists(translatedPattern.getVariablesInScope(), translated.getVariablesInScope());
+
+                translatedPattern = new TranslatedSegment(variablesInScope, intercode);
+            }
+        }
+
+        assert translatedPattern != null;
+        return translatedPattern;
     }
 
 
