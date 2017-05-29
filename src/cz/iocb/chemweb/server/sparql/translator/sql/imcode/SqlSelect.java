@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
@@ -10,14 +11,16 @@ import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
 public class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
+    private final ArrayList<String> selectedVariables;
     private boolean distinct = false;
     private BigInteger limit = null;
     private BigInteger offset = null;
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child)
+    public SqlSelect(ArrayList<String> selectedVariables, UsedVariables variables, SqlIntercode child)
     {
         super(variables);
+        this.selectedVariables = selectedVariables;
         this.child = child;
     }
 
@@ -53,8 +56,13 @@ public class SqlSelect extends SqlIntercode
 
         boolean hasSelect = false;
 
-        for(UsedVariable variable : variables.getValues())
+        for(String variableName : selectedVariables)
         {
+            UsedVariable variable = variables.get(variableName);
+
+            if(variable == null)
+                continue;
+
             for(ResourceClass resClass : variable.getClasses())
             {
                 for(int i = 0; i < resClass.getPartsCount(); i++)

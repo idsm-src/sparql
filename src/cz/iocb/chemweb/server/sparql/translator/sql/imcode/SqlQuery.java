@@ -11,12 +11,13 @@ import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
 
 public class SqlQuery extends SqlIntercode
 {
+    private final ArrayList<String> selectedVariables;
     private final SqlIntercode child;
 
-
-    public SqlQuery(SqlIntercode child)
+    public SqlQuery(ArrayList<String> selectedVariables, SqlIntercode child)
     {
         super(child.variables);
+        this.selectedVariables = selectedVariables;
         this.child = child;
     }
 
@@ -30,23 +31,24 @@ public class SqlQuery extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(UsedVariable variable : variables.getValues())
+        for(String variableName : selectedVariables)
         {
-            List<ResourceClass> classes = variable.getClasses();
+            UsedVariable variable = variables.get(variableName);
 
-            if(classes.size() == 0)
+            if(variable == null)
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
 
                 builder.append("NULL AS \"");
-                builder.append(variable.getName());
+                builder.append(variableName);
                 builder.append('#');
                 builder.append(ResourceClass.nullTag);
                 builder.append('"');
             }
             else
             {
+                List<ResourceClass> classes = variable.getClasses();
                 List<ResourceClass> iriClasses = new ArrayList<ResourceClass>();
                 List<ResourceClass> literalClasses = new ArrayList<ResourceClass>();
 
@@ -71,14 +73,14 @@ public class SqlQuery extends SqlIntercode
                         appendComma(builder, i > 0);
 
                         ResourceClass iriClass = iriClasses.get(i);
-                        builder.append(iriClass.getSparqlValue(variable.getName()));
+                        builder.append(iriClass.getSparqlValue(variableName));
                     }
 
                     if(iriClasses.size() > 1)
                         builder.append(")");
 
                     builder.append(" AS \"");
-                    builder.append(variable.getName());
+                    builder.append(variableName);
                     builder.append('#');
                     builder.append(IriClass.iriTag);
                     builder.append('"');

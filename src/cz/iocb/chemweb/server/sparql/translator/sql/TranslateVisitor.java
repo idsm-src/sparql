@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.sql;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -69,7 +70,7 @@ import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestrictio
 
 
 
-public class TranslateVisitor extends ElementVisitor<SqlIntercode>
+public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 {
     private final Stack<List<DataSet>> selectDatasets = new Stack<>();
     private final Stack<GraphOrServiceRestriction> graphOrServiceRestrictions = new Stack<>();
@@ -96,15 +97,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(SelectQuery selectQuery)
+    public TranslatedSegment visit(SelectQuery selectQuery)
     {
-        SqlIntercode translatedSelect = visitElement(selectQuery.getSelect());
-        return new SqlQuery(translatedSelect);
+        TranslatedSegment translatedSelect = visitElement(selectQuery.getSelect());
+        SqlQuery intercode = new SqlQuery(translatedSelect.getVariablesInScope(), translatedSelect.getIntercode());
+
+        return new TranslatedSegment(translatedSelect.getVariablesInScope(), intercode);
     }
 
 
     @Override
-    public SqlIntercode visit(Select select)
+    public TranslatedSegment visit(Select select)
     {
         checkProjectionVariables(select);
 
@@ -112,33 +115,37 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         selectDatasets.push(select.getDataSets()); // TODO: datasets are not supported
 
         // translate the WHERE clause
-        SqlIntercode translatedWhereClause = visitElement(select.getPattern());
+        TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
 
         if(!select.getGroupByConditions().isEmpty())
             translatedWhereClause = translateBindInGroupBy(select.getGroupByConditions(), translatedWhereClause);
 
 
 
-        UsedVariables variables = null;
+        UsedVariables variables = new UsedVariables();
+        ArrayList<String> variablesInScope = null;
 
         if(select.getProjections().isEmpty())
         {
             //TODO: check whether star can be used
 
-            variables = new UsedVariables();
+            for(String variableName : translatedWhereClause.getVariablesInScope())
+            {
+                UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
 
-            //TODO: use code that add variables in the correct order
-            for(UsedVariable variable : translatedWhereClause.getVariables().getValues())
-                if(!variable.getName().startsWith(BlankNode.prefix))
+                if(variable != null)
                     variables.add(variable);
+            }
+
+            variablesInScope = translatedWhereClause.getVariablesInScope();
         }
         else
         {
-            variables = new UsedVariables();
+            variablesInScope = new ArrayList<String>();
 
             for(Projection projection : select.getProjections())
             {
-                String varName = projection.getVariable().getName();
+                String variableName = projection.getVariable().getName();
 
                 if(projection.getExpression() != null)
                 {
@@ -146,18 +153,18 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
                 else
                 {
-                    UsedVariable variable = translatedWhereClause.getVariables().get(varName);
+                    UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
 
-                    if(variable == null)
-                        variable = new UsedVariable(varName, true);
+                    if(variable != null)
+                        variables.add(variable);
 
-                    variables.add(variable);
+                    variablesInScope.add(variableName);
                 }
             }
         }
 
 
-        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause);
+        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause.getIntercode());
 
 
         if(select.isDistinct())
@@ -173,26 +180,26 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         // clear information about datasets of this SELECT (sub)query
         selectDatasets.pop();
 
-        return sqlSelect;
+        return new TranslatedSegment(variablesInScope, sqlSelect);
     }
 
 
     @Override
-    public SqlIntercode visit(GroupGraph groupGraph)
+    public TranslatedSegment visit(GroupGraph groupGraph)
     {
-        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
+        TranslatedSegment translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
 
         return translatedGroupGraphPattern;
     }
 
 
     @Override
-    public SqlIntercode visit(Graph graph)
+    public TranslatedSegment visit(Graph graph)
     {
         VarOrIri varOrIri = graph.getName();
         graphOrServiceRestrictions.push(new GraphOrServiceRestriction(RestrictionType.GRAPH_RESTRICTION, varOrIri));
 
-        SqlIntercode translatedPattern = visitElement(graph.getPattern());
+        TranslatedSegment translatedPattern = visitElement(graph.getPattern());
 
         graphOrServiceRestrictions.pop();
         return translatedPattern;
@@ -200,28 +207,28 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(Service service)
+    public TranslatedSegment visit(Service service)
     {
         return null;
     }
 
 
     @Override
-    public SqlIntercode visit(Union union)
+    public TranslatedSegment visit(Union union)
     {
         return null;
     }
 
 
     @Override
-    public SqlIntercode visit(Values values)
+    public TranslatedSegment visit(Values values)
     {
         return null;
     }
 
 
     @Override
-    public SqlIntercode visit(Triple triple)
+    public TranslatedSegment visit(Triple triple)
     {
         if(!(triple.getPredicate() instanceof Node))
             return null; //TODO: paths are not yet implemented
@@ -290,16 +297,31 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
+        ArrayList<String> variablesInScope = new ArrayList<String>();
+
+        if(graph instanceof Variable)
+            variablesInScope.add(((Variable) graph).getName());
+
+        if(subject instanceof Variable)
+            variablesInScope.add(((Variable) subject).getName());
+
+        if(predicate instanceof Variable)
+            variablesInScope.add(((Variable) predicate).getName());
+
+        if(object instanceof Variable)
+            variablesInScope.add(((Variable) object).getName());
+
+
         if(translatedPattern == null)
-            return new SqlNoSolution();
+            return new TranslatedSegment(variablesInScope, new SqlNoSolution());
 
 
-        return translatedPattern;
+        return new TranslatedSegment(variablesInScope, translatedPattern);
     }
 
 
     @Override
-    public SqlIntercode visit(Minus minus)
+    public TranslatedSegment visit(Minus minus)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -308,7 +330,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(Optional optional)
+    public TranslatedSegment visit(Optional optional)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -317,7 +339,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(Bind bind)
+    public TranslatedSegment visit(Bind bind)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -326,7 +348,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(Filter filter)
+    public TranslatedSegment visit(Filter filter)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -529,7 +551,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     /**************************************************************************/
 
-    private SqlIntercode translateBindInGroupBy(List<GroupCondition> groupByList, SqlIntercode translatedWhereClause)
+    private TranslatedSegment translateBindInGroupBy(List<GroupCondition> groupByList,
+            TranslatedSegment translatedWhereClause)
     {
         for(GroupCondition groupBy : groupByList)
         {
@@ -549,9 +572,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translatePatternList(List<Pattern> patterns)
+    private TranslatedSegment translatePatternList(List<Pattern> patterns)
     {
-        SqlIntercode translatedGroupPattern = new SqlEmptySolution();
+        TranslatedSegment translatedGroupPattern = new TranslatedSegment(new ArrayList<String>(),
+                new SqlEmptySolution());
 
         LinkedList<Filter> filters = new LinkedList<>();
 
@@ -565,7 +589,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(optionalPattern == null) //TODO: this possibility should be eliminated by the parser
                     continue;
 
-                SqlIntercode translatedPattern = null;
+                TranslatedSegment translatedPattern = null;
                 LinkedList<Filter> optionalFilters = new LinkedList<>();
 
 
@@ -608,12 +632,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else
             {
-                SqlIntercode translatedPattern = visitElement(pattern);
+                TranslatedSegment translatedPattern = visitElement(pattern);
 
                 if(translatedPattern == null)
                     System.err.println(pattern.getClass().getCanonicalName());
 
-                translatedGroupPattern = SqlJoin.join(schema, translatedGroupPattern, translatedPattern);
+                SqlIntercode intercode = SqlJoin.join(schema, translatedGroupPattern.getIntercode(),
+                        translatedPattern.getIntercode());
+                ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
+                        translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
+
+                translatedGroupPattern = new TranslatedSegment(variablesInScope, intercode);
             }
         }
 
@@ -664,40 +693,45 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
-            LinkedList<Filter> optionalFilters)
+    private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
+            TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
     {
         //TODO: expressions are not yet supported
-        return SqlLeftJoin.leftJoin(translatedGroupPattern, translatedPattern);
+        SqlIntercode intercode = SqlLeftJoin.leftJoin(translatedGroupPattern.getIntercode(),
+                translatedPattern.getIntercode());
+        ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
+                translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
+
+        return new TranslatedSegment(variablesInScope, intercode);
     }
 
 
-    private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
+    private TranslatedSegment translateMinus(Minus pattern, TranslatedSegment translatedGroupPattern)
     {
         // TODO
         return null;
     }
 
 
-    private SqlIntercode translateBind(Bind pattern, SqlIntercode translatedGroupPattern)
+    private TranslatedSegment translateBind(Bind pattern, TranslatedSegment translatedGroupPattern)
     {
         // TODO
         return null;
     }
 
 
-    private SqlIntercode translateFilters(LinkedList<Filter> filters, SqlIntercode translatedGroupPattern)
+    private TranslatedSegment translateFilters(LinkedList<Filter> filters, TranslatedSegment translatedGroupPattern)
     {
         // TODO
         return translatedGroupPattern;
     }
 
 
-    private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
+    private TranslatedSegment translateProcedureCall(ProcedureCallBase procedureCallBase, TranslatedSegment context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
         ProcedureDefinition procedureDefinition = procedures.get(procedureName.getUri().toString());
-        UsedVariables contextVariables = context.getVariables();
+        UsedVariables contextVariables = context.getIntercode().getVariables();
 
 
         /* check graph */
@@ -721,6 +755,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         for(ParameterDefinition parameter : procedureDefinition.getParameters())
             parameterNodes.put(parameter, null);
 
+
+        ArrayList<String> variablesInScope = new ArrayList<String>();
 
         for(ProcedureCall.Parameter parameter : procedureCallBase.getParameters())
         {
@@ -765,6 +801,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 parameterNodes.put(parameterDefinition, new ClassifiedNode(value, valueClass));
             }
+
+
+            if(parameter.getValue() instanceof Variable)
+                variablesInScope.add(((Variable) parameter.getValue()).getName());
         }
 
 
@@ -809,6 +849,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 resultClass = classes.stream().filter(c -> c.match(result)).findAny().orElse(null);
 
             resultNodes.put(resultDefinition, new ClassifiedNode(result, resultClass));
+
+
+            if(result instanceof Variable)
+                variablesInScope.add(((Variable) result).getName());
         }
         else
         {
@@ -841,22 +885,28 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     resultNodes.put(resultDefinition, new ClassifiedNode(result.getValue(), resultClass));
                 }
+
+
+                if(result.getValue() instanceof Variable)
+                    variablesInScope.add(((Variable) result.getValue()).getName());
             }
         }
 
+        SqlIntercode intercode = SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes,
+                context.getIntercode());
 
-        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
+        return new TranslatedSegment(variablesInScope, intercode);
     }
 
 
     public String translate(SelectQuery sparqlQuery) throws TranslateExceptions
     {
-        SqlIntercode code = visitElement(sparqlQuery);
+        TranslatedSegment segment = visitElement(sparqlQuery);
 
         if(!exceptions.isEmpty())
             throw new TranslateExceptions(exceptions);
 
-        return code.translate();
+        return segment.getIntercode().translate();
     }
 
 
