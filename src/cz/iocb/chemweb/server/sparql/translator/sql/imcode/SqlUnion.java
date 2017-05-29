@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
 
 import java.util.ArrayList;
-import com.google.gwt.thirdparty.guava.common.collect.Lists;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
@@ -27,64 +26,10 @@ public class SqlUnion extends SqlIntercode
         /* special cases */
 
         if(left instanceof SqlNoSolution)
-        {
-            boolean included = true;
-
-            for(UsedVariable var : left.getVariables().getValues())
-                if(right.getVariables().get(var.getName()) == null)
-                    included = false;
-
-            if(included)
-                return right;
-
-
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                variables.add(variable);
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                if(variables.get(variable.getName()) == null)
-                    variables.add(variable);
-
-            if(right instanceof SqlNoSolution)
-                return new SqlNoSolution();
-
-            if(!(right instanceof SqlUnion))
-                return new SqlUnion(variables, Lists.newArrayList(right));
-
-            SqlUnion union = (SqlUnion) right;
-            return new SqlUnion(variables, union.childs);
-        }
-
+            return right;
 
         if(right instanceof SqlNoSolution)
-        {
-            boolean included = true;
-
-            for(UsedVariable var : right.getVariables().getValues())
-                if(left.getVariables().get(var.getName()) == null)
-                    included = false;
-
-            if(included)
-                return left;
-
-
-            UsedVariables variables = new UsedVariables();
-
-            for(UsedVariable variable : left.getVariables().getValues())
-                variables.add(variable);
-
-            for(UsedVariable variable : right.getVariables().getValues())
-                if(variables.get(variable.getName()) == null)
-                    variables.add(variable);
-
-            if(!(left instanceof SqlUnion))
-                return new SqlUnion(variables, Lists.newArrayList(left));
-
-            SqlUnion union = (SqlUnion) left;
-            return new SqlUnion(variables, union.childs);
-        }
+            return left;
 
 
         /* standard union */
