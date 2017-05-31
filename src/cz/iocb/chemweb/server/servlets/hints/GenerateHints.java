@@ -18,7 +18,7 @@ import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
@@ -121,7 +121,7 @@ public class GenerateHints extends HttpServlet
 
         System.err.println(translatedQuery);
 
-        PostgreDatabase database = new PostgreDatabase();
+        PostgresDatabase database = new PostgresDatabase();
         Result result = database.query(translatedQuery);
 
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();

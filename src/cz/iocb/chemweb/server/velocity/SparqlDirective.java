@@ -21,7 +21,7 @@ import org.apache.velocity.runtime.parser.node.Node;
 import org.apache.velocity.runtime.parser.node.SimpleNode;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -41,14 +41,14 @@ public class SparqlDirective extends Directive
     private Log log;
 
     private final Parser parser;
-    private final PostgreDatabase db;
+    private final PostgresDatabase db;
 
 
     public SparqlDirective()
             throws FileNotFoundException, IOException, SQLException, PropertyVetoException, DatabaseException
     {
         parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
-        db = new PostgreDatabase();
+        db = new PostgresDatabase();
     }
 
     @Override

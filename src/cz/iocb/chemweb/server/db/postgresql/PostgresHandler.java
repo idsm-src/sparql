@@ -6,12 +6,12 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
-public class PostgreHandler
+public class PostgresHandler
 {
     Statement stmt;
 
 
-    public PostgreHandler(Statement stmt)
+    public PostgresHandler(Statement stmt)
     {
         this.stmt = stmt;
     }

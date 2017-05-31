@@ -55,7 +55,7 @@ import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -65,7 +65,7 @@ public class CompoundImageServlet extends HttpServlet
 {
     //private static String compoundQuery = "select molfile from compounds where id=?";
     //private static PGPoolingDataSource connectionPool = null;
-    private final PostgreDatabase db;
+    private final PostgresDatabase db;
     //private final Decoder base64Decoder;
 
 
@@ -103,7 +103,7 @@ public class CompoundImageServlet extends HttpServlet
         //generators.add(new BasicSceneGenerator());
         //generators.add(new StandardGenerator(new Font("Verdana", Font.PLAIN, 18)));
 
-        db = new PostgreDatabase();
+        db = new PostgresDatabase();
         //base64Decoder = Base64.getDecoder();
     }
 

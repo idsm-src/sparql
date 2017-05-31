@@ -27,8 +27,8 @@ import cz.iocb.chemweb.server.db.Literal;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
-import cz.iocb.chemweb.server.db.postgresql.PostgreHandler;
+import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.services.SessionData;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
@@ -57,7 +57,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static class QueryState
     {
         Thread thread;
-        PostgreHandler handler;
+        PostgresHandler handler;
         QueryResult result;
         Throwable exception;
     }
@@ -69,7 +69,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
 
     private final Parser parser;
-    private final PostgreDatabase database;
+    private final PostgresDatabase database;
 
     LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
 
@@ -78,7 +78,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     public QueryServiceImpl()
             throws DatabaseException, FileNotFoundException, IOException, SQLException, PropertyVetoException
     {
-        database = new PostgreDatabase();
+        database = new PostgresDatabase();
         parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
     }
 
