@@ -1,21 +1,35 @@
 package cz.iocb.chemweb.server.servlets.hints;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.VirtuosoDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgreDatabase;
+import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
+import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.parser.Parser;
+import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
+import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
+import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.translator.sql.TranslateVisitor;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -34,7 +48,8 @@ public class GenerateHints extends HttpServlet
     private static String hintsJS;
 
 
-    public GenerateHints() throws DatabaseException
+    public GenerateHints() throws DatabaseException, FileNotFoundException, TranslateExceptions, ParseExceptions,
+            SQLException, IOException
     {
         if(hintsJS == null)
             generateHints();
@@ -63,7 +78,8 @@ public class GenerateHints extends HttpServlet
     }
 
 
-    private static synchronized void generateHints() throws DatabaseException
+    private static synchronized void generateHints() throws DatabaseException, TranslateExceptions, ParseExceptions,
+            FileNotFoundException, SQLException, IOException
     {
         if(hintsJS != null)
             return;
@@ -71,39 +87,42 @@ public class GenerateHints extends HttpServlet
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);
 
-        String query = "sparql                                                "
-                + "define input:storage virtrdf:PubchemQuadStorage            "
-                + "select ?H ?T ?R ?D ?L where                                "
+        String query = "select ?H ?T ?L where                                 "
                 + "{                                                          "
+                + "  graph pubchem:ontology                                   "
                 + "  {                                                        "
-                + "    ?H rdf:type rdf:Property.                              "
-                + "    bind( 'P' as ?T)                                       "
+                + "    {                                                      "
+                + "      ?H rdf:type rdf:Property.                            "
+                + "    }                                                      "
+                + "    union                                                  "
+                + "    {                                                      "
+                + "      ?H rdf:type owl:Class.                               "
+                + "    }                                                      "
+                + "                                                           "
+                + "    ?H rdf:type ?T.                                        "
                 + "                                                           "
                 + "    optional                                               "
                 + "    {                                                      "
-                //+ "      ?H rdfs:domain ?D. ?H rdfs:range ?R.                 "
-                //+ "      filter(isIRI(?D) && isIRI(?R))                       "
-                //+ "      filter (!strstarts(str(?D), 'http://blanknodes/'))   "
-                //+ "      filter (!strstarts(str(?R), 'http://blanknodes/'))   "
+                + "      ?H rdfs:label ?L.                                    "
                 + "    }                                                      "
                 + "  }                                                        "
-                + "  union                                                    "
-                + "  {                                                        "
-                + "    ?H rdf:type owl:Class.                                 "
-                + "    bind( 'C' as ?T)                                       "
-                + "  }                                                        "
-                + "                                                           "
-                + "  optional                                                 "
-                + "  {                                                        "
-                + "    ?H rdfs:label ?L.                                      "
-                + "  }                                                        "
-                + "                                                           "
-                + "  filter(isIRI(?H))                                        "
-                + "  filter (!strstarts(str(?H), 'http://blanknodes/'))       "
                 + "}                                                          ";
 
-        VirtuosoDatabase database = new VirtuosoDatabase();
-        Result result = database.query(query);
+
+        Parser parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+        SelectQuery syntaxTree = parser.parse(query);
+        DatabaseSchema schema = PostgresSchema.get();
+        List<ResourceClass> classes = PubChemMapping.getClasses();
+        List<QuadMapping> mappings = PubChemMapping.getMappings();
+        LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+
+        String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
+
+
+        System.err.println(translatedQuery);
+
+        PostgreDatabase database = new PostgreDatabase();
+        Result result = database.query(translatedQuery);
 
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
 
@@ -112,8 +131,6 @@ public class GenerateHints extends HttpServlet
             RdfNode text = row.get("H");
             RdfNode type = row.get("T");
             RdfNode label = row.get("L");
-            //RdfNode domain = row.get("D");
-            //RdfNode range = row.get("R");
 
             PrefixedName iri = NormalizeIRI.decompose(text.getValue());
 
@@ -129,8 +146,24 @@ public class GenerateHints extends HttpServlet
             }
 
 
+            String typeCode = null;
+
+            switch(type.getValue())
+            {
+                case "http://www.w3.org/2002/07/owl#Class":
+                    typeCode = "C";
+                    break;
+
+                case "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property":
+                    typeCode = "P";
+                    break;
+
+                default:
+                    continue;
+            }
+
             Item item = new Item();
-            item.type = type.getValue();
+            item.type = typeCode;
             item.name = iri.name;
 
             if(label != null)
