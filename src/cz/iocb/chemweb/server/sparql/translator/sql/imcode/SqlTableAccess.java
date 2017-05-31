@@ -12,7 +12,10 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
+import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
 
@@ -23,11 +26,9 @@ public class SqlTableAccess extends SqlIntercode
     private final String table;
     private final String condition;
 
-    private final LinkedHashMap<String, NodeMapping> mappings = new LinkedHashMap<String, NodeMapping>();
-
+    private final LinkedHashMap<String, ArrayList<NodeMapping>> mappings = new LinkedHashMap<String, ArrayList<NodeMapping>>();
     private final ArrayList<ParametrisedLiteralMapping> notNullConditions = new ArrayList<ParametrisedLiteralMapping>();
     private final ArrayList<Pair<Node, ParametrisedMapping>> valueConditions = new ArrayList<Pair<Node, ParametrisedMapping>>();
-    private final ArrayList<Pair<NodeMapping, NodeMapping>> equalityConditions = new ArrayList<Pair<NodeMapping, NodeMapping>>();
 
 
     public SqlTableAccess(String table, String condition)
@@ -38,19 +39,51 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addMapping(String variable, NodeMapping mapping)
+    public void addVariableClass(String variable, ResourceClass resourceClass)
     {
         UsedVariable other = variables.get(variable);
 
-        if(other != null && other.containsClass(mapping.getResourceClass()))
+        if(other != null && other.containsClass(resourceClass))
             return;
 
         if(other != null)
-            other.addClass(mapping.getResourceClass());
+            other.addClass(resourceClass);
         else
-            variables.add(new UsedVariable(variable, mapping.getResourceClass(), false));
+            variables.add(new UsedVariable(variable, resourceClass, false));
+    }
 
-        mappings.put(variable, mapping);
+
+    public void addMapping(String variable, NodeMapping mapping)
+    {
+        ArrayList<NodeMapping> list = mappings.get(variable);
+
+        if(list == null)
+        {
+            list = new ArrayList<NodeMapping>();
+            mappings.put(variable, list);
+        }
+
+        if(!list.contains(mapping))
+            list.add(mapping);
+    }
+
+
+    public void addMappings(LinkedHashMap<String, ArrayList<NodeMapping>> values)
+    {
+        for(Entry<String, ArrayList<NodeMapping>> entry : values.entrySet())
+        {
+            ArrayList<NodeMapping> list = mappings.get(entry.getKey());
+
+            if(list == null)
+            {
+                list = new ArrayList<NodeMapping>();
+                mappings.put(entry.getKey(), list);
+            }
+
+            for(NodeMapping nodeMapping : entry.getValue())
+                if(!list.contains(nodeMapping))
+                    list.add(nodeMapping);
+        }
     }
 
 
@@ -86,55 +119,48 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addEqualityCondition(NodeMapping map1, NodeMapping map2)
-    {
-        Pair<NodeMapping, NodeMapping> cond = new Pair<NodeMapping, NodeMapping>(map1, map2);
-        Pair<NodeMapping, NodeMapping> revCond = new Pair<NodeMapping, NodeMapping>(map2, map1);
-
-        if(!equalityConditions.contains(cond) && !equalityConditions.contains(revCond))
-            equalityConditions.add(cond);
-    }
-
-
-    public void addEqualityConditions(List<Pair<NodeMapping, NodeMapping>> conditions)
-    {
-        for(Pair<NodeMapping, NodeMapping> cond : conditions)
-            if(!equalityConditions.contains(cond))
-                equalityConditions.add(cond);
-    }
-
-
     public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
+        // at this time, we allow merging only in the case that variables share the same classes
+        for(UsedPairedVariable pairedVariable : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
+            for(PairedClass p : pairedVariable.getClasses())
+                if(p.getLeftClass() != null && p.getRightClass() != null && p.getLeftClass() != p.getRightClass())
+                    return false;
+
+
         if(!left.table.equals(right.table))
             return false;
 
 
         LinkedList<String> columns = new LinkedList<String>();
 
-        for(Entry<String, NodeMapping> leftEntry : left.mappings.entrySet())
+        for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
         {
-            for(Entry<String, NodeMapping> rightEntry : right.mappings.entrySet())
+            ArrayList<NodeMapping> leftMappings = leftEntry.getValue();
+            ArrayList<NodeMapping> rightMappings = right.mappings.get(leftEntry.getKey());
+
+            if(rightMappings == null)
+                continue;
+
+
+            for(NodeMapping leftMap : leftMappings)
             {
-                if(!leftEntry.getKey().equals(rightEntry.getKey()))
-                    continue;
-
-                NodeMapping leftMap = leftEntry.getValue();
-                NodeMapping rightMap = rightEntry.getValue();
-
-                assert leftMap.getResourceClass() == rightMap.getResourceClass();
-
-                if(leftMap instanceof ParametrisedIriMapping && rightMap instanceof ParametrisedIriMapping
-                        || leftMap instanceof ParametrisedLiteralMapping
-                                && rightMap instanceof ParametrisedLiteralMapping)
+                for(NodeMapping rightMap : rightMappings)
                 {
-                    for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
-                    {
-                        String leftColumn = leftMap.getSqlValueAccess(i);
-                        String rightColumn = rightMap.getSqlValueAccess(i);
+                    assert leftMap.getResourceClass() == rightMap.getResourceClass();
 
-                        if(leftColumn.equals(rightColumn))
-                            columns.add(leftColumn);
+                    if(leftMap instanceof ParametrisedIriMapping && rightMap instanceof ParametrisedIriMapping
+                            || leftMap instanceof ParametrisedLiteralMapping
+                                    && rightMap instanceof ParametrisedLiteralMapping)
+                    {
+                        for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
+                        {
+                            String leftColumn = leftMap.getSqlValueAccess(i);
+                            String rightColumn = rightMap.getSqlValueAccess(i);
+
+                            if(leftColumn.equals(rightColumn))
+                                columns.add(leftColumn);
+                        }
                     }
                 }
             }
@@ -199,10 +225,23 @@ public class SqlTableAccess extends SqlIntercode
             if(!left.valueConditions.contains(condition))
                 return false;
 
-        for(Pair<NodeMapping, NodeMapping> condition : right.equalityConditions)
-            if(!left.equalityConditions.contains(condition)
-                    && !left.equalityConditions.contains(new Pair<>(condition.getRight(), condition.getLeft())))
-                return false;
+        for(Entry<String, ArrayList<NodeMapping>> entry : right.mappings.entrySet())
+        {
+            ArrayList<NodeMapping> rightList = entry.getValue();
+            ArrayList<NodeMapping> leftList = left.mappings.get(entry.getKey());
+
+            if(leftList == null)
+            {
+                if(rightList.size() > 1)
+                    return false;
+            }
+            else
+            {
+                for(NodeMapping nodeMapping : rightList)
+                    if(!leftList.contains(nodeMapping))
+                        return false;
+            }
+        }
 
         return true;
     }
@@ -210,6 +249,13 @@ public class SqlTableAccess extends SqlIntercode
 
     public static List<KeyPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess foreign)
     {
+        // at this time, we allow dropping only in the case that variables share the same classes
+        for(UsedPairedVariable paired : UsedPairedVariable.getPairs(parent.getVariables(), foreign.getVariables()))
+            for(PairedClass p : paired.getClasses())
+                if(p.getLeftClass() != null && p.getRightClass() != null && p.getLeftClass() != p.getRightClass())
+                    return null;
+
+
         List<List<KeyPair>> keys = schema.getForeignKeys(parent.table, foreign.table);
 
         if(keys == null)
@@ -223,34 +269,39 @@ public class SqlTableAccess extends SqlIntercode
         ArrayList<KeyPair> columns = new ArrayList<KeyPair>();
         LinkedHashSet<String> parentColumns = new LinkedHashSet<String>();
 
-        for(Entry<String, NodeMapping> parentEntry : parent.mappings.entrySet())
+        for(Entry<String, ArrayList<NodeMapping>> parentEntry : parent.mappings.entrySet())
         {
-            NodeMapping parentMap = parentEntry.getValue();
+            ArrayList<NodeMapping> parentMappings = parentEntry.getValue();
 
-            if(parentMap instanceof ParametrisedMapping)
-                for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
-                    parentColumns.add(parentMap.getSqlValueAccess(i));
-
-
-            for(Entry<String, NodeMapping> foreignEntry : foreign.mappings.entrySet())
-            {
-                if(!parentEntry.getKey().equals(foreignEntry.getKey()))
-                    continue;
-
-                NodeMapping foreignMap = foreignEntry.getValue();
-
-                assert parentMap.getResourceClass() == foreignMap.getResourceClass();
-
-                if(parentMap instanceof ParametrisedIriMapping && foreignMap instanceof ParametrisedIriMapping
-                        || parentMap instanceof ParametrisedLiteralMapping
-                                && foreignMap instanceof ParametrisedLiteralMapping)
-                {
+            for(NodeMapping parentMap : parentMappings)
+                if(parentMap instanceof ParametrisedMapping)
                     for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
-                    {
-                        String parentColumn = parentMap.getSqlValueAccess(i);
-                        String foreignColumn = foreignMap.getSqlValueAccess(i);
+                        parentColumns.add(parentMap.getSqlValueAccess(i));
 
-                        columns.add(new KeyPair(parentColumn, foreignColumn));
+
+            ArrayList<NodeMapping> foreignMappings = foreign.mappings.get(parentEntry.getKey());
+
+            if(foreignMappings == null)
+                continue;
+
+
+            for(NodeMapping parentMap : parentMappings)
+            {
+                for(NodeMapping foreignMap : foreignMappings)
+                {
+                    assert parentMap.getResourceClass() == foreignMap.getResourceClass();
+
+                    if(parentMap instanceof ParametrisedIriMapping && foreignMap instanceof ParametrisedIriMapping
+                            || parentMap instanceof ParametrisedLiteralMapping
+                                    && foreignMap instanceof ParametrisedLiteralMapping)
+                    {
+                        for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
+                        {
+                            String parentColumn = parentMap.getSqlValueAccess(i);
+                            String foreignColumn = foreignMap.getSqlValueAccess(i);
+
+                            columns.add(new KeyPair(parentColumn, foreignColumn));
+                        }
                     }
                 }
             }
@@ -333,12 +384,10 @@ public class SqlTableAccess extends SqlIntercode
         merged.mappings.putAll(left.mappings);
         merged.valueConditions.addAll(left.valueConditions);
         merged.notNullConditions.addAll(left.notNullConditions);
-        merged.equalityConditions.addAll(left.equalityConditions);
 
-        merged.mappings.putAll(right.mappings);
+        merged.addMappings(right.mappings);
         merged.addValueConditions(right.valueConditions);
         merged.addNotNullConditions(right.notNullConditions);
-        merged.addEqualityConditions(right.equalityConditions);
 
         return merged;
     }
@@ -381,9 +430,8 @@ public class SqlTableAccess extends SqlIntercode
         merged.mappings.putAll(left.mappings);
         merged.valueConditions.addAll(left.valueConditions);
         merged.notNullConditions.addAll(left.notNullConditions);
-        merged.equalityConditions.addAll(left.equalityConditions);
 
-        merged.mappings.putAll(right.mappings);
+        merged.addMappings(right.mappings);
 
         return merged;
     }
@@ -405,38 +453,34 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : foreign.getVariables().getValues())
         {
-            assert !var.canBeNull();
-            merged.getVariables().add(var);
+            UsedVariable other = parent.getVariables().get(var.getName());
+
+            if(other == null)
+            {
+                merged.getVariables().add(var);
+            }
+            else
+            {
+                assert var.getClasses().size() == 1;
+                assert other.getClasses().size() == 1;
+                assert var.getClasses().get(0) == other.getClasses().get(0);
+
+                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().get(0),
+                        var.canBeNull() && other.canBeNull());
+                merged.getVariables().add(newVar);
+            }
         }
 
         for(UsedVariable var : parent.getVariables().getValues())
         {
-            assert !var.canBeNull();
-
             if(foreign.getVariables().get(var.getName()) == null)
                 merged.getVariables().add(var);
         }
 
+
         merged.mappings.putAll(foreign.mappings);
         merged.valueConditions.addAll(foreign.valueConditions);
         merged.notNullConditions.addAll(foreign.notNullConditions);
-        merged.equalityConditions.addAll(foreign.equalityConditions);
-
-
-        for(Entry<String, NodeMapping> entry : parent.mappings.entrySet())
-        {
-            String variable = entry.getKey();
-            NodeMapping mapping = entry.getValue();
-            NodeMapping remaped = mapping.remapColumns(columnMap);
-
-            NodeMapping foreignMapping = foreign.mappings.get(variable);
-
-            if(foreignMapping == null)
-                merged.mappings.put(variable, remaped);
-            else if(!remaped.equals(foreignMapping))
-                merged.equalityConditions.add(new Pair<NodeMapping, NodeMapping>(foreignMapping, remaped));
-        }
-
 
         for(Pair<Node, ParametrisedMapping> cond : parent.valueConditions)
             merged.addValueCondition(cond.getLeft(), (ParametrisedMapping) cond.getRight().remapColumns(columnMap));
@@ -444,10 +488,26 @@ public class SqlTableAccess extends SqlIntercode
         for(ParametrisedLiteralMapping mapping : parent.notNullConditions)
             merged.addNotNullCondition((ParametrisedLiteralMapping) mapping.remapColumns(columnMap));
 
-        for(Pair<NodeMapping, NodeMapping> cond : parent.equalityConditions)
-            merged.addEqualityCondition(cond.getLeft().remapColumns(columnMap),
-                    cond.getRight().remapColumns(columnMap));
 
+        for(Entry<String, ArrayList<NodeMapping>> entry : parent.mappings.entrySet())
+        {
+            String variable = entry.getKey();
+
+            for(NodeMapping mapping : entry.getValue())
+            {
+                NodeMapping remaped = mapping.remapColumns(columnMap);
+                ArrayList<NodeMapping> list = merged.mappings.get(variable);
+
+                if(list == null)
+                {
+                    list = new ArrayList<NodeMapping>();
+                    merged.mappings.put(variable, list);
+                }
+
+                if(!list.contains(remaped))
+                    list.add(remaped);
+            }
+        }
 
         return merged;
     }
@@ -462,22 +522,37 @@ public class SqlTableAccess extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(Entry<String, NodeMapping> entry : mappings.entrySet())
+        for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
         {
             appendComma(builder, hasSelect);
             hasSelect = true;
 
-            NodeMapping mapping = entry.getValue();
+            ArrayList<NodeMapping> mappings = entry.getValue();
+            ResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
 
-            for(int i = 0; i < mapping.getResourceClass().getPartsCount(); i++)
+            for(int i = 0; i < resourceClass.getPartsCount(); i++)
             {
                 appendComma(builder, i > 0);
 
-                builder.append(mapping.getSqlValueAccess(i));
+                //TODO: remove COALESCE if it is possible
+
+                if(mappings.size() > 1)
+                    builder.append("COALESCE(");
+
+                for(int j = 0; j < mappings.size(); j++)
+                {
+                    appendComma(builder, j > 0);
+                    builder.append(mappings.get(j).getSqlValueAccess(i));
+                }
+
+                if(mappings.size() > 1)
+                    builder.append(")");
+
                 builder.append(" AS ");
-                builder.append(mapping.getResourceClass().getSqlColumn(entry.getKey(), i));
+                builder.append(resourceClass.getSqlColumn(entry.getKey(), i));
             }
         }
+
 
         if(!hasSelect)
             builder.append("1");
@@ -490,7 +565,13 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        if(!valueConditions.isEmpty() || !notNullConditions.isEmpty() || !equalityConditions.isEmpty())
+        boolean hasWhereCondition = !valueConditions.isEmpty() || !notNullConditions.isEmpty();
+
+        for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
+            if(entry.getValue().size() > 1)
+                hasWhereCondition = true;
+
+        if(hasWhereCondition)
         {
             builder.append(" WHERE ");
             boolean hasWhere = false;
@@ -536,22 +617,38 @@ public class SqlTableAccess extends SqlIntercode
             }
 
 
-            for(Pair<NodeMapping, NodeMapping> entry : equalityConditions)
+            for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
             {
-                NodeMapping map1 = entry.getLeft();
-                NodeMapping map2 = entry.getRight();
-
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
-
-                assert map1.getResourceClass() == map2.getResourceClass();
-
-                for(int i = 0; i < map1.getResourceClass().getPartsCount(); i++)
+                for(int m = 0; m < entry.getValue().size() - 1; m++)
                 {
-                    appendAnd(builder, i > 0);
-                    builder.append(map1.getSqlValueAccess(i));
-                    builder.append(" = ");
-                    builder.append(map2.getSqlValueAccess(i));
+                    NodeMapping map1 = entry.getValue().get(m);
+                    NodeMapping map2 = entry.getValue().get(m + 1);
+
+                    appendAnd(builder, hasWhere);
+                    hasWhere = true;
+
+                    assert map1.getResourceClass() == map2.getResourceClass();
+
+                    for(int i = 0; i < map1.getResourceClass().getPartsCount(); i++)
+                    {
+                        appendAnd(builder, i > 0);
+
+                        builder.append("(");
+                        builder.append(map1.getSqlValueAccess(i));
+                        builder.append(" = ");
+                        builder.append(map2.getSqlValueAccess(i));
+
+                        //TODO: remove IS NULL if it is possible
+
+                        builder.append(" OR ");
+                        builder.append(map1.getSqlValueAccess(i));
+                        builder.append(" IS NULL");
+
+                        builder.append(" OR ");
+                        builder.append(map2.getSqlValueAccess(i));
+                        builder.append(" IS NULL");
+                        builder.append(")");
+                    }
                 }
             }
         }

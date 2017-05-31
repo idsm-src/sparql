@@ -676,6 +676,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(!(node instanceof VariableOrBlankNode))
             return;
 
+        translated.addVariableClass(((VariableOrBlankNode) node).getName(), mapping.getResourceClass());
         translated.addMapping(((VariableOrBlankNode) node).getName(), mapping);
     }
 
@@ -706,9 +707,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             else
                 return true;
         }
-
-        if(!map1.equals(map2))
-            translated.addEqualityCondition(map1, map2);
 
         return false;
     }
