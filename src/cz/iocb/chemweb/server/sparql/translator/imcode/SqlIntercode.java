@@ -1,6 +1,6 @@
-package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
+package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 

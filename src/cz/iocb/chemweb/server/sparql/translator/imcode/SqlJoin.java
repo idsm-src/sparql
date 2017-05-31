@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
+package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,10 +6,10 @@ import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariable;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 
 
 

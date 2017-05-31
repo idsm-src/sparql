@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
+package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,10 +11,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariable;
-import cz.iocb.chemweb.server.sparql.translator.sql.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 
 
 

@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator.visitor;
+package cz.iocb.chemweb.server.sparql.translator;
 
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 

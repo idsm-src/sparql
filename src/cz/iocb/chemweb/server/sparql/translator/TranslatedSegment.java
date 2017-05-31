@@ -1,7 +1,7 @@
-package cz.iocb.chemweb.server.sparql.translator.sql;
+package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 
 
 

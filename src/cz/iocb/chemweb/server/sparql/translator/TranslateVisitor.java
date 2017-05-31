@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator.sql;
+package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -50,23 +50,21 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
+import cz.iocb.chemweb.server.sparql.translator.GraphOrServiceRestriction.RestrictionType;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlEmptySolution;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlIntercode;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlJoin;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlLeftJoin;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlNoSolution;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlProcedureCall.ClassifiedNode;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlQuery;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlSelect;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlTableAccess;
-import cz.iocb.chemweb.server.sparql.translator.sql.imcode.SqlUnion;
-import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestriction;
-import cz.iocb.chemweb.server.sparql.translator.visitor.GraphOrServiceRestriction.RestrictionType;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall.ClassifiedNode;
 
 
 

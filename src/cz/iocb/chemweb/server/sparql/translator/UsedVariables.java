@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator.sql;
+package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
