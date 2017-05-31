@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.sql.imcode;
 
 import java.util.ArrayList;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.sql.UsedPairedVariable.PairedClass;
@@ -26,7 +27,7 @@ public class SqlLeftJoin extends SqlIntercode
     }
 
 
-    public static SqlIntercode leftJoin(SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right)
     {
         /* special cases */
 
@@ -48,13 +49,18 @@ public class SqlLeftJoin extends SqlIntercode
             SqlIntercode newUnion = new SqlNoSolution();
 
             for(SqlIntercode child : union.getChilds())
-                newUnion = SqlUnion.union(newUnion, leftJoin(child, right));
+                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right));
 
             return newUnion;
         }
 
         if(right instanceof SqlUnion)
             right = optimizeRightUnion(left.getVariables(), (SqlUnion) right);
+
+
+        if(left instanceof SqlTableAccess && right instanceof SqlTableAccess)
+            if(SqlTableAccess.canBeLeftMerged(schema, (SqlTableAccess) left, (SqlTableAccess) right))
+                return SqlTableAccess.leftMerge((SqlTableAccess) left, (SqlTableAccess) right);
 
 
         /* standard left join */

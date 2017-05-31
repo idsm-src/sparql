@@ -718,7 +718,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
     {
         //TODO: expressions are not yet supported
-        SqlIntercode intercode = SqlLeftJoin.leftJoin(translatedGroupPattern.getIntercode(),
+        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),
                 translatedPattern.getIntercode());
         ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
                 translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());

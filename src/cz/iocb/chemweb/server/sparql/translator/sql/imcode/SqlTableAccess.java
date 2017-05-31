@@ -174,6 +174,40 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    public static boolean canBeLeftMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    {
+        if(!canBeMerged(schema, left, right))
+            return false;
+
+        if(right.condition != null && !right.condition.equals(left.condition))
+            return false;
+
+        // Only one not null condition may be extra in the right table. For more extra conditions,
+        // we cannot be sure that all relevant columns are null for the same rows. Thus, the following
+        // example cannot be simply optimized as self left join:
+        // { ?S <ex:pred0> ?V } optional { ?S <ex:pred1> ?Literal1. ?S <ex:pred2> ?Literal2 }
+        int extra = 0;
+
+        for(ParametrisedLiteralMapping condition : right.notNullConditions)
+            if(!left.notNullConditions.contains(condition))
+                extra++;
+
+        if(extra > 1)
+            return false;
+
+        for(Pair<Node, ParametrisedMapping> condition : right.valueConditions)
+            if(!left.valueConditions.contains(condition))
+                return false;
+
+        for(Pair<NodeMapping, NodeMapping> condition : right.equalityConditions)
+            if(!left.equalityConditions.contains(condition)
+                    && !left.equalityConditions.contains(new Pair<>(condition.getRight(), condition.getLeft())))
+                return false;
+
+        return true;
+    }
+
+
     public static List<KeyPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess foreign)
     {
         List<List<KeyPair>> keys = schema.getForeignKeys(parent.table, foreign.table);
@@ -309,6 +343,50 @@ public class SqlTableAccess extends SqlIntercode
         return merged;
     }
 
+
+    public static SqlTableAccess leftMerge(SqlTableAccess left, SqlTableAccess right)
+    {
+        SqlTableAccess merged = new SqlTableAccess(left.table, left.condition);
+
+        for(UsedVariable var : left.getVariables().getValues())
+        {
+            UsedVariable other = right.getVariables().get(var.getName());
+
+            if(other == null)
+            {
+                merged.getVariables().add(var);
+            }
+            else
+            {
+                assert var.getClasses().size() == 1;
+                assert other.getClasses().size() == 1;
+                assert var.getClasses().get(0) == other.getClasses().get(0);
+
+                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().get(0),
+                        var.canBeNull() && other.canBeNull());
+                merged.getVariables().add(newVar);
+            }
+        }
+
+        for(UsedVariable var : right.getVariables().getValues())
+        {
+            if(left.getVariables().get(var.getName()) == null)
+            {
+                assert var.getClasses().size() == 1;
+                merged.getVariables().add(new UsedVariable(var.getName(), var.getClasses().get(0), true));
+            }
+        }
+
+
+        merged.mappings.putAll(left.mappings);
+        merged.valueConditions.addAll(left.valueConditions);
+        merged.notNullConditions.addAll(left.notNullConditions);
+        merged.equalityConditions.addAll(left.equalityConditions);
+
+        merged.mappings.putAll(right.mappings);
+
+        return merged;
+    }
 
 
     public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<KeyPair> columnMap)
