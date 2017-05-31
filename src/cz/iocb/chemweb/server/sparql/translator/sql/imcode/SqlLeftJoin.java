@@ -66,7 +66,7 @@ public class SqlLeftJoin extends SqlIntercode
         for(UsedPairedVariable pair : pairs)
         {
             UsedVariable leftVariable = pair.getLeftVariable();
-
+            UsedVariable rightVariable = pair.getRightVariable();
 
             String var = pair.getName();
             boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
@@ -74,6 +74,8 @@ public class SqlLeftJoin extends SqlIntercode
             UsedVariable variable = new UsedVariable(var, canBeLeftNull);
             variables.add(variable);
 
+
+            int produceOnCondition = 0;
 
             for(PairedClass pairedClass : pair.getClasses())
             {
@@ -83,17 +85,29 @@ public class SqlLeftJoin extends SqlIntercode
                         continue;
 
                     variable.addClass(pairedClass.getRightClass());
+                    produceOnCondition++;
                 }
                 else if(pairedClass.getRightClass() == null)
                 {
-                    variable.addClass(pairedClass.getLeftClass());
+                    variable.addClass(pairedClass.getLeftClass()); // left class is always included in the left join result
+
+                    if(rightVariable != null && !rightVariable.canBeNull())
+                        continue;
+
+                    produceOnCondition++;
                 }
                 else
                 {
                     assert pairedClass.getLeftClass() == pairedClass.getRightClass();
                     variable.addClass(pairedClass.getLeftClass());
+                    produceOnCondition++;
                 }
             }
+
+            // If no 'on condition' is produced, then the whole condition will be false
+            // and therefore the left join can be eliminated./
+            if(produceOnCondition == 0)
+                return left;
         }
 
 
