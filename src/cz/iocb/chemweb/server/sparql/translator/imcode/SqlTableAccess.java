@@ -15,9 +15,9 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 
 
 
@@ -212,14 +212,18 @@ public class SqlTableAccess extends SqlIntercode
         // we cannot be sure that all relevant columns are null for the same rows. Thus, the following
         // example cannot be simply optimized as self left join:
         // { ?S <ex:pred0> ?V } optional { ?S <ex:pred1> ?Literal1. ?S <ex:pred2> ?Literal2 }
-        int extra = 0;
+        ParametrisedLiteralMapping extraCondition = null;
 
         for(ParametrisedLiteralMapping condition : right.notNullConditions)
+        {
             if(!left.notNullConditions.contains(condition))
-                extra++;
-
-        if(extra > 1)
-            return false;
+            {
+                if(extraCondition != null)
+                    return false;
+                else
+                    extraCondition = condition;
+            }
+        }
 
         for(Pair<Node, ParametrisedMapping> condition : right.valueConditions)
             if(!left.valueConditions.contains(condition))
@@ -232,7 +236,10 @@ public class SqlTableAccess extends SqlIntercode
 
             if(leftList == null)
             {
-                if(rightList.size() > 1)
+                // only variable using extraCondition can be included on the right side
+                // if it is not included on the left side
+
+                if(rightList.size() > 1 || rightList.get(0) != extraCondition)
                     return false;
             }
             else
