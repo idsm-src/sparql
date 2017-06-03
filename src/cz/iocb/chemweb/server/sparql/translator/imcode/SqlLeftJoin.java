@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 
 
 
@@ -215,7 +215,9 @@ public class SqlLeftJoin extends SqlIntercode
                     appendComma(builder, hasSelect);
                     hasSelect = true;
 
-                    generateJoinSelectVarable(builder, leftVariable, rightVariable, resClass.getSqlColumn(var, i));
+                    UsedVariable leftClassVar = pairedClass.getLeftClass() != null ? leftVariable : null;
+                    UsedVariable rightClassVar = pairedClass.getRightClass() != null ? rightVariable : null;
+                    generateJoinSelectVarable(builder, leftClassVar, rightClassVar, resClass.getSqlColumn(var, i));
                 }
             }
         }
