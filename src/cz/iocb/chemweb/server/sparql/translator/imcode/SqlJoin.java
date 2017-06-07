@@ -61,20 +61,11 @@ public class SqlJoin extends SqlIntercode
                 rightChilds = Lists.newArrayList(right);
 
 
-            SqlIntercode union = null;
+            SqlIntercode union = new SqlNoSolution();
 
             for(SqlIntercode leftChild : leftChilds)
-            {
                 for(SqlIntercode rightChild : rightChilds)
-                {
-                    SqlIntercode join = join(schema, leftChild, rightChild);
-
-                    if(union == null)
-                        union = join;
-                    else
-                        union = SqlUnion.union(union, join);
-                }
-            }
+                    union = SqlUnion.union(union, join(schema, leftChild, rightChild));
 
             return union;
         }
