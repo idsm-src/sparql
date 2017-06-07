@@ -23,19 +23,36 @@ public class BinaryExpression extends BaseElement implements Expression
 {
     public enum Operator
     {
-        Or("||"), And("&&"), Equals("="), NotEquals("!="), LessThan("<"), GreaterThan(">"), LessThanOrEqual(
-                "<="), GreaterThanOrEqual(">="), Multiply("*"), Divide("/"), Add("+"), Subtract("-");
+        Or("||", " OR "),
+        And("&&", " AND "),
+        Equals("=", "="),
+        NotEquals("!=", "<>"),
+        LessThan("<", "<"),
+        GreaterThan(">", ">"),
+        LessThanOrEqual("<=", "<="),
+        GreaterThanOrEqual(">=", ">="),
+        Multiply("*", "*"),
+        Divide("/", "/"),
+        Add("+", "+"),
+        Subtract("-", "-");
 
         private final String text;
+        private final String code;
 
-        Operator(String text)
+        Operator(String text, String code)
         {
             this.text = text;
+            this.code = code;
         }
 
         public String getText()
         {
             return text;
+        }
+
+        public String getCode()
+        {
+            return code;
         }
     }
 

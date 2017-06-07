@@ -16,18 +16,25 @@ public class UnaryExpression extends BaseElement implements Expression
 {
     public enum Operator
     {
-        Not("!"), Plus("+"), Minus("-");
+        Not("!", "NOT "), Plus("+", "+"), Minus("-", "-");
 
         private final String text;
+        private final String code;
 
-        Operator(String text)
+        Operator(String text, String code)
         {
             this.text = text;
+            this.code = code;
         }
 
         public String getText()
         {
             return text;
+        }
+
+        public String getCode()
+        {
+            return code;
         }
     }
 
