@@ -54,17 +54,21 @@ import cz.iocb.chemweb.server.sparql.translator.GraphOrServiceRestriction.Restri
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest;
+import cz.iocb.chemweb.server.sparql.translator.expression.TranslatedExpression;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall.ClassifiedNode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall.ClassifiedNode;
 
 
 
@@ -737,10 +741,70 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateFilters(LinkedList<Filter> filters, TranslatedSegment translatedGroupPattern)
+
+    private SqlIntercode translateFilters(LinkedList<Filter> filters, SqlIntercode child)
     {
-        // TODO
-        return translatedGroupPattern;
+        if(child instanceof SqlUnion)
+        {
+            SqlIntercode union = new SqlNoSolution();
+
+            for(SqlIntercode subChild : ((SqlUnion) child).getChilds())
+                union = SqlUnion.union(union, translateFilters(filters, subChild));
+
+            return union;
+        }
+
+
+        StringBuilder builder = new StringBuilder();
+
+        boolean hasCondition = false;
+        boolean isFalse = false;
+
+        builder.append("(");
+
+        for(Filter filter : filters)
+        {
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this, child.getVariables());
+
+            TranslatedExpression translatedExpression = visitor.visitElement(filter.getConstraint(),
+                    TranslateRequest.EBV);
+
+            if(translatedExpression == null || translatedExpression.isFalse())
+            {
+                isFalse = true;
+            }
+            else
+            {
+                String condition = ExpressionTranslateVisitor.createEBV(translatedExpression).getCode();
+
+                if(hasCondition)
+                    builder.append(" AND ");
+
+                hasCondition = true;
+
+                builder.append("(");
+                builder.append(condition);
+                builder.append(")");
+            }
+        }
+
+        builder.append(")");
+
+
+        if(isFalse)
+            return new SqlNoSolution();
+
+        return new SqlFilter(child, builder.toString());
+    }
+
+
+    private TranslatedSegment translateFilters(LinkedList<Filter> filters, TranslatedSegment groupPattern)
+    {
+        if(filters.size() == 0)
+            return groupPattern;
+
+        return new TranslatedSegment(groupPattern.getVariablesInScope(),
+                translateFilters(filters, groupPattern.getIntercode()));
     }
 
 
