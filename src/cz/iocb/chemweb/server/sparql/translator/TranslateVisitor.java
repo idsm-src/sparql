@@ -932,4 +932,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         visitElement(sparqlQuery);
         return new TranslateResult(null, exceptions, warnings);
     }
+
+
+    public final List<ResourceClass> getResourceClasses()
+    {
+        return classes;
+    }
 }
