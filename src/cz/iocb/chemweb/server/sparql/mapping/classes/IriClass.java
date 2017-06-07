@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -12,6 +13,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 public class IriClass extends ResourceClass
 {
     public static final String iriTag = "iri";
+    public static final IriClass iriClass = new IriClass(iriTag, Arrays.asList("varchar"));
 
     private final String pattern;
     private final HashSet<String> values;
@@ -35,6 +37,19 @@ public class IriClass extends ResourceClass
         else
             for(int i = 0; i < sqlTypes.size(); i++)
                 this.inverseFunction.add(name + "_inv" + (i + 1));
+    }
+
+
+    private IriClass(String name, List<String> sqlTypes)
+    {
+        super(name);
+        this.pattern = null;
+        this.values = null;
+        this.function = "";
+        this.sqlTypes = sqlTypes;
+
+        this.inverseFunction = new ArrayList<String>(sqlTypes.size());
+        this.inverseFunction.add("");
     }
 
 
