@@ -14,6 +14,7 @@ public class IriClass extends ResourceClass
 {
     public static final String iriTag = "iri";
     public static final IriClass iriClass = new IriClass(iriTag, Arrays.asList("varchar"));
+    public static final IriClass uncategorizedClass = new IriClass("uncategorized", Arrays.asList("varchar"));
 
     private final String pattern;
     private final HashSet<String> values;

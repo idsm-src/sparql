@@ -1059,7 +1059,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 if(((IriClass) resClass).match(iri))
                     return (IriClass) resClass;
 
-        return IriClass.iriClass;
+        return IriClass.uncategorizedClass;
     }
 
 
