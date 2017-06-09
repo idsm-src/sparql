@@ -34,20 +34,19 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
 public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<TranslatedExpression, TranslateRequest>
 {
     private final List<ResourceClass> classes;
-    private final UsedVariables usedVariables;
+    private final VariableAccessor variableAccessor;
 
 
-    public ExpressionTranslateVisitor(TranslateVisitor parentVisitor, UsedVariables usedVariables)
+    public ExpressionTranslateVisitor(TranslateVisitor parentVisitor, VariableAccessor variableAccessor)
     {
         this.classes = parentVisitor.getResourceClasses();
-        this.usedVariables = usedVariables;
+        this.variableAccessor = variableAccessor;
     }
 
 
@@ -128,8 +127,8 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
 
                 if(leftVar != null && rightVar != null)
                 {
-                    UsedVariable left = getUsedVariable(leftVar);
-                    UsedVariable right = getUsedVariable(rightVar);
+                    UsedVariable left = variableAccessor.getUsedVariable(leftVar);
+                    UsedVariable right = variableAccessor.getUsedVariable(rightVar);
 
                     if(left == null || right == null)
                         return null;
@@ -169,9 +168,9 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                             comparison++;
 
                             assert literalClass.getPartsCount() == 1;
-                            builder.append(variableAccess(leftVar, literalClass, 0));
+                            builder.append(variableAccessor.variableAccess(leftVar, literalClass, 0));
                             builder.append(operator.getCode());
-                            builder.append(variableAccess(rightVar, literalClass, 0));
+                            builder.append(variableAccessor.variableAccess(rightVar, literalClass, 0));
                         }
                     }
 
@@ -206,9 +205,9 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                                 {
                                     appendAnd(builder, i > 0);
 
-                                    builder.append(variableAccess(leftVar, resourceClass, i));
+                                    builder.append(variableAccessor.variableAccess(leftVar, resourceClass, i));
                                     builder.append(operator.getCode());
-                                    builder.append(variableAccess(rightVar, resourceClass, i));
+                                    builder.append(variableAccessor.variableAccess(rightVar, resourceClass, i));
                                 }
                             }
                         }
@@ -309,7 +308,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                         if(operator != BinaryExpression.Operator.Equals)
                             return null;
 
-                        UsedVariable usedVariable = getUsedVariable(variable);
+                        UsedVariable usedVariable = variableAccessor.getUsedVariable(variable);
                         IriClass iriClass = getIriClass(iri.getUri().toString());
 
                         StringBuilder builder = new StringBuilder();
@@ -323,7 +322,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                             {
                                 appendAnd(builder, i > 0);
 
-                                builder.append(variableAccess(variable, iriClass, i));
+                                builder.append(variableAccessor.variableAccess(variable, iriClass, i));
                                 builder.append(operator.getCode());
                                 builder.append(iriClass.getSqlValue(iri, i));
                             }
@@ -352,7 +351,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                     {
                         /* variable vs (general) expression */
 
-                        UsedVariable usedVariable = getUsedVariable(variable);
+                        UsedVariable usedVariable = variableAccessor.getUsedVariable(variable);
                         TranslatedExpression translatedExpression = visitElement(expression);
 
                         if(usedVariable == null)
@@ -699,7 +698,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
     @Override
     public TranslatedExpression visit(Variable variable, TranslateRequest request)
     {
-        UsedVariable usedVariable = getUsedVariable(variable);
+        UsedVariable usedVariable = variableAccessor.getUsedVariable(variable);
 
         if(usedVariable == null)
             return null;
@@ -724,10 +723,11 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else if(ebvClasses.size() == 1)
                 {
                     if(ebvClasses.get(0) == xsdBoolean)
-                        return new TranslatedExpression(xsdBoolean, canBeNull, variableAccess(variable, xsdBoolean, 0));
+                        return new TranslatedExpression(xsdBoolean, canBeNull,
+                                variableAccessor.variableAccess(variable, xsdBoolean, 0));
                     else
                         return new TranslatedExpression(xsdBoolean, canBeNull,
-                                "ebv(" + variableAccess(variable, xsdBoolean, 0) + ")");
+                                "ebv(" + variableAccessor.variableAccess(variable, xsdBoolean, 0) + ")");
                 }
                 else
                 {
@@ -739,9 +739,10 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                         appendComma(builder, i > 0);
 
                         if(ebvClasses.get(i) == xsdBoolean)
-                            builder.append(variableAccess(variable, ebvClasses.get(i), 0));
+                            builder.append(variableAccessor.variableAccess(variable, ebvClasses.get(i), 0));
                         else
-                            builder.append("ebv(" + variableAccess(variable, ebvClasses.get(i), 0) + ")");
+                            builder.append(
+                                    "ebv(" + variableAccessor.variableAccess(variable, ebvClasses.get(i), 0) + ")");
                     }
 
                     builder.append(")");
@@ -755,7 +756,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else
                     return new TranslatedExpression(xsdBoolean,
                             usedVariable.canBeNull() || usedVariable.getClasses().size() > 1,
-                            variableAccess(variable, xsdBoolean, 0));
+                            variableAccessor.variableAccess(variable, xsdBoolean, 0));
 
             case STRING:
                 if(!resClasses.contains(xsdString))
@@ -763,7 +764,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else
                     return new TranslatedExpression(xsdString,
                             usedVariable.canBeNull() || usedVariable.getClasses().size() > 1,
-                            variableAccess(variable, xsdString, 0));
+                            variableAccessor.variableAccess(variable, xsdString, 0));
 
             case DATETIME:
                 if(!resClasses.contains(xsdDateTime))
@@ -771,7 +772,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else
                     return new TranslatedExpression(xsdDateTime,
                             usedVariable.canBeNull() || usedVariable.getClasses().size() > 1,
-                            variableAccess(variable, xsdDateTime, 0));
+                            variableAccessor.variableAccess(variable, xsdDateTime, 0));
 
             case DATE:
                 if(!resClasses.contains(xsdDate))
@@ -779,7 +780,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else
                     return new TranslatedExpression(xsdDate,
                             usedVariable.canBeNull() || usedVariable.getClasses().size() > 1,
-                            variableAccess(variable, xsdDate, 0));
+                            variableAccessor.variableAccess(variable, xsdDate, 0));
 
             case INTEGER:
                 if(!resClasses.contains(xsdInteger))
@@ -787,7 +788,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 else
                     return new TranslatedExpression(xsdInteger,
                             usedVariable.canBeNull() || usedVariable.getClasses().size() > 1,
-                            variableAccess(variable, xsdInteger, 0));
+                            variableAccessor.variableAccess(variable, xsdInteger, 0));
 
             case NUMERIC:
             {
@@ -871,7 +872,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
     {
         if(numericClasses.size() == 1)
         {
-            builder.append(variableAccess(variable, numericClasses.get(0), 0));
+            builder.append(variableAccessor.variableAccess(variable, numericClasses.get(0), 0));
         }
         else
         {
@@ -880,7 +881,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
             for(int i = 0; i < numericClasses.size(); i++)
             {
                 appendComma(builder, i > 0);
-                builder.append(variableAccess(variable, numericClasses.get(i), 0));
+                builder.append(variableAccessor.variableAccess(variable, numericClasses.get(i), 0));
             }
 
             builder.append(")");
@@ -900,7 +901,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 appendAnd(builder, useAnd);
                 useAnd = true;
 
-                builder.append(variableAccess(variable, resourceClass, i));
+                builder.append(variableAccessor.variableAccess(variable, resourceClass, i));
                 builder.append(" IS NULL ");
             }
         }
@@ -1120,18 +1121,6 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
 
         assert false;
         return null;
-    }
-
-
-    private UsedVariable getUsedVariable(Variable variable)
-    {
-        return usedVariables.get(variable.getName());
-    }
-
-
-    private String variableAccess(Variable variable, ResourceClass resourceClass, int i)
-    {
-        return resourceClass.getSqlColumn(variable.getName(), i);
     }
 
 

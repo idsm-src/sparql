@@ -59,6 +59,7 @@ import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest;
 import cz.iocb.chemweb.server.sparql.translator.expression.TranslatedExpression;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
@@ -858,7 +859,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(Filter filter : filters)
         {
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this, child.getVariables());
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this,
+                    new SimpleVariableAccessor(child.getVariables()));
 
             TranslatedExpression translatedExpression = visitor.visitElement(filter.getConstraint(),
                     TranslateRequest.EBV);
