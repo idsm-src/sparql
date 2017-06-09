@@ -12,22 +12,24 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlLeftJoin extends SqlIntercode
 {
-    private static final String leftTable = "tab0";
-    private static final String rightTable = "tab1";
+    public static final String leftTable = "tab0";
+    public static final String rightTable = "tab1";
 
     private final SqlIntercode left;
     private final SqlIntercode right;
+    private final String condition;
 
 
-    protected SqlLeftJoin(UsedVariables variables, SqlIntercode left, SqlIntercode right)
+    protected SqlLeftJoin(UsedVariables variables, SqlIntercode left, SqlIntercode right, String condition)
     {
         super(variables);
         this.left = left;
         this.right = right;
+        this.condition = condition;
     }
 
 
-    public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right, String condition)
     {
         /* special cases */
 
@@ -49,7 +51,7 @@ public class SqlLeftJoin extends SqlIntercode
             SqlIntercode newUnion = new SqlNoSolution();
 
             for(SqlIntercode child : union.getChilds())
-                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right));
+                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right, condition));
 
             return newUnion;
         }
@@ -58,7 +60,7 @@ public class SqlLeftJoin extends SqlIntercode
             right = optimizeRightUnion(left.getVariables(), (SqlUnion) right);
 
 
-        if(left instanceof SqlTableAccess && right instanceof SqlTableAccess)
+        if(left instanceof SqlTableAccess && right instanceof SqlTableAccess && condition == null)
             if(SqlTableAccess.canBeLeftMerged(schema, (SqlTableAccess) left, (SqlTableAccess) right))
                 return SqlTableAccess.leftMerge((SqlTableAccess) left, (SqlTableAccess) right);
 
@@ -117,7 +119,7 @@ public class SqlLeftJoin extends SqlIntercode
         }
 
 
-        return new SqlLeftJoin(variables, left, right);
+        return new SqlLeftJoin(variables, left, right, condition);
     }
 
 
@@ -330,6 +332,14 @@ public class SqlLeftJoin extends SqlIntercode
 
                 assert restricted;
             }
+        }
+
+        if(condition != null)
+        {
+            appendAnd(builder, hasWhere);
+            hasWhere = true;
+
+            builder.append(condition);
         }
 
         if(!hasWhere)

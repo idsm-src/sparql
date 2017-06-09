@@ -59,9 +59,11 @@ import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest;
 import cz.iocb.chemweb.server.sparql.translator.expression.TranslatedExpression;
+import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
@@ -810,13 +812,70 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
             TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
     {
-        //TODO: expressions are not yet supported
+        String condition = null;
+
+        if(!optionalFilters.isEmpty())
+        {
+            VariableAccessor variableAccessor = new LeftJoinVariableAccessor(
+                    translatedGroupPattern.getIntercode().getVariables(),
+                    translatedPattern.getIntercode().getVariables());
+            condition = translateLeftJoinFilters(optionalFilters, variableAccessor);
+
+            if(condition == null)
+                return translatedGroupPattern;
+        }
+
         SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),
-                translatedPattern.getIntercode());
+                translatedPattern.getIntercode(), condition);
         ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
                 translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
 
         return new TranslatedSegment(variablesInScope, intercode);
+    }
+
+
+    String translateLeftJoinFilters(LinkedList<Filter> optionalFilters, VariableAccessor variableAccessor)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        boolean hasCondition = false;
+        boolean isFalse = false;
+
+        builder.append("(");
+
+        for(Filter filter : optionalFilters)
+        {
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this, variableAccessor);
+
+            TranslatedExpression translatedExpression = visitor.visitElement(filter.getConstraint(),
+                    TranslateRequest.EBV);
+
+            if(translatedExpression == null || translatedExpression.isFalse())
+            {
+                isFalse = true;
+            }
+            else
+            {
+                String condition = ExpressionTranslateVisitor.createEBV(translatedExpression).getCode();
+
+                if(hasCondition)
+                    builder.append(" AND ");
+
+                hasCondition = true;
+
+                builder.append("(");
+                builder.append(condition);
+                builder.append(")");
+            }
+        }
+
+        builder.append(")");
+
+
+        if(isFalse)
+            return null;
+
+        return builder.toString();
     }
 
 
