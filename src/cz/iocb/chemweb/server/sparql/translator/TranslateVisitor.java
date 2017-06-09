@@ -14,6 +14,8 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -29,6 +31,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BuiltInCallExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Filter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Graph;
@@ -44,6 +47,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase.Para
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values.ValuesList;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
@@ -69,6 +73,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
 
 
 
@@ -246,7 +251,93 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Values values)
     {
-        return null;
+        final int size = values.getVariables().size();
+
+        ArrayList<String> variablesInScope = new ArrayList<String>();
+        UsedVariables usedVariables = new UsedVariables();
+
+
+        ArrayList<Pair<String, ArrayList<ResourceClass>>> typedVariables = new ArrayList<>();
+        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
+
+        for(int j = 0; j < values.getValuesLists().size(); j++)
+            typedValuesList.add(new ArrayList<Pair<Node, ResourceClass>>(size));
+
+
+        for(int i = 0; i < values.getVariables().size(); i++)
+        {
+            String variable = values.getVariables().get(i).getName();
+
+            if(!variablesInScope.contains(variable))
+                variablesInScope.add(variable);
+            else
+                exceptions.add(new TranslateException(ErrorType.repeatOfValuesVariable,
+                        values.getVariables().get(i).getRange(), variable));
+
+
+            ArrayList<ResourceClass> valueClasses = new ArrayList<ResourceClass>();
+            typedVariables.add(new Pair<String, ArrayList<ResourceClass>>(variable, valueClasses));
+
+
+            int valueCount = 0;
+
+            for(int j = 0; j < values.getValuesLists().size(); j++)
+            {
+                ValuesList valuesList = values.getValuesLists().get(j);
+                Expression value = valuesList.getValues().get(i);
+                ResourceClass valueType = null;
+
+                if(value != null)
+                {
+                    valueCount++;
+
+                    if(value instanceof Literal)
+                    {
+                        //TODO: fix Literal.getTypeIri() to not return null
+                        IRI iri = ((Literal) value).getTypeIri();
+                        String type = iri != null ? iri.getUri().toString() : "http://www.w3.org/2001/XMLSchema#string";
+
+                        //TODO: use shared method for this code
+                        for(LiteralClass literalClass : LiteralClass.getClasses())
+                            if(literalClass.getTypeIri().equals(type))
+                                valueType = literalClass;
+
+                        assert valueType != null;
+                    }
+                    else if(value instanceof IRI)
+                    {
+                        //TODO: use shared method for this code
+                        valueType = IriClass.uncategorizedClass;
+
+                        for(ResourceClass resClass : classes)
+                            if(resClass instanceof IriClass)
+                                if(((IriClass) resClass).match((Node) value))
+                                    valueType = resClass;
+                    }
+                    else
+                    {
+                        assert false;
+                    }
+
+                    if(!valueClasses.contains(valueType))
+                        valueClasses.add(valueType);
+                }
+
+                typedValuesList.get(j).add(new Pair<Node, ResourceClass>((Node) value, valueType));
+            }
+
+
+            if(valueCount > 0)
+            {
+                boolean canBeNull = valueCount < values.getValuesLists().size();
+                UsedVariable usedVariable = new UsedVariable(variable, canBeNull);
+                usedVariable.addClasses(valueClasses);
+
+                usedVariables.add(usedVariable);
+            }
+        }
+
+        return new TranslatedSegment(variablesInScope, new SqlValues(usedVariables, typedVariables, typedValuesList));
     }
 
 

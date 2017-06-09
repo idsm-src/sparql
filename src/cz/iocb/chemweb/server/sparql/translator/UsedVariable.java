@@ -34,6 +34,12 @@ public class UsedVariable
     }
 
 
+    public void addClasses(List<ResourceClass> mapClasses)
+    {
+        classes.addAll(mapClasses);
+    }
+
+
     public boolean containsClass(ResourceClass mapClass)
     {
         for(ResourceClass map : classes)

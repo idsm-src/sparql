@@ -51,7 +51,9 @@ public enum ErrorType
 
     unusedVariable("Variable '%s' is not used in the WHERE clause."),
 
-    unnecessaryMinus("The MINUS clause has no effect.");
+    unnecessaryMinus("The MINUS clause has no effect."),
+
+    repeatOfValuesVariable("Variable '%s' cannot be used twice in a VALUES clause.");
 
     /**
      * Error message template.
