@@ -66,6 +66,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlMinus;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall.ClassifiedNode;
@@ -820,8 +821,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     private TranslatedSegment translateMinus(Minus pattern, TranslatedSegment translatedGroupPattern)
     {
-        // TODO
-        return null;
+        TranslatedSegment minusPattern = visitElement(pattern.getPattern());
+
+        SqlIntercode intercode = SqlMinus.minus(translatedGroupPattern.getIntercode(), minusPattern.getIntercode());
+        return new TranslatedSegment(translatedGroupPattern.getVariablesInScope(), intercode);
     }
 
 
