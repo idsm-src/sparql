@@ -12,9 +12,9 @@ import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 
 
 
@@ -245,32 +245,16 @@ public class SqlProcedureCall extends SqlIntercode
             ResultDefinition definition = entry.getKey();
 
             ResourceClass resultClass = definition.getResultClass();
-            String field = definition.getSqlTypeField();
+            String[] fields = definition.getSqlTypeFields();
 
-            if(field == null)
+            for(int i = 0; i < resultClass.getPartsCount(); i++)
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
 
-                builder.append('"');
-                builder.append(resultName);
-                builder.append("\" AS ");
-                builder.append(resultClass.getSqlColumn(name, 0));
-            }
-            else
-            {
-                for(int i = 0; i < resultClass.getPartsCount(); i++)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    builder.append("(\"");
-                    builder.append(resultName);
-                    builder.append("\").");
-                    builder.append(resultClass.getSqlColumn(field, i));
-                    builder.append(" AS ");
-                    builder.append(resultClass.getSqlColumn(name, i));
-                }
+                builder.append(getSqlResultColumn(fields, i));
+                builder.append(" AS ");
+                builder.append(resultClass.getSqlColumn(name, i));
             }
         }
 
@@ -313,7 +297,7 @@ public class SqlProcedureCall extends SqlIntercode
             Node node = entry.getValue().getNode();
 
             ResultDefinition definition = entry.getKey();
-            String field = definition.getSqlTypeField();
+            String[] fields = definition.getSqlTypeFields();
             ResourceClass resultClass = definition.getResultClass();
 
             if(node instanceof VariableOrBlankNode)
@@ -328,7 +312,7 @@ public class SqlProcedureCall extends SqlIntercode
                         appendAnd(builder, hasWhere);
                         hasWhere = true;
 
-                        builder.append(resultClass.getSqlColumn(field, i));
+                        builder.append(getSqlResultColumn(fields, i));
                         builder.append(" = ");
                         builder.append(resultClass.getSqlColumn(name, i));
                     }
@@ -340,9 +324,9 @@ public class SqlProcedureCall extends SqlIntercode
                         appendAnd(builder, hasWhere);
                         hasWhere = true;
 
-                        builder.append(resultClass.getSqlColumn(field, i));
+                        builder.append(getSqlResultColumn(fields, i));
                         builder.append(" = ");
-                        builder.append(resultClass.getSqlColumn(previousDefinition.getSqlTypeField(), i));
+                        builder.append(getSqlResultColumn(previousDefinition.getSqlTypeFields(), i));
                     }
                 }
                 else
@@ -357,7 +341,7 @@ public class SqlProcedureCall extends SqlIntercode
                     appendAnd(builder, hasWhere);
                     hasWhere = true;
 
-                    builder.append(resultClass.getSqlColumn(field, i));
+                    builder.append(getSqlResultColumn(fields, i));
                     builder.append(" = ");
                     builder.append(resultClass.getSqlValue(node, i));
                 }
@@ -377,9 +361,6 @@ public class SqlProcedureCall extends SqlIntercode
     {
         builder.append("SELECT ");
 
-
-        if(procedure.getSqlReturnType() != null)
-            builder.append("(");
 
         builder.append('"');
         builder.append(procedure.getSqlProcedureName());
@@ -404,13 +385,6 @@ public class SqlProcedureCall extends SqlIntercode
         }
 
         builder.append(")");
-
-        if(procedure.getSqlReturnType() != null)
-        {
-            builder.append("::");
-            builder.append(procedure.getSqlReturnType());
-            builder.append(") ");
-        }
 
         builder.append(" AS \"");
         builder.append(resultName);
@@ -468,5 +442,14 @@ public class SqlProcedureCall extends SqlIntercode
             if(!hasWhere)
                 builder.append("true");
         }
+    }
+
+
+    private static String getSqlResultColumn(String[] fields, int i)
+    {
+        if(fields == null)
+            return "\"" + resultName + "\"";
+        else
+            return "(\"" + resultName + "\").\"" + fields[i] + "\"";
     }
 }

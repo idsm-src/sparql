@@ -8,14 +8,24 @@ public class ResultDefinition
 {
     private final String resultName;
     private final ResourceClass resultClass;
-    private final String sqlTypeField;
+    private final String[] sqlTypeFields;
+
+
+    public ResultDefinition(String resultName, ResourceClass resultClass, String[] sqlTypeFields)
+    {
+        this.resultName = resultName;
+        this.resultClass = resultClass;
+        this.sqlTypeFields = sqlTypeFields;
+    }
 
 
     public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
+        String[] sqlTypeFields = { sqlTypeField };
+
         this.resultName = resultName;
         this.resultClass = resultClass;
-        this.sqlTypeField = sqlTypeField;
+        this.sqlTypeFields = sqlTypeFields;
     }
 
 
@@ -23,7 +33,7 @@ public class ResultDefinition
     {
         this.resultName = null;
         this.resultClass = resultClass;
-        this.sqlTypeField = null;
+        this.sqlTypeFields = null;
     }
 
 
@@ -39,8 +49,8 @@ public class ResultDefinition
     }
 
 
-    public final String getSqlTypeField()
+    public final String[] getSqlTypeFields()
     {
-        return sqlTypeField;
+        return sqlTypeFields;
     }
 }

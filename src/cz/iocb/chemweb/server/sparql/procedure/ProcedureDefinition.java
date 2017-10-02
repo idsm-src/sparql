@@ -9,16 +9,14 @@ public class ProcedureDefinition
 {
     private final String procedureName;
     private final String sqlProcedureName;
-    private final String sqlReturnType;
     private final LinkedHashMap<String, ParameterDefinition> parameters;
     private final LinkedHashMap<String, ResultDefinition> results;
 
 
-    public ProcedureDefinition(String procedureName, String sqlProcedureName, String sqlReturnType)
+    public ProcedureDefinition(String procedureName, String sqlProcedureName)
     {
         this.procedureName = procedureName;
         this.sqlProcedureName = sqlProcedureName;
-        this.sqlReturnType = sqlReturnType;
         this.parameters = new LinkedHashMap<String, ParameterDefinition>();
         this.results = new LinkedHashMap<String, ResultDefinition>();
     }
@@ -75,11 +73,5 @@ public class ProcedureDefinition
     public final String getSqlProcedureName()
     {
         return sqlProcedureName;
-    }
-
-
-    public final String getSqlReturnType()
-    {
-        return sqlReturnType;
     }
 }

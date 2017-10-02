@@ -152,8 +152,8 @@ public class PubChemMapping
         String fulltext = prefixes.get("fulltext");
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new ProcedureDefinition(orchem + "substructureSearch", "substructureSearch",
-                null);
+        ProcedureDefinition subsearch = new ProcedureDefinition(orchem + "substructureSearch",
+                "orchem_substructure_search");
         subsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         subsearch.addParameter(
                 new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
@@ -170,8 +170,8 @@ public class PubChemMapping
 
 
         /* orchem:similaritySearch */
-        ProcedureDefinition simsearch = new ProcedureDefinition(orchem + "similaritySearch", "similaritySearch",
-                "OrChemCompound");
+        ProcedureDefinition simsearch = new ProcedureDefinition(orchem + "similaritySearch",
+                "orchem_similarity_search");
         simsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         simsearch.addParameter(
                 new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
@@ -179,14 +179,14 @@ public class PubChemMapping
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simsearch.addResult(new ResultDefinition(orchem + "compound", Compound.compound, "@f1"));
-        simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "@f2"));
+        simsearch.addResult(new ResultDefinition(orchem + "compound", Compound.compound, "compound"));
+        simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* orchem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(orchem + "similarCompoundSearch",
-                "similarCompoundSearch", null);
+                "orchem_similarity_search");
         simcmpsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         simcmpsearch.addParameter(
                 new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
@@ -194,12 +194,12 @@ public class PubChemMapping
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simcmpsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simcmpsearch.addResult(new ResultDefinition(Compound.compound));
+        simsearch.addResult(new ResultDefinition(null, Compound.compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
         /* orchem:smartsSearch */
-        ProcedureDefinition smartssearch = new ProcedureDefinition(orchem + "smartsSearch", "smartsSearch", null);
+        ProcedureDefinition smartssearch = new ProcedureDefinition(orchem + "smartsSearch", "smartsSearch");
         smartssearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         smartssearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
@@ -208,7 +208,7 @@ public class PubChemMapping
 
 
         /* fulltext:bioassaySearch */
-        ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay", null);
+        ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay");
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
         bioassay.addResult(new ResultDefinition(Bioassay.bioassay));
         procedures.put(bioassay.getProcedureName(), bioassay);
