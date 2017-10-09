@@ -316,7 +316,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
 
                         if(compatible)
                         {
-                            builder.append("COALESCE(");
+                            builder.append("(");
 
                             for(int i = 0; i < iriClass.getPartsCount(); i++)
                             {
@@ -327,10 +327,9 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                                 builder.append(iriClass.getSqlValue(iri, i));
                             }
 
-                            builder.append(", ");
+                            builder.append(")");
                         }
-
-                        if(usedVariable.canBeNull())
+                        else if(usedVariable.canBeNull())
                         {
                             builder.append("NULLIF(");
                             generateIsNullCheck(builder, variable, usedVariable.getClasses());
@@ -340,9 +339,6 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                         {
                             builder.append("false");
                         }
-
-                        if(compatible)
-                            builder.append(")");
 
 
                         return new TranslatedExpression(xsdBoolean, usedVariable.canBeNull(), builder.toString());
