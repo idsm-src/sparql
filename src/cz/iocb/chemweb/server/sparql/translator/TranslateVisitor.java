@@ -898,6 +898,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     private SqlIntercode translateFilters(LinkedList<Filter> filters, SqlIntercode child)
     {
+        if(child instanceof SqlNoSolution)
+            return new SqlNoSolution();
+
+
         if(child instanceof SqlUnion)
         {
             SqlIntercode union = new SqlNoSolution();
