@@ -311,6 +311,9 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                         UsedVariable usedVariable = variableAccessor.getUsedVariable(variable);
                         IriClass iriClass = getIriClass(iri.getUri().toString());
 
+                        if(usedVariable == null)
+                            return null;
+
                         StringBuilder builder = new StringBuilder();
                         boolean compatible = usedVariable.getClasses().contains(iriClass);
 
