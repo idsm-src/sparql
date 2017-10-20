@@ -19,7 +19,6 @@
 
   <!-- Other module inherits                                      -->
   <inherits name="com.google.gwt.http.HTTP"/>
-  <inherits name="com.teknonsys.RetinaImages"/>
 
   <set-configuration-property name="CssResource.enableGss" value="true" />
   <set-configuration-property name="CssResource.legacy" value="true" />
@@ -53,6 +52,15 @@
     return 'no';
   }
   ]]></property-provider>
+
+  <define-property name="display.type" values="retina, normal"/>
+  <property-provider name="display.type"><![CDATA[
+  {
+    if ($wnd.devicePixelRatio >= 2) { return 'retina'; }
+    return 'normal';
+  }
+  ]]>
+  </property-provider>
 
 
   <replace-with class="cz.iocb.chemweb.client.services.downloader.FileDownloaderServer">
