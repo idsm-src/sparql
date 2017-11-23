@@ -7,69 +7,79 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Ontology extends PubChemMapping
+class Ontology
 {
-    static IriClass rdfclass;
-    static IriClass property;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(rdfclass = new IriClass("class", Arrays.asList("integer"), getIriValues("class_bases")));
-        classmap(property = new IriClass("property", Arrays.asList("integer"), getIriValues("property_bases")));
+        config.addIriClass(new IriClass("class", Arrays.asList("integer"), config.getIriValues("class_bases")));
+        config.addIriClass(new IriClass("property", Arrays.asList("integer"), config.getIriValues("property_bases")));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:ontology");
+        IriClass rdfclass = config.getIriClass("class");
+        IriClass property = config.getIriClass("property");
+        NodeMapping graph = config.createIriMapping("pubchem:ontology");
 
         {
             String table = "class_bases";
-            NodeMapping subject = iri(rdfclass, "id");
+            NodeMapping subject = config.createIriMapping(rdfclass, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("owl:Class"));
-            quad(table, graph, subject, iri("template:itemTemplate"), literal("base/Class.vm"));
-            quad(table, graph, subject, iri("template:pageTemplate"), literal("base/Class.vm"));
-            quad(table, graph, subject, iri("rdfs:label"), literal(xsdString, "label"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Class"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("base/Class.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("base/Class.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "label"));
         }
 
         {
             String table = "class_superclasses";
-            NodeMapping subject = iri(rdfclass, "class");
+            NodeMapping subject = config.createIriMapping(rdfclass, "class");
 
-            quad(table, graph, subject, iri("rdfs:subClassOf"), iri(rdfclass, "superclass"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
+                    config.createIriMapping(rdfclass, "superclass"));
         }
 
         {
             String table = "property_bases";
-            NodeMapping subject = iri(property, "id");
+            NodeMapping subject = config.createIriMapping(property, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("rdf:Property"));
-            quad(table, graph, subject, iri("template:itemTemplate"), literal("base/Property.vm"));
-            quad(table, graph, subject, iri("template:pageTemplate"), literal("base/Property.vm"));
-            quad(table, graph, subject, iri("rdfs:label"), literal(xsdString, "label"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("rdf:Property"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("base/Property.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("base/Property.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "label"));
         }
 
         {
             String table = "property_superproperties";
-            NodeMapping subject = iri(property, "property");
+            NodeMapping subject = config.createIriMapping(property, "property");
 
-            quad(table, graph, subject, iri("rdfs:subPropertyOf"), iri(property, "superproperty"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subPropertyOf"),
+                    config.createIriMapping(property, "superproperty"));
         }
 
         {
             String table = "property_domains";
-            NodeMapping subject = iri(property, "property");
+            NodeMapping subject = config.createIriMapping(property, "property");
 
-            quad(table, graph, subject, iri("rdfs:domain"), iri(rdfclass, "domain"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:domain"),
+                    config.createIriMapping(rdfclass, "domain"));
         }
 
         {
             String table = "property_ranges";
-            NodeMapping subject = iri(property, "property");
+            NodeMapping subject = config.createIriMapping(property, "property");
 
-            quad(table, graph, subject, iri("rdfs:range"), iri(rdfclass, "range"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:range"),
+                    config.createIriMapping(rdfclass, "range"));
         }
     }
 }

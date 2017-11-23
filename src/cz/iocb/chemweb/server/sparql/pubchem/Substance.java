@@ -1,99 +1,102 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDate;
-import static cz.iocb.chemweb.server.sparql.pubchem.Compound.compound;
-import static cz.iocb.chemweb.server.sparql.pubchem.Measuregroup.measuregroup;
-import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.pdblink;
-import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
-import static cz.iocb.chemweb.server.sparql.pubchem.SubstanceDescriptor.descriptorSubstanceVersion;
-import static cz.iocb.chemweb.server.sparql.pubchem.Synonym.synonym;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Substance extends PubChemMapping
+class Substance
 {
-    static IriClass substance;
-    static IriClass substanceChembl;
-    static IriClass substanceEbiChembl;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(substance = new IriClass("substance", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("substance", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/SID[0-9]+"));
-        classmap(substanceChembl = new IriClass("substance_chembl", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("substance_chembl", Arrays.asList("integer"),
                 "http://linkedchemistry.info/chembl/chemblid/S?CHEMBL[0-9]+"));
-        classmap(substanceEbiChembl = new IriClass("substance_ebi_chembl", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("substance_ebi_chembl", Arrays.asList("integer"),
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/S?CHEMBL[0-9]+"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:substance");
+        IriClass substance = config.getIriClass("substance");
+        NodeMapping graph = config.createIriMapping("pubchem:substance");
 
         {
             String table = "substance_bases";
-            NodeMapping subject = iri(substance, "id");
+            NodeMapping subject = config.createIriMapping(substance, "id");
 
-            quad(table, graph, subject, iri("dcterms:available"), literal(xsdDate, "available"));
-            quad(table, graph, subject, iri("dcterms:source"), iri(source, "source"));
-            quad(table, graph, subject, iri("dcterms:modified"), literal(xsdDate, "modified"));
-            quad(table, graph, subject, iri("sio:CHEMINF_000477"), iri(compound, "compound"), "compound is not null");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
+                    config.createLiteralMapping(xsdDate, "available"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
+                    config.createIriMapping("source", "source"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:modified"),
+                    config.createLiteralMapping(xsdDate, "modified"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
+                    config.createIriMapping("compound", "compound"), "compound is not null");
         }
 
         {
+            /* TODO:
             String table = "substance_types";
-            NodeMapping subject = iri(substance, "substance");
-
-            //TODO: quad(table, graph, subject, iri("rdf:type"), iri(rdfclass, "chebi"));
+            NodeMapping subject = config.createIriMapping(substance, "substance");
+            
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("class", "chebi"));
+            */
         }
 
         {
             String table = "endpoint_bases";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("obo:BFO_0000056"), iri(measuregroup, "bioassay", "measuregroup"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("measuregroup", "bioassay", "measuregroup"));
         }
 
         {
             String table = "substance_matches";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("skos:exactMatch"), iri(substanceChembl, "match"));
-            quad(table, graph, subject, iri("skos:exactMatch"), iri(substanceEbiChembl, "match"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("substance_chembl", "match"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("substance_ebi_chembl", "match"));
         }
 
         {
             String table = "substance_references";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("cito:isDiscussedBy"), iri(reference, "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("reference", "reference"));
         }
 
         {
             String table = "substance_pdblinks";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("pdbo:link_to_pdb"), iri(pdblink, "pdblink"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
+                    config.createIriMapping("pdblink", "pdblink"));
         }
 
         {
             String table = "substance_synonyms";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("sio:has-attribute"), iri(synonym, "synonym"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
+                    config.createIriMapping("synonym", "synonym"));
         }
 
         {
             String table = "descriptor_substance_bases";
-            NodeMapping subject = iri(substance, "substance");
+            NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            quad(table, graph, subject, iri("sio:has-attribute"), iri(descriptorSubstanceVersion, "substance"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
+                    config.createIriMapping("substance_version", "substance"));
         }
     }
 }

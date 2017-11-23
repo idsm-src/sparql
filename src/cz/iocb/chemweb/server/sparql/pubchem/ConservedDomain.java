@@ -1,43 +1,44 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class ConservedDomain extends PubChemMapping
+class ConservedDomain
 {
-    static IriClass conserveddomain;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(conserveddomain = new IriClass("conserveddomain", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("conserveddomain", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/PSSMID[0-9]+"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:conserveddomain");
+        IriClass conserveddomain = config.getIriClass("conserveddomain");
+        NodeMapping graph = config.createIriMapping("pubchem:conserveddomain");
 
         {
             String table = "conserveddomain_bases";
-            NodeMapping subject = iri(conserveddomain, "id");
+            NodeMapping subject = config.createIriMapping(conserveddomain, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("obo:SO_0000417"));
-            quad(table, graph, subject, iri("dcterms:title"), literal(xsdString, "title"));
-            quad(table, graph, subject, iri("dcterms:abstract"), literal(xsdString, "abstract"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("obo:SO_0000417"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(xsdString, "title"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:abstract"),
+                    config.createLiteralMapping(xsdString, "abstract"));
         }
 
         {
             String table = "conserveddomain_references";
-            NodeMapping subject = iri(conserveddomain, "domain");
+            NodeMapping subject = config.createIriMapping(conserveddomain, "domain");
 
-            quad(table, graph, subject, iri("cito:isDiscussedBy"), iri(reference, "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("reference", "reference"));
         }
     }
 }

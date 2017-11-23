@@ -1,134 +1,142 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import static cz.iocb.chemweb.server.sparql.pubchem.Biosystem.biosystem;
-import static cz.iocb.chemweb.server.sparql.pubchem.ConservedDomain.conserveddomain;
-import static cz.iocb.chemweb.server.sparql.pubchem.Gene.gene;
-import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.go;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.pdblink;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.taxonomy;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.uniprot;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Protein extends PubChemMapping
+class Protein
 {
-    static IriClass protein;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(protein = new IriClass("protein", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*"));
+        config.addIriClass(
+                new IriClass("protein", Arrays.asList("integer"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:protein");
+        IriClass protein = config.getIriClass("protein");
+        NodeMapping graph = config.createIriMapping("pubchem:protein");
 
         {
             String table = "protein_bases";
-            NodeMapping subject = iri(protein, "id");
+            NodeMapping subject = config.createIriMapping(protein, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("bp:Protein"));
-            quad(table, graph, subject, iri("dcterms:title"), literal(xsdString, "title"));
-            quad(table, graph, subject, iri("bp:organism"), iri(taxonomy, "organism"), "organism is not null");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("bp:Protein"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(xsdString, "title"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
+                    config.createIriMapping("taxonomy", "organism"), "organism is not null");
         }
 
         {
             String table = "protein_references";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("cito:isDiscussedBy"), iri(reference, "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("reference", "reference"));
         }
 
         {
             String table = "protein_pdblinks";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("pdbo:link_to_pdb"), iri(pdblink, "pdblink"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
+                    config.createIriMapping("pdblink", "pdblink"));
         }
 
         {
             String table = "protein_similarproteins";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("vocab:hasSimilarProtein"), iri(protein, "simprotein"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:hasSimilarProtein"),
+                    config.createIriMapping(protein, "simprotein"));
         }
 
         {
             String table = "protein_genes";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("vocab:encodedBy"), iri(gene, "gene"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:encodedBy"),
+                    config.createIriMapping("gene", "gene"));
         }
 
         {
             String table = "protein_closematches";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("skos:closeMatch"), iri(uniprot, "match"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("uniprot", "match"));
         }
 
         {
             String table = "protein_conserveddomains";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000110"), iri(conserveddomain, "domain"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000110"),
+                    config.createIriMapping("conserveddomain", "domain"));
         }
 
         {
             String table = "protein_continuantparts";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000178"), iri(protein, "part"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000178"),
+                    config.createIriMapping(protein, "part"));
         }
 
         {
             String table = "protein_participates_goes";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000056"), iri(go, "participation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("go", "participation"));
         }
 
         {
             String table = "protein_participates_biosystems";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000056"), iri(biosystem, "biosystem"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("biosystem", "biosystem"));
         }
 
         {
             String table = "protein_functions";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000160"), iri(go, "gofunction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000160"),
+                    config.createIriMapping("go", "gofunction"));
         }
 
         {
             String table = "protein_locations";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("obo:BFO_0000171"), iri(go, "location"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000171"),
+                    config.createIriMapping("go", "location"));
         }
 
         {
+            /* TODO:
             String table = "protein_types";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            //TODO: quad(table, graph, subject, iri("rdf:type"), iri(pr, "type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("class", "type"));
+            */
         }
 
         {
             String table = "protein_complexes";
-            NodeMapping subject = iri(protein, "protein");
+            NodeMapping subject = config.createIriMapping(protein, "protein");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("obo:GO_0043234"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("obo:GO_0043234"));
         }
     }
 }

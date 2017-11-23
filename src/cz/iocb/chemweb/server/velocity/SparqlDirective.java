@@ -22,14 +22,14 @@ import org.apache.velocity.runtime.parser.node.SimpleNode;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.shared.services.DatabaseException;
@@ -38,17 +38,18 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 public class SparqlDirective extends Directive
 {
-    private Log log;
-
+    private final SparqlDatabaseConfiguration dbConfig;
     private final Parser parser;
     private final PostgresDatabase db;
+    private Log log;
 
 
     public SparqlDirective()
             throws FileNotFoundException, IOException, SQLException, PropertyVetoException, DatabaseException
     {
-        parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
-        db = new PostgresDatabase();
+        dbConfig = PubChemConfiguration.get();
+        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+        db = new PostgresDatabase(dbConfig.getConnectionPool());
     }
 
     @Override
@@ -93,10 +94,10 @@ public class SparqlDirective extends Directive
 
         try
         {
-            DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = PubChemMapping.getClasses();
-            List<QuadMapping> mappings = PubChemMapping.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+            DatabaseSchema schema = dbConfig.getSchema();
+            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            List<QuadMapping> mappings = dbConfig.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
             SelectQuery syntaxTree = parser.parse(query);
             String code = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);

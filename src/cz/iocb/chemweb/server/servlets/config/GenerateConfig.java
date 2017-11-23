@@ -1,13 +1,14 @@
 package cz.iocb.chemweb.server.servlets.config;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 
 
 
@@ -20,18 +21,33 @@ public class GenerateConfig extends HttpServlet
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        processRequest(req, res);
+        try
+        {
+            processRequest(req, res);
+        }
+        catch (SQLException e)
+        {
+            throw new IOException(e);
+        }
     }
 
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        processRequest(req, res);
+        try
+        {
+            processRequest(req, res);
+        }
+        catch (SQLException e)
+        {
+            throw new IOException(e);
+        }
     }
 
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException, SQLException
     {
         ServletOutputStream out = res.getOutputStream();
 
@@ -40,7 +56,7 @@ public class GenerateConfig extends HttpServlet
 
         boolean first = true;
 
-        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
+        for(Entry<String, String> prefix : PubChemConfiguration.get().getPrefixes().entrySet())
         {
             if(!first)
                 out.println(",");

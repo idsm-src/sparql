@@ -8,14 +8,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ParseResult;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
@@ -30,13 +30,15 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 {
     private static final long serialVersionUID = 1L;
 
+    private final SparqlDatabaseConfiguration dbConfig;
     private final Parser parser;
 
 
     public CheckServiceImpl() throws FileNotFoundException, IOException, ClassNotFoundException, PropertyVetoException,
             DatabaseException, SQLException
     {
-        parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+        dbConfig = PubChemConfiguration.get();
+        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
     }
 
 
@@ -61,10 +63,10 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
             /* translator */
             DatabaseSchema schema;
-            schema = PostgresSchema.get();
-            List<ResourceClass> classes = PubChemMapping.getClasses();
-            List<QuadMapping> mappings = PubChemMapping.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+            schema = dbConfig.getSchema();
+            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            List<QuadMapping> mappings = dbConfig.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
             TranslateResult translateResult = new TranslateVisitor(classes, mappings, schema, procedures)
                     .tryTranslate(parseResult.getResult());
@@ -75,7 +77,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
             for(TranslateException err : translateResult.getWarnings())
                 addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
         }
-        catch (SQLException | IOException e)
+        catch (SQLException e)
         {
             e.printStackTrace();
         }

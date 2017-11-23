@@ -7,38 +7,43 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Concept extends PubChemMapping
+class Concept
 {
-    static IriClass concept;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(concept = new IriClass("concept", Arrays.asList("smallint"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
+        config.addIriClass(
+                new IriClass("concept", Arrays.asList("smallint"), "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:concept");
+        IriClass concept = config.getIriClass("concept");
+        NodeMapping graph = config.createIriMapping("pubchem:concept");
 
         {
-            quad(null, graph, iri("concept:ATC"), iri("rdf:type"), iri("skos:ConceptScheme"));
-            quad(null, graph, iri("concept:SubstanceCategorization"), iri("rdf:type"), iri("skos:ConceptScheme"));
+            config.addQuadMapping(null, graph, config.createIriMapping("concept:ATC"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("skos:ConceptScheme"));
+            config.addQuadMapping(null, graph, config.createIriMapping("concept:SubstanceCategorization"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("skos:ConceptScheme"));
         }
 
         {
             String table = "concept_bases";
-            NodeMapping subject = iri(concept, "id");
+            NodeMapping subject = config.createIriMapping(concept, "id");
 
-            quad(table, graph, subject, iri("skos:prefLabel"), literal(xsdString, "label"));
-            quad(table, graph, subject, iri("skos:inScheme"), iri(concept, "scheme"));
-            quad(table, graph, subject, iri("skos:broader"), iri(concept, "broader"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
+                    config.createLiteralMapping(xsdString, "label"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:inScheme"),
+                    config.createIriMapping(concept, "scheme"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:broader"),
+                    config.createIriMapping(concept, "broader"));
 
-            quad(table, graph, subject, iri("<http://purl.org/pav/importedFrom>"), iri("source:WHO"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("<http://purl.org/pav/importedFrom>"),
+                    config.createIriMapping("source:WHO"),
                     "iri like 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC%'");
-            quad(table, graph, subject, iri("rdf:type"), iri("skos:Concept"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("skos:Concept"),
                     "(iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/SubstanceCategorization'"
                             + " and iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC')");
         }

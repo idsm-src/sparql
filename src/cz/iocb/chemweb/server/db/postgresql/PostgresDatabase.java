@@ -29,6 +29,15 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 public class PostgresDatabase
 {
+    private final ConnectionPool connectionPool;
+
+
+    public PostgresDatabase(ConnectionPool connectionPool)
+    {
+        this.connectionPool = connectionPool;
+    }
+
+
     public Result rawQuery(String query, PostgresHandler handler) throws DatabaseException
     {
         try
@@ -167,7 +176,7 @@ public class PostgresDatabase
     {
         try
         {
-            Statement stmt = ConnectionPool.getConnection().createStatement();
+            Statement stmt = connectionPool.getConnection().createStatement();
             return new PostgresHandler(stmt);
         }
         catch (Exception e)

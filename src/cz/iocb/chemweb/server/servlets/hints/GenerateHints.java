@@ -19,7 +19,6 @@ import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -27,7 +26,8 @@ import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.shared.services.DatabaseException;
@@ -109,19 +109,20 @@ public class GenerateHints extends HttpServlet
                 + "}                                                          ";
 
 
-        Parser parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+        SparqlDatabaseConfiguration dbConfig = PubChemConfiguration.get();
+        Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
         SelectQuery syntaxTree = parser.parse(query);
-        DatabaseSchema schema = PostgresSchema.get();
-        List<ResourceClass> classes = PubChemMapping.getClasses();
-        List<QuadMapping> mappings = PubChemMapping.getMappings();
-        LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+        DatabaseSchema schema = dbConfig.getSchema();
+        LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+        List<QuadMapping> mappings = dbConfig.getMappings();
+        LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
         String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
 
 
         System.err.println(translatedQuery);
 
-        PostgresDatabase database = new PostgresDatabase();
+        PostgresDatabase database = new PostgresDatabase(dbConfig.getConnectionPool());
         Result result = database.query(translatedQuery);
 
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
@@ -132,7 +133,7 @@ public class GenerateHints extends HttpServlet
             RdfNode type = row.get("T");
             RdfNode label = row.get("L");
 
-            PrefixedName iri = NormalizeIRI.decompose(text.getValue());
+            PrefixedName iri = NormalizeIRI.decompose(dbConfig, text.getValue());
 
             if(iri == null)
                 continue;

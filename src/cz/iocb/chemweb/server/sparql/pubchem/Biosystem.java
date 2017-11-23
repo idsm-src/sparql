@@ -1,63 +1,64 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import static cz.iocb.chemweb.server.sparql.pubchem.Reference.reference;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.taxonomy;
-import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Biosystem extends PubChemMapping
+class Biosystem
 {
-    static IriClass biosystem;
-    static IriClass wikipathway;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(biosystem = new IriClass("biosystem", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("biosystem", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID[0-9]+"));
-        classmap(wikipathway = new IriClass("wikipathway", Arrays.asList("integer"),
-                "http://identifiers.org/wikipathways/WP[0-9]+"));
+        config.addIriClass(
+                new IriClass("wikipathway", Arrays.asList("integer"), "http://identifiers.org/wikipathways/WP[0-9]+"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:biosystem");
+        IriClass biosystem = config.getIriClass("biosystem");
+        NodeMapping graph = config.createIriMapping("pubchem:biosystem");
 
         {
             String table = "biosystem_bases";
-            NodeMapping subject = iri(biosystem, "id");
+            NodeMapping subject = config.createIriMapping(biosystem, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("bp:Pathway"));
-            quad(table, graph, subject, iri("dcterms:title"), literal(xsdString, "title"));
-            quad(table, graph, subject, iri("dcterms:source"), iri(source, "source"));
-            quad(table, graph, subject, iri("bp:organism"), iri(taxonomy, "organism"), "organism is not null");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("bp:Pathway"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(xsdString, "title"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
+                    config.createIriMapping("source", "source"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
+                    config.createIriMapping("taxonomy", "organism"), "organism is not null");
         }
 
         {
             String table = "biosystem_components";
-            NodeMapping subject = iri(biosystem, "biosystem");
+            NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            quad(table, graph, subject, iri("bp:pathwayComponent"), iri(biosystem, "component"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:pathwayComponent"),
+                    config.createIriMapping(biosystem, "component"));
         }
 
         {
             String table = "biosystem_references";
-            NodeMapping subject = iri(biosystem, "biosystem");
+            NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            quad(table, graph, subject, iri("cito:isDiscussedBy"), iri(reference, "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("reference", "reference"));
         }
 
         {
             String table = "biosystem_matches";
-            NodeMapping subject = iri(biosystem, "biosystem");
+            NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            quad(table, graph, subject, iri("skos:exactMatch"), iri(wikipathway, "wikipathway"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("wikipathway", "wikipathway"));
         }
     }
 }

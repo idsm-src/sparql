@@ -7,42 +7,46 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Source extends PubChemMapping
+class Source
 {
-    static IriClass source;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(source = new IriClass("source", Arrays.asList("smallint"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/source/.*"));
+        config.addIriClass(
+                new IriClass("source", Arrays.asList("smallint"), "http://rdf.ncbi.nlm.nih.gov/pubchem/source/.*"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:source");
+        IriClass source = config.getIriClass("source");
+        NodeMapping graph = config.createIriMapping("pubchem:source");
 
         {
             String table = "source_bases";
-            NodeMapping subject = iri(source, "id");
+            NodeMapping subject = config.createIriMapping(source, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("dcterms:Dataset"));
-            quad(table, graph, subject, iri("dcterms:title"), literal(xsdString, "title"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("dcterms:Dataset"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(xsdString, "title"));
         }
 
         {
+            /* TODO:
             String table = "source_subjects";
-            NodeMapping subject = iri(source, "source");
-
-            //TODO: quad(table, graph, subject, iri("dcterms:subject"), iri(concept, "subject"));
+            NodeMapping subject = config.createIriMapping(source, "source");
+            
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+                    config.createIriMapping("concept", "subject"));
+            */
         }
 
         {
             String table = "source_alternatives";
-            NodeMapping subject = iri(source, "source");
+            NodeMapping subject = config.createIriMapping(source, "source");
 
-            quad(table, graph, subject, iri("dcterms:alternative"), literal(xsdString, "alternative"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
+                    config.createLiteralMapping(xsdString, "alternative"));
         }
     }
 }

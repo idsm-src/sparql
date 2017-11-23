@@ -1,51 +1,63 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Properties;
+import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
-import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Xsd;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
-public class PubChemMapping
+public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
-    private static HashMap<String, String> prefixes = new HashMap<String, String>();
-    private static ArrayList<ResourceClass> classes = new ArrayList<ResourceClass>();
-    private static List<QuadMapping> mappings = new ArrayList<QuadMapping>();
-    private static LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
+    private static PubChemConfiguration singleton;
 
 
-    static
+    public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException
     {
+        Properties properties = new Properties();
+        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/datasource-postgresql.properties"));
+
+        connectionPool = new ConnectionPool(properties);
+        schema = new PostgresSchema(connectionPool);
+
         loadPrefixes();
         loadClasses();
-        loadMapping();
+        loadQuadMapping();
         loadProcedures();
     }
 
 
-    private static void loadPrefixes()
+    public static PubChemConfiguration get() throws FileNotFoundException, IOException, SQLException
+    {
+        if(singleton != null)
+            return singleton;
+
+        synchronized(PubChemConfiguration.class)
+        {
+            if(singleton != null)
+                return singleton;
+
+            singleton = new PubChemConfiguration();
+        }
+
+        return singleton;
+    }
+
+
+    private void loadPrefixes()
     {
         prefixes.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
         prefixes.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
@@ -99,57 +111,58 @@ public class PubChemMapping
     }
 
 
-    private static void loadClasses()
+    private void loadClasses()
     {
-        classes.addAll(LiteralClass.getClasses());
-
-        Bioassay.loadClasses();
-        Biosystem.loadClasses();
-        Compound.loadClasses();
-        Concept.loadClasses();
-        ConservedDomain.loadClasses();
-        CompoundDescriptor.loadClasses();
-        SubstanceDescriptor.loadClasses();
-        Endpoint.loadClasses();
-        Gene.loadClasses();
-        InchiKey.loadClasses();
-        Measuregroup.loadClasses();
-        Ontology.loadClasses();
-        Protein.loadClasses();
-        Reference.loadClasses();
-        Shared.loadClasses();
-        Source.loadClasses();
-        Substance.loadClasses();
-        Synonym.loadClasses();
+        Bioassay.addIriClasses(this);
+        Biosystem.addIriClasses(this);
+        Compound.addIriClasses(this);
+        Concept.addIriClasses(this);
+        ConservedDomain.addIriClasses(this);
+        CompoundDescriptor.addIriClasses(this);
+        SubstanceDescriptor.addIriClasses(this);
+        Endpoint.addIriClasses(this);
+        Gene.addIriClasses(this);
+        InchiKey.addIriClasses(this);
+        Measuregroup.addIriClasses(this);
+        Ontology.addIriClasses(this);
+        Protein.addIriClasses(this);
+        Reference.addIriClasses(this);
+        Shared.addIriClasses(this);
+        Source.addIriClasses(this);
+        Substance.addIriClasses(this);
+        Synonym.addIriClasses(this);
     }
 
 
-    private static void loadMapping()
+    private void loadQuadMapping()
     {
-        Bioassay.loadMapping();
-        Biosystem.loadMapping();
-        Compound.loadMapping();
-        Concept.loadMapping();
-        ConservedDomain.loadMapping();
-        CompoundDescriptor.loadMapping();
-        SubstanceDescriptor.loadMapping();
-        Endpoint.loadMapping();
-        Gene.loadMapping();
-        InchiKey.loadMapping();
-        Measuregroup.loadMapping();
-        Ontology.loadMapping();
-        Protein.loadMapping();
-        Reference.loadMapping();
-        Source.loadMapping();
-        Substance.loadMapping();
-        Synonym.loadMapping();
+        Bioassay.addQuadMapping(this);
+        Biosystem.addQuadMapping(this);
+        Compound.addQuadMapping(this);
+        Concept.addQuadMapping(this);
+        ConservedDomain.addQuadMapping(this);
+        CompoundDescriptor.addQuadMapping(this);
+        SubstanceDescriptor.addQuadMapping(this);
+        Endpoint.addQuadMapping(this);
+        Gene.addQuadMapping(this);
+        InchiKey.addQuadMapping(this);
+        Measuregroup.addQuadMapping(this);
+        Ontology.addQuadMapping(this);
+        Protein.addQuadMapping(this);
+        Reference.addQuadMapping(this);
+        Source.addQuadMapping(this);
+        Substance.addQuadMapping(this);
+        Synonym.addQuadMapping(this);
     }
 
 
-    private static void loadProcedures()
+    private void loadProcedures()
     {
         String orchem = prefixes.get("orchem");
         String fulltext = prefixes.get("fulltext");
+
+        IriClass compound = getIriClass("compound");
+
 
         /* orchem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(orchem + "substructureSearch",
@@ -165,7 +178,7 @@ public class PubChemMapping
                 new Literal("false", new IRI(Xsd.BOOLEAN))));
         subsearch.addParameter(new ParameterDefinition(orchem + "tautomers", LiteralClass.xsdBoolean,
                 new Literal("false", new IRI(Xsd.BOOLEAN))));
-        subsearch.addResult(new ResultDefinition(Compound.compound));
+        subsearch.addResult(new ResultDefinition(compound));
         procedures.put(subsearch.getProcedureName(), subsearch);
 
 
@@ -179,7 +192,7 @@ public class PubChemMapping
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simsearch.addResult(new ResultDefinition(orchem + "compound", Compound.compound, "compound"));
+        simsearch.addResult(new ResultDefinition(orchem + "compound", compound, "compound"));
         simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
@@ -194,7 +207,7 @@ public class PubChemMapping
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simcmpsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simsearch.addResult(new ResultDefinition(null, Compound.compound, "compound"));
+        simsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
@@ -203,138 +216,14 @@ public class PubChemMapping
         smartssearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
         smartssearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        smartssearch.addResult(new ResultDefinition(Compound.compound));
+        smartssearch.addResult(new ResultDefinition(compound));
         procedures.put(smartssearch.getProcedureName(), smartssearch);
 
 
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay");
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
-        bioassay.addResult(new ResultDefinition(Bioassay.bioassay));
+        bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
-    }
-
-
-    public static synchronized HashMap<String, String> getPrefixes()
-    {
-        return PubChemMapping.prefixes;
-    }
-
-
-    public static synchronized List<ResourceClass> getClasses()
-    {
-        return PubChemMapping.classes;
-    }
-
-
-    public static synchronized List<QuadMapping> getMappings()
-    {
-        return PubChemMapping.mappings;
-    }
-
-
-    public static synchronized LinkedHashMap<String, ProcedureDefinition> getProcedures()
-    {
-        return PubChemMapping.procedures;
-    }
-
-
-    protected static void classmap(IriClass iriClass)
-    {
-        classes.add(iriClass);
-    }
-
-
-    protected static NodeMapping iri(IriClass iriClass, String... columns)
-    {
-        return new ParametrisedIriMapping(iriClass, Arrays.asList(columns));
-    }
-
-
-    protected static ConstantIriMapping iri(String value)
-    {
-        String iri = null;
-
-        if(value.startsWith("<"))
-        {
-            iri = value.substring(1, value.length() - 1);
-        }
-        else
-        {
-            String[] parts = value.split(":");
-            iri = prefixes.get(parts[0]) + parts[1];
-        }
-
-        IriClass iriClass = null;
-
-        for(ResourceClass c : classes)
-        {
-            if(c instanceof IriClass && ((IriClass) c).match(iri))
-            {
-                if(iriClass != null)
-                    throw new RuntimeException("ambigous iri class for " + value);
-
-                iriClass = (IriClass) c;
-            }
-        }
-
-        assert iriClass != null;
-
-        if(iriClass == null)
-            throw new RuntimeException("no iri class for " + value);
-
-        return new ConstantIriMapping(iriClass, iri);
-    }
-
-
-    protected static NodeMapping literal(LiteralClass literalClass, String column)
-    {
-        return new ParametrisedLiteralMapping(literalClass, column);
-    }
-
-
-    protected static NodeMapping literal(String value)
-    {
-        return new ConstantLiteralMapping(xsdString, new Literal(value));
-    }
-
-
-    protected static void quad(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate,
-            NodeMapping object)
-    {
-        QuadMapping map = new QuadMapping(table, graph, subject, predicate, object);
-        mappings.add(map);
-    }
-
-
-    protected static void quad(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate,
-            NodeMapping object, String condition)
-    {
-        QuadMapping map = new QuadMapping(table, graph, subject, predicate, object, condition);
-        mappings.add(map);
-    }
-
-
-    protected static HashSet<String> getIriValues(String table)
-    {
-        HashSet<String> set = new HashSet<String>();
-
-        try (Connection connection = ConnectionPool.getConnection())
-        {
-            try (PreparedStatement statement = connection.prepareStatement("select iri from " + table))
-            {
-                try (java.sql.ResultSet result = statement.executeQuery())
-                {
-                    while(result.next())
-                        set.add(result.getString(1));
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-
-        return set;
     }
 }

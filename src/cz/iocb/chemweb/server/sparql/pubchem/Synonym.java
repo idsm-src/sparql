@@ -1,64 +1,66 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import static cz.iocb.chemweb.server.sparql.pubchem.Compound.compound;
-import static cz.iocb.chemweb.server.sparql.pubchem.Concept.concept;
-import static cz.iocb.chemweb.server.sparql.pubchem.Shared.mesh;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 
 
 
-class Synonym extends PubChemMapping
+class Synonym
 {
-    static IriClass synonym;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
-        classmap(synonym = new IriClass("synonym", Arrays.asList("integer"),
+        config.addIriClass(new IriClass("synonym", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_.*"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:synonym");
+        IriClass synonym = config.getIriClass("synonym");
+        NodeMapping graph = config.createIriMapping("pubchem:synonym");
 
         {
             String table = "synonym_values";
-            NodeMapping subject = iri(synonym, "synonym");
+            NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            quad(table, graph, subject, iri("sio:has-value"), literal(xsdString, "value"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(xsdString, "value"));
         }
 
         {
+            /* TODO:
             String table = "synonym_types";
-            NodeMapping subject = iri(synonym, "synonym");
+            NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            //TODO: quad(table, graph, subject, iri("rdf:type"), iri(rdfclass, "type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("class", "type"));
+            */
         }
 
         {
             String table = "synonym_compounds";
-            NodeMapping subject = iri(synonym, "synonym");
+            NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            quad(table, graph, subject, iri("sio:is-attribute-of"), iri(compound, "compound"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping("compound", "compound"));
         }
 
         {
             String table = "synonym_mesh_subjects";
-            NodeMapping subject = iri(synonym, "synonym");
+            NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            quad(table, graph, subject, iri("dcterms:subject"), iri(mesh, "subject"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+                    config.createIriMapping("mesh", "subject"));
         }
 
         {
             String table = "synonym_concept_subjects";
-            NodeMapping subject = iri(synonym, "synonym");
+            NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            quad(table, graph, subject, iri("dcterms:subject"), iri(concept, "concept"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+                    config.createIriMapping("concept", "concept"));
         }
     }
 }

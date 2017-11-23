@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -56,6 +57,8 @@ import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -65,6 +68,7 @@ public class CompoundImageServlet extends HttpServlet
 {
     //private static String compoundQuery = "select molfile from compounds where id=?";
     //private static PGPoolingDataSource connectionPool = null;
+    private final SparqlDatabaseConfiguration dbConfig;
     private final PostgresDatabase db;
     //private final Decoder base64Decoder;
 
@@ -97,13 +101,14 @@ public class CompoundImageServlet extends HttpServlet
     //private final List<IGenerator<IAtomContainer>> generators;
 
 
-    public CompoundImageServlet() throws FileNotFoundException, IOException, DatabaseException
+    public CompoundImageServlet() throws FileNotFoundException, IOException, DatabaseException, SQLException
     {
         //generators = new ArrayList<IGenerator<IAtomContainer>>();
         //generators.add(new BasicSceneGenerator());
         //generators.add(new StandardGenerator(new Font("Verdana", Font.PLAIN, 18)));
 
-        db = new PostgresDatabase();
+        dbConfig = PubChemConfiguration.get();
+        db = new PostgresDatabase(dbConfig.getConnectionPool());
         //base64Decoder = Base64.getDecoder();
     }
 

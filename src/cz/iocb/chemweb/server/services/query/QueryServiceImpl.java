@@ -29,7 +29,6 @@ import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.services.SessionData;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -38,7 +37,8 @@ import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
@@ -68,6 +68,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
 
+    private final SparqlDatabaseConfiguration dbConfig;
     private final Parser parser;
     private final PostgresDatabase database;
 
@@ -78,8 +79,9 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     public QueryServiceImpl()
             throws DatabaseException, FileNotFoundException, IOException, SQLException, PropertyVetoException
     {
-        database = new PostgresDatabase();
-        parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+        dbConfig = PubChemConfiguration.get();
+        database = new PostgresDatabase(dbConfig.getConnectionPool());
+        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
     }
 
 
@@ -118,10 +120,10 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 syntaxTree.setSelect(limitedSelect);
             }
 
-            DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = PubChemMapping.getClasses();
-            List<QuadMapping> mappings = PubChemMapping.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+            DatabaseSchema schema = dbConfig.getSchema();
+            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            List<QuadMapping> mappings = dbConfig.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
             final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
                     .translate(syntaxTree);
@@ -234,7 +236,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             e.printStackTrace();
             throw new QueryException();
         }
-        catch (SQLException | IOException e)
+        catch (SQLException e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);
@@ -310,15 +312,15 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         Result result;
         try
         {
-            Parser parser = new Parser(PubChemMapping.getProcedures(), PubChemMapping.getPrefixes());
+            Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
 
             final SelectQuery syntaxTree = parser
                     .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
-            DatabaseSchema schema = PostgresSchema.get();
-            List<ResourceClass> classes = PubChemMapping.getClasses();
-            List<QuadMapping> mappings = PubChemMapping.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = PubChemMapping.getProcedures();
+            DatabaseSchema schema = dbConfig.getSchema();
+            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            List<QuadMapping> mappings = dbConfig.getMappings();
+            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
             final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
                     .translate(syntaxTree);
@@ -339,7 +341,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch (URISyntaxException | ParseExceptions | SQLException | IOException | TranslateExceptions e)
+        catch (URISyntaxException | ParseExceptions | SQLException | TranslateExceptions e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);

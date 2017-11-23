@@ -89,7 +89,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
-    private final List<ResourceClass> classes;
+    private final LinkedHashMap<String, ResourceClass> classes;
     private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
@@ -97,8 +97,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private Prologue prologue;
 
 
-    public TranslateVisitor(List<ResourceClass> classes, List<QuadMapping> mappings, DatabaseSchema schema,
-            LinkedHashMap<String, ProcedureDefinition> procedures)
+    public TranslateVisitor(LinkedHashMap<String, ResourceClass> classes, List<QuadMapping> mappings,
+            DatabaseSchema schema, LinkedHashMap<String, ProcedureDefinition> procedures)
     {
         this.classes = classes;
         this.mappings = mappings;
@@ -313,7 +313,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         //TODO: use shared method for this code
                         valueType = IriClass.uncategorizedClass;
 
-                        for(ResourceClass resClass : classes)
+                        for(ResourceClass resClass : classes.values())
                             if(resClass instanceof IriClass)
                                 if(((IriClass) resClass).match((Node) value))
                                     valueType = resClass;
@@ -1036,7 +1036,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 }
                 else
                 {
-                    valueClass = classes.stream().filter(c -> c.match(value)).findAny().orElse(null);
+                    valueClass = classes.values().stream().filter(c -> c.match(value)).findAny().orElse(null);
                 }
 
                 parameterNodes.put(parameterDefinition, new ClassifiedNode(value, valueClass));
@@ -1086,7 +1086,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             ResourceClass resultClass = null;
 
             if(!(result instanceof VariableOrBlankNode))
-                resultClass = classes.stream().filter(c -> c.match(result)).findAny().orElse(null);
+                resultClass = classes.values().stream().filter(c -> c.match(result)).findAny().orElse(null);
 
             resultNodes.put(resultDefinition, new ClassifiedNode(result, resultClass));
 
@@ -1121,7 +1121,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     ResourceClass resultClass = null;
 
                     if(!(result instanceof VariableOrBlankNode))
-                        resultClass = classes.stream().filter(c -> c.match(result.getValue())).findAny().orElse(null);
+                        resultClass = classes.values().stream().filter(c -> c.match(result.getValue())).findAny()
+                                .orElse(null);
 
                     resultNodes.put(resultDefinition, new ClassifiedNode(result.getValue(), resultClass));
                 }
@@ -1157,7 +1158,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public final List<ResourceClass> getResourceClasses()
+    public final LinkedHashMap<String, ResourceClass> getResourceClasses()
     {
         return classes;
     }

@@ -1,59 +1,65 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
-import static cz.iocb.chemweb.server.sparql.pubchem.Measuregroup.measuregroup;
-import static cz.iocb.chemweb.server.sparql.pubchem.Source.source;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;;
 
 
 
-class Bioassay extends PubChemMapping
+class Bioassay
 {
-    static IriClass bioassay;
-    static IriClass bioassayData;
-
-
-    static void loadClasses()
+    static void addIriClasses(PubChemConfiguration config)
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID[0-9]+";
 
-        classmap(bioassay = new IriClass("bioassay", Arrays.asList("integer"), prefix));
-        classmap(bioassayData = new IriClass("bioassay_data", Arrays.asList("integer", "smallint"),
+        config.addIriClass(new IriClass("bioassay", Arrays.asList("integer"), prefix));
+        config.addIriClass(new IriClass("bioassay_data", Arrays.asList("integer", "smallint"),
                 prefix + "_(Description|Protocol|Comment)"));
     }
 
 
-    static void loadMapping()
+    static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = iri("pubchem:bioassay");
+        IriClass bioassay = config.getIriClass("bioassay");
+        NodeMapping graph = config.createIriMapping("pubchem:bioassay");
 
         {
             String table = "bioassay_bases";
-            NodeMapping subject = iri(bioassay, "id");
+            NodeMapping subject = config.createIriMapping(bioassay, "id");
 
-            quad(table, graph, subject, iri("rdf:type"), iri("bao:BAO_0000015"));
-            quad(table, graph, subject, iri("template:itemTemplate"), literal("pubchem/Bioassay.vm"));
-            quad(table, graph, subject, iri("template:pageTemplate"), literal("pubchem/Bioassay.vm"));
-            quad(table, graph, subject, iri("dcterms:title"), literal(xsdString, "title"));
-            quad(table, graph, subject, iri("dcterms:source"), iri(source, "source"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("bao:BAO_0000015"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Bioassay.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/Bioassay.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(xsdString, "title"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
+                    config.createIriMapping("source", "source"));
         }
 
         {
             String table = "bioassay_measuregroups";
-            NodeMapping subject = iri(bioassay, "bioassay");
+            NodeMapping subject = config.createIriMapping(bioassay, "bioassay");
 
-            quad(table, graph, subject, iri("bao:BAO_0000209"), iri(measuregroup, "bioassay", "measuregroup"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0000209"),
+                    config.createIriMapping("measuregroup", "bioassay", "measuregroup"));
         }
 
         {
             String table = "bioassay_data";
-            NodeMapping subject = iri(bioassayData, "bioassay", "type");
+            NodeMapping subject = config.createIriMapping("bioassay_data", "bioassay", "type");
 
-            //TODO: quad(table, graph, subject, iri("rdf:type"), iri(rdfclass, "type"));
-            quad(table, graph, subject, iri("sio:is-attribute-of"), iri(bioassay, "bioassay"));
-            quad(table, graph, subject, iri("sio:has-value"), literal(xsdString, "value"));
+            /* TODO:
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping(rdfclass, "type"));
+            */
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping(bioassay, "bioassay"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(xsdString, "value"));
         }
     }
 }

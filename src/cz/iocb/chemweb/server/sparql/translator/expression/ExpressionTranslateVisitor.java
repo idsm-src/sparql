@@ -16,6 +16,7 @@ import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateReque
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.NUMERIC;
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.RDFTERM;
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.STRING;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -39,7 +40,7 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 
 public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<TranslatedExpression, TranslateRequest>
 {
-    private final List<ResourceClass> classes;
+    private final LinkedHashMap<String, ResourceClass> classes;
     private final VariableAccessor variableAccessor;
 
 
@@ -1054,7 +1055,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
 
     private IriClass getIriClass(String iri)
     {
-        for(ResourceClass resClass : classes)
+        for(ResourceClass resClass : classes.values())
             if(resClass instanceof IriClass)
                 if(((IriClass) resClass).match(iri))
                     return (IriClass) resClass;

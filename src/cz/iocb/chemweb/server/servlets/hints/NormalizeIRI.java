@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.servlets.hints;
 
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemMapping;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
@@ -14,12 +14,12 @@ public class NormalizeIRI
     }
 
 
-    public static String normalize(String iri)
+    public static String normalize(SparqlDatabaseConfiguration dbConfig, String iri)
     {
         if(iri == null)
             return null;
 
-        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
+        for(Entry<String, String> prefix : dbConfig.getPrefixes().entrySet())
             if(iri.startsWith(prefix.getValue()))
                 return iri.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
 
@@ -27,12 +27,12 @@ public class NormalizeIRI
     }
 
 
-    public static PrefixedName decompose(String iri)
+    public static PrefixedName decompose(SparqlDatabaseConfiguration dbConfig, String iri)
     {
         if(iri == null)
             return null;
 
-        for(Entry<String, String> prefix : PubChemMapping.getPrefixes().entrySet())
+        for(Entry<String, String> prefix : dbConfig.getPrefixes().entrySet())
         {
             if(iri.startsWith(prefix.getValue()))
             {

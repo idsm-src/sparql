@@ -1,7 +1,5 @@
 package cz.iocb.chemweb.server.db.postgresql;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -14,12 +12,9 @@ import cz.iocb.chemweb.server.db.DatabaseSchema;
 
 public class PostgresSchema extends DatabaseSchema
 {
-    private static PostgresSchema singleton = null;
-
-
-    private PostgresSchema() throws FileNotFoundException, SQLException, IOException
+    public PostgresSchema(ConnectionPool connectionPool) throws SQLException
     {
-        try (Connection connection = ConnectionPool.getConnection())
+        try (Connection connection = connectionPool.getConnection())
         {
             DatabaseMetaData metaData = connection.getMetaData();
 
@@ -86,21 +81,6 @@ public class PostgresSchema extends DatabaseSchema
                     }
                 }
             }
-        }
-    }
-
-
-    public static PostgresSchema get() throws FileNotFoundException, SQLException, IOException
-    {
-        if(singleton != null)
-            return singleton;
-
-        synchronized(PostgresSchema.class)
-        {
-            if(singleton == null)
-                singleton = new PostgresSchema();
-
-            return singleton;
         }
     }
 }
