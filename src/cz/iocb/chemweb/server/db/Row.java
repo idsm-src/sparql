@@ -19,7 +19,7 @@ public class Row
 
     public RdfNode get(String name)
     {
-        Integer idx = columnNames.get(name.toUpperCase());
+        Integer idx = columnNames.get(name);
 
         if(idx == null)
             return null;
