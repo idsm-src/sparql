@@ -312,7 +312,7 @@ public class CompoundImageServlet extends HttpServlet
     {
         String label = chemObj.getProperty(CDKConstants.CIP_DESCRIPTOR);
 
-        if(label == null)
+        if(label == null || label.equals("NONE"))
             return null;
 
         return StandardGenerator.ITALIC_DISPLAY_PREFIX + label;
