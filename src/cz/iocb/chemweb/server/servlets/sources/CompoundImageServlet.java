@@ -147,7 +147,7 @@ public class CompoundImageServlet extends HttpServlet
         }
         catch (NullPointerException | NumberFormatException e)
         {
-            throw new ServletException("an invalid value of the 'id' argument");
+            throw new ServletException("an invalid value of the 'w' argument");
         }
 
         //if(size != 80 && size != 200)
