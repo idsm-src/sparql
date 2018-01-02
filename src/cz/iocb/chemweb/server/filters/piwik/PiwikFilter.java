@@ -2,7 +2,9 @@ package cz.iocb.chemweb.server.filters.piwik;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -63,7 +65,7 @@ public class PiwikFilter implements Filter
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)
             throws IOException, ServletException
     {
-        MultiReadHttpServletRequest httpRequest = new MultiReadHttpServletRequest((HttpServletRequest) request);
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
 
         URL actionUrl = new URL(httpRequest.getRequestURL().toString());
         PiwikRequest piwikRequest = new PiwikRequest(siteId, actionUrl);
@@ -71,15 +73,41 @@ public class PiwikFilter implements Filter
 
         String visitorId = null;
 
-        for(Cookie cookie : httpRequest.getCookies())
-            if(cookie.getName().startsWith(cookieName) && cookie.getValue().length() >= 16)
-                visitorId = cookie.getValue().substring(0, 16);
+        if(httpRequest.getCookies() != null)
+            for(Cookie cookie : httpRequest.getCookies())
+                if(cookie.getName().startsWith(cookieName) && cookie.getValue().length() >= 16)
+                    visitorId = cookie.getValue().substring(0, 16);
 
         if(visitorId != null)
             piwikRequest.setVisitorId(visitorId);
 
         piwikRequest.setAuthToken(authToken);
-        piwikRequest.setVisitorIp(httpRequest.getRemoteAddr());
+
+        
+        String forwarded = httpRequest.getHeader("X-Forwarded-For");
+        String address = null;
+        
+        if(forwarded != null)
+        {
+            for(String forward : forwarded.split(","))
+            {
+                String trimmed = forward.trim();
+                
+                try
+                {
+                    if(!InetAddress.getByName(trimmed).isSiteLocalAddress())
+                    {
+                        address = trimmed;
+                        break;
+                    }
+                } catch (UnknownHostException e) {
+
+                    e.printStackTrace();
+                }
+            }
+        }
+        
+        piwikRequest.setVisitorIp(address != null ? address : httpRequest.getRemoteAddr());
 
 
         String agent = httpRequest.getHeader("User-Agent");
@@ -90,6 +118,8 @@ public class PiwikFilter implements Filter
 
         if(rpc)
         {
+            httpRequest = new MultiReadHttpServletRequest(httpRequest);
+
             StringWriter writer = new StringWriter();
             IOUtils.copy(httpRequest.getReader(), writer);
             String body = writer.toString();
