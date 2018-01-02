@@ -40,11 +40,11 @@ public class PiwikFilter implements Filter
         siteId = Integer.parseInt(siteIdString);
 
         hostUrl = config.getInitParameter("hostUrl");
-        if(hostUrl == null && hostUrl.isEmpty())
+        if(hostUrl == null || hostUrl.isEmpty())
             throw new IllegalArgumentException("Host URL not set, please set init-param 'hostUrl' in web.xml");
 
         authToken = config.getInitParameter("authToken");
-        if(authToken == null && authToken.isEmpty())
+        if(authToken == null || authToken.isEmpty())
             throw new IllegalArgumentException("AuthToken not set, please set init-param 'authToken' in web.xml");
 
         String rpcString = config.getInitParameter("rpc");
