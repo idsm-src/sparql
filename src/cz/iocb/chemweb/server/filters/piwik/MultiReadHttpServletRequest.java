@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -64,6 +65,24 @@ public class MultiReadHttpServletRequest extends HttpServletRequestWrapper
         public int read() throws IOException
         {
             return input.read();
+        }
+
+        @Override
+        public boolean isFinished()
+        {
+            return input.available() == 0;
+        }
+
+        @Override
+        public boolean isReady()
+        {
+            return input.available() > 0;
+        }
+
+        @Override
+        public void setReadListener(ReadListener arg)
+        {
+            
         }
     }
 }
