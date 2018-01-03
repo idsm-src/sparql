@@ -57,6 +57,31 @@
   </filter-mapping>
 
 
+  <filter>
+    <filter-name>PiwikFilterSachem</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param>
+      <param-name>siteId</param-name>
+      <param-value>4</param-value>
+    </init-param>
+    <init-param>
+      <param-name>hostUrl</param-name>
+      <param-value>http://localhost/piwik/piwik.php</param-value>
+    </init-param>
+    <init-param>
+      <param-name>authToken</param-name>
+      <param-value>5997045117f26014cce5de5c4a071ce0</param-value>
+    </init-param>
+    <init-param>
+      <param-name>rpc</param-name>
+      <param-value>false</param-value>
+    </init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>PiwikFilterSachem</filter-name>
+    <url-pattern>/endpoint/*</url-pattern>
+  </filter-mapping>
+
 
   <!-- Servlets -->
    <servlet>
@@ -100,6 +125,10 @@
   <servlet>
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration</param-value>
+    </init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>CompoundImage</servlet-name>
@@ -142,6 +171,120 @@
     <url-pattern>/download/helper/query.sparql</url-pattern>
   </servlet-mapping>
 
+  <servlet>
+    <servlet-name>ChebiEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChebiEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/chebi</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>ChemblEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChemblEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/chembl</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>DrugbankEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DrugbankEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/drugbank</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>PubChemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>PubChemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/pubchem</url-pattern>
+  </servlet-mapping>
+
+
+  <servlet>
+    <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.SachemEndpointStatisticsServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
+    <url-pattern>/endpoint/statistics.json</url-pattern>
+  </servlet-mapping>
+
+
+  <servlet>
+    <servlet-name>ChebiCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChebiCompoundImage</servlet-name>
+    <url-pattern>/chebi/compound/image</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>ChemblCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChemblCompoundImage</servlet-name>
+    <url-pattern>/chembl/compound/image</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>DrugbankCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DrugbankCompoundImage</servlet-name>
+    <url-pattern>/drugbank/compound/image</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>PubChemCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param>
+      <param-name>configClass</param-name>
+      <param-value>cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration</param-value>
+    </init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>PubChemCompoundImage</servlet-name>
+    <url-pattern>/pubchem/compound/image</url-pattern>
+  </servlet-mapping>
 
 
   <!-- Default page to serve -->
