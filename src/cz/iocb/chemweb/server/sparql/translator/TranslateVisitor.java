@@ -120,6 +120,15 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Select select)
     {
+        /*
+         * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
+         * 
+         * FIXME: This is not valid in general!
+         */
+        if(select.getValues() != null)
+            ((GroupGraph) select.getPattern()).getPatterns().add(0, select.getValues());
+
+
         checkProjectionVariables(select);
 
         // register information about datasets used in this SELECT (sub)query
