@@ -45,7 +45,7 @@ public class SessionData<Data>
         synchronized(session)
         {
             @SuppressWarnings("unchecked")
-            Map<Integer, Data> sessionStorage = (Map<Integer, Data>) session.getAttribute(storageName);
+            Map<Long, Data> sessionStorage = (Map<Long, Data>) session.getAttribute(storageName);
 
             if(sessionStorage == null)
                 return null;
@@ -63,7 +63,7 @@ public class SessionData<Data>
         synchronized(session)
         {
             @SuppressWarnings("unchecked")
-            Map<Integer, Data> sessionStorage = (Map<Integer, Data>) session.getAttribute(storageName);
+            Map<Long, Data> sessionStorage = (Map<Long, Data>) session.getAttribute(storageName);
 
             if(sessionStorage == null)
                 return;
@@ -79,7 +79,7 @@ public class SessionData<Data>
         synchronized(session)
         {
             @SuppressWarnings("unchecked")
-            Map<Integer, Data> sessionStorage = (Map<Integer, Data>) session.getAttribute(storageName);
+            Map<Long, Data> sessionStorage = (Map<Long, Data>) session.getAttribute(storageName);
 
             if(sessionStorage == null)
                 return null;
