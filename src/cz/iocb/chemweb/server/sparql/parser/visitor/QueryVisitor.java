@@ -218,15 +218,11 @@ public class QueryVisitor extends BaseVisitor<Query>
             {
                 IRI rdfIri = new IRI(Rdf.NS);
 
-                // if we find PREFIX with the rdf IRI, we don't need to add a
-                // new one
-                // if we find PREFIX with the rdf: prefix, adding a new one
-                // would cause a conflict
-                // this means that if the existing rdf: PREFIX is wrong,
-                // expanded RDF collection triplets
-                // will use the full IRI
+                // if we find PREFIX with the rdf IRI, we don't need to add a new one
+                // if we find PREFIX with the rdf: prefix, adding a new one would cause a conflict this means that if
+                // the existing rdf: PREFIX is wrong, expanded RDF collection triplets will use the full IRI
                 if(!result.getPrologue().getAllPrefixes().stream()
-                        .filter(prefix -> prefix.getName().equals("rdf") || prefix.getIri().equals(rdfIri)).findAny()
+                        .filter(prefix -> prefix.getName().equals("rdf") || prefix.getIri().equals(Rdf.NS)).findAny()
                         .isPresent())
                 {
                     result.getPrologue().addPrefixDefinition(new PrefixDefinition("rdf", rdfIri));
