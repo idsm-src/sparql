@@ -106,7 +106,8 @@ public class GenerateExamples extends HttpServlet
         if(nl != null && nl.getLength() > 0)
         {
             Element el = (Element) nl.item(0);
-            textVal = el.getFirstChild().getNodeValue();
+
+            textVal = el.getFirstChild() == null ? "" : el.getFirstChild().getNodeValue();
         }
 
         return textVal.trim().replace("\n", "\\n").replace("\"", "\\\"");
