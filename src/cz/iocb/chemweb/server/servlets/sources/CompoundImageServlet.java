@@ -5,11 +5,14 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
-import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
@@ -54,87 +58,101 @@ import org.openscience.cdk.renderer.generators.standard.StandardGenerator;
 import org.openscience.cdk.renderer.visitor.AWTDrawVisitor;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
-import cz.iocb.chemweb.server.db.RdfNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
 @SuppressWarnings("serial")
 public class CompoundImageServlet extends HttpServlet
 {
-    //private static String compoundQuery = "select molfile from compounds where id=?";
-    //private static PGPoolingDataSource connectionPool = null;
-    private final SparqlDatabaseConfiguration dbConfig;
-    private final PostgresDatabase db;
-    //private final Decoder base64Decoder;
+    private ConnectionPool connectionPool;
+    private String queryPattern;
 
 
-    /*
-    static synchronized void initConnectionPool() throws FileNotFoundException, IOException, NumberFormatException,
-            SQLException, PropertyVetoException
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        if(connectionPool != null)
-            return;
+        String configClassName = config.getInitParameter("configClass");
 
-        Properties properties = new Properties();
-        properties.load(new FileInputStream("orchem.properties"));
-
-        connectionPool = new PGPoolingDataSource();
-        connectionPool.setDataSourceName("PubChem Data Source");
-        connectionPool.setServerName(properties.getProperty("host"));
-        connectionPool.setPortNumber(Integer.parseInt(properties.getProperty("port")));
-        connectionPool.setDatabaseName(properties.getProperty("database"));
-        connectionPool.setUser(properties.getProperty("user"));
-        connectionPool.setPassword(properties.getProperty("password"));
-        connectionPool.setSocketTimeout(Integer.parseInt(properties.getProperty("socketTimeout")));
-        connectionPool.setTcpKeepAlive(properties.getProperty("tcpKeepAlive").equals("true"));
-        connectionPool.setCompatible(properties.getProperty("assumeMinServerVersion"));
-        connectionPool.setMaxConnections(Integer.parseInt(properties.getProperty("maxConnections")));
-    }
-    */
+        if(configClassName == null || configClassName.isEmpty())
+            throw new IllegalArgumentException("Config class is not set");
 
 
-    //private final List<IGenerator<IAtomContainer>> generators;
+        String table = config.getInitParameter("table");
+
+        if(table == null)
+            table = "compounds";
+
+        if(!table.matches("^[a-zA-Z0-9_]+$"))
+            throw new IllegalArgumentException("Table name is not set properly");
 
 
-    public CompoundImageServlet() throws FileNotFoundException, IOException, DatabaseException, SQLException
-    {
-        //generators = new ArrayList<IGenerator<IAtomContainer>>();
-        //generators.add(new BasicSceneGenerator());
-        //generators.add(new StandardGenerator(new Font("Verdana", Font.PLAIN, 18)));
+        String column = config.getInitParameter("column");
 
-        dbConfig = PubChemConfiguration.get();
-        db = new PostgresDatabase(dbConfig.getConnectionPool());
-        //base64Decoder = Base64.getDecoder();
+        if(column == null)
+            column = "molfile";
+
+        if(!column.matches("^[a-zA-Z0-9_]+$"))
+            throw new IllegalArgumentException("Column name is not set properly");
+
+
+        queryPattern = "select " + column + " from " + table + " where id = ?";
+
+
+        try
+        {
+            Class<?> configClass = Class.forName(configClassName);
+            Method method = configClass.getMethod("get");
+            SparqlDatabaseConfiguration configuration = (SparqlDatabaseConfiguration) method.invoke(null);
+
+            connectionPool = configuration.getConnectionPool();
+        }
+        catch (ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
+                | IllegalArgumentException | InvocationTargetException e)
+        {
+            throw new ServletException(e);
+        }
     }
 
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        processRequest(req, res);
+        try
+        {
+            processRequest(req, res);
+        }
+        catch (SQLException e)
+        {
+            throw new IOException(e);
+        }
     }
 
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        processRequest(req, res);
+        try
+        {
+            processRequest(req, res);
+        }
+        catch (SQLException e)
+        {
+            throw new IOException(e);
+        }
     }
 
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException, SQLException
     {
         int id;
         int size;
 
         try
         {
-            id = Integer.parseInt(req.getParameter("id").substring(3));
+            id = Integer.parseInt(req.getParameter("id"));
         }
         catch (NullPointerException | NumberFormatException e)
         {
@@ -169,7 +187,7 @@ public class CompoundImageServlet extends HttpServlet
                 generateImage(out, molecule, size, size);
             }
         }
-        catch (CDKException | DatabaseException e)
+        catch (CDKException e)
         {
             e.printStackTrace();
             throw new ServletException("cannot generate image output");
@@ -244,37 +262,24 @@ public class CompoundImageServlet extends HttpServlet
     }
 
 
-    private IAtomContainer getMolecule(int id)
-            throws DatabaseException, UnsupportedEncodingException, CDKException, IOException
+    private IAtomContainer getMolecule(int id) throws SQLException, CDKException, IOException
     {
-        //Result result = db
-        //        .query("sparql SELECT ?SDF WHERE { GRAPH <http://rdf.ncbi.nlm.nih.gov/pubchem/compound/extra> { compound:CID"
-        //                + id + "_Molfile sio:has-value ?SDF } }");
-
-        Result result = db.query("select sdf as \"SDF#str\" from compound_sdfiles where compound = " + id);
-
-        if(result.getCount() == 1)
+        try (Connection connection = connectionPool.getConnection())
         {
-            /*
-            RdfNode node = result.get("SDF");
+            try (PreparedStatement statement = connection.prepareStatement(queryPattern))
+            {
+                statement.setInt(1, id);
+                ResultSet result = statement.executeQuery();
 
-            byte[] compresedMolfile = base64Decoder.decode(node.getValue());
+                if(result.next())
+                {
+                    IAtomContainer atomContainer = crateAtomContainer(result.getString(1));
+                    return atomContainer;
+                }
+            }
 
-            ByteArrayInputStream in = new ByteArrayInputStream(compresedMolfile);
-            BZip2CompressorInputStream bzip = new BZip2CompressorInputStream(in);
-            String molfile = IOUtils.toString(bzip, "ASCII");
-            bzip.close();
-
-            IAtomContainer atomContainer = crateAtomContainer(molfile);
-            return atomContainer;
-            */
-
-            RdfNode node = result.get("SDF");
-            IAtomContainer atomContainer = crateAtomContainer(node.getValue());
-            return atomContainer;
+            return null;
         }
-
-        return null;
     }
 
 
