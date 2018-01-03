@@ -73,10 +73,10 @@ public class EndpointServlet extends HttpServlet
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
         String[] namedGraphs = req.getParameterValues("named-graph-uri");
 
-        if("application/x-www-form-urlencoded".equals(req.getContentType()))
+        if(req.getContentType().matches("application/x-www-form-urlencoded.*"))
             query = req.getParameter("query");
-        else if("application/sparql-query".equals(req.getContentType()))
-            query = IOUtils.toString(req.getInputStream(), StandardCharsets.UTF_8);
+        else if(req.getContentType().matches("application/sparql-query.*"))
+            query = IOUtils.toString(req.getInputStream());
 
         process(req, res, query, defaultGraphs, namedGraphs);
     }
