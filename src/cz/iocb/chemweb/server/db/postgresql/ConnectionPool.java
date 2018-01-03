@@ -7,6 +7,7 @@ import org.postgresql.ds.PGPoolingDataSource;
 
 
 
+@SuppressWarnings("deprecation")
 public class ConnectionPool
 {
     private PGPoolingDataSource pool = null;
@@ -22,7 +23,7 @@ public class ConnectionPool
         pool.setPassword(properties.getProperty("password"));
         pool.setSocketTimeout(Integer.parseInt(properties.getProperty("socketTimeout")));
         pool.setTcpKeepAlive(properties.getProperty("tcpKeepAlive").equals("true"));
-        pool.setCompatible(properties.getProperty("assumeMinServerVersion"));
+        pool.setAssumeMinServerVersion(properties.getProperty("assumeMinServerVersion"));
         pool.setMaxConnections(Integer.parseInt(properties.getProperty("maxConnections")));
     }
 
