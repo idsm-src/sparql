@@ -2,10 +2,10 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
+import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -56,6 +56,15 @@ public class EndpointServlet extends HttpServlet
 
 
     @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException
+    {
+        res.setHeader("access-control-allow-headers", "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+        res.setHeader("access-control-allow-origin", "*");
+        super.doOptions(req, res);
+    }
+
+
+    @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
         String query = req.getParameter("query");
@@ -87,6 +96,7 @@ public class EndpointServlet extends HttpServlet
     {
         /* TODO: take defaultGraphs and namedGraphs into the account */
 
+        res.setHeader("access-control-allow-headers", "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
         res.setHeader("access-control-allow-origin", "*");
 
         try
