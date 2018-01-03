@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -529,11 +530,123 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         return Stream.of(pattern);
     }
 
+    /**
+     * Quick (and dirty) fix to merge triplets representing a procedure call splitted by a remote endpoint.
+     *
+     * TODO: need to be addressed more generally
+     */
+    private Stream<Pattern> repairExpandedProcedureCalls(Stream<Pattern> stream)
+    {
+        List<Pattern> patterns = stream.collect(Collectors.toList());;
+        LinkedList<Pattern> removed = new LinkedList<Pattern>();
+
+
+        for(Pattern pattern : patterns)
+        {
+            if(removed.contains(pattern))
+                continue;
+
+            if(!(pattern instanceof ComplexTriple))
+                continue;
+
+            ComplexTriple triple = (ComplexTriple) pattern;
+
+            List<Property> properties = triple.getProperties();
+
+            if(properties.size() != 1)
+                continue;
+
+            Property property = properties.get(0);
+            Verb verb = property.getVerb();
+
+            if(!(verb instanceof IRI))
+                continue;
+
+            ProcedureDefinition callDefinition = QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString());
+
+            if(callDefinition == null)
+                continue;
+
+            List<ComplexNode> objects = property.getObjects();
+
+            if(objects.size() != 1)
+                continue;
+
+            ComplexNode object = objects.get(0);
+
+            if(!(object instanceof Variable) && !(object instanceof BlankNode))
+                continue;
+
+
+            /* procedure call object needs to be fixed */
+            BlankNodePropertyList objectBlanknode = new BlankNodePropertyList();
+            objectBlanknode.setRange(object.getRange());
+            property.getObjects().set(0, objectBlanknode);
+
+            for(Pattern subPattern : patterns)
+            {
+                if(subPattern == pattern)
+                    continue;
+
+                if(!(subPattern instanceof ComplexTriple))
+                    continue;
+
+                ComplexTriple subTriple = (ComplexTriple) subPattern;
+
+                ComplexNode subSubject = subTriple.getNode();
+
+                if(subSubject.equals(object))
+                {
+                    objectBlanknode.getProperties().addAll(subTriple.getProperties());
+                    removed.add(subPattern);
+                }
+            }
+
+
+            if(callDefinition.isSimple())
+                continue;
+
+            ComplexNode subject = triple.getNode();
+
+            if(!(subject instanceof Variable) && !(subject instanceof BlankNode))
+                continue;
+
+
+            /* procedure call subject needs to be fixed */
+            BlankNodePropertyList subjectBlanknode = new BlankNodePropertyList();
+            subjectBlanknode.setRange(subject.getRange());
+            triple.setNode(subjectBlanknode);
+
+            for(Pattern subPattern : patterns)
+            {
+                if(subPattern == pattern)
+                    continue;
+
+                if(!(subPattern instanceof ComplexTriple))
+                    continue;
+
+                ComplexTriple subTriple = (ComplexTriple) subPattern;
+
+                ComplexNode subSubject = subTriple.getNode();
+
+                if(subSubject.equals(subject))
+                {
+                    subjectBlanknode.getProperties().addAll(subTriple.getProperties());
+                    removed.add(subPattern);
+                }
+            }
+        }
+
+        patterns.removeAll(removed);
+
+        return patterns.stream();
+    }
+
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = new GroupGraphPatternVisitor().visit(ctx).flatMap(this::processPattern)
-                .collect(Collectors.toList());
+        List<Pattern> patterns = repairExpandedProcedureCalls(new GroupGraphPatternVisitor().visit(ctx))
+                .flatMap(this::processPattern).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
