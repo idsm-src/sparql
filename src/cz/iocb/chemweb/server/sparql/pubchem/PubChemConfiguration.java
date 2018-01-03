@@ -28,7 +28,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
     public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException
     {
         Properties properties = new Properties();
-        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/datasource-postgresql.properties"));
+        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/datasource-rdf.properties"));
 
         connectionPool = new ConnectionPool(properties);
         schema = new PostgresSchema(connectionPool);
