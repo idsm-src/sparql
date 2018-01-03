@@ -2,9 +2,12 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
@@ -42,16 +45,34 @@ public class EndpointServlet extends HttpServlet
     };
 
 
-    private final SparqlDatabaseConfiguration dbConfig;
-    private final Parser parser;
-    private final PostgresDatabase db;
+    private SparqlDatabaseConfiguration dbConfig;
+    private Parser parser;
+    private PostgresDatabase db;
 
-
-    public EndpointServlet(SparqlDatabaseConfiguration dbConfig) throws FileNotFoundException, IOException, SQLException
+    
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        this.dbConfig = dbConfig;
-        this.parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-        this.db = new PostgresDatabase(dbConfig.getConnectionPool());
+        String configClassName = config.getInitParameter("configClass");
+
+        if(configClassName == null || configClassName.isEmpty())
+            throw new IllegalArgumentException("Config class is not set");
+        
+        
+        try
+        {
+            Class<?> configClass = Class.forName(configClassName);
+            Method method = configClass.getMethod("get");
+            
+            dbConfig = (SparqlDatabaseConfiguration) method.invoke(null);
+            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+            db = new PostgresDatabase(dbConfig.getConnectionPool());
+        }
+        catch (ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
+                | IllegalArgumentException | InvocationTargetException e)
+        {
+            throw new ServletException(e);
+        }
     }
 
 
