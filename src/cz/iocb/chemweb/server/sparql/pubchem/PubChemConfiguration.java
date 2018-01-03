@@ -207,7 +207,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simcmpsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simsearch.addResult(new ResultDefinition(null, compound, "compound"));
+        simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
