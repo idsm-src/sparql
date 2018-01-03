@@ -44,7 +44,7 @@ public class NodeUtils
         {
             return "NODE_" + Encode.base32m(node.getValue());
         }
-        catch (Throwable e)
+        catch(Throwable e)
         {
             System.err.println("#" + node.getValue() + "#"); // FIXME: log error
 

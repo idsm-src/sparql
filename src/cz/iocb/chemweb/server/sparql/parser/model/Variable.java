@@ -27,6 +27,7 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
     /**
      * The variable name, without the '?' (or '$') prefix.
      */
+    @Override
     public String getName()
     {
         return name;

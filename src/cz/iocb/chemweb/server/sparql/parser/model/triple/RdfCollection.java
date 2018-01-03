@@ -16,7 +16,7 @@ import cz.iocb.chemweb.server.sparql.parser.Parser;
  *
  * <p>
  * This is a {@link ComplexElement}, so it won't appear in the output of the {@link Parser}.
- * 
+ *
  * <p>
  * Corresponds to rules [103] CollectionPath and [161] NIL in the SPARQL grammar.
  */

@@ -10,7 +10,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 /**
  * Pattern that contains a list of other patterns ({@link #getPatterns}).
- * 
+ *
  * <p>
  * Corresponds to the rule [54] GroupGraphPatternSub in the SPARQL grammar.
  */

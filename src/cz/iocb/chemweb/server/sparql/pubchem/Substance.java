@@ -43,7 +43,7 @@ class Substance
             /* TODO:
             String table = "substance_types";
             NodeMapping subject = config.createIriMapping(substance, "substance");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "chebi"));
             */

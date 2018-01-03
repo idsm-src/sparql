@@ -73,7 +73,7 @@ public class PrefixedName extends BaseElement implements Define.DefineValue
         {
             return URI.create(prologue.getBase().getUri().resolve(prefixURI).toString() + localName);
         }
-        catch (IllegalArgumentException e)
+        catch(IllegalArgumentException e)
         {
             // bif: or sql: need a special treatment
             return URI.create(prefixURI + localName);

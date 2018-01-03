@@ -108,7 +108,7 @@ public class CompoundImageServlet extends HttpServlet
 
             connectionPool = configuration.getConnectionPool();
         }
-        catch (ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
+        catch(ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
                 | IllegalArgumentException | InvocationTargetException e)
         {
             throw new ServletException(e);
@@ -123,7 +123,7 @@ public class CompoundImageServlet extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new IOException(e);
         }
@@ -137,7 +137,7 @@ public class CompoundImageServlet extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new IOException(e);
         }
@@ -154,7 +154,7 @@ public class CompoundImageServlet extends HttpServlet
         {
             id = Integer.parseInt(req.getParameter("id"));
         }
-        catch (NullPointerException | NumberFormatException e)
+        catch(NullPointerException | NumberFormatException e)
         {
             throw new ServletException("an invalid value of the 'id' argument");
         }
@@ -163,7 +163,7 @@ public class CompoundImageServlet extends HttpServlet
         {
             size = Integer.parseInt(req.getParameter("w"));
         }
-        catch (NullPointerException | NumberFormatException e)
+        catch(NullPointerException | NumberFormatException e)
         {
             throw new ServletException("an invalid value of the 'w' argument");
         }
@@ -182,12 +182,12 @@ public class CompoundImageServlet extends HttpServlet
 
             res.setContentType("image/png");
 
-            try (ServletOutputStream out = res.getOutputStream())
+            try(ServletOutputStream out = res.getOutputStream())
             {
                 generateImage(out, molecule, size, size);
             }
         }
-        catch (CDKException e)
+        catch(CDKException e)
         {
             e.printStackTrace();
             throw new ServletException("cannot generate image output");
@@ -264,9 +264,9 @@ public class CompoundImageServlet extends HttpServlet
 
     private IAtomContainer getMolecule(int id) throws SQLException, CDKException, IOException
     {
-        try (Connection connection = connectionPool.getConnection())
+        try(Connection connection = connectionPool.getConnection())
         {
-            try (PreparedStatement statement = connection.prepareStatement(queryPattern))
+            try(PreparedStatement statement = connection.prepareStatement(queryPattern))
             {
                 statement.setInt(1, id);
                 ResultSet result = statement.executeQuery();
@@ -287,7 +287,7 @@ public class CompoundImageServlet extends HttpServlet
     {
         boolean isV3000 = molfile.contains("M  V30 BEGIN CTAB");
 
-        try (DefaultChemObjectReader mdlReader = isV3000 ? new MDLV3000Reader() : new MDLV2000Reader())
+        try(DefaultChemObjectReader mdlReader = isV3000 ? new MDLV3000Reader() : new MDLV2000Reader())
         {
             IAtomContainer molecule = new AtomContainer();
             mdlReader.setReader(new StringReader(molfile));
@@ -352,7 +352,7 @@ public class CompoundImageServlet extends HttpServlet
 
             /*
             boolean addToRemove = false;
-
+            
             if(suppressibleHydrogen(org, atom))
             {
                 // test whether connected to a single hetero atom only, otherwise keep
@@ -364,18 +364,18 @@ public class CompoundImageServlet extends HttpServlet
                     if(stereoParity == null || stereoParity == 0)
                     {
                         addToRemove = true;
-
+            
                         // keep if any of the bonds of the hetero atom have stereo information
                         for(IBond bond : org.getConnectedBondsList(neighbour))
                         {
                             IBond.Stereo bondStereo = bond.getStereo();
-
+            
                             if(bondStereo != null && bondStereo != IBond.Stereo.NONE)
                             {
                                 addToRemove = false;
                                 System.err.println(bondStereo.name());
                             }
-
+            
                             IAtom neighboursNeighbour = bond.getConnectedAtom(neighbour);
                             // remove in any case if the hetero atom is connected to more than one hydrogen
                             if(neighboursNeighbour.getSymbol().equals("H") && neighboursNeighbour != atom)
@@ -455,7 +455,7 @@ public class CompoundImageServlet extends HttpServlet
                 {
                     clone = org.getBond(i).clone();
                 }
-                catch (CloneNotSupportedException e)
+                catch(CloneNotSupportedException e)
                 {
                     e.printStackTrace();
                 }
@@ -498,7 +498,7 @@ public class CompoundImageServlet extends HttpServlet
         {
             clonedAtom = atom.clone();
         }
-        catch (CloneNotSupportedException e)
+        catch(CloneNotSupportedException e)
         {
             e.printStackTrace();
         }

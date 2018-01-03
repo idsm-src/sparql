@@ -31,11 +31,11 @@ public class BaseVisitor<T> extends SparqlParserBaseVisitor<T>
         {
             result = super.visit(tree);
         }
-        catch (UncheckedParseException e)
+        catch(UncheckedParseException e)
         {
             throw e;
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             throw new UncheckedParseException(ErrorType.parsingException, e, Range.compute((ParserRuleContext) tree),
                     e.getMessage());

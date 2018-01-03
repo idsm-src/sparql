@@ -250,7 +250,7 @@ class Type<T>
         {
             return parser.apply(input);
         }
-        catch (Exception ex)
+        catch(Exception ex)
         {
             return null;
         }

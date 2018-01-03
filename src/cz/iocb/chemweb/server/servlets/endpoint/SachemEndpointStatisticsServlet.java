@@ -40,7 +40,7 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             writeDrugbank(out);
             out.println("]}");
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new IOException(e);
         }

@@ -77,7 +77,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
             for(TranslateException err : translateResult.getWarnings())
                 addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             e.printStackTrace();
         }

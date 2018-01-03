@@ -34,7 +34,7 @@ public class TranslateException extends Exception
      * public TranslateException(String message, Range range) {
      * super(String.format("Line %d: %s", range.getStart().getLineNumber(),
      * message));
-     * 
+     *
      * this.range = range; this.message = message; }
      */
 

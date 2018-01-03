@@ -156,7 +156,7 @@ public class PostgresDatabase
 
             return new Result(heads, rows);
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             e.printStackTrace();
             System.err.println(query);
@@ -179,7 +179,7 @@ public class PostgresDatabase
             Statement stmt = connectionPool.getConnection().createStatement();
             return new PostgresHandler(stmt);
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             throw new DatabaseException(e);
         }

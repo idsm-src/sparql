@@ -17,7 +17,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
  *
  * <p>
  * Only {@link Triple}s can appear in the output of {@link Parser}, never {@link ComplexTriple}s.
- * 
+ *
  * <p>
  * Corresponds to the rule [81] TriplesSameSubjectPath in the SPARQL grammar.
  */

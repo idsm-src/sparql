@@ -83,16 +83,16 @@ public class PiwikFilter implements Filter
 
         piwikRequest.setAuthToken(authToken);
 
-        
+
         String forwarded = httpRequest.getHeader("X-Forwarded-For");
         String address = null;
-        
+
         if(forwarded != null)
         {
             for(String forward : forwarded.split(","))
             {
                 String trimmed = forward.trim();
-                
+
                 try
                 {
                     if(!InetAddress.getByName(trimmed).isSiteLocalAddress())
@@ -100,13 +100,15 @@ public class PiwikFilter implements Filter
                         address = trimmed;
                         break;
                     }
-                } catch (UnknownHostException e) {
+                }
+                catch(UnknownHostException e)
+                {
 
                     e.printStackTrace();
                 }
             }
         }
-        
+
         piwikRequest.setVisitorIp(address != null ? address : httpRequest.getRemoteAddr());
 
 

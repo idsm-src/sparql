@@ -51,7 +51,7 @@ class Compound
             /* TODO:
             String table = "compound_relations";
             NodeMapping subject = config.createIriMapping(compound, "compound_from");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping(property, "relation"),
                     config.createIriMapping(compound, "compound_to"));
             */
@@ -69,7 +69,7 @@ class Compound
             /* TODO:
             String table = "compound_types";
             NodeMapping subject = config.createIriMapping(compound, "compound");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(rdfclass, "type"));
             */
@@ -79,7 +79,7 @@ class Compound
             /* TODO:
             String table = "compound_active_ingredients";
             NodeMapping subject = config.createIriMapping(compound, "compound");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:is_active_ingredient_of"),
                     config.createIriMapping(rdfclass, "ingredient"));
             */

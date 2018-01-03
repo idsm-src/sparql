@@ -4,6 +4,7 @@ import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.cellview.client.SimplePager;
 
 
+
 public class RetinaPagerResourcesFactory extends PagerResourcesFactory
 {
     @Override

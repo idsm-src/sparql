@@ -10,7 +10,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 /**
  * Pattern used to compute set union of a list of patterns ({@link #getPatterns} ).
- * 
+ *
  * <p>
  * Corresponds to the rule [67] GroupOrUnionGraphPattern in the SPARQL grammar, with at least one {@code UNION}.
  */

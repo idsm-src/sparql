@@ -159,7 +159,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                                 {
                                     queryState.handler.cancel();
                                 }
-                                catch (DatabaseException e)
+                                catch(DatabaseException e)
                                 {
                                     e.printStackTrace();
                                 }
@@ -222,7 +222,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
                         queryState.result = new QueryResult(result.getHeads(), items, truncated);
                     }
-                    catch (Throwable e) // (SQLException | IOException e)
+                    catch(Throwable e) // (SQLException | IOException e)
                     {
                         e.printStackTrace();
 
@@ -231,12 +231,12 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 }
             };
         }
-        catch (ParseExceptions | TranslateExceptions e)
+        catch(ParseExceptions | TranslateExceptions e)
         {
             e.printStackTrace();
             throw new QueryException();
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);
@@ -265,7 +265,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         {
             queryState.thread.join();
         }
-        catch (InterruptedException e)
+        catch(InterruptedException e)
         {
             e.printStackTrace();
             throw new DatabaseException(e); //FIXME: use different exception
@@ -341,7 +341,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch (URISyntaxException | ParseExceptions | SQLException | TranslateExceptions e)
+        catch(URISyntaxException | ParseExceptions | SQLException | TranslateExceptions e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);

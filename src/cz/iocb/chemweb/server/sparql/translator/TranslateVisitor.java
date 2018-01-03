@@ -122,7 +122,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     {
         /*
          * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
-         * 
+         *
          * FIXME: This is not valid in general!
          */
         if(select.getValues() != null)

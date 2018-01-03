@@ -167,7 +167,7 @@ public class Parser
             if(result != null)
                 result.setQueryVariables(usedVariables);
         }
-        catch (UncheckedParseException e)
+        catch(UncheckedParseException e)
         {
             exceptions.add(new ParseException(e));
         }

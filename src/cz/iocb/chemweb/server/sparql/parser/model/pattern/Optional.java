@@ -7,7 +7,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 /**
  * Pattern used to contain a pattern that may not succeed ({@link #getPattern}).
- * 
+ *
  * <p>
  * Corresponds to the rule [57] OptionalGraphPattern in the SPARQL grammar.
  */

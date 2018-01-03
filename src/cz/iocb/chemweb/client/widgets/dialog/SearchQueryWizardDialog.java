@@ -331,7 +331,7 @@ public class SearchQueryWizardDialog extends DialogBox
             if(val >= 0 && val <= 1)
                 return true;
         }
-        catch (NumberFormatException exp)
+        catch(NumberFormatException exp)
         {
 
         }
@@ -353,7 +353,7 @@ public class SearchQueryWizardDialog extends DialogBox
             if(val > 0)
                 return true;
         }
-        catch (NumberFormatException exp)
+        catch(NumberFormatException exp)
         {
 
         }
@@ -625,8 +625,7 @@ public class SearchQueryWizardDialog extends DialogBox
         //  return;
 
         if (!$wnd.File || !$wnd.FileReader || !$wnd.FileList || !$wnd.Blob)
-            $wnd
-                    .alert("The File APIs are not fully supported by your browser.");
+            $wnd.alert("The File APIs are not fully supported by your browser.");
 
         var reader = new $wnd.FileReader();
         var that = this;

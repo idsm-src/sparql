@@ -142,8 +142,7 @@ public class CodeMirror
             if (hint.linfo == null && hint.info != null)
                 hint.linfo = hint.info.replace(/ /g, '').toLowerCase();
 
-            if (hint.lname.includes(suffix)
-                    || (hint.linfo != null && hint.linfo.includes(suffix)))
+            if (hint.lname.includes(suffix) || (hint.linfo != null && hint.linfo.includes(suffix)))
                 result
                         .push({
                             text : set.prefix + ":" + hint.name,

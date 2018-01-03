@@ -24,7 +24,7 @@ public class DownloadServlet extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             e.printStackTrace();
             throw new ServletException();
@@ -39,7 +39,7 @@ public class DownloadServlet extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             e.printStackTrace();
             throw new ServletException();

@@ -107,7 +107,7 @@ public class SparqlDirective extends Directive
             context.put(varName, result);
             return true;
         }
-        catch (DatabaseException | ParseExceptions | SQLException | TranslateExceptions e)
+        catch(DatabaseException | ParseExceptions | SQLException | TranslateExceptions e)
         {
             log.error("sparql directive: " + e.getMessage());
             System.err.println(query);

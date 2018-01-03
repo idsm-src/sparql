@@ -66,12 +66,12 @@ public class DetailsPageServiceImpl extends RemoteServiceServlet implements Deta
 
             return writer.toString();
         }
-        catch (URISyntaxException e)
+        catch(URISyntaxException e)
         {
             // TODO:
             return "";
         }
-        catch (IOException e)
+        catch(IOException e)
         {
             // TODO:
             return "";

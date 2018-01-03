@@ -35,7 +35,7 @@ class Source
             /* TODO:
             String table = "source_subjects";
             NodeMapping subject = config.createIriMapping(source, "source");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("concept", "subject"));
             */

@@ -317,8 +317,7 @@ public class QueryPart extends ResizeComposite implements HasHandlers
         //  return;
 
         if (!$wnd.File || !$wnd.FileReader || !$wnd.FileList || !$wnd.Blob)
-            $wnd
-                    .alert("The File APIs are not fully supported by your browser.");
+            $wnd.alert("The File APIs are not fully supported by your browser.");
 
         var reader = new $wnd.FileReader();
         var that = this;

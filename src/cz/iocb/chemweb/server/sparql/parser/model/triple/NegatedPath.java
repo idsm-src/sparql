@@ -7,7 +7,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 /**
  * Path that cannot be traversed.
- * 
+ *
  * <p>
  * Corresponds to the case with {@code !} of the rule [94] PathPrimary in the SPARQL grammar.
  */

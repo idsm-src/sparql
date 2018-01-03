@@ -127,7 +127,8 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         }
 
         BinaryExpression.Operator operator = rightLiteral.getStringValue().startsWith("+")
-                ? BinaryExpression.Operator.Add : BinaryExpression.Operator.Subtract;
+                ? BinaryExpression.Operator.Add
+                : BinaryExpression.Operator.Subtract;
 
         rightLiteral.setStringValue(rightLiteral.getStringValue().substring(1));
         rightLiteral.setRange(

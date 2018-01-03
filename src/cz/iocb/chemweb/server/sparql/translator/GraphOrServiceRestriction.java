@@ -15,7 +15,7 @@ public class GraphOrServiceRestriction
 
     /**
      * Constructs the restriction object.
-     * 
+     *
      * @param restrictionType Type of restriction.
      * @param varOrIri Restricted variable or IRI.
      */
@@ -28,7 +28,7 @@ public class GraphOrServiceRestriction
 
     /**
      * Sets the SILENT modifier for the restriction object.
-     * 
+     *
      * @param isSilent Is the SILENT modifier applied?
      * @return The object itself.
      */
@@ -40,7 +40,7 @@ public class GraphOrServiceRestriction
 
     /**
      * Checks whether the restriction type is of the given type.
-     * 
+     *
      * @param restrictionType Restriction type to check.
      * @return true if the given restriction type matches.
      */
@@ -51,7 +51,7 @@ public class GraphOrServiceRestriction
 
     /**
      * Checks whether the SILENT modifier is applied.
-     * 
+     *
      * @return true if the SILENT modifier is applied.
      */
     public boolean isSilent()
@@ -61,7 +61,7 @@ public class GraphOrServiceRestriction
 
     /**
      * Get variable or IRI on which the restriction is applied.
-     * 
+     *
      * @return Variable or IRI.
      */
     public VarOrIri getVarOrIri()

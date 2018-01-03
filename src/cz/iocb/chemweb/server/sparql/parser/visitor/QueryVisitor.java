@@ -486,7 +486,7 @@ class PrologueVisitor extends BaseVisitor<Void>
         /*
         java.util.Optional<PrefixDefinition> existingPrefix = prologue.getPrefixes().stream()
                 .filter(p -> p.getName().equals(result.getName())).findFirst();
-
+        
         if(existingPrefix.isPresent())
         {
             // this should probably be a warning
@@ -697,7 +697,8 @@ class TripleExpander extends ComplexElementVisitor<Node>
         {
             Verb verb = property.getVerb();
             ProcedureDefinition callDefinition = verb instanceof IRI
-                    ? QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString()) : null;
+                    ? QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString())
+                    : null;
 
             if(callDefinition != null)
             {
@@ -894,7 +895,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
         {
             return super.visit(tree);
         }
-        catch (UncheckedParseException e)
+        catch(UncheckedParseException e)
         {
             QueryVisitor.getExceptionConsumer().accept(new ParseException(e));
 
@@ -953,7 +954,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
         {
             return super.visit(tree);
         }
-        catch (UncheckedParseException e)
+        catch(UncheckedParseException e)
         {
             QueryVisitor.getExceptionConsumer().accept(new ParseException(e));
 

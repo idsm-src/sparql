@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.servlets.endpoint;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -49,7 +48,7 @@ public class EndpointServlet extends HttpServlet
     private Parser parser;
     private PostgresDatabase db;
 
-    
+
     @Override
     public void init(ServletConfig config) throws ServletException
     {
@@ -57,18 +56,18 @@ public class EndpointServlet extends HttpServlet
 
         if(configClassName == null || configClassName.isEmpty())
             throw new IllegalArgumentException("Config class is not set");
-        
-        
+
+
         try
         {
             Class<?> configClass = Class.forName(configClassName);
             Method method = configClass.getMethod("get");
-            
+
             dbConfig = (SparqlDatabaseConfiguration) method.invoke(null);
             parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
             db = new PostgresDatabase(dbConfig.getConnectionPool());
         }
-        catch (ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
+        catch(ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
                 | IllegalArgumentException | InvocationTargetException e)
         {
             throw new ServletException(e);
@@ -79,7 +78,8 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException
     {
-        res.setHeader("access-control-allow-headers", "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+        res.setHeader("access-control-allow-headers",
+                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
         res.setHeader("access-control-allow-origin", "*");
         super.doOptions(req, res);
     }
@@ -117,7 +117,8 @@ public class EndpointServlet extends HttpServlet
     {
         /* TODO: take defaultGraphs and namedGraphs into the account */
 
-        res.setHeader("access-control-allow-headers", "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+        res.setHeader("access-control-allow-headers",
+                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
         res.setHeader("access-control-allow-origin", "*");
 
         try
@@ -144,7 +145,7 @@ public class EndpointServlet extends HttpServlet
                     res.setStatus(406);
             }
         }
-        catch (SQLException | TranslateExceptions | DatabaseException | ParseExceptions e)
+        catch(SQLException | TranslateExceptions | DatabaseException | ParseExceptions e)
         {
             throw new IOException(e);
         }

@@ -32,12 +32,12 @@ public class LiteralVisitor extends BaseVisitor<Literal>
             {
                 result.setTypeIri(new IriVisitor().visit(ctx.iri()));
             }
-            catch (UncheckedParseException ex)
+            catch(UncheckedParseException ex)
             {
                 throw ex;
             }
             // FIXME: it is needed?
-            catch (Throwable ex)
+            catch(Throwable ex)
             {
                 throw new UncheckedParseException(ErrorType.parsingException, ex, Range.compute(ctx), ex.getMessage());
             }

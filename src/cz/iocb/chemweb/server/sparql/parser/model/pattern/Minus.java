@@ -7,7 +7,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 /**
  * Pattern used to compute set difference with the given pattern ( {@link #getPattern}).
- * 
+ *
  * <p>
  * Corresponds to the rule [66] MinusGraphPattern in the SPARQL grammar.
  */

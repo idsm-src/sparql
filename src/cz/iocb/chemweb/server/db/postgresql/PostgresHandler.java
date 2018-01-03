@@ -23,7 +23,7 @@ public class PostgresHandler
         {
             stmt.cancel();
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new DatabaseException(e);
         }

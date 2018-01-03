@@ -25,7 +25,7 @@ public class GenerateConfig extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new IOException(e);
         }
@@ -39,7 +39,7 @@ public class GenerateConfig extends HttpServlet
         {
             processRequest(req, res);
         }
-        catch (SQLException e)
+        catch(SQLException e)
         {
             throw new IOException(e);
         }

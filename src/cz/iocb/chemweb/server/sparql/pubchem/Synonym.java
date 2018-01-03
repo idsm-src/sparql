@@ -33,7 +33,7 @@ class Synonym
             /* TODO:
             String table = "synonym_types";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

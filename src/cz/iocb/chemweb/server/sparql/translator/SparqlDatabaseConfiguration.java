@@ -129,18 +129,18 @@ public abstract class SparqlDatabaseConfiguration
     {
         HashSet<String> set = new HashSet<String>();
 
-        try (Connection connection = connectionPool.getConnection())
+        try(Connection connection = connectionPool.getConnection())
         {
-            try (PreparedStatement statement = connection.prepareStatement("select iri from " + table))
+            try(PreparedStatement statement = connection.prepareStatement("select iri from " + table))
             {
-                try (java.sql.ResultSet result = statement.executeQuery())
+                try(java.sql.ResultSet result = statement.executeQuery())
                 {
                     while(result.next())
                         set.add(result.getString(1));
                 }
             }
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             throw new RuntimeException(e);
         }

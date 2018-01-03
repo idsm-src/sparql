@@ -14,18 +14,18 @@ public class PostgresSchema extends DatabaseSchema
 {
     public PostgresSchema(ConnectionPool connectionPool) throws SQLException
     {
-        try (Connection connection = connectionPool.getConnection())
+        try(Connection connection = connectionPool.getConnection())
         {
             DatabaseMetaData metaData = connection.getMetaData();
 
-            try (ResultSet tables = metaData.getTables(null, null, null, new String[] { "TABLE", "VIEW" }))
+            try(ResultSet tables = metaData.getTables(null, null, null, new String[] { "TABLE", "VIEW" }))
             {
                 while(tables.next())
                 {
                     String table = tables.getString("TABLE_NAME");
                     List<List<String>> pkeys = new ArrayList<List<String>>();
 
-                    try (ResultSet indexes = metaData.getIndexInfo(null, null, table, true, false))
+                    try(ResultSet indexes = metaData.getIndexInfo(null, null, table, true, false))
                     {
                         List<String> columns = null;
 
@@ -49,7 +49,7 @@ public class PostgresSchema extends DatabaseSchema
                     primaryKeys.put(table, pkeys);
 
 
-                    try (ResultSet indexes = metaData.getCrossReference(null, null, table, null, null, null))
+                    try(ResultSet indexes = metaData.getCrossReference(null, null, table, null, null, null))
                     {
                         List<List<KeyPair>> fkeys = null;
                         List<KeyPair> columns = null;
