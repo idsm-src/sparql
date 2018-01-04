@@ -1,6 +1,5 @@
 /gwt-unitCache/
-/chemweb.war
-/chemweb-devel.war
+/*.war
 /war/chemweb/
 /war/WEB-INF/classes/
 /war/WEB-INF/deploy/
