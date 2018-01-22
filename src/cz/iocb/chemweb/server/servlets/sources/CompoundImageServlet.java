@@ -295,7 +295,7 @@ public class CompoundImageServlet extends HttpServlet
 
             AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
 
-            ElectronDonation model = ElectronDonation.cdk();
+            ElectronDonation model = ElectronDonation.cdkAllowingExocyclic();
             CycleFinder cycles = Cycles.cdkAromaticSet();
             Aromaticity aromaticity = new Aromaticity(model, cycles);
             aromaticity.apply(molecule);
