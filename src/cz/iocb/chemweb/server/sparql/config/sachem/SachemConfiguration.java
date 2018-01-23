@@ -56,6 +56,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         String sachem = prefixes.get("sachem");
 
         HashSet<String> queryFormatValues = new HashSet<String>();
+        queryFormatValues.add(sachem + "UnspecifiedFormat");
         queryFormatValues.add(sachem + "SMILES");
         queryFormatValues.add(sachem + "MolFile");
         queryFormatValues.add(sachem + "RGroup");
@@ -103,7 +104,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
                 "orchem_substructure_search");
         subsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
-                new IRI(sachem + "SMILES")));
+                new IRI(sachem + "UnspecifiedFormat")));
         subsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
         subsearch.addParameter(new ParameterDefinition(sachem + "graphMode", getIriClass("graphMode"),
@@ -125,7 +126,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
                 "orchem_similarity_search");
         simsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
-                new IRI(sachem + "SMILES")));
+                new IRI(sachem + "UnspecifiedFormat")));
         simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
@@ -140,7 +141,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
                 "orchem_similarity_search");
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
-                new IRI(sachem + "SMILES")));
+                new IRI(sachem + "UnspecifiedFormat")));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
