@@ -125,7 +125,7 @@ class Protein
             /* TODO:
             String table = "protein_types";
             NodeMapping subject = config.createIriMapping(protein, "protein");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

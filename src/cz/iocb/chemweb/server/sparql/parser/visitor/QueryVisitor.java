@@ -482,7 +482,7 @@ class PrologueVisitor extends BaseVisitor<Void>
         /*
         java.util.Optional<PrefixDefinition> existingPrefix = prologue.getPrefixes().stream()
                 .filter(p -> p.getName().equals(result.getName())).findFirst();
-        
+
         if(existingPrefix.isPresent())
         {
             // this should probably be a warning
