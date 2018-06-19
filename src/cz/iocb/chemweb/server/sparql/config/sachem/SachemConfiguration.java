@@ -101,7 +101,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* orchem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                "orchem_substructure_search");
+                "sachem_substructure_search");
         subsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
@@ -123,7 +123,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* orchem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                "orchem_similarity_search");
+                "sachem_similarity_search");
         simsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
@@ -138,7 +138,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* orchem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                "orchem_similarity_search");
+                "sachem_similarity_search");
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
