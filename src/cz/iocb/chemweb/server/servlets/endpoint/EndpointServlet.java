@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -8,7 +9,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -197,8 +197,9 @@ public class EndpointServlet extends HttpServlet
     private static void writeXml(HttpServletResponse res, Result result) throws IOException
     {
         res.setHeader("content-type", "application/sparql-results+xml");
+        res.setCharacterEncoding("UTF-8");
 
-        ServletOutputStream out = res.getOutputStream();
+        PrintWriter out = res.getWriter();
 
         out.println("<?xml version=\"1.0\"?>");
         out.println("<sparql xmlns=\"http://www.w3.org/2005/sparql-results#\">");
@@ -281,8 +282,9 @@ public class EndpointServlet extends HttpServlet
     private static void writeJson(HttpServletResponse res, Result result) throws IOException
     {
         res.setHeader("content-type", "application/sparql-results+json");
+        res.setCharacterEncoding("UTF-8");
 
-        ServletOutputStream out = res.getOutputStream();
+        PrintWriter out = res.getWriter();
 
         out.print("{\n\t\"head\": { \"vars\": [ ");
 
@@ -379,8 +381,9 @@ public class EndpointServlet extends HttpServlet
     private static void writeTsv(HttpServletResponse res, Result result) throws IOException
     {
         res.setHeader("content-type", "text/tab-separated-values");
+        res.setCharacterEncoding("UTF-8");
 
-        ServletOutputStream out = res.getOutputStream();
+        PrintWriter out = res.getWriter();
 
 
         boolean hasHead = false;
@@ -453,8 +456,9 @@ public class EndpointServlet extends HttpServlet
     private static void writeCsv(HttpServletResponse res, Result result) throws IOException
     {
         res.setHeader("content-type", "text/csv");
+        res.setCharacterEncoding("UTF-8");
 
-        ServletOutputStream out = res.getOutputStream();
+        PrintWriter out = res.getWriter();
 
 
         boolean hasHead = false;
@@ -494,7 +498,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeXmlValue(ServletOutputStream out, String value) throws IOException
+    private static void writeXmlValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -514,7 +518,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeJsonValue(ServletOutputStream out, String value) throws IOException
+    private static void writeJsonValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -538,7 +542,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTsvValue(ServletOutputStream out, String value) throws IOException
+    private static void writeTsvValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -556,7 +560,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTsvIriValue(ServletOutputStream out, String value) throws IOException
+    private static void writeTsvIriValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -576,7 +580,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTsvLiteralValue(ServletOutputStream out, String value) throws IOException
+    private static void writeTsvLiteralValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
         {
@@ -596,7 +600,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeCsvValue(ServletOutputStream out, String value) throws IOException
+    private static void writeCsvValue(PrintWriter out, String value) throws IOException
     {
         boolean mustBeQuoted = false;
 
