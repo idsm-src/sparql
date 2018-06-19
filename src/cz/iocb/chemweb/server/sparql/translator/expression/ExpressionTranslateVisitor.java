@@ -684,7 +684,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
         Object value = literal.getValue();
 
         if(type.equals("http://www.w3.org/2001/XMLSchema#string"))
-            value = "'" + ((String) value).replaceAll("'", "\\'") + "'";
+            value = "'" + ((String) value).replaceAll("'", "''") + "'";
 
         for(LiteralClass literalClass : LiteralClass.getClasses())
             if(literalClass.getTypeIri().equals(type))

@@ -85,7 +85,7 @@ public class LiteralClass extends ResourceClass
         Object value = literal.getValue();
 
         if(value instanceof String)
-            return "'" + value.toString().replaceAll("'", "\\'") + "'";
+            return "'" + value.toString().replaceAll("'", "''") + "'";
         else
             return value.toString();
     }
