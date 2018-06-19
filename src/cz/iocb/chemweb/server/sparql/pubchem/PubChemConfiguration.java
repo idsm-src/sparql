@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Properties;
 import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
@@ -106,7 +108,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
         prefixes.put("template", "http://bioinfo.iocb.cz/0.9/template#");
 
-        prefixes.put("orchem", "http://bioinfo.iocb.cz/rdf/0.9/orchem#");
+        prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/");
         prefixes.put("fulltext", "http://bioinfo.iocb.cz/rdf/0.9/fulltext#");
     }
 
@@ -131,6 +133,43 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Source.addIriClasses(this);
         Substance.addIriClasses(this);
         Synonym.addIriClasses(this);
+
+
+        String sachem = prefixes.get("sachem");
+
+        HashSet<String> queryFormatValues = new HashSet<String>();
+        queryFormatValues.add(sachem + "UnspecifiedFormat");
+        queryFormatValues.add(sachem + "SMILES");
+        queryFormatValues.add(sachem + "MolFile");
+        queryFormatValues.add(sachem + "RGroup");
+        addIriClass(new IriClass("queryFormat", Arrays.asList("integer"), queryFormatValues));
+
+        HashSet<String> graphModeValues = new HashSet<String>();
+        graphModeValues.add(sachem + "substructureSearch");
+        graphModeValues.add(sachem + "exactSearch");
+        addIriClass(new IriClass("graphMode", Arrays.asList("integer"), graphModeValues));
+
+        HashSet<String> chargeModeValues = new HashSet<String>();
+        chargeModeValues.add(sachem + "ignoreCharges");
+        chargeModeValues.add(sachem + "defaultChargeAsZero");
+        chargeModeValues.add(sachem + "defaultChargeAsAny");
+        addIriClass(new IriClass("chargeMode", Arrays.asList("integer"), chargeModeValues));
+
+        HashSet<String> isotopeModeValues = new HashSet<String>();
+        isotopeModeValues.add(sachem + "ignoreIsotopes");
+        isotopeModeValues.add(sachem + "defaultIsotopeAsStandard");
+        isotopeModeValues.add(sachem + "defaultIsotopeAsAny");
+        addIriClass(new IriClass("isotopeMode", Arrays.asList("integer"), isotopeModeValues));
+
+        HashSet<String> stereoModeValues = new HashSet<String>();
+        stereoModeValues.add(sachem + "ignoreStrereo");
+        stereoModeValues.add(sachem + "strictStereo");
+        addIriClass(new IriClass("stereoMode", Arrays.asList("integer"), stereoModeValues));
+
+        HashSet<String> tautomerModeValues = new HashSet<String>();
+        tautomerModeValues.add(sachem + "ignoreTautomers");
+        tautomerModeValues.add(sachem + "inchiTautomers");
+        addIriClass(new IriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
     }
 
 
@@ -158,66 +197,60 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
     private void loadProcedures()
     {
-        String orchem = prefixes.get("orchem");
+        String sachem = prefixes.get("sachem");
         String fulltext = prefixes.get("fulltext");
-
         IriClass compound = getIriClass("compound");
 
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new ProcedureDefinition(orchem + "substructureSearch",
-                "orchem_substructure_search");
-        subsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
-        subsearch.addParameter(
-                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
-        subsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
+                "sachem_substructure_search");
+        subsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        subsearch.addParameter(new ParameterDefinition(orchem + "strictStereo", LiteralClass.xsdBoolean,
-                new Literal("false", new IRI(Xsd.BOOLEAN))));
-        subsearch.addParameter(new ParameterDefinition(orchem + "exact", LiteralClass.xsdBoolean,
-                new Literal("false", new IRI(Xsd.BOOLEAN))));
-        subsearch.addParameter(new ParameterDefinition(orchem + "tautomers", LiteralClass.xsdBoolean,
-                new Literal("false", new IRI(Xsd.BOOLEAN))));
+        subsearch.addParameter(new ParameterDefinition(sachem + "graphMode", getIriClass("graphMode"),
+                new IRI(sachem + "substructureSearch")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("chargeMode"),
+                new IRI(sachem + "defaultChargeAsAny")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotopeMode"),
+                new IRI(sachem + "ignoreIsotopes")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereoMode"),
+                new IRI(sachem + "ignoreStrereo")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomerMode"),
+                new IRI(sachem + "ignoreTautomers")));
         subsearch.addResult(new ResultDefinition(compound));
         procedures.put(subsearch.getProcedureName(), subsearch);
 
 
         /* orchem:similaritySearch */
-        ProcedureDefinition simsearch = new ProcedureDefinition(orchem + "similaritySearch",
-                "orchem_similarity_search");
-        simsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
-        simsearch.addParameter(
-                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
-        simsearch.addParameter(new ParameterDefinition(orchem + "cutoff", LiteralClass.xsdFloat,
+        ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
+                "sachem_similarity_search");
+        simsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+        simsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
-        simsearch.addResult(new ResultDefinition(orchem + "compound", compound, "compound"));
-        simsearch.addResult(new ResultDefinition(orchem + "score", LiteralClass.xsdFloat, "score"));
+        simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
+        simsearch.addResult(new ResultDefinition(sachem + "score", LiteralClass.xsdFloat, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* orchem:similarCompoundSearch */
-        ProcedureDefinition simcmpsearch = new ProcedureDefinition(orchem + "similarCompoundSearch",
-                "orchem_similarity_search");
-        simcmpsearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
-        simcmpsearch.addParameter(
-                new ParameterDefinition(orchem + "queryType", LiteralClass.xsdString, new Literal("SMILES")));
-        simcmpsearch.addParameter(new ParameterDefinition(orchem + "cutoff", LiteralClass.xsdFloat,
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
+                "sachem_similarity_search");
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
                 new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simcmpsearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
                 new Literal("-1", new IRI(Xsd.INTEGER))));
         simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
-
-
-        /* orchem:smartsSearch */
-        ProcedureDefinition smartssearch = new ProcedureDefinition(orchem + "smartsSearch", "smartsSearch");
-        smartssearch.addParameter(new ParameterDefinition(orchem + "query", LiteralClass.xsdString, null));
-        smartssearch.addParameter(new ParameterDefinition(orchem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
-        smartssearch.addResult(new ResultDefinition(compound));
-        procedures.put(smartssearch.getProcedureName(), smartssearch);
 
 
         /* fulltext:bioassaySearch */

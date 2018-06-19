@@ -40,7 +40,7 @@ public class SearchQueryWizardDialog extends DialogBox
 
     private static enum Methods
     {
-        SUBSEARCH, SIMSEARCH, EXACTSEARCH, SMARTSEARCH;
+        SUBSEARCH, SIMSEARCH, EXACTSEARCH;
     }
 
 
@@ -148,14 +148,6 @@ public class SearchQueryWizardDialog extends DialogBox
                 resultThresholdTextBox.getElement().getStyle().setZIndex(2);
                 useTautomersListBox.getElement().getStyle().setZIndex(1);
                 scoreCheckBox.setEnabled(true);
-                break;
-
-            case SMARTSEARCH:
-                resultThresholdLabel.setVisible(false);
-                resultThresholdTextBox.setVisible(false);
-                useTautomersLabel.setVisible(false);
-                useTautomersListBox.setVisible(false);
-                scoreCheckBox.setEnabled(false);
                 break;
         }
 
@@ -393,45 +385,36 @@ public class SearchQueryWizardDialog extends DialogBox
         if(searchCompounds && !mol.trim().isEmpty())
         {
             if(method == Methods.SIMSEARCH)
-                query.append("\n  [ orchem:compound ?COMPOUND; orchem:score ?SCORE ]\n");
+                query.append("\n  [ sachem:compound ?COMPOUND; sachem:score ?SCORE ]\n");
             else
                 query.append("\n  ?COMPOUND ");
 
             if(method == Methods.EXACTSEARCH || method == Methods.SUBSEARCH)
-                query.append("orchem:substructureSearch");
+                query.append("sachem:substructureSearch");
             else if(method == Methods.SIMSEARCH)
-                query.append("    orchem:similaritySearch");
-            else /*if(method == Methods.SMARTSEARCH)*/
-                query.append("orchem:smartsSearch");
+                query.append("    sachem:similaritySearch");
 
-            query.append(" [\n      orchem:query '''");
+            query.append(" [\n      sachem:query '''");
             query.append(queryTextArea.getValue());
             query.append("'''");
-
-            if(method != Methods.SMARTSEARCH)
-            {
-                query.append(";\n      orchem:queryType \"");
-                query.append(queryTypeListBox.getSelectedValue());
-                query.append("\"");
-            }
 
 
             String limit = resultLimitTextBox.getValue().trim();
 
             if(!limit.isEmpty())
             {
-                query.append(";\n      orchem:topn ");
+                query.append(";\n      sachem:topn ");
                 query.append(limit);
             }
 
             if(method == Methods.EXACTSEARCH)
             {
-                query.append(";\n      orchem:exact true");
+                query.append(";\n      sachem:graphMode sachem:exactSearch");
             }
 
             if(method == Methods.SUBSEARCH || method == Methods.EXACTSEARCH)
             {
-                query.append(";\n      orchem:tautomers ");
+                query.append(";\n      sachem:tautomerMode ");
                 query.append(useTautomersListBox.getSelectedValue());
             }
 
@@ -439,8 +422,9 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(method == Methods.SIMSEARCH && !threshold.isEmpty())
             {
-                query.append(";\n      orchem:cutoff ");
+                query.append(";\n      sachem:cutoff \"");
                 query.append(threshold);
+                query.append("\"^^xsd:float");
             }
 
             query.append(" ].\n");
@@ -589,13 +573,12 @@ public class SearchQueryWizardDialog extends DialogBox
 
         queryMethodListBox.addItem("Substructure search", "SUBSEARCH");
         queryMethodListBox.addItem("Exact search", "EXACTSEARCH");
-        queryMethodListBox.addItem("SMARTS search", "SMARTSEARCH");
         queryMethodListBox.addItem("Similarity search", "SIMSEARCH");
 
-        queryTypeListBox.addItem("MOL/SDF file", "MOL");
-        queryTypeListBox.addItem("SMILES", "SMILES");
-        useTautomersListBox.addItem("yes", "true");
-        useTautomersListBox.addItem("no", "false");
+        queryTypeListBox.addItem("MOL/SDF file", "sachem:MolFile");
+        queryTypeListBox.addItem("SMILES", "sachem:SMILES");
+        useTautomersListBox.addItem("yes", "sachem:inchiTautomers");
+        useTautomersListBox.addItem("no", "sachem:ignoreTautomers");
 
         orderByListBox.addItem("(none)", "NONE");
         orderByListBox.addItem("Compound ID", "COMPOUND");
