@@ -519,7 +519,7 @@ public class EndpointServlet extends HttpServlet
         for(char val : value.toCharArray())
         {
             if(val == '"')
-                out.print("\"");
+                out.print("\\\"");
             else if(val == '\\')
                 out.print("\\\\");
             else if(val == '\n')
