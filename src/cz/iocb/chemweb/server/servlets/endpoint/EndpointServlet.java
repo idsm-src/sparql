@@ -224,6 +224,10 @@ public class EndpointServlet extends HttpServlet
             {
                 RdfNode node = row.get(head);
 
+                if(node == null)
+                    continue;
+
+
                 out.print("\t\t\t<binding name=\"");
                 writeXmlValue(out, head);
                 out.print("\">");
@@ -256,7 +260,7 @@ public class EndpointServlet extends HttpServlet
                     writeXmlValue(out, node.getValue());
                     out.print("</literal>");
                 }
-                else
+                else if(node instanceof BlankNode)
                 {
                     out.print("<bnode>");
                     writeXmlValue(out, node.getValue());
@@ -314,6 +318,12 @@ public class EndpointServlet extends HttpServlet
 
             for(String head : result.getHeads())
             {
+                RdfNode node = row.get(head);
+
+                if(node == null)
+                    continue;
+
+
                 if(hasResultHead)
                     out.println(',');
                 else
@@ -323,8 +333,6 @@ public class EndpointServlet extends HttpServlet
                 writeJsonValue(out, head);
                 out.println("\": {");
 
-
-                RdfNode node = row.get(head);
 
                 out.print("\t\t\t\"type\": ");
 
