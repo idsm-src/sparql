@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
+import cz.iocb.chemweb.server.db.BlankNode;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.IriNode;
 import cz.iocb.chemweb.server.db.LanguageTaggedLiteral;
@@ -40,7 +41,7 @@ public class EndpointServlet extends HttpServlet
 {
     static enum OutputType
     {
-        NONE, XML, JSON
+        NONE, XML, JSON, TSV, CSV
     };
 
 
@@ -141,6 +142,12 @@ public class EndpointServlet extends HttpServlet
                 case XML:
                     writeXml(res, result);
                     break;
+                case TSV:
+                    writeTsv(res, result);
+                    break;
+                case CSV:
+                    writeCsv(res, result);
+                    break;
                 default:
                     res.setStatus(406);
             }
@@ -171,6 +178,12 @@ public class EndpointServlet extends HttpServlet
 
             if(value.matches("application/sparql-results\\+json;?.*"))
                 return OutputType.JSON;
+
+            if(value.matches("text/tab-separated-values;?.*"))
+                return OutputType.TSV;
+
+            if(value.matches("text/csv;?.*"))
+                return OutputType.CSV;
         }
 
         if(common)
@@ -355,6 +368,124 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static void writeTsv(HttpServletResponse res, Result result) throws IOException
+    {
+        res.setHeader("content-type", "text/tab-separated-values");
+
+        ServletOutputStream out = res.getOutputStream();
+
+
+        boolean hasHead = false;
+
+        for(String head : result.getHeads())
+        {
+            if(hasHead)
+                out.print("\t");
+            else
+                hasHead = true;
+
+            writeTsvValue(out, head);
+        }
+
+        out.print("\r\n");
+
+
+        for(Row row : result)
+        {
+            boolean hasResult = false;
+
+            for(String head : result.getHeads())
+            {
+                if(hasResult)
+                    out.print('\t');
+                else
+                    hasResult = true;
+
+                RdfNode node = row.get(head);
+
+                if(node instanceof IriNode)
+                {
+                    out.print('<');
+                    writeTsvIriValue(out, node.getValue());
+                    out.print('>');
+                }
+                else if(node instanceof LanguageTaggedLiteral)
+                {
+                    out.print('"');
+                    writeTsvLiteralValue(out, node.getValue());
+                    out.print("\"@");
+                    writeTsvValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+                }
+                else if(node instanceof TypedLiteral)
+                {
+                    out.print('"');
+                    writeTsvLiteralValue(out, node.getValue());
+                    out.print("\"^^<");
+                    writeTsvIriValue(out, ((TypedLiteral) node).getDatatype().getValue());
+                    out.print('>');
+                }
+                else if(node instanceof Literal)
+                {
+                    out.print('"');
+                    writeTsvLiteralValue(out, node.getValue());
+                    out.print('"');
+                }
+                else if(node instanceof BlankNode)
+                {
+                    out.print("_:");
+                    writeTsvValue(out, node.getValue());
+                }
+            }
+
+            out.print("\r\n");
+        }
+    }
+
+
+    private static void writeCsv(HttpServletResponse res, Result result) throws IOException
+    {
+        res.setHeader("content-type", "text/csv");
+
+        ServletOutputStream out = res.getOutputStream();
+
+
+        boolean hasHead = false;
+
+        for(String head : result.getHeads())
+        {
+            if(hasHead)
+                out.print(",");
+            else
+                hasHead = true;
+
+            writeCsvValue(out, head);
+        }
+
+        out.print("\r\n");
+
+
+        for(Row row : result)
+        {
+            boolean hasResult = false;
+
+            for(String head : result.getHeads())
+            {
+                if(hasResult)
+                    out.print(',');
+                else
+                    hasResult = true;
+
+                RdfNode node = row.get(head);
+
+                if(node != null)
+                    writeCsvValue(out, node.getValue());
+            }
+
+            out.print("\r\n");
+        }
+    }
+
+
     private static void writeXmlValue(ServletOutputStream out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -396,5 +527,93 @@ public class EndpointServlet extends HttpServlet
             else if(val < 32)
                 out.print("\\u001" + ('A' + val - 26));
         }
+    }
+
+
+    private static void writeTsvValue(ServletOutputStream out, String value) throws IOException
+    {
+        for(char val : value.toCharArray())
+        {
+            if(val == '\\')
+                out.print("\\\\");
+            else if(val == '\t')
+                out.print("\\t");
+            else if(val == '\r')
+                out.print("\\r");
+            else if(val == '\n')
+                out.print("\\n");
+            else
+                out.print(val);
+        }
+    }
+
+
+    private static void writeTsvIriValue(ServletOutputStream out, String value) throws IOException
+    {
+        for(char val : value.toCharArray())
+        {
+            if(val == '\\')
+                out.print("\\\\");
+            else if(val == '\t')
+                out.print("\\t");
+            else if(val == '\r')
+                out.print("\\r");
+            else if(val == '\n')
+                out.print("\\n");
+            else if(val == '>')
+                out.print("\\>");
+            else
+                out.print(val);
+        }
+    }
+
+
+    private static void writeTsvLiteralValue(ServletOutputStream out, String value) throws IOException
+    {
+        for(char val : value.toCharArray())
+        {
+            if(val == '\\')
+                out.print("\\\\");
+            else if(val == '\t')
+                out.print("\\t");
+            else if(val == '\r')
+                out.print("\\r");
+            else if(val == '\n')
+                out.print("\\n");
+            else if(val == '"')
+                out.print("\\\"");
+            else
+                out.print(val);
+        }
+    }
+
+
+    private static void writeCsvValue(ServletOutputStream out, String value) throws IOException
+    {
+        boolean mustBeQuoted = false;
+
+        for(char val : value.toCharArray())
+        {
+            if(val == '"' || val == ',' || val == '\n' || val == '\r')
+            {
+                mustBeQuoted = true;
+                break;
+            }
+        }
+
+
+        if(mustBeQuoted)
+            out.print('"');
+
+        for(char val : value.toCharArray())
+        {
+            if(val == '"')
+                out.print("\"\"");
+            else
+                out.print(val);
+        }
+
+        if(mustBeQuoted)
+            out.print('"');
     }
 }
