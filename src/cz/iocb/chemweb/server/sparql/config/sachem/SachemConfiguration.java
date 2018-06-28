@@ -47,7 +47,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("xsd", "http://www.w3.org/2001/XMLSchema#");
 
         prefixes.put(name, iriPrefix);
-        prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/");
+        prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
     }
 
 

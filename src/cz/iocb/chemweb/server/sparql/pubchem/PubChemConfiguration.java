@@ -108,8 +108,8 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
         prefixes.put("template", "http://bioinfo.iocb.cz/0.9/template#");
 
-        prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/");
-        prefixes.put("fulltext", "http://bioinfo.iocb.cz/rdf/0.9/fulltext#");
+        prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
+        prefixes.put("fulltext", "http://bioinfo.uochb.cas.cz/rdf/v1.0/fulltext#");
     }
 
 
