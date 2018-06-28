@@ -161,6 +161,27 @@ public class EndpointServlet extends HttpServlet
 
     private static OutputType detectOutputType(HttpServletRequest req)
     {
+        // IOCB SPARQL protocol extension
+        String format = req.getParameter("format");
+
+        if(format != null)
+        {
+            switch(format)
+            {
+                case "xml":
+                    return OutputType.XML;
+                case "json":
+                    return OutputType.JSON;
+                case "tsv":
+                    return OutputType.TSV;
+                case "csv":
+                    return OutputType.CSV;
+                default:
+                    return OutputType.NONE;
+            }
+        }
+
+
         String accepts = req.getHeader("accept");
 
         if(accepts == null)
