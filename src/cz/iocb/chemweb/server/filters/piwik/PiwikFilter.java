@@ -1,10 +1,12 @@
 package cz.iocb.chemweb.server.filters.piwik;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.Properties;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -16,6 +18,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.io.IOUtils;
 import org.piwik.java.tracking.PiwikRequest;
 import org.piwik.java.tracking.PiwikTracker;
+import cz.iocb.chemweb.server.Utils;
 
 
 
@@ -32,6 +35,7 @@ public class PiwikFilter implements Filter
     @Override
     public void init(FilterConfig config) throws ServletException
     {
+        /* obtain the value of parameter siteId */
         String siteIdString = config.getInitParameter("siteId");
 
         if(siteIdString == null || siteIdString.isEmpty())
@@ -39,17 +43,44 @@ public class PiwikFilter implements Filter
 
         siteId = Integer.parseInt(siteIdString);
 
+
+        /* obtain the value of parameter hostUrl */
         hostUrl = config.getInitParameter("hostUrl");
+
         if(hostUrl == null || hostUrl.isEmpty())
             throw new IllegalArgumentException("Host URL not set, please set init-param 'hostUrl' in web.xml");
 
-        authToken = config.getInitParameter("authToken");
-        if(authToken == null || authToken.isEmpty())
-            throw new IllegalArgumentException("AuthToken not set, please set init-param 'authToken' in web.xml");
 
+        /* obtain the value of parameter rpc */
         String rpcString = config.getInitParameter("rpc");
+
         if(rpcString != null && !rpcString.isEmpty())
             rpc = Boolean.parseBoolean(rpcString);
+
+
+        /* obtain the value of parameter authToken */
+        String authTokenFile = config.getInitParameter("authToken");
+
+        if(authTokenFile == null || authTokenFile.isEmpty())
+            throw new IllegalArgumentException(
+                    "AuthToken property file not set, please set init-param 'authToken' in web.xml");
+
+        try
+        {
+            if(!authTokenFile.startsWith("/"))
+                authTokenFile = Utils.getConfigDirectory() + "/" + authTokenFile;
+
+            Properties properties = new Properties();
+            properties.load(new FileInputStream(authTokenFile));
+            authToken = properties.getProperty("authToken");
+        }
+        catch(IOException e)
+        {
+            throw new IllegalArgumentException("Cannot load authToken property file " + authTokenFile);
+        }
+
+        if(authToken == null || authToken.isEmpty())
+            throw new IllegalArgumentException("AuthToken property file " + authTokenFile + " is not valid");
 
 
         cookieName = "_pk_id." + siteId + ".";
