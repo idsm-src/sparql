@@ -43,7 +43,7 @@
     </init-param>
     <init-param>
       <param-name>authToken</param-name>
-      <param-value>5997045117f26014cce5de5c4a071ce0</param-value>
+      <param-value>piwik.properties</param-value>
     </init-param>
     <init-param>
       <param-name>rpc</param-name>
@@ -54,31 +54,6 @@
     <filter-name>PiwikFilterQuery</filter-name>
     <url-pattern>/chemweb/query</url-pattern>
     <url-pattern>/chemweb/details</url-pattern>
-  </filter-mapping>
-
-
-  <filter>
-    <filter-name>PiwikFilterSachem</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param>
-      <param-name>siteId</param-name>
-      <param-value>4</param-value>
-    </init-param>
-    <init-param>
-      <param-name>hostUrl</param-name>
-      <param-value>http://localhost/piwik/piwik.php</param-value>
-    </init-param>
-    <init-param>
-      <param-name>authToken</param-name>
-      <param-value>5997045117f26014cce5de5c4a071ce0</param-value>
-    </init-param>
-    <init-param>
-      <param-name>rpc</param-name>
-      <param-value>false</param-value>
-    </init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>PiwikFilterSachem</filter-name>
     <url-pattern>/endpoint/*</url-pattern>
   </filter-mapping>
 
