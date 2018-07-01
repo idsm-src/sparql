@@ -16,6 +16,13 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public class LiteralVisitor extends BaseVisitor<Literal>
 {
+    private final QueryVisitorContext context;
+
+    public LiteralVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
@@ -30,7 +37,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         {
             try
             {
-                result.setTypeIri(new IriVisitor().visit(ctx.iri()));
+                result.setTypeIri(new IriVisitor(context).visit(ctx.iri()));
             }
             catch(UncheckedParseException ex)
             {

@@ -1,7 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser;
 
-import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
-
 
 
 /**
@@ -13,21 +11,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 public abstract class BaseElement implements Element
 {
     private Range range;
-
-    @Override
-    public String toString()
-    {
-        ToStringVisitor visitor = new ToStringVisitor();
-        visitor.visitElement(this);
-        return visitor.getString();
-    }
-
-    public String toString(Prologue prologue)
-    {
-        ToStringVisitor visitor = new ToStringVisitor(prologue);
-        visitor.visitElement(this);
-        return visitor.getString();
-    }
 
     @Override
     public Range getRange()

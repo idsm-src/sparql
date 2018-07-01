@@ -62,14 +62,10 @@ public class ToStringVisitor extends ElementVisitor<Void>
     private final int indentationMultiplier = 4;
     boolean shouldIndent = false;
     boolean topLevel = true;
-    protected boolean noIriSimplification = true;
-    protected boolean ignorePredefinedPrefixes = true;
 
     public ToStringVisitor(Prologue prologue)
     {
         this.prologue = prologue;
-        noIriSimplification = false;
-        ignorePredefinedPrefixes = false;
     }
 
     public ToStringVisitor()
@@ -168,7 +164,7 @@ public class ToStringVisitor extends ElementVisitor<Void>
         if(!prologue.getBase().getUri().toString().equals(""))
         {
             word("BASE");
-            word(prologue.getBase().toString(null, false, true));
+            word(prologue.getBase().toString());
             newLine();
         }
 
@@ -186,9 +182,7 @@ public class ToStringVisitor extends ElementVisitor<Void>
         word("DEFINE");
         visit(define.getKey());
         word();
-        boolean prev = noIriSimplification;
         visitElements(define.getValues());
-        noIriSimplification = prev;
         newLine();
 
         return null;
@@ -215,7 +209,7 @@ public class ToStringVisitor extends ElementVisitor<Void>
     {
         word("PREFIX");
         word(prefix.getName() + ':');
-        word(prefix.getIri().toString(null, false, true));
+        word(prefix.getIri().toString());
         newLine();
 
         return null;
@@ -647,7 +641,7 @@ public class ToStringVisitor extends ElementVisitor<Void>
     @Override
     public Void visit(IRI iri)
     {
-        write(iri.toString(prologue, noIriSimplification, ignorePredefinedPrefixes));
+        write(iri.toString(prologue));
 
         return null;
     }

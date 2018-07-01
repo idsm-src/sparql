@@ -26,6 +26,13 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.SequencePath;
 
 public class PathVisitor extends BaseVisitor<Path>
 {
+    private final QueryVisitorContext context;
+
+    public PathVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     private List<Path> visitPathList(List<? extends ParserRuleContext> pathSequenceContexts)
     {
         return pathSequenceContexts.stream().map(this::visit).collect(Collectors.toList());
@@ -114,7 +121,7 @@ public class PathVisitor extends BaseVisitor<Path>
     @Override
     public IRI visitIri(IriContext ctx)
     {
-        return new IriVisitor().visit(ctx);
+        return new IriVisitor(context).visit(ctx);
     }
 
     @Override

@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.parser.BaseComplexNode;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
-import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 
 
 
@@ -73,21 +72,19 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path, Define
     }
 
 
-    public String toString(Prologue prologue, boolean noIriSimplification, boolean ignorePredefinedPrefixes)
+    @Override
+    public String toString()
     {
-        if(noIriSimplification)
+        return "<" + uri + ">";
+    }
+
+
+    public String toString(Prologue prologue)
+    {
+        if(prologue == null)
             return "<" + uri + ">";
 
-
-        Collection<Prefix> prefixes = null;
-
-        if(prologue == null)
-            prefixes = QueryVisitor.getPredefinedPrefixes();
-        else if(ignorePredefinedPrefixes)
-            prefixes = prologue.getUserPrefixes();
-        else
-            prefixes = prologue.getAllPrefixes();
-
+        Collection<Prefix> prefixes = prologue.getAllPrefixes();
 
         if(!prefixes.isEmpty())
         {
@@ -111,8 +108,10 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path, Define
                 return options.stream().collect(Collectors.minBy(Comparator.comparingInt(s -> s.length()))).get();
         }
 
+
         URI result;
-        if(prologue != null)
+
+        if(prologue.getBase() != null)
             result = prologue.getBase().getUri().relativize(uri);
         else
             result = uri;

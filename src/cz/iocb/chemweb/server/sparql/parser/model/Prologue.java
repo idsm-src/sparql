@@ -25,7 +25,7 @@ public class Prologue extends BaseElement
     private final LinkedHashMap<String, Prefix> allPrefixes;
 
 
-    public Prologue()
+    public Prologue(List<Prefix> predefinedPrefixes)
     {
         this.defines = new ArrayList<>();
         setBase(new IRI(""));
@@ -34,24 +34,8 @@ public class Prologue extends BaseElement
         userPrefixes = new LinkedHashMap<>();
         allPrefixes = new LinkedHashMap<>();
 
-        for(Prefix prefix : QueryVisitor.getPredefinedPrefixes())
+        for(Prefix prefix : predefinedPrefixes)
             allPrefixes.put(prefix.getName(), prefix);
-    }
-
-    public Prologue(Collection<Define> defines, IRI base, Collection<PrefixDefinition> prefixes)
-    {
-        this.defines = new ArrayList<>(defines);
-        setBase(base);
-
-        prefixDefinitions = new ArrayList<>();
-        userPrefixes = new LinkedHashMap<>();
-        allPrefixes = new LinkedHashMap<>();
-
-        for(Prefix prefix : QueryVisitor.getPredefinedPrefixes())
-            allPrefixes.put(prefix.getName(), prefix);
-
-        for(PrefixDefinition definition : prefixes)
-            addPrefixDefinition(definition);
     }
 
     /**

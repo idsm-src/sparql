@@ -27,6 +27,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.visitor.BaseVisitor;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
+import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitorContext;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
@@ -143,11 +144,12 @@ public class Parser
 
             exceptions.addAll(errorListener.getExceptions());
 
-            QueryVisitor.setProcedures(procedures);
-            QueryVisitor.setPredefinedPrefixes(predefinedPrefixes);
-            QueryVisitor.setExceptionConsumer(exceptions::add);
+            QueryVisitorContext context = new QueryVisitorContext();
+            context.setProcedures(procedures);
+            context.setPredefinedPrefixes(predefinedPrefixes);
+            context.setExceptionConsumer(exceptions::add);
 
-            QueryVisitor visitor = new QueryVisitor();
+            QueryVisitor visitor = new QueryVisitor(context);
             result = (SelectQuery) visitor.visit(t);
 
 

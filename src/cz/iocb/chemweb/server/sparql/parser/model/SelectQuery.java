@@ -11,15 +11,6 @@ public class SelectQuery extends Query
 {
     private Select select;
 
-    public SelectQuery()
-    {
-    }
-
-    public SelectQuery(Select select)
-    {
-        this(null, select);
-    }
-
     public SelectQuery(Prologue prologue, Select select)
     {
         super(prologue);

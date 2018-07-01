@@ -53,6 +53,13 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 
 public class ExpressionVisitor extends BaseVisitor<Expression>
 {
+    private final QueryVisitorContext context;
+
+    public ExpressionVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     @Override
     public Expression visitConstraint(ConstraintContext ctx)
     {
@@ -252,7 +259,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         if(superResult != null)
             return superResult;
 
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor();
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(context);
 
         ParseTree functionNameNode = ctx.children.get(0);
         String functionName = functionNameNode.getChildCount() == 0 ? functionNameNode.getText()
@@ -270,18 +277,18 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public ExistsExpression visitExistsFunction(ExistsFunctionContext ctx)
     {
-        return new ExistsExpression(new GraphPatternVisitor().visit(ctx.groupGraphPattern()), false);
+        return new ExistsExpression(new GraphPatternVisitor(context).visit(ctx.groupGraphPattern()), false);
     }
 
     @Override
     public ExistsExpression visitNotExistsFunction(NotExistsFunctionContext ctx)
     {
-        return new ExistsExpression(new GraphPatternVisitor().visit(ctx.groupGraphPattern()), true);
+        return new ExistsExpression(new GraphPatternVisitor(context).visit(ctx.groupGraphPattern()), true);
     }
 
-    private static FunctionCallExpression parseFunctionCall(IRI iri, ArgListContext ctx)
+    private FunctionCallExpression parseFunctionCall(IRI iri, ArgListContext ctx)
     {
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor();
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(context);
 
         List<Expression> arguments = argumentsVisitor.visit(ctx);
 
@@ -294,7 +301,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public Expression visitIriRefOrFunction(IriRefOrFunctionContext ctx)
     {
-        IRI iri = new IriVisitor().visit(ctx.iri());
+        IRI iri = new IriVisitor(context).visit(ctx.iri());
 
         if(ctx.argList() == null)
             return iri;
@@ -305,7 +312,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public FunctionCallExpression visitFunctionCall(FunctionCallContext ctx)
     {
-        IRI iri = new IriVisitor().visit(ctx.iri());
+        IRI iri = new IriVisitor(context).visit(ctx.iri());
 
         return parseFunctionCall(iri, ctx.argList());
     }
@@ -319,36 +326,43 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
-        return new LiteralVisitor().visitRdfLiteral(ctx);
+        return new LiteralVisitor(context).visitRdfLiteral(ctx);
     }
 
     @Override
     public Literal visitNumericLiteral(NumericLiteralContext ctx)
     {
-        return new LiteralVisitor().visitNumericLiteral(ctx);
+        return new LiteralVisitor(context).visitNumericLiteral(ctx);
     }
 
     @Override
     public Literal visitNumericLiteralPositive(NumericLiteralPositiveContext ctx)
     {
-        return new LiteralVisitor().visitNumericLiteralPositive(ctx);
+        return new LiteralVisitor(context).visitNumericLiteralPositive(ctx);
     }
 
     @Override
     public Literal visitNumericLiteralNegative(NumericLiteralNegativeContext ctx)
     {
-        return new LiteralVisitor().visitNumericLiteralNegative(ctx);
+        return new LiteralVisitor(context).visitNumericLiteralNegative(ctx);
     }
 
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new LiteralVisitor().visitBooleanLiteral(ctx);
+        return new LiteralVisitor(context).visitBooleanLiteral(ctx);
     }
 }
 
 class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 {
+    private final QueryVisitorContext context;
+
+    public ArgumentsVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     private boolean foundDistinct = false;
 
     public boolean foundDistinct()
@@ -356,9 +370,9 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         return foundDistinct;
     }
 
-    private static List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
+    private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
-        return contexts.stream().map(new ExpressionVisitor()::visit).collect(Collectors.toList());
+        return contexts.stream().map(new ExpressionVisitor(context)::visit).collect(Collectors.toList());
     }
 
     @Override
@@ -382,7 +396,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         if(ctx.var() != null)
         {
             List<Expression> result = new ArrayList<>();
-            result.add(new ExpressionVisitor().visit(ctx.var()));
+            result.add(new ExpressionVisitor(context).visit(ctx.var()));
             return result;
         }
 
@@ -398,7 +412,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     @Override
     public List<Expression> visitAggregate(AggregateContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor();
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(context);
 
         if(ctx.DISTINCT() != null)
             foundDistinct = true;

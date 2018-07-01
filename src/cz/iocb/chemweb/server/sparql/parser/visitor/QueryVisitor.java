@@ -4,14 +4,11 @@ import static cz.iocb.chemweb.server.sparql.parser.StreamUtils.mapList;
 import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -70,7 +67,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.Define;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
-import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixedName;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
@@ -112,51 +108,11 @@ import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 public class QueryVisitor extends BaseVisitor<Query>
 {
-    // This is not very nice, but it's better than passing these values
-    // everywhere.
-    // It needs to be improved if more than one query is to be parsed at the
-    // same time on the same thread.
-    private static ThreadLocal<Prologue> currentPrologue = new ThreadLocal<>();
-    private static ThreadLocal<LinkedHashMap<String, ProcedureDefinition>> currentProcedures = new ThreadLocal<>();
-    private static ThreadLocal<List<Prefix>> currentPredefinedPrefixes = new ThreadLocal<>();
-    private static ThreadLocal<Consumer<ParseException>> currentExceptionConsumer = new ThreadLocal<>();
+    private final QueryVisitorContext context;
 
-    /**
-     * Returns prologue for the tree that's currently being processed on the current thread.
-     */
-    public static Prologue getPrologue()
+    public QueryVisitor(QueryVisitorContext context)
     {
-        return currentPrologue.get();
-    }
-
-    public static LinkedHashMap<String, ProcedureDefinition> getProcedures()
-    {
-        return currentProcedures.get();
-    }
-
-    public static void setProcedures(LinkedHashMap<String, ProcedureDefinition> procedures)
-    {
-        currentProcedures.set(procedures);
-    }
-
-    public static List<Prefix> getPredefinedPrefixes()
-    {
-        return currentPredefinedPrefixes.get();
-    }
-
-    public static void setPredefinedPrefixes(Collection<Prefix> predefinedPrefixes)
-    {
-        currentPredefinedPrefixes.set(new ArrayList<>(predefinedPrefixes));
-    }
-
-    public static Consumer<ParseException> getExceptionConsumer()
-    {
-        return currentExceptionConsumer.get();
-    }
-
-    public static void setExceptionConsumer(Consumer<ParseException> exceptionConsumer)
-    {
-        currentExceptionConsumer.set(exceptionConsumer);
+        this.context = context;
     }
 
     class ContainsCollectionVisitor extends BaseVisitor<Boolean>
@@ -199,14 +155,14 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(ctx.prologue() != null)
         {
-            PrologueVisitor visitor = new PrologueVisitor();
+            PrologueVisitor visitor = new PrologueVisitor(context);
             visitor.visit(ctx.prologue());
             prologue = visitor.getPrologue();
         }
         else
-            prologue = new Prologue();
+            prologue = new Prologue(context.getPredefinedPrefixes());
 
-        currentPrologue.set(prologue);
+        context.setPrologue(prologue);
 
         if(ctx.selectQuery() != null)
         {
@@ -231,12 +187,12 @@ public class QueryVisitor extends BaseVisitor<Query>
 
             result.getSelect().setValues(parseValues(ctx.valuesClause()));
 
-            currentPrologue.set(null);
+            context.setPrologue(null);
 
             return result;
         }
 
-        currentPrologue.set(null);
+        context.setPrologue(null);
 
         return null;
     }
@@ -244,7 +200,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     /**
      * @param ctx Can be null.
      */
-    public static Values parseValues(ValuesClauseContext ctx)
+    public Values parseValues(ValuesClauseContext ctx)
     {
         if(ctx == null)
             return null;
@@ -253,7 +209,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(dataBlockCtx == null)
             return null;
 
-        return (Values) new PatternVisitor().visit(dataBlockCtx);
+        return (Values) new PatternVisitor(context).visit(dataBlockCtx);
     }
 
     @Override
@@ -261,10 +217,10 @@ public class QueryVisitor extends BaseVisitor<Query>
     {
         Select select = parseSelect(ctx.selectClause(), ctx.datasetClause(), ctx.whereClause(), ctx.solutionModifier());
 
-        return new SelectQuery(select);
+        return new SelectQuery(context.getPrologue(), select);
     }
 
-    public static Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
+    public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
             WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx)
     {
         Select result = withRange(new Select(), selectClauseCtx);
@@ -276,15 +232,15 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(!selectClauseCtx.selectVariable().isEmpty())
         {
-            result.getProjections().addAll(mapList(selectClauseCtx.selectVariable(), QueryVisitor::parseProjection));
+            result.getProjections().addAll(mapList(selectClauseCtx.selectVariable(), this::parseProjection));
         }
 
         if(dataSetClauseCtxs != null)
         {
-            result.getDataSets().addAll(mapList(dataSetClauseCtxs, QueryVisitor::parseDataSet));
+            result.getDataSets().addAll(mapList(dataSetClauseCtxs, this::parseDataSet));
         }
 
-        GraphPattern pattern = new GraphPatternVisitor().visit(whereClauseCtx);
+        GraphPattern pattern = new GraphPatternVisitor(context).visit(whereClauseCtx);
 
         result.setPattern(pattern);
 
@@ -293,13 +249,13 @@ public class QueryVisitor extends BaseVisitor<Query>
         return result;
     }
 
-    private static Projection parseProjection(SelectVariableContext variableCtx)
+    private Projection parseProjection(SelectVariableContext variableCtx)
     {
         Variable variable = withRange(new Variable(variableCtx.var().getText()), variableCtx.var());
 
         if(variableCtx.expression() != null)
         {
-            Expression expression = new ExpressionVisitor().visit(variableCtx.expression());
+            Expression expression = new ExpressionVisitor(context).visit(variableCtx.expression());
 
             return new Projection(expression, variable);
         }
@@ -307,15 +263,15 @@ public class QueryVisitor extends BaseVisitor<Query>
         return withRange(new Projection(variable), variableCtx);
     }
 
-    private static DataSet parseDataSet(DatasetClauseContext dataSetCtx)
+    private DataSet parseDataSet(DatasetClauseContext dataSetCtx)
     {
-        IRI iri = new IriVisitor().visit(dataSetCtx.iri());
+        IRI iri = new IriVisitor(context).visit(dataSetCtx.iri());
         boolean isDefault = dataSetCtx.NAMED() == null;
 
         return withRange(new DataSet(iri, isDefault), dataSetCtx);
     }
 
-    private static void parseSolutionModifier(SolutionModifierContext ctx, Select select)
+    private void parseSolutionModifier(SolutionModifierContext ctx, Select select)
     {
         parseGroupClause(ctx.groupClause(), select);
         parseHavingClause(ctx.havingClause(), select);
@@ -323,19 +279,19 @@ public class QueryVisitor extends BaseVisitor<Query>
         parseLimitOffsetClauses(ctx.limitOffsetClauses(), select);
     }
 
-    private static void parseGroupClause(GroupClauseContext ctx, Select select)
+    private void parseGroupClause(GroupClauseContext ctx, Select select)
     {
         if(ctx == null)
             return;
 
-        List<GroupCondition> conditions = mapList(ctx.groupCondition(), QueryVisitor::parseGroupCondition);
+        List<GroupCondition> conditions = mapList(ctx.groupCondition(), this::parseGroupCondition);
 
         select.getGroupByConditions().addAll(conditions);
     }
 
-    private static GroupCondition parseGroupCondition(GroupConditionContext ctx)
+    private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor();
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(context);
 
         if(ctx.expression() != null)
         {
@@ -354,39 +310,39 @@ public class QueryVisitor extends BaseVisitor<Query>
         return withRange(new GroupCondition(expressionVisitor.visit(ctx)), ctx);
     }
 
-    private static void parseHavingClause(HavingClauseContext ctx, Select select)
+    private void parseHavingClause(HavingClauseContext ctx, Select select)
     {
         if(ctx == null)
             return;
 
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor();
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(context);
 
         List<Expression> conditions = mapList(ctx.havingCondition(), expressionVisitor::visit);
 
         select.getHavingConditions().addAll(conditions);
     }
 
-    private static void parseOrderClause(OrderClauseContext ctx, Select select)
+    private void parseOrderClause(OrderClauseContext ctx, Select select)
     {
         if(ctx == null)
             return;
 
-        List<OrderCondition> conditions = mapList(ctx.orderCondition(), QueryVisitor::parseOrderCondition);
+        List<OrderCondition> conditions = mapList(ctx.orderCondition(), this::parseOrderCondition);
 
         select.getOrderByConditions().addAll(conditions);
     }
 
-    private static OrderCondition parseOrderCondition(OrderConditionContext ctx)
+    private OrderCondition parseOrderCondition(OrderConditionContext ctx)
     {
         if(ctx.ASC() != null || ctx.DESC() != null)
         {
             OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending
                     : OrderCondition.Direction.Descending;
 
-            return new OrderCondition(direction, new ExpressionVisitor().visit(ctx.expression()));
+            return new OrderCondition(direction, new ExpressionVisitor(context).visit(ctx.expression()));
         }
 
-        return withRange(new OrderCondition(new ExpressionVisitor().visit(ctx)), ctx);
+        return withRange(new OrderCondition(new ExpressionVisitor(context).visit(ctx)), ctx);
     }
 
     private static void parseLimitOffsetClauses(LimitOffsetClausesContext ctx, Select select)
@@ -417,7 +373,15 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 class PrologueVisitor extends BaseVisitor<Void>
 {
-    private final Prologue prologue = new Prologue();
+    private final QueryVisitorContext context;
+
+    private final Prologue prologue;
+
+    public PrologueVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+        prologue = new Prologue(context.getPredefinedPrefixes());
+    }
 
     public Prologue getPrologue()
     {
@@ -449,7 +413,7 @@ class PrologueVisitor extends BaseVisitor<Void>
             // can't use IriVisitor.visit for both, because prefixed name has to
             // use PrefixedName here, not IRI
             if(iriCtx.IRIREF() != null)
-                value = new IriVisitor().visit(iriCtx);
+                value = new IriVisitor(context).visit(iriCtx);
             else
                 value = IriVisitor.parsePrefixedName(iriCtx.prefixedName());
         }
@@ -498,6 +462,13 @@ class PrologueVisitor extends BaseVisitor<Void>
 
 class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 {
+    private final QueryVisitorContext context;
+
+    public GraphPatternVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     @Override
     public GraphPattern visitGroupGraphPattern(GroupGraphPatternContext ctx)
     {
@@ -518,7 +489,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         {
             ComplexTriple triple = (ComplexTriple) pattern;
 
-            TripleExpander tripleExpander = new TripleExpander();
+            TripleExpander tripleExpander = new TripleExpander(context);
             tripleExpander.visit(triple);
             return tripleExpander.getResults().stream();
         }
@@ -558,7 +529,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             if(!(verb instanceof IRI))
                 continue;
 
-            ProcedureDefinition callDefinition = QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString());
+            ProcedureDefinition callDefinition = context.getProcedures().get(((IRI) verb).getUri().toString());
 
             if(callDefinition == null)
                 continue;
@@ -641,7 +612,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = repairExpandedProcedureCalls(new GroupGraphPatternVisitor().visit(ctx))
+        List<Pattern> patterns = repairExpandedProcedureCalls(new GroupGraphPatternVisitor(context).visit(ctx))
                 .flatMap(this::processPattern).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
@@ -650,9 +621,10 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        Select select = QueryVisitor.parseSelect(ctx.selectClause(), null, ctx.whereClause(), ctx.solutionModifier());
+        Select select = new QueryVisitor(context).parseSelect(ctx.selectClause(), null, ctx.whereClause(),
+                ctx.solutionModifier());
 
-        select.setValues(QueryVisitor.parseValues(ctx.valuesClause()));
+        select.setValues(new QueryVisitor(context).parseValues(ctx.valuesClause()));
 
         return select;
     }
@@ -660,6 +632,13 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 
 class TripleExpander extends ComplexElementVisitor<Node>
 {
+    private final QueryVisitorContext context;
+
+    public TripleExpander(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     private static AtomicInteger variableId = new AtomicInteger();
 
     private final List<BasicPattern> results = new ArrayList<>();
@@ -693,7 +672,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         {
             Verb verb = property.getVerb();
             ProcedureDefinition callDefinition = verb instanceof IRI
-                    ? QueryVisitor.getProcedures().get(((IRI) verb).getUri().toString())
+                    ? context.getProcedures().get(((IRI) verb).getUri().toString())
                     : null;
 
             if(callDefinition != null)
@@ -704,7 +683,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                 {
                     if(!(objectNode instanceof BlankNodePropertyList))
                         throw new UncheckedParseException(ErrorType.invalidProcedureCallObject, objectNode.getRange(),
-                                procedureName.toString(QueryVisitor.getPrologue()));
+                                procedureName.toString(context.getPrologue()));
 
                     BlankNodePropertyList blankNodePropertyList = (BlankNodePropertyList) objectNode;
 
@@ -719,7 +698,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     {
                         if(!(originalSubject instanceof BlankNodePropertyList))
                             throw new UncheckedParseException(ErrorType.invalidMultiProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(QueryVisitor.getPrologue()));
+                                    originalSubject.getRange(), procedureName.toString(context.getPrologue()));
 
                         if(triple.getProperties().size() > 1)
                             throw new UncheckedParseException(ErrorType.invalidMultiProcedureCallPredicateCombinaion,
@@ -735,7 +714,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     {
                         if(!(originalSubject instanceof BlankNodePropertyList) && !(originalSubject instanceof Node))
                             throw new UncheckedParseException(ErrorType.invalidProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(QueryVisitor.getPrologue()));
+                                    originalSubject.getRange(), procedureName.toString(context.getPrologue()));
 
                         if(subject == null)
                             subject = visitElement(triple.getNode());
@@ -754,7 +733,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        if(QueryVisitor.getProcedures().get(iri.getUri().toString()) != null)
+                        if(context.getProcedures().get(iri.getUri().toString()) != null)
                             throw new UncheckedParseException(ErrorType.invalidProcedureCallPropertyPathCombinaion,
                                     iri.getRange());
 
@@ -884,6 +863,13 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
 class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 {
+    private final QueryVisitorContext context;
+
+    public GroupGraphPatternVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     @Override
     public Stream<Pattern> visit(ParseTree tree)
     {
@@ -893,7 +879,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
         }
         catch(UncheckedParseException e)
         {
-            QueryVisitor.getExceptionConsumer().accept(new ParseException(e));
+            context.getExceptionConsumer().accept(new ParseException(e));
 
             return Stream.empty();
         }
@@ -920,7 +906,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitTriplesBlock(TriplesBlockContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor();
+        PatternVisitor patternVisitor = new PatternVisitor(context);
 
         return ctx.triplesSameSubjectPath().stream().map(patternVisitor::visit).filter(Objects::nonNull);
     }
@@ -928,7 +914,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor();
+        PatternVisitor patternVisitor = new PatternVisitor(context);
 
         Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
 
@@ -940,8 +926,17 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 
 class PatternVisitor extends BaseVisitor<Pattern>
 {
-    GraphPatternVisitor graphPatternVisitor = new GraphPatternVisitor();
-    ExpressionVisitor expressionVisitor = new ExpressionVisitor();
+    private final GraphPatternVisitor graphPatternVisitor;
+    private final ExpressionVisitor expressionVisitor;
+    private final QueryVisitorContext context;
+
+    public PatternVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+        this.graphPatternVisitor = new GraphPatternVisitor(context);
+        this.expressionVisitor = new ExpressionVisitor(context);
+    }
+
 
     @Override
     public Pattern visit(ParseTree tree)
@@ -952,7 +947,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
         }
         catch(UncheckedParseException e)
         {
-            QueryVisitor.getExceptionConsumer().accept(new ParseException(e));
+            context.getExceptionConsumer().accept(new ParseException(e));
 
             return null;
         }
@@ -961,7 +956,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
     @Override
     public ComplexTriple visitTriplesSameSubjectPath(TriplesSameSubjectPathContext ctx)
     {
-        return TripleVisitor.parseTriple(ctx);
+        return new TripleVisitor(context).parseTriple(ctx);
     }
 
     @Override
@@ -992,14 +987,14 @@ class PatternVisitor extends BaseVisitor<Pattern>
     @Override
     public Graph visitGraphGraphPattern(GraphGraphPatternContext ctx)
     {
-        return new Graph(new NodeVisitor().parseVarOrIri(ctx.varOrIRI()),
+        return new Graph(new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI()),
                 graphPatternVisitor.visit(ctx.groupGraphPattern()));
     }
 
     @Override
     public Service visitServiceGraphPattern(ServiceGraphPatternContext ctx)
     {
-        return new Service(new NodeVisitor().parseVarOrIri(ctx.varOrIRI()),
+        return new Service(new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI()),
                 graphPatternVisitor.visit(ctx.groupGraphPattern()), ctx.SILENT() != null);
     }
 
@@ -1057,10 +1052,10 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
     Expression createVal(DataBlockValueContext value)
     {
-        Expression ret = new LiteralVisitor().visit(value);
+        Expression ret = new LiteralVisitor(context).visit(value);
 
         if(ret == null)
-            ret = new IriVisitor().visit(value);
+            ret = new IriVisitor(context).visit(value);
 
         return ret;
     }
@@ -1068,12 +1063,19 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
 class IriVisitor extends BaseVisitor<IRI>
 {
+    private final QueryVisitorContext context;
+
+    public IriVisitor(QueryVisitorContext context)
+    {
+        this.context = context;
+    }
+
     @Override
     public IRI visitIri(IriContext ctx)
     {
         if(ctx.IRIREF() != null)
         {
-            URI uri = parseUri(ctx.IRIREF().getText(), QueryVisitor.getPrologue());
+            URI uri = parseUri(ctx.IRIREF().getText(), context.getPrologue());
 
             return new IRI(uri);
         }
@@ -1098,7 +1100,7 @@ class IriVisitor extends BaseVisitor<IRI>
     @Override
     public IRI visitPrefixedName(PrefixedNameContext ctx)
     {
-        return new IRI(parsePrefixedName(ctx).getAbsoluteURI(QueryVisitor.getPrologue()));
+        return new IRI(parsePrefixedName(ctx).getAbsoluteURI(context.getPrologue()));
     }
 
     public static PrefixedName parsePrefixedName(PrefixedNameContext ctx)

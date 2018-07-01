@@ -10,16 +10,11 @@ import cz.iocb.chemweb.server.sparql.parser.BaseElement;
  */
 public abstract class Query extends BaseElement
 {
-    private Prologue prologue = new Prologue();
-
-    public Query()
-    {
-    }
+    private Prologue prologue;
 
     public Query(Prologue prologue)
     {
-        if(prologue != null)
-            this.prologue = prologue;
+        this.prologue = prologue;
     }
 
     public Prologue getPrologue()
