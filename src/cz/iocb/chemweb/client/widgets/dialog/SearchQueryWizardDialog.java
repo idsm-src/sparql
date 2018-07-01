@@ -479,7 +479,7 @@ public class SearchQueryWizardDialog extends DialogBox
             }
             else if(statusCount > 0 || statusCheckBox.getValue())
             {
-                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS");
+                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS.");
 
                 if(statusCount > 0)
                 {
