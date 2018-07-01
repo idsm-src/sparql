@@ -134,6 +134,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             queryState.thread = new Thread()
             {
+                final Timer timer = new Timer();
+
                 @Override
                 public void run()
                 {
@@ -149,7 +151,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
 
                         // query timeout
-                        final Timer timer = new Timer();
                         timer.schedule(new TimerTask()
                         {
                             @Override
@@ -224,8 +225,9 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                     }
                     catch(Throwable e) // (SQLException | IOException e)
                     {
-                        e.printStackTrace();
+                        timer.cancel();
 
+                        e.printStackTrace();
                         queryState.exception = e;
                     }
                 }
