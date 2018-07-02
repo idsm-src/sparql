@@ -33,25 +33,25 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         connectionPool = new ConnectionPool(properties);
         schema = new PostgresSchema(connectionPool);
 
-        loadPrefixes(name, iriPrefix);
-        loadClasses(name, iriPrefix, idPattern);
-        loadProcedures(name);
+        loadPrefixes(iriPrefix);
+        loadClasses(iriPrefix, idPattern);
+        loadProcedures();
     }
 
 
-    private void loadPrefixes(String name, String iriPrefix)
+    private void loadPrefixes(String iriPrefix)
     {
         prefixes.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
         prefixes.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
         prefixes.put("owl", "http://www.w3.org/2002/07/owl#");
         prefixes.put("xsd", "http://www.w3.org/2001/XMLSchema#");
 
-        prefixes.put(name, iriPrefix);
+        prefixes.put("compound", iriPrefix);
         prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
     }
 
 
-    private void loadClasses(String name, String iriPrefix, String idPattern)
+    private void loadClasses(String iriPrefix, String idPattern)
     {
         String sachem = prefixes.get("sachem");
 
@@ -89,14 +89,14 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         tautomerModeValues.add(sachem + "inchiTautomers");
         addIriClass(new IriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
 
-        addIriClass(new IriClass(name, Arrays.asList("integer"), iriPrefix + idPattern));
+        addIriClass(new IriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
     }
 
 
-    private void loadProcedures(String name)
+    private void loadProcedures()
     {
         String sachem = prefixes.get("sachem");
-        IriClass molClass = getIriClass(name);
+        IriClass molClass = getIriClass("compound");
 
 
         /* orchem:substructureSearch */
