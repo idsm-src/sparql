@@ -122,6 +122,14 @@ public class EndpointServlet extends HttpServlet
                 "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
         res.setHeader("access-control-allow-origin", "*");
 
+
+        // IOCB SPARQL protocol extension
+        String filename = req.getParameter("filename");
+
+        if(filename != null)
+            res.setHeader("content-disposition", "attachment; filename=\"" + filename + "\"");
+
+
         try
         {
             DatabaseSchema schema = dbConfig.getSchema();
