@@ -27,6 +27,8 @@ public class PiwikFilter implements Filter
     private int siteId = -1;
     private String hostUrl = null;
     private String authToken = null;
+    private String actionName = null;
+    String[] replaceUrl = null;
     private boolean rpc = false;
 
     private String cookieName = null;
@@ -49,6 +51,31 @@ public class PiwikFilter implements Filter
 
         if(hostUrl == null || hostUrl.isEmpty())
             throw new IllegalArgumentException("Host URL not set, please set init-param 'hostUrl' in web.xml");
+
+
+        /* obtain the value of parameter filterName */
+        actionName = config.getInitParameter("actionName");
+
+
+        /* obtain the value of parameter replaceUrl */
+        String replace = config.getInitParameter("replaceUrl");
+
+        if(replace != null)
+        {
+            if(replace.length() < 4)
+                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+
+            if(replace.charAt(0) != replace.charAt(replace.length() - 1))
+                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+
+            int delimiter = replace.indexOf(replace.charAt(0), 1);
+
+            if(delimiter == -1 || replace.indexOf(replace.charAt(0), delimiter + 1) != replace.length() - 1)
+                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+
+            replaceUrl = new String[] { replace.substring(1, delimiter),
+                    replace.substring(delimiter + 1, replace.length() - 1) };
+        }
 
 
         /* obtain the value of parameter rpc */
@@ -97,11 +124,40 @@ public class PiwikFilter implements Filter
             throws IOException, ServletException
     {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
+        String actionUrl = httpRequest.getRequestURL().toString();
+        String actionName = null;
 
-        URL actionUrl = new URL(httpRequest.getRequestURL().toString());
-        PiwikRequest piwikRequest = new PiwikRequest(siteId, actionUrl);
+
+        if(rpc)
+        {
+            httpRequest = new MultiReadHttpServletRequest(httpRequest);
+
+            StringWriter writer = new StringWriter();
+            IOUtils.copy(httpRequest.getReader(), writer);
+            String body = writer.toString();
+            String[] args = body.split("\\|");
+
+            if(args.length > 6)
+            {
+                actionName = "GWT RPC: " + args[5] + "." + args[6] + "()";
+                actionUrl = actionUrl + "/" + args[6];
+            }
+        }
+
+        if(replaceUrl != null)
+            actionUrl = actionUrl.replaceFirst(replaceUrl[0], replaceUrl[1]);
+
+        if(this.actionName != null)
+            actionName = this.actionName;
 
 
+        /* create piwik request */
+        PiwikRequest piwikRequest = new PiwikRequest(siteId, new URL(actionUrl));
+        piwikRequest.setActionName(actionName);
+        piwikRequest.setAuthToken(authToken);
+
+
+        /* set visitor id */
         String visitorId = null;
 
         if(httpRequest.getCookies() != null)
@@ -112,9 +168,8 @@ public class PiwikFilter implements Filter
         if(visitorId != null)
             piwikRequest.setVisitorId(visitorId);
 
-        piwikRequest.setAuthToken(authToken);
 
-
+        /* set visitor ip */
         String forwarded = httpRequest.getHeader("X-Forwarded-For");
         String address = null;
 
@@ -143,28 +198,14 @@ public class PiwikFilter implements Filter
         piwikRequest.setVisitorIp(address != null ? address : httpRequest.getRemoteAddr());
 
 
+        /* set user agent */
         String agent = httpRequest.getHeader("User-Agent");
 
         if(agent != null)
             piwikRequest.setHeaderUserAgent(agent);
 
 
-        if(rpc)
-        {
-            httpRequest = new MultiReadHttpServletRequest(httpRequest);
-
-            StringWriter writer = new StringWriter();
-            IOUtils.copy(httpRequest.getReader(), writer);
-            String body = writer.toString();
-            String[] args = body.split("\\|");
-
-            if(args.length > 6)
-            {
-                piwikRequest.setActionName("GWT RPC: " + args[5] + "." + args[6] + "()");
-                piwikRequest.setActionUrl(new URL(actionUrl.toString() + "/" + args[6]));
-            }
-        }
-
+        /* set action time */
         long actionTime = System.currentTimeMillis();
         filterChain.doFilter(httpRequest, response);
         actionTime = System.currentTimeMillis() - actionTime;
