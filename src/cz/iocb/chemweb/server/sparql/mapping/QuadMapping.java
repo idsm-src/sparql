@@ -55,6 +55,9 @@ public class QuadMapping
         if(node == null)
             return true;
 
+        if(mapping == null)
+            return false;
+
         return mapping.match(node);
     }
 
