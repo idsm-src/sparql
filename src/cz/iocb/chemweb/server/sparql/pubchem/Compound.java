@@ -14,7 +14,7 @@ class Compound
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID[0-9]+";
 
         config.addIriClass(new IriClass("compound", Arrays.asList("integer"), prefix));
-        config.addIriClass(new IriClass("compound_sdfile", Arrays.asList("integer"), prefix + "_SDfile"));
+        config.addIriClass(new IriClass("compound_molfile", Arrays.asList("integer"), prefix + "_Molfile"));
     }
 
 
@@ -36,15 +36,15 @@ class Compound
         }
 
         {
-            String table = "compound_sdfiles";
-            NodeMapping subject = config.createIriMapping("compound_sdfile", "compound");
+            String table = "compounds";
+            NodeMapping subject = config.createIriMapping("compound_molfile", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_011120"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
-                    config.createIriMapping(compound, "compound"));
+                    config.createIriMapping(compound, "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(xsdString, "sdf"));
+                    config.createLiteralMapping(xsdString, "molfile"));
         }
 
         {
