@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.util.Properties;
 import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
+import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.Xsd;
@@ -35,6 +37,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
 
         loadPrefixes(iriPrefix);
         loadClasses(iriPrefix, idPattern);
+        loadQuadMapping();
         loadProcedures();
     }
 
@@ -45,6 +48,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
         prefixes.put("owl", "http://www.w3.org/2002/07/owl#");
         prefixes.put("xsd", "http://www.w3.org/2001/XMLSchema#");
+        prefixes.put("sio", "http://semanticscience.org/resource/");
 
         prefixes.put("compound", iriPrefix);
         prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
@@ -90,6 +94,24 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         addIriClass(new IriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
 
         addIriClass(new IriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
+        addIriClass(new IriClass("compound_molfile", Arrays.asList("integer"), iriPrefix + idPattern + "_Molfile"));
+
+        addIriClass(new IriClass("class", Arrays.asList("integer"), getIriValues("class_bases")));
+        addIriClass(new IriClass("property", Arrays.asList("integer"), getIriValues("property_bases")));
+    }
+
+
+    private void loadQuadMapping()
+    {
+        IriClass compound = getIriClass("compound");
+
+        String table = "compounds";
+        NodeMapping subject = createIriMapping("compound_molfile", "id");
+
+        addQuadMapping(table, null, subject, createIriMapping("rdf:type"), createIriMapping("sio:SIO_011120"));
+        addQuadMapping(table, null, subject, createIriMapping("sio:is-attribute-of"), createIriMapping(compound, "id"));
+        addQuadMapping(table, null, subject, createIriMapping("sio:has-value"),
+                createLiteralMapping(xsdString, "molfile"));
     }
 
 
