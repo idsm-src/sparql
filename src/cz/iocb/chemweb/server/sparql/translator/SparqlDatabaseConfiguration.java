@@ -72,7 +72,7 @@ public abstract class SparqlDatabaseConfiguration
         else
         {
             String[] parts = value.split(":");
-            iri = prefixes.get(parts[0]) + parts[1];
+            iri = prefixes.get(parts[0]) + (parts.length > 1 ? parts[1] : "");
         }
 
         IriClass iriClass = null;
