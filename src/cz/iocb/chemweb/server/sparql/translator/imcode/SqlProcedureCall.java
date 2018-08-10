@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
@@ -20,40 +22,17 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlProcedureCall extends SqlIntercode
 {
-    public static class ClassifiedNode
-    {
-        private final Node node;
-        private final ResourceClass nodeClass;
-
-        public ClassifiedNode(Node node, ResourceClass nodeClass)
-        {
-            this.node = node;
-            this.nodeClass = nodeClass;
-        }
-
-        public final Node getNode()
-        {
-            return node;
-        }
-
-        public final ResourceClass getNodeClass()
-        {
-            return nodeClass;
-        }
-    }
-
-
     private static final String resultName = "@res";
 
     private final ProcedureDefinition procedure;
-    private final LinkedHashMap<ParameterDefinition, ClassifiedNode> parameters;
-    private final LinkedHashMap<ResultDefinition, ClassifiedNode> results;
+    private final LinkedHashMap<ParameterDefinition, Node> parameters;
+    private final LinkedHashMap<ResultDefinition, Node> results;
     private final SqlIntercode context;
 
 
     protected SqlProcedureCall(UsedVariables variables, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, ClassifiedNode> parameters,
-            LinkedHashMap<ResultDefinition, ClassifiedNode> results, SqlIntercode context)
+            LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
+            SqlIntercode context)
     {
         super(variables);
         this.procedure = procedure;
@@ -64,29 +43,18 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     public static SqlIntercode create(ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, ClassifiedNode> parameters,
-            LinkedHashMap<ResultDefinition, ClassifiedNode> results, SqlIntercode context)
+            LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
+            SqlIntercode context)
     {
         UsedVariables callVariables = new UsedVariables();
         boolean hasSolution = true;
         boolean useContext = false;
 
 
-        for(Entry<ParameterDefinition, ClassifiedNode> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
         {
-            if(entry.getValue() == null)
-                continue;
-
             ParameterDefinition definition = entry.getKey();
-            Node node = entry.getValue().getNode();
-            ResourceClass nodeClass = entry.getValue().getNodeClass();
-
-            if(nodeClass != null && nodeClass != definition.getParameterClass())
-                hasSolution = false;
-
-            if(nodeClass == null && !(node instanceof VariableOrBlankNode))
-                hasSolution = false;
-
+            Node node = entry.getValue();
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -105,24 +73,24 @@ public class SqlProcedureCall extends SqlIntercode
                     usedVariable.getClasses().add(definition.getParameterClass());
                 }
             }
+            else if(node == null || !definition.getParameterClass().match(node))
+            {
+                System.err.println("A");
+                System.err.println(node);
+                System.err.println(((Literal) node).getValue());
+                System.err.println(((Literal) node).getTypeIri());
+                System.err.println(((LiteralClass) definition.getParameterClass()).getTypeIri());
+
+
+                hasSolution = false;
+            }
         }
 
 
-        for(Entry<ResultDefinition, ClassifiedNode> entry : results.entrySet())
+        for(Entry<ResultDefinition, Node> entry : results.entrySet())
         {
-            if(entry.getValue() == null)
-                continue;
-
             ResultDefinition definition = entry.getKey();
-            Node node = entry.getValue().getNode();
-            ResourceClass nodeClass = entry.getValue().getNodeClass();
-
-            if(nodeClass != null && nodeClass != definition.getResultClass())
-                hasSolution = false;
-
-            if(nodeClass == null && !(node instanceof VariableOrBlankNode))
-                hasSolution = false;
-
+            Node node = entry.getValue();
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -138,6 +106,11 @@ public class SqlProcedureCall extends SqlIntercode
                     hasSolution = false;
                     usedVariable.getClasses().add(definition.getResultClass());
                 }
+            }
+            else if(node == null || !definition.getResultClass().match(node))
+            {
+                System.err.println("A");
+                hasSolution = false;
             }
         }
 
@@ -218,13 +191,13 @@ public class SqlProcedureCall extends SqlIntercode
         boolean hasSelect = false;
         HashSet<String> usedInSelect = new HashSet<String>();
 
-        for(Entry<ResultDefinition, ClassifiedNode> entry : results.entrySet())
+        for(Entry<ResultDefinition, Node> entry : results.entrySet())
         {
             if(entry.getValue() == null)
                 continue;
 
 
-            Node node = entry.getValue().getNode();
+            Node node = entry.getValue();
 
             if(!(node instanceof VariableOrBlankNode))
                 continue;
@@ -288,13 +261,13 @@ public class SqlProcedureCall extends SqlIntercode
 
         HashMap<String, ResultDefinition> notUsedInWhere = new HashMap<String, ResultDefinition>();
 
-        for(Entry<ResultDefinition, ClassifiedNode> entry : results.entrySet())
+        for(Entry<ResultDefinition, Node> entry : results.entrySet())
         {
             if(entry.getValue() == null)
                 continue;
 
 
-            Node node = entry.getValue().getNode();
+            Node node = entry.getValue();
 
             ResultDefinition definition = entry.getKey();
             String[] fields = definition.getSqlTypeFields();
@@ -370,7 +343,7 @@ public class SqlProcedureCall extends SqlIntercode
         boolean hasParameter = false;
         builder.append("(");
 
-        for(Entry<ParameterDefinition, ClassifiedNode> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
         {
             ResourceClass resClass = entry.getKey().getParameterClass();
 
@@ -380,7 +353,7 @@ public class SqlProcedureCall extends SqlIntercode
             for(int i = 0; i < resClass.getPartsCount(); i++)
             {
                 appendComma(builder, i > 0);
-                builder.append(resClass.getSqlValue(entry.getValue().getNode(), i));
+                builder.append(resClass.getSqlValue(entry.getValue(), i));
             }
         }
 
@@ -412,9 +385,9 @@ public class SqlProcedureCall extends SqlIntercode
             builder.append(" WHERE ");
             boolean hasWhere = false;
 
-            for(Entry<ParameterDefinition, ClassifiedNode> entry : parameters.entrySet())
+            for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
             {
-                Node node = entry.getValue().getNode();
+                Node node = entry.getValue();
 
                 if(!(node instanceof VariableOrBlankNode))
                     continue;

@@ -1,12 +1,16 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BooleanLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralNegativeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralPositiveContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.RdfLiteralContext;
 import cz.iocb.chemweb.server.sparql.parser.Range;
-import cz.iocb.chemweb.server.sparql.parser.Xsd;
 import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -26,31 +30,35 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
-        Literal result = new Literal(unquote(ctx.string().getText()));
-
         if(ctx.LANGTAG() != null)
-        {
-            result.setLanguageTag(ctx.LANGTAG().getText());
-        }
+            return new Literal(unquote(ctx.string().getText()), ctx.LANGTAG().getText().substring(1));
 
-        if(ctx.iri() != null)
-        {
-            try
-            {
-                result.setTypeIri(new IriVisitor(context).visit(ctx.iri()));
-            }
-            catch(UncheckedParseException ex)
-            {
-                throw ex;
-            }
-            // FIXME: it is needed?
-            catch(Throwable ex)
-            {
-                throw new UncheckedParseException(ErrorType.parsingException, ex, Range.compute(ctx), ex.getMessage());
-            }
-        }
+        if(ctx.iri() == null)
+            return new Literal(unquote(ctx.string().getText()), xsdStringIri);
 
-        return result;
+        try
+        {
+            Literal literal = new Literal(unquote(ctx.string().getText()), new IriVisitor(context).visit(ctx.iri()));
+
+            if(!literal.isTypeSupported())
+            {
+                //TODO: warning: type is not supported
+            }
+            else if(literal.getValue() == null)
+            {
+                //TODO: warning: lexical value is not supported
+            }
+
+            return literal;
+        }
+        catch(UncheckedParseException ex)
+        {
+            throw ex;
+        }
+        catch(Throwable ex) //TODO: is it needed?
+        {
+            throw new UncheckedParseException(ErrorType.parsingException, ex, Range.compute(ctx), ex.getMessage());
+        }
     }
 
     private static String unescape(String text)
@@ -74,15 +82,16 @@ public class LiteralVisitor extends BaseVisitor<Literal>
 
     private static Literal createNumericLiteral(String text)
     {
-        String type;
-        if(text.contains("e") || text.contains("E"))
-            type = Xsd.DOUBLE;
-        else if(text.contains("."))
-            type = Xsd.DECIMAL;
-        else
-            type = Xsd.INTEGER;
+        IRI type;
 
-        return new Literal(text, new IRI(type));
+        if(text.contains("e") || text.contains("E"))
+            type = xsdDoubleIri;
+        else if(text.contains("."))
+            type = xsdDecimalIri;
+        else
+            type = xsdIntegerIri;
+
+        return new Literal(text, type);
     }
 
     @Override
@@ -106,6 +115,6 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new Literal(ctx.getText(), new IRI(Xsd.BOOLEAN));
+        return new Literal(ctx.getText(), xsdBooleanIri);
     }
 }

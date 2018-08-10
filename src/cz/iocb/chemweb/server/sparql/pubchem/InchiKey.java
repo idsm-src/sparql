@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -28,7 +28,7 @@ class InchiKey
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:CHEMINF_000399"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(xsdString, "inchikey"));
+                    config.createLiteralMapping(rdfLangStringEn, "inchikey"));
         }
 
         {

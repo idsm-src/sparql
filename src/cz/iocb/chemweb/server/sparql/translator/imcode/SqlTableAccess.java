@@ -23,11 +23,29 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlTableAccess extends SqlIntercode
 {
+    /**
+     * Name of the table for which the access is generated
+     */
     private final String table;
+
+    /**
+     * Extra sql condition used in the generated where clause
+     */
     private final String condition;
 
+    /**
+     * Map variable names to lists of their node mappings
+     */
     private final LinkedHashMap<String, ArrayList<NodeMapping>> mappings = new LinkedHashMap<String, ArrayList<NodeMapping>>();
+
+    /**
+     * List of mappings containing columns that have to be checked for not-null property
+     */
     private final ArrayList<ParametrisedLiteralMapping> notNullConditions = new ArrayList<ParametrisedLiteralMapping>();
+
+    /**
+     * List of pairs of non-variable nodes and their mappings that have to be checked for values equality
+     */
     private final ArrayList<Pair<Node, ParametrisedMapping>> valueConditions = new ArrayList<Pair<Node, ParametrisedMapping>>();
 
 

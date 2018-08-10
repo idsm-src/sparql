@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloat;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -74,7 +74,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -87,7 +87,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -100,7 +100,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -113,7 +113,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -126,7 +126,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -139,7 +139,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -152,7 +152,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -165,7 +165,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -178,7 +178,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -191,7 +191,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -204,7 +204,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -217,7 +217,7 @@ class CompoundDescriptor
                     condition);
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), condition);
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdInteger, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -310,7 +310,7 @@ class CompoundDescriptor
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000335"));
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdString, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -321,7 +321,7 @@ class CompoundDescriptor
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000379"));
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdString, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -332,7 +332,7 @@ class CompoundDescriptor
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000376"));
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdString, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -343,7 +343,7 @@ class CompoundDescriptor
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000396"));
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdString, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -354,7 +354,7 @@ class CompoundDescriptor
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000382"));
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdString, field));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
     }
 }

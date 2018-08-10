@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -28,14 +28,14 @@ class Source
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("dcterms:Dataset"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(xsdString, "title"));
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
         }
 
         {
             /* TODO:
             String table = "source_subjects";
             NodeMapping subject = config.createIriMapping(source, "source");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("concept", "subject"));
             */
@@ -46,7 +46,7 @@ class Source
             NodeMapping subject = config.createIriMapping(source, "source");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
-                    config.createLiteralMapping(xsdString, "alternative"));
+                    config.createLiteralMapping(rdfLangStringEn, "alternative"));
         }
     }
 }

@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -31,11 +31,11 @@ class Reference
                     config.createIriMapping("class", "type"));
             */
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(xsdString, "title"));
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:date"),
-                    config.createLiteralMapping(xsdDate, "dcdate"));
+                    config.createLiteralMapping(xsdDateM4, "dcdate"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:bibliographicCitation"),
-                    config.createLiteralMapping(xsdString, "citation"));
+                    config.createLiteralMapping(rdfLangStringEn, "citation"));
         }
 
         {

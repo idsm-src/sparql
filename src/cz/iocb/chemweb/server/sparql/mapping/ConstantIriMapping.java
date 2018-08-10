@@ -11,10 +11,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class ConstantIriMapping extends IriMapping implements ConstantMapping
 {
-    private final String value;
+    private final IRI value;
 
 
-    public ConstantIriMapping(IriClass iriClass, String iri)
+    public ConstantIriMapping(IriClass iriClass, IRI iri)
     {
         super(iriClass);
         value = iri;
@@ -27,17 +27,14 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
         if(node instanceof VariableOrBlankNode)
             return true;
 
-        if(node instanceof IRI && value.equals(((IRI) node).getUri().toString()))
-            return true;
-
-        return false;
+        return value.equals(node);
     }
 
 
     @Override
     public String getSqlValueAccess(int i)
     {
-        return getIriClass().getInverseFunction(i) + "('" + value + "')";
+        return getIriClass().getInverseFunction(i) + "('" + value.getUri().toString() + "')";
     }
 
 

@@ -1,5 +1,10 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -10,9 +15,10 @@ import java.util.Properties;
 import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateClassWithConstantZone;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringClassWithConstantTag;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.parser.Xsd;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
@@ -25,6 +31,9 @@ import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
     private static PubChemConfiguration singleton;
+
+    static final LiteralClass rdfLangStringEn = new LangStringClassWithConstantTag("en");
+    static final LiteralClass xsdDateM4 = new DateClassWithConstantZone(-4 * 60 * 60);
 
 
     public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException
@@ -205,11 +214,10 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         /* orchem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
                 "sachem_substructure_search");
-        subsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         subsearch.addParameter(new ParameterDefinition(sachem + "graphMode", getIriClass("graphMode"),
                 new IRI(sachem + "substructureSearch")));
         subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("chargeMode"),
@@ -227,35 +235,32 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         /* orchem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
                 "sachem_similarity_search");
-        simsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
-                new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
-        simsearch.addResult(new ResultDefinition(sachem + "score", LiteralClass.xsdFloat, "score"));
+        simsearch.addResult(new ResultDefinition(sachem + "score", xsdFloat, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* orchem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
                 "sachem_similarity_search");
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
-                new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simcmpsearch
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay");
-        bioassay.addParameter(new ParameterDefinition(fulltext + "query", LiteralClass.xsdString, null));
+        bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
     }

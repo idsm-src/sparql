@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -28,7 +28,7 @@ class Measuregroup
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bao:BAO_0000040"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(xsdString, "title"));
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("source", "source"), "source is not null");
         }

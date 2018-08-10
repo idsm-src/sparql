@@ -1,11 +1,17 @@
 package cz.iocb.chemweb.server.db;
 
-
 public class BlankNode extends ReferenceNode
 {
     public BlankNode(String value)
     {
         super(value);
+    }
+
+
+    @Override
+    public String toString()
+    {
+        return "_:" + value;
     }
 
 

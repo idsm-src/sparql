@@ -14,6 +14,7 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -72,7 +73,6 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlMinus;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall.ClassifiedNode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
@@ -89,7 +89,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
-    private final LinkedHashMap<String, ResourceClass> classes;
+    private final LinkedHashMap<String, IriClass> iriClasses;
     private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
@@ -97,10 +97,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private Prologue prologue;
 
 
-    public TranslateVisitor(LinkedHashMap<String, ResourceClass> classes, List<QuadMapping> mappings,
+    public TranslateVisitor(LinkedHashMap<String, IriClass> iriClasses, List<QuadMapping> mappings,
             DatabaseSchema schema, LinkedHashMap<String, ProcedureDefinition> procedures)
     {
-        this.classes = classes;
+        this.iriClasses = iriClasses;
         this.mappings = mappings;
         this.schema = schema;
         this.procedures = procedures;
@@ -306,23 +306,30 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                     if(value instanceof Literal)
                     {
-                        //TODO: fix Literal.getTypeIri() to not return null
-                        IRI iri = ((Literal) value).getTypeIri();
-                        String type = iri != null ? iri.getUri().toString() : "http://www.w3.org/2001/XMLSchema#string";
+                        if(((Literal) value).getLanguageTag() != null)
+                        {
+                            valueType = BuiltinClasses.rdfLangString;
+                        }
+                        else
+                        {
+                            valueType = BuiltinClasses.unsupportedLiteral;
 
-                        //TODO: use shared method for this code
-                        for(LiteralClass literalClass : LiteralClass.getClasses())
-                            if(literalClass.getTypeIri().equals(type))
-                                valueType = literalClass;
+                            if(((Literal) value).getValue() != null)
+                            {
+                                IRI iri = ((Literal) value).getTypeIri();
 
-                        assert valueType != null;
+                                if(iri != null)
+                                    for(LiteralClass literalClass : BuiltinClasses.getValuesClauseLiteralClasses())
+                                        if(literalClass.getTypeIri().equals(iri))
+                                            valueType = literalClass;
+                            }
+                        }
                     }
                     else if(value instanceof IRI)
                     {
-                        //TODO: use shared method for this code
-                        valueType = IriClass.uncategorizedClass;
+                        valueType = BuiltinClasses.iri;
 
-                        for(ResourceClass resClass : classes.values())
+                        for(ResourceClass resClass : iriClasses.values())
                             if(resClass instanceof IriClass)
                                 if(((IriClass) resClass).match((Node) value))
                                     valueType = resClass;
@@ -999,7 +1006,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         /* check paramaters */
 
-        LinkedHashMap<ParameterDefinition, ClassifiedNode> parameterNodes = new LinkedHashMap<ParameterDefinition, ClassifiedNode>();
+        LinkedHashMap<ParameterDefinition, Node> parameterNodes = new LinkedHashMap<ParameterDefinition, Node>();
 
         for(ParameterDefinition parameter : procedureDefinition.getParameters())
             parameterNodes.put(parameter, null);
@@ -1026,7 +1033,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             else
             {
                 Node value = parameter.getValue();
-                ResourceClass valueClass = null;
 
                 if(value instanceof VariableOrBlankNode)
                 {
@@ -1043,12 +1049,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                                     value.getRange(), parameter.getName().toString(prologue)));
                     }
                 }
-                else
-                {
-                    valueClass = classes.values().stream().filter(c -> c.match(value)).findAny().orElse(null);
-                }
 
-                parameterNodes.put(parameterDefinition, new ClassifiedNode(value, valueClass));
+                parameterNodes.put(parameterDefinition, value);
             }
 
 
@@ -1057,17 +1059,16 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
 
-        for(Entry<ParameterDefinition, ClassifiedNode> entry : parameterNodes.entrySet())
+        for(Entry<ParameterDefinition, Node> entry : parameterNodes.entrySet())
         {
-            ClassifiedNode parameterValue = entry.getValue();
+            Node parameterValue = entry.getValue();
 
             if(parameterValue == null)
             {
                 ParameterDefinition parameterDefinition = entry.getKey();
 
                 if(parameterDefinition.getDefaultValue() != null)
-                    entry.setValue(new ClassifiedNode(parameterDefinition.getDefaultValue(),
-                            parameterDefinition.getParameterClass()));
+                    entry.setValue(parameterDefinition.getDefaultValue());
                 else
                     exceptions.add(new TranslateException(ErrorType.missingParameterPredicate,
                             procedureCallBase.getProcedure().getRange(),
@@ -1079,10 +1080,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         /* check results */
 
-        LinkedHashMap<ResultDefinition, ClassifiedNode> resultNodes = new LinkedHashMap<ResultDefinition, ClassifiedNode>();
-
-        for(ResultDefinition result : procedureDefinition.getResults())
-            resultNodes.put(result, null);
+        LinkedHashMap<ResultDefinition, Node> resultNodes = new LinkedHashMap<ResultDefinition, Node>();
 
 
         if(procedureCallBase instanceof ProcedureCall)
@@ -1090,15 +1088,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             /* single-result procedure call */
 
             ResultDefinition resultDefinition = procedureDefinition.getResult(null);
-
             Node result = ((ProcedureCall) procedureCallBase).getResult();
-            ResourceClass resultClass = null;
-
-            if(!(result instanceof VariableOrBlankNode))
-                resultClass = classes.values().stream().filter(c -> c.match(result)).findAny().orElse(null);
-
-            resultNodes.put(resultDefinition, new ClassifiedNode(result, resultClass));
-
+            resultNodes.put(resultDefinition, result);
 
             if(result instanceof Variable)
                 variablesInScope.add(((Variable) result).getName());
@@ -1127,13 +1118,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 }
                 else
                 {
-                    ResourceClass resultClass = null;
-
-                    if(!(result instanceof VariableOrBlankNode))
-                        resultClass = classes.values().stream().filter(c -> c.match(result.getValue())).findAny()
-                                .orElse(null);
-
-                    resultNodes.put(resultDefinition, new ClassifiedNode(result.getValue(), resultClass));
+                    resultNodes.put(resultDefinition, result.getValue());
                 }
 
 
@@ -1167,8 +1152,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public final LinkedHashMap<String, ResourceClass> getResourceClasses()
+    public final LinkedHashMap<String, IriClass> getIriClasses()
     {
-        return classes;
+        return iriClasses;
     }
 }

@@ -21,7 +21,7 @@ import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
@@ -113,7 +113,7 @@ public class GenerateHints extends HttpServlet
         Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
         SelectQuery syntaxTree = parser.parse(query);
         DatabaseSchema schema = dbConfig.getSchema();
-        LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+        LinkedHashMap<String, IriClass> classes = dbConfig.getIriClasses();
         List<QuadMapping> mappings = dbConfig.getMappings();
         LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 

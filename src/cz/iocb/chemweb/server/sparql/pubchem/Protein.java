@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -28,7 +28,7 @@ class Protein
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Protein"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(xsdString, "title"));
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
                     config.createIriMapping("taxonomy", "organism"), "organism is not null");
         }
@@ -125,7 +125,7 @@ class Protein
             /* TODO:
             String table = "protein_types";
             NodeMapping subject = config.createIriMapping(protein, "protein");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -30,9 +30,9 @@ class Gene
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Gene"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(xsdString, "title"));
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:description"),
-                    config.createLiteralMapping(xsdString, "description"));
+                    config.createLiteralMapping(rdfLangStringEn, "description"));
         }
 
         {
@@ -48,7 +48,7 @@ class Gene
             NodeMapping subject = config.createIriMapping(gene, "gene");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
-                    config.createLiteralMapping(xsdString, "alternative"));
+                    config.createLiteralMapping(rdfLangStringEn, "alternative"));
         }
 
         {

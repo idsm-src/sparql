@@ -1,6 +1,10 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,8 +17,6 @@ import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.parser.Xsd;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
@@ -124,11 +126,10 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         /* orchem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
                 "sachem_substructure_search");
-        subsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         subsearch.addParameter(new ParameterDefinition(sachem + "graphMode", getIriClass("graphMode"),
                 new IRI(sachem + "substructureSearch")));
         subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("chargeMode"),
@@ -146,28 +147,25 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         /* orchem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
                 "sachem_similarity_search");
-        simsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
-                new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simsearch.addResult(new ResultDefinition(sachem + "compound", molClass, "compound"));
-        simsearch.addResult(new ResultDefinition(sachem + "score", LiteralClass.xsdFloat, "score"));
+        simsearch.addResult(new ResultDefinition(sachem + "score", xsdFloat, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* orchem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
                 "sachem_similarity_search");
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", LiteralClass.xsdString, null));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "cutoff", LiteralClass.xsdFloat,
-                new Literal("0.8", new IRI(Xsd.FLOAT))));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", LiteralClass.xsdInteger,
-                new Literal("-1", new IRI(Xsd.INTEGER))));
+        simcmpsearch
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simcmpsearch.addResult(new ResultDefinition(null, molClass, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
     }

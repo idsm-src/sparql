@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.db;
 
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+
 
 
 public class TypedLiteral extends Literal
@@ -14,6 +16,13 @@ public class TypedLiteral extends Literal
     }
 
 
+    public TypedLiteral(String value, IRI datatype)
+    {
+        super(value);
+        this.datatype = datatype.getUri().toString();
+    }
+
+
     public IriNode getDatatype()
     {
         return new IriNode(datatype);
@@ -23,7 +32,7 @@ public class TypedLiteral extends Literal
     @Override
     public String toString()
     {
-        return "\"" + value.replace("\"", "\\\"") + "\"^^<" + datatype + ">";
+        return "\"" + value.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\"^^<" + datatype + ">";
     }
 
 

@@ -1,13 +1,14 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdBoolean;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDateTime;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDecimal;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDouble;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloat;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.BOOLEAN;
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.DATE;
 import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest.DATETIME;
@@ -19,6 +20,7 @@ import static cz.iocb.chemweb.server.sparql.translator.expression.TranslateReque
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -40,13 +42,13 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 
 public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<TranslatedExpression, TranslateRequest>
 {
-    private final LinkedHashMap<String, ResourceClass> classes;
+    private final LinkedHashMap<String, IriClass> classes;
     private final VariableAccessor variableAccessor;
 
 
     public ExpressionTranslateVisitor(TranslateVisitor parentVisitor, VariableAccessor variableAccessor)
     {
-        this.classes = parentVisitor.getResourceClasses();
+        this.classes = parentVisitor.getIriClasses();
         this.variableAccessor = variableAccessor;
     }
 
@@ -670,25 +672,18 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
     @Override
     public TranslatedExpression visit(IRI iri, TranslateRequest request)
     {
-        return new TranslatedExpression(IriClass.iriClass, false, iri.getUri().toString());
+        return new TranslatedExpression(BuiltinClasses.iri, false, iri.getUri().toString());
     }
 
 
     @Override
     public TranslatedExpression visit(Literal literal, TranslateRequest request)
     {
-        //TODO: fix Literal.getTypeIri() to not return null
-        IRI iri = literal.getTypeIri();
-        String type = iri != null ? iri.getUri().toString() : "http://www.w3.org/2001/XMLSchema#string";
+        IRI type = literal.getTypeIri();
 
-        Object value = literal.getValue();
-
-        if(type.equals("http://www.w3.org/2001/XMLSchema#string"))
-            value = "'" + ((String) value).replaceAll("'", "''") + "'";
-
-        for(LiteralClass literalClass : LiteralClass.getClasses())
+        for(LiteralClass literalClass : BuiltinClasses.getExpressionLiteralClasses())
             if(literalClass.getTypeIri().equals(type))
-                return new TranslatedExpression(literalClass, false, value.toString());
+                return new TranslatedExpression(literalClass, false, literalClass.getSqlValue(literal, 0));
 
         //TODO: report literal with an unsupported type as an error
         return null;
@@ -824,8 +819,8 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
 
                 if(iriClasses.size() == 1)
                 {
-                    return new TranslatedExpression(IriClass.iriClass, canBeNull,
-                            iriClasses.get(0).getSparqlValue(variable.getName()));
+                    return new TranslatedExpression(iri, canBeNull,
+                            iriClasses.get(0).getResultValue(variable.getName(), 0));
                 }
                 else
                 {
@@ -835,11 +830,11 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                     for(int i = 0; i < iriClasses.size(); i++)
                     {
                         appendComma(builder, i > 0);
-                        builder.append(iriClasses.get(i).getSparqlValue(variable.getName()));
+                        builder.append(iriClasses.get(i).getResultValue(variable.getName(), 0));
                     }
 
                     builder.append(")");
-                    return new TranslatedExpression(IriClass.iriClass, canBeNull, builder.toString());
+                    return new TranslatedExpression(iri, canBeNull, builder.toString());
                 }
             }
 
@@ -1060,7 +1055,9 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
                 if(((IriClass) resClass).match(iri))
                     return (IriClass) resClass;
 
-        return IriClass.uncategorizedClass;
+        //FIXME:
+        //return IriClass.uncategorizedClass;
+        return BuiltinClasses.iri;
     }
 
 
@@ -1116,7 +1113,7 @@ public class ExpressionTranslateVisitor extends ParameterizedTranslateVisitor<Tr
         if(resourceClass == xsdDate)
             return DATE;
 
-        if(resourceClass == IriClass.iriClass)
+        if(resourceClass == iri)
             return IRI;
 
         assert false;

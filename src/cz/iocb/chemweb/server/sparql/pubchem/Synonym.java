@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -26,14 +26,14 @@ class Synonym
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(xsdString, "value"));
+                    config.createLiteralMapping(rdfLangStringEn, "value"));
         }
 
         {
             /* TODO:
             String table = "synonym_types";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

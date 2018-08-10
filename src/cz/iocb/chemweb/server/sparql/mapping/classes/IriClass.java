@@ -12,24 +12,28 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class IriClass extends ResourceClass
 {
-    public static final String iriTag = "iri";
-    public static final IriClass iriClass = new IriClass(iriTag, Arrays.asList("varchar"));
-    public static final IriClass uncategorizedClass = new IriClass("uncategorized", Arrays.asList("varchar"));
-
     private final String pattern;
     private final HashSet<String> values;
     private final String function;
     private final List<String> inverseFunction;
-    private final List<String> sqlTypes;
+
+
+    public IriClass(String name, List<String> sqlTypes)
+    {
+        super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
+        this.pattern = null;
+        this.values = null;
+        this.function = null;
+        this.inverseFunction = null;
+    }
 
 
     public IriClass(String name, List<String> sqlTypes, String pattern, HashSet<String> values)
     {
-        super(name);
+        super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
         this.pattern = pattern;
         this.values = values;
         this.function = name;
-        this.sqlTypes = sqlTypes;
 
         this.inverseFunction = new ArrayList<String>(sqlTypes.size());
 
@@ -38,19 +42,6 @@ public class IriClass extends ResourceClass
         else
             for(int i = 0; i < sqlTypes.size(); i++)
                 this.inverseFunction.add(name + "_inv" + (i + 1));
-    }
-
-
-    private IriClass(String name, List<String> sqlTypes)
-    {
-        super(name);
-        this.pattern = null;
-        this.values = null;
-        this.function = "";
-        this.sqlTypes = sqlTypes;
-
-        this.inverseFunction = new ArrayList<String>(sqlTypes.size());
-        this.inverseFunction.add("");
     }
 
 
@@ -67,31 +58,14 @@ public class IriClass extends ResourceClass
 
 
     @Override
-    public int getPartsCount()
-    {
-        return inverseFunction.size();
-    }
-
-
-    @Override
-    public String getSqlColumn(String var, int par)
-    {
-        if(inverseFunction.size() > 1)
-            return '"' + var + '#' + name + "-par" + par + '"';
-        else
-            return '"' + var + '#' + name + '"';
-    }
-
-
-    @Override
-    public String getSparqlValue(String var)
+    public String getResultValue(String var, int part)
     {
         StringBuffer strBuf = new StringBuffer();
 
         strBuf.append(function);
         strBuf.append("(");
 
-        for(int i = 0; i < inverseFunction.size(); i++)
+        for(int i = 0; i < getPartsCount(); i++)
         {
             if(i > 0)
                 strBuf.append(", ");
@@ -106,34 +80,27 @@ public class IriClass extends ResourceClass
 
 
     @Override
-    public String getSqlValue(Node node, int i)
+    public String getSqlValue(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getName(), i);
-
-        if(!(node instanceof IRI))
-            return null;
+            return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
 
         IRI iri = (IRI) node;
 
-        return inverseFunction.get(i) + "('" + iri.getUri().toString() + "')";
+        return inverseFunction.get(part) + "('" + iri.getUri().toString() + "')";
     }
 
 
     @Override
-    public String getSqlType(int i)
+    public boolean match(Node node)
     {
-        return sqlTypes.get(i);
-    }
+        if(node instanceof VariableOrBlankNode)
+            return true;
 
-
-    @Override
-    public boolean match(Node value)
-    {
-        if(!(value instanceof IRI))
+        if(!(node instanceof IRI))
             return false;
 
-        return match(((IRI) value).getUri().toString());
+        return match(((IRI) node).getUri().toString());
     }
 
 
@@ -155,8 +122,8 @@ public class IriClass extends ResourceClass
     }
 
 
-    public String getInverseFunction(int i)
+    public String getInverseFunction(int part)
     {
-        return inverseFunction.get(i);
+        return inverseFunction.get(part);
     }
 }

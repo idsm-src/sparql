@@ -1,9 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import java.util.Map.Entry;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -13,6 +15,7 @@ public class SqlQuery extends SqlIntercode
 {
     private final ArrayList<String> selectedVariables;
     private final SqlIntercode child;
+
 
     public SqlQuery(ArrayList<String> selectedVariables, SqlIntercode child)
     {
@@ -43,55 +46,60 @@ public class SqlQuery extends SqlIntercode
                 builder.append("NULL AS \"");
                 builder.append(variableName);
                 builder.append('#');
-                builder.append(ResourceClass.nullTag);
+                builder.append(ResultTag.RDFTERM.getTag());
                 builder.append('"');
             }
             else
             {
                 List<ResourceClass> classes = variable.getClasses();
-                List<ResourceClass> iriClasses = new ArrayList<ResourceClass>();
-                List<ResourceClass> literalClasses = new ArrayList<ResourceClass>();
+
+                LinkedHashMap<List<ResultTag>, List<ResourceClass>> resultClasses = new LinkedHashMap<>();
 
                 for(ResourceClass resClass : classes)
                 {
-                    if(resClass instanceof IriClass)
-                        iriClasses.add(resClass);
-                    else
-                        literalClasses.add(resClass);
-                }
+                    List<ResourceClass> list = resultClasses.get(resClass.getResultTags());
 
-                if(!iriClasses.isEmpty())
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    if(iriClasses.size() > 1)
-                        builder.append("COALESCE(");
-
-                    for(int i = 0; i < iriClasses.size(); i++)
+                    if(list == null)
                     {
-                        appendComma(builder, i > 0);
-
-                        ResourceClass iriClass = iriClasses.get(i);
-                        builder.append(iriClass.getSparqlValue(variableName));
+                        list = new ArrayList<ResourceClass>();
+                        resultClasses.put(resClass.getResultTags(), list);
                     }
 
-                    if(iriClasses.size() > 1)
-                        builder.append(")");
-
-                    builder.append(" AS \"");
-                    builder.append(variableName);
-                    builder.append('#');
-                    builder.append(IriClass.iriTag);
-                    builder.append('"');
+                    list.add(resClass);
                 }
 
-                for(ResourceClass literalClass : literalClasses)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
 
-                    builder.append(literalClass.getSparqlValue(variable.getName()));
+                for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
+                {
+                    List<ResultTag> tags = entry.getKey();
+                    List<ResourceClass> resClasses = entry.getValue();
+
+                    for(int part = 0; part < tags.size(); part++)
+                    {
+                        appendComma(builder, hasSelect);
+                        hasSelect = true;
+
+                        if(resClasses.size() > 1)
+                            builder.append("COALESCE(");
+
+                        for(int i = 0; i < resClasses.size(); i++)
+                        {
+                            appendComma(builder, i > 0);
+
+                            ResourceClass resClass = resClasses.get(i);
+                            builder.append(resClass.getResultValue(variableName, part));
+                        }
+
+                        if(resClasses.size() > 1)
+                            builder.append(")");
+
+                        builder.append(" AS \"");
+
+                        builder.append(variableName);
+                        builder.append('#');
+                        builder.append(tags.get(part).getTag());
+                        builder.append('"');
+                    }
                 }
             }
         }
@@ -99,15 +107,13 @@ public class SqlQuery extends SqlIntercode
         if(!hasSelect)
         {
             builder.append("1 AS \"*#");
-            builder.append(ResourceClass.nullTag);
+            builder.append(ResultTag.RDFTERM.getTag());
             builder.append('"');
         }
-
 
         builder.append(" FROM (");
         builder.append(child.translate());
         builder.append(") AS tab");
-
 
         return builder.toString();
     }

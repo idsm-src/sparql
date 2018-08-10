@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdInteger;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -29,7 +29,7 @@ class SubstanceDescriptor
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:IAO_0000129"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(xsdInteger, "version"));
+                    config.createLiteralMapping(xsdInt, "version"));
         }
     }
 }

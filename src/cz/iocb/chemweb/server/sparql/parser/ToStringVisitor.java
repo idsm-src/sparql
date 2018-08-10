@@ -1,9 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser;
 
-import java.math.BigDecimal;
-import java.net.URI;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -659,68 +655,24 @@ public class ToStringVisitor extends ElementVisitor<Void>
     @Override
     public Void visit(Literal literal)
     {
-        // FIXME: use better print method
+        String lexicalValue = literal.getStringValue();
 
-        IRI typeIri = literal.getTypeIri();
-        URI typeUri = typeIri == null ? null : typeIri.getUri();
-
-        if(literal.getValue() == null)
-        {
-            writeAsString(literal, typeUri);
-            return null;
-        }
-
-        if(URI.create(Xsd.INTEGER).equals(typeUri) || URI.create(Xsd.BOOLEAN).equals(typeUri))
-        {
-            write(literal.getValue().toString());
-        }
-        else if(URI.create(Xsd.DECIMAL).equals(typeUri))
-        {
-            BigDecimal value = (BigDecimal) literal.getValue();
-
-            if(value.scale() == 0)
-                value = value.setScale(1);
-
-            write(value.toPlainString());
-        }
-        else if(URI.create(Xsd.DOUBLE).equals(typeUri))
-        {
-            DecimalFormat format = (DecimalFormat) NumberFormat.getInstance(Locale.US);
-            // this many #s should be enough for everyone
-            format.applyPattern("#.#################################E0");
-
-            write(format.format(literal.getValue()).replace("Infinity", "INF"));
-        }
-        else
-        {
-            writeAsString(literal, typeUri);
-        }
-
-        return null;
-    }
-
-    private void writeAsString(Literal literal, URI typeUri)
-    {
-        writeQuoted(literal.getStringValue());
+        write("\"");
+        write(lexicalValue.replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n"));
+        write("\"");
 
         if(literal.getLanguageTag() != null)
         {
             write("@");
             write(literal.getLanguageTag());
         }
-        else if(typeUri != null)
+        else if(literal.getTypeIri() != null)
         {
             write("^^");
             visit(literal.getTypeIri());
         }
-    }
 
-    private void writeQuoted(String stringValue)
-    {
-        write("\"");
-        // escape \ " \r \n
-        write(stringValue.replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n"));
-        write("\"");
+        return null;
     }
 
     @Override

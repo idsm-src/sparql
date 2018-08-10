@@ -3,19 +3,19 @@ package cz.iocb.chemweb.server.sparql.mapping;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ParametrisedLiteralMapping extends LiteralMapping implements ParametrisedMapping
+public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements ParametrisedMapping
 {
     private final List<String> columns;
 
 
-    public ParametrisedLiteralMapping(LiteralClass literalClass, List<String> columns)
+    public ParametrisedBlankNodeMapping(BlankNodeClass blankNodeClass, List<String> columns)
     {
-        super(literalClass);
+        super(blankNodeClass);
         this.columns = columns;
     }
 
@@ -23,7 +23,7 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
     @Override
     public boolean match(Node node)
     {
-        return getLiteralClass().match(node);
+        return getBlankNodeClass().match(node);
     }
 
 
@@ -46,7 +46,7 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
             remappedColumns.add(remapped);
         }
 
-        return new ParametrisedLiteralMapping(getLiteralClass(), remappedColumns);
+        return new ParametrisedBlankNodeMapping(getBlankNodeClass(), remappedColumns);
     }
 
 
@@ -56,13 +56,13 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
         if(this == obj)
             return true;
 
-        if(obj == null || !(obj instanceof ParametrisedLiteralMapping))
+        if(obj == null || !(obj instanceof ParametrisedBlankNodeMapping))
             return false;
 
         if(!super.equals(obj))
             return false;
 
-        ParametrisedLiteralMapping other = (ParametrisedLiteralMapping) obj;
+        ParametrisedBlankNodeMapping other = (ParametrisedBlankNodeMapping) obj;
 
         return columns.equals(other.columns);
     }

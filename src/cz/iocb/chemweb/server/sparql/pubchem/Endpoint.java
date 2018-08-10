@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdFloat;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -45,7 +45,7 @@ class Endpoint
                     config.createIriMapping("class", "class"));
             */
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
-                    config.createLiteralMapping(xsdString, "label"));
+                    config.createLiteralMapping(rdfLangStringEn, "label"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdFloat, "value"));
         }

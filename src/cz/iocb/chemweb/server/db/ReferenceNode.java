@@ -13,13 +13,6 @@ public abstract class ReferenceNode extends RdfNode
 
 
     @Override
-    public String toString()
-    {
-        return "<" + value + ">";
-    }
-
-
-    @Override
     public boolean isLiteral()
     {
         return false;

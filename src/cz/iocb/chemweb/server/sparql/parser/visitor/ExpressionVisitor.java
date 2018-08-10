@@ -35,11 +35,13 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnaryLiteralExpression
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnaryNegationExpressionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnarySignedLiteralExpressionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
+import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.Position;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BracketedExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BuiltInCallExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.ExistsExpression;
@@ -121,31 +123,22 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         Expression left = visit(ctx.expression());
         Expression right = visit(ctx.unaryLiteralExpression());
 
-        Literal rightLiteral;
+        Literal signNumber = (Literal) (right instanceof Literal ? right : ((BinaryExpression) right).getLeft());
+        Operator operator = signNumber.getStringValue().startsWith("+") ? Operator.Add : Operator.Subtract;
 
-        // we have to extract the sign from the numeric literal from right
-        if(right instanceof Literal)
-        {
-            rightLiteral = (Literal) right;
-        }
-        else
-        {
-            rightLiteral = (Literal) ((BinaryExpression) right).getLeft();
-        }
+        Literal fixed = new Literal(signNumber.getStringValue().substring(1), signNumber.getTypeIri());
+        fixed.setRange(new Range(moveByOneCharacter(signNumber.getRange().getStart()), signNumber.getRange().getEnd()));
 
-        BinaryExpression.Operator operator = rightLiteral.getStringValue().startsWith("+")
-                ? BinaryExpression.Operator.Add
-                : BinaryExpression.Operator.Subtract;
+        if(!(right instanceof Literal))
+            ((BinaryExpression) right).setLeft(fixed);
 
-        rightLiteral.setStringValue(rightLiteral.getStringValue().substring(1));
-        rightLiteral.setRange(
-                new Range(moveByOneCharacter(rightLiteral.getRange().getStart()), rightLiteral.getRange().getEnd()));
-
-        return new BinaryExpression(operator, left, right);
+        return new BinaryExpression(operator, left, right instanceof Literal ? fixed : right);
     }
 
     private static Position moveByOneCharacter(Position original)
     {
+        System.err.println(original.getLineNumber() + ":" + original.getPositionInLine());
+
         return new Position(original.getLineNumber(), original.getPositionInLine() + 1);
     }
 
@@ -424,7 +417,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         result.add(expressionVisitor.visit(ctx.expression()));
 
         if(ctx.string() != null)
-            result.add(withRange(new Literal(LiteralVisitor.unquote(ctx.string().getText())), ctx.string()));
+            result.add(withRange(new Literal(LiteralVisitor.unquote(ctx.string().getText()), BuiltinTypes.xsdStringIri),
+                    ctx.string()));
 
         return result;
     }

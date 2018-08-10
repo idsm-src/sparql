@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdDate;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -30,11 +30,11 @@ class Substance
             NodeMapping subject = config.createIriMapping(substance, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
-                    config.createLiteralMapping(xsdDate, "available"));
+                    config.createLiteralMapping(xsdDateM4, "available"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("source", "source"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:modified"),
-                    config.createLiteralMapping(xsdDate, "modified"));
+                    config.createLiteralMapping(xsdDateM4, "modified"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
                     config.createIriMapping("compound", "compound"), "compound is not null");
         }

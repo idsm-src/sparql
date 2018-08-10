@@ -31,7 +31,7 @@ import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
 import cz.iocb.chemweb.server.services.SessionData;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
@@ -121,7 +121,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             }
 
             DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            LinkedHashMap<String, IriClass> classes = dbConfig.getIriClasses();
             List<QuadMapping> mappings = dbConfig.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
@@ -320,7 +320,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                     .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
             DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, ResourceClass> classes = dbConfig.getClasses();
+            LinkedHashMap<String, IriClass> classes = dbConfig.getIriClasses();
             List<QuadMapping> mappings = dbConfig.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 

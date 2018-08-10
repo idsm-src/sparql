@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass.xsdString;
+import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -33,7 +33,7 @@ class Concept
             NodeMapping subject = config.createIriMapping(concept, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
-                    config.createLiteralMapping(xsdString, "label"));
+                    config.createLiteralMapping(rdfLangStringEn, "label"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:inScheme"),
                     config.createIriMapping(concept, "scheme"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:broader"),
