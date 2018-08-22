@@ -24,7 +24,7 @@ import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
@@ -133,7 +133,7 @@ public class EndpointServlet extends HttpServlet
         try
         {
             DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, IriClass> classes = dbConfig.getIriClasses();
+            LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
             List<QuadMapping> mappings = dbConfig.getMappings();
             LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 

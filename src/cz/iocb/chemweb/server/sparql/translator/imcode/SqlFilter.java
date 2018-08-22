@@ -1,21 +1,23 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 
 
 
 public class SqlFilter extends SqlIntercode
 {
     private final SqlIntercode child;
-    private final String condition;
+    private final List<SqlExpressionIntercode> conditions;
 
 
-    public SqlFilter(SqlIntercode child, String condition)
+    public SqlFilter(SqlIntercode child, List<SqlExpressionIntercode> conditions)
     {
         super(child.variables);
         this.child = child;
-        this.condition = condition;
+        this.conditions = conditions;
     }
 
 
@@ -29,7 +31,7 @@ public class SqlFilter extends SqlIntercode
 
         for(UsedVariable variable : child.variables.getValues())
         {
-            for(ResourceClass resClass : variable.getClasses())
+            for(PatternResourceClass resClass : variable.getClasses())
             {
                 for(int i = 0; i < resClass.getPartsCount(); i++)
                 {
@@ -52,7 +54,16 @@ public class SqlFilter extends SqlIntercode
         builder.append(" ) AS tab");
 
         builder.append(" WHERE ");
-        builder.append(condition);
+
+        boolean hasCondition = false;
+
+        for(SqlExpressionIntercode condition : conditions)
+        {
+            appendAnd(builder, hasCondition);
+            hasCondition = true;
+
+            builder.append(condition.translate());
+        }
 
         return builder.toString();
     }

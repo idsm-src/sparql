@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.procedure;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -8,11 +8,11 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 public class ParameterDefinition
 {
     private final String parameterName;
-    private final ResourceClass parameterClass;
+    private final PatternResourceClass parameterClass;
     private final Node defaultValue;
 
 
-    public ParameterDefinition(String parameterName, ResourceClass parameterClass, Node defaultValue)
+    public ParameterDefinition(String parameterName, PatternResourceClass parameterClass, Node defaultValue)
     {
         this.parameterName = parameterName;
         this.parameterClass = parameterClass;
@@ -26,7 +26,7 @@ public class ParameterDefinition
     }
 
 
-    public final ResourceClass getParameterClass()
+    public final PatternResourceClass getParameterClass()
     {
         return parameterClass;
     }

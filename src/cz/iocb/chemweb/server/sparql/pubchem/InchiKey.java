@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,14 +11,14 @@ class InchiKey
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(
-                new IriClass("inchikey", Arrays.asList("integer"), "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*"));
+        config.addIriClass(new UserIriClass("inchikey", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass inchikey = config.getIriClass("inchikey");
+        UserIriClass inchikey = config.getIriClass("inchikey");
         NodeMapping graph = config.createIriMapping("pubchem:inchikey");
 
         {

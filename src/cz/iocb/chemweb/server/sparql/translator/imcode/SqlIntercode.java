@@ -4,7 +4,7 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
-public abstract class SqlIntercode
+public abstract class SqlIntercode extends SqlBaseClass
 {
     protected final UsedVariables variables;
 
@@ -21,26 +21,5 @@ public abstract class SqlIntercode
     public final UsedVariables getVariables()
     {
         return variables;
-    }
-
-
-    protected static void appendComma(StringBuilder builder, boolean condition)
-    {
-        if(condition)
-            builder.append(", ");
-    }
-
-
-    protected static void appendAnd(StringBuilder builder, boolean condition)
-    {
-        if(condition)
-            builder.append(" AND ");
-    }
-
-
-    protected static void appendOr(StringBuilder builder, boolean condition)
-    {
-        if(condition)
-            builder.append(" OR ");
     }
 }

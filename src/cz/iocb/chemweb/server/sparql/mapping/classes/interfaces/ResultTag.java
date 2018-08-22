@@ -1,11 +1,11 @@
-package cz.iocb.chemweb.server.sparql.mapping.classes;
+package cz.iocb.chemweb.server.sparql.mapping.classes.interfaces;
 
 
 
 public enum ResultTag
 {
     /* generic tag */
-    RDFTERM("rdfterm"),
+    NULL("null"),
 
     /* generic iri tag */
     IRI("iri"),
@@ -28,9 +28,11 @@ public enum ResultTag
     DAYTIMEDURATION("daytimeduration"),
     STRING("string"),
     LANGSTRING("langstring"),
+    LITERAL("literal"),
 
     /* supplementary literal tags */
-    LANG("lang");
+    LANG("lang"),
+    TYPE("type");
 
 
     private final String tag;
@@ -54,6 +56,6 @@ public enum ResultTag
             if(tag.getTag().equals(name))
                 return tag;
 
-        return RDFTERM;
+        return NULL;
     }
 }

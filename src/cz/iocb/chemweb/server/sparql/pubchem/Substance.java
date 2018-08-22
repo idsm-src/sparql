@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,18 +11,18 @@ class Substance
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new IriClass("substance", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("substance", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/SID[0-9]+"));
-        config.addIriClass(new IriClass("substance_chembl", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("substance_chembl", Arrays.asList("integer"),
                 "http://linkedchemistry.info/chembl/chemblid/S?CHEMBL[0-9]+"));
-        config.addIriClass(new IriClass("substance_ebi_chembl", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("substance_ebi_chembl", Arrays.asList("integer"),
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/S?CHEMBL[0-9]+"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass substance = config.getIriClass("substance");
+        UserIriClass substance = config.getIriClass("substance");
         NodeMapping graph = config.createIriMapping("pubchem:substance");
 
         {
@@ -43,7 +43,7 @@ class Substance
             /* TODO:
             String table = "substance_types";
             NodeMapping subject = config.createIriMapping(substance, "substance");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "chebi"));
             */

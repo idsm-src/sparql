@@ -1,12 +1,15 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 
 
 
@@ -17,19 +20,21 @@ public class SqlLeftJoin extends SqlIntercode
 
     private final SqlIntercode left;
     private final SqlIntercode right;
-    private final String condition;
+    private final List<SqlExpressionIntercode> conditions;
 
 
-    protected SqlLeftJoin(UsedVariables variables, SqlIntercode left, SqlIntercode right, String condition)
+    protected SqlLeftJoin(UsedVariables variables, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> conditions)
     {
         super(variables);
         this.left = left;
         this.right = right;
-        this.condition = condition;
+        this.conditions = conditions;
     }
 
 
-    public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right, String condition)
+    public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> condition)
     {
         /* special cases */
 
@@ -209,7 +214,7 @@ public class SqlLeftJoin extends SqlIntercode
                 }
 
 
-                ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
+                PatternResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
                         : pairedClass.getRightClass();
 
                 for(int i = 0; i < resClass.getPartsCount(); i++)
@@ -260,7 +265,7 @@ public class SqlLeftJoin extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(ResourceClass resClass : leftVariable.getClasses())
+                    for(PatternResourceClass resClass : leftVariable.getClasses())
                     {
                         for(int i = 0; i < resClass.getPartsCount(); i++)
                         {
@@ -286,7 +291,7 @@ public class SqlLeftJoin extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(ResourceClass resClass : rightVariable.getClasses())
+                    for(PatternResourceClass resClass : rightVariable.getClasses())
                     {
                         for(int i = 0; i < resClass.getPartsCount(); i++)
                         {
@@ -308,7 +313,7 @@ public class SqlLeftJoin extends SqlIntercode
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
                         assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        ResourceClass resClass = pairedClass.getLeftClass();
+                        PatternResourceClass resClass = pairedClass.getLeftClass();
 
                         appendOr(builder, restricted);
                         restricted = true;
@@ -334,12 +339,12 @@ public class SqlLeftJoin extends SqlIntercode
             }
         }
 
-        if(condition != null)
+        for(SqlExpressionIntercode condition : conditions)
         {
             appendAnd(builder, hasWhere);
             hasWhere = true;
 
-            builder.append(condition);
+            builder.append(condition.translate());
         }
 
         if(!hasWhere)

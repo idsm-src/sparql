@@ -12,7 +12,7 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -57,7 +57,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addVariableClass(String variable, ResourceClass resourceClass)
+    public void addVariableClass(String variable, PatternResourceClass resourceClass)
     {
         UsedVariable other = variables.get(variable);
 
@@ -391,9 +391,9 @@ public class SqlTableAccess extends SqlIntercode
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
-                assert var.getClasses().get(0) == other.getClasses().get(0);
+                assert var.getClasses().iterator().next() == other.getClasses().iterator().next();
 
-                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().get(0),
+                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().iterator().next(),
                         var.canBeNull() && other.canBeNull());
                 merged.getVariables().add(newVar);
             }
@@ -434,9 +434,9 @@ public class SqlTableAccess extends SqlIntercode
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
-                assert var.getClasses().get(0) == other.getClasses().get(0);
+                assert var.getClasses().iterator().next() == other.getClasses().iterator().next();
 
-                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().get(0),
+                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().iterator().next(),
                         var.canBeNull() && other.canBeNull());
                 merged.getVariables().add(newVar);
             }
@@ -447,7 +447,7 @@ public class SqlTableAccess extends SqlIntercode
             if(left.getVariables().get(var.getName()) == null)
             {
                 assert var.getClasses().size() == 1;
-                merged.getVariables().add(new UsedVariable(var.getName(), var.getClasses().get(0), true));
+                merged.getVariables().add(new UsedVariable(var.getName(), var.getClasses().iterator().next(), true));
             }
         }
 
@@ -488,9 +488,9 @@ public class SqlTableAccess extends SqlIntercode
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
-                assert var.getClasses().get(0) == other.getClasses().get(0);
+                assert var.getClasses().iterator().next() == other.getClasses().iterator().next();
 
-                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().get(0),
+                UsedVariable newVar = new UsedVariable(var.getName(), var.getClasses().iterator().next(),
                         var.canBeNull() && other.canBeNull());
                 merged.getVariables().add(newVar);
             }
@@ -553,7 +553,7 @@ public class SqlTableAccess extends SqlIntercode
             hasSelect = true;
 
             ArrayList<NodeMapping> mappings = entry.getValue();
-            ResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
+            PatternResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
 
             for(int i = 0; i < resourceClass.getPartsCount(); i++)
             {

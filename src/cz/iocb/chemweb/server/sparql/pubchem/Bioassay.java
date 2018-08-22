@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -13,15 +13,15 @@ class Bioassay
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID[0-9]+";
 
-        config.addIriClass(new IriClass("bioassay", Arrays.asList("integer"), prefix));
-        config.addIriClass(new IriClass("bioassay_data", Arrays.asList("integer", "smallint"),
+        config.addIriClass(new UserIriClass("bioassay", Arrays.asList("integer"), prefix));
+        config.addIriClass(new UserIriClass("bioassay_data", Arrays.asList("integer", "smallint"),
                 prefix + "_(Description|Protocol|Comment)"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass bioassay = config.getIriClass("bioassay");
+        UserIriClass bioassay = config.getIriClass("bioassay");
         NodeMapping graph = config.createIriMapping("pubchem:bioassay");
 
         {

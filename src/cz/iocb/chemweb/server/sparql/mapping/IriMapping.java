@@ -1,19 +1,19 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
 public abstract class IriMapping extends NodeMapping
 {
-    protected IriMapping(IriClass iriClass)
+    protected IriMapping(UserIriClass iriClass)
     {
         super(iriClass);
     }
 
 
-    public final IriClass getIriClass()
+    public final UserIriClass getIriClass()
     {
-        return (IriClass) resourceClass;
+        return (UserIriClass) resourceClass;
     }
 }

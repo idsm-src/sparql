@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,14 +11,14 @@ class Protein
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(
-                new IriClass("protein", Arrays.asList("integer"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*"));
+        config.addIriClass(new UserIriClass("protein", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass protein = config.getIriClass("protein");
+        UserIriClass protein = config.getIriClass("protein");
         NodeMapping graph = config.createIriMapping("pubchem:protein");
 
         {
@@ -125,7 +125,7 @@ class Protein
             /* TODO:
             String table = "protein_types";
             NodeMapping subject = config.createIriMapping(protein, "protein");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

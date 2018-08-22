@@ -5,10 +5,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
@@ -75,13 +73,6 @@ public class SqlProcedureCall extends SqlIntercode
             }
             else if(node == null || !definition.getParameterClass().match(node))
             {
-                System.err.println("A");
-                System.err.println(node);
-                System.err.println(((Literal) node).getValue());
-                System.err.println(((Literal) node).getTypeIri());
-                System.err.println(((LiteralClass) definition.getParameterClass()).getTypeIri());
-
-
                 hasSolution = false;
             }
         }
@@ -217,7 +208,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             ResultDefinition definition = entry.getKey();
 
-            ResourceClass resultClass = definition.getResultClass();
+            PatternResourceClass resultClass = definition.getResultClass();
             String[] fields = definition.getSqlTypeFields();
 
             for(int i = 0; i < resultClass.getPartsCount(); i++)
@@ -234,7 +225,7 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
-            for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
+            for(PatternResourceClass resClass : variables.get(variable.getName()).getClasses())
             {
                 for(int i = 0; i < resClass.getPartsCount(); i++)
                 {
@@ -271,7 +262,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             ResultDefinition definition = entry.getKey();
             String[] fields = definition.getSqlTypeFields();
-            ResourceClass resultClass = definition.getResultClass();
+            PatternResourceClass resultClass = definition.getResultClass();
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -345,7 +336,7 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
         {
-            ResourceClass resClass = entry.getKey().getParameterClass();
+            PatternResourceClass resClass = entry.getKey().getParameterClass();
 
             appendComma(builder, hasParameter);
             hasParameter = true;
@@ -365,7 +356,7 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
-            for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
+            for(PatternResourceClass resClass : variables.get(variable.getName()).getClasses())
             {
                 for(int i = 0; i < resClass.getPartsCount(); i++)
                 {
@@ -398,7 +389,7 @@ public class SqlProcedureCall extends SqlIntercode
                     continue;
 
 
-                ResourceClass parameterClass = entry.getKey().getParameterClass();
+                PatternResourceClass parameterClass = entry.getKey().getParameterClass();
 
                 appendAnd(builder, hasWhere);
                 hasWhere = true;

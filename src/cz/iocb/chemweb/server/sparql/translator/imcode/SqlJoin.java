@@ -5,7 +5,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -273,7 +273,7 @@ public class SqlJoin extends SqlIntercode
                     }
 
 
-                    ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
+                    PatternResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
                             : pairedClass.getRightClass();
 
                     for(int i = 0; i < resClass.getPartsCount(); i++)
@@ -324,7 +324,7 @@ public class SqlJoin extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(ResourceClass resClass : leftVariable.getClasses())
+                        for(PatternResourceClass resClass : leftVariable.getClasses())
                         {
                             for(int i = 0; i < resClass.getPartsCount(); i++)
                             {
@@ -350,7 +350,7 @@ public class SqlJoin extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(ResourceClass resClass : rightVariable.getClasses())
+                        for(PatternResourceClass resClass : rightVariable.getClasses())
                         {
                             for(int i = 0; i < resClass.getPartsCount(); i++)
                             {
@@ -372,7 +372,7 @@ public class SqlJoin extends SqlIntercode
                         if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                         {
                             assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                            ResourceClass resClass = pairedClass.getLeftClass();
+                            PatternResourceClass resClass = pairedClass.getLeftClass();
 
                             appendOr(builder, restricted);
                             restricted = true;

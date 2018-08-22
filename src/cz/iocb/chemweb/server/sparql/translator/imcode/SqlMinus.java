@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -53,7 +53,7 @@ public class SqlMinus extends SqlIntercode
         {
             String varName = variable.getName();
 
-            for(ResourceClass resClass : variable.getClasses())
+            for(PatternResourceClass resClass : variable.getClasses())
             {
                 for(int j = 0; j < resClass.getPartsCount(); j++)
                 {
@@ -116,7 +116,7 @@ public class SqlMinus extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(ResourceClass resClass : leftVariable.getClasses())
+                    for(PatternResourceClass resClass : leftVariable.getClasses())
                     {
                         for(int i = 0; i < resClass.getPartsCount(); i++)
                         {
@@ -142,7 +142,7 @@ public class SqlMinus extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(ResourceClass resClass : rightVariable.getClasses())
+                    for(PatternResourceClass resClass : rightVariable.getClasses())
                     {
                         for(int i = 0; i < resClass.getPartsCount(); i++)
                         {
@@ -164,7 +164,7 @@ public class SqlMinus extends SqlIntercode
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
                         assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        ResourceClass resClass = pairedClass.getLeftClass();
+                        PatternResourceClass resClass = pairedClass.getLeftClass();
 
                         appendOr(builder, restricted);
                         restricted = true;
@@ -214,7 +214,7 @@ public class SqlMinus extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(ResourceClass resClass : leftVariable.getClasses())
+                        for(PatternResourceClass resClass : leftVariable.getClasses())
                         {
                             for(int i = 0; i < resClass.getPartsCount(); i++)
                             {
@@ -239,7 +239,7 @@ public class SqlMinus extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(ResourceClass resClass : rightVariable.getClasses())
+                        for(PatternResourceClass resClass : rightVariable.getClasses())
                         {
                             for(int i = 0; i < resClass.getPartsCount(); i++)
                             {

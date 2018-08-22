@@ -30,7 +30,7 @@ import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
@@ -38,8 +38,6 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 public class PostgresDatabase
 {
     private static final DecimalFormat decimalFormat;
-    private static final String typedLiteralPattern = "^\"(.*)\"\\^\\^<([^<>]+)>$";
-    private static final String taggedLiteralPattern = "^\"(.*)\"@([^@]+)$";
     private static final long USECS_PER_DAY = 86400000000l;
     private static final long USECS_PER_HOUR = 3600000000l;
     private static final long USECS_PER_MINUTE = 60000000l;
@@ -112,39 +110,19 @@ public class PostgresDatabase
                 for(int i = 0; i < metadata.getColumnCount(); i++)
                 {
                     String name = metadata.getColumnName(i + 1);
-                    String type = name.replaceAll(".*#", "");
+                    String tagName = name.replaceAll(".*#", "");
                     String lexical = rs.getString(i + 1);
                     Object value = rs.getObject(i + 1);
                     int idx = varNames.get(name);
 
-                    ResultTag tag = ResultTag.get(type);
+                    ResultTag tag = ResultTag.get(tagName);
 
                     if(lexical != null)
                     {
                         switch(tag)
                         {
-                            case RDFTERM:
-                                switch(lexical.charAt(0))
-                                {
-                                    case '<':
-                                        rowData[idx] = new IriNode(lexical.substring(1, lexical.length() - 1));
-                                        break;
-
-                                    case '_':
-                                        rowData[idx] = new BlankNode(lexical.substring(2));
-                                        break;
-
-                                    case '"':
-                                        if(lexical.endsWith(">"))
-                                            rowData[idx] = new TypedLiteral(
-                                                    lexical.replaceFirst(typedLiteralPattern, "$1"),
-                                                    lexical.replaceFirst(typedLiteralPattern, "$2"));
-                                        else
-                                            rowData[idx] = new LanguageTaggedLiteral(
-                                                    lexical.replaceFirst(taggedLiteralPattern, "$1"),
-                                                    lexical.replaceFirst(taggedLiteralPattern, "$2"));
-                                        break;
-                                }
+                            case NULL:
+                                rowData[idx] = null;
                                 break;
 
                             case BLANKNODEINT:
@@ -185,11 +163,13 @@ public class PostgresDatabase
                                 break;
 
                             case INTEGER:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdIntegerIri);
+                                rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toString(),
+                                        xsdIntegerIri);
                                 break;
 
                             case DECIMAL:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdDecimalIri);
+                                rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toString(),
+                                        xsdDecimalIri);
                                 break;
 
                             case DATETIME:
@@ -213,8 +193,13 @@ public class PostgresDatabase
                                 rowData[idx] = new LanguageTaggedLiteral(value.toString(), lang);
                                 break;
 
-                            // ignore supplementary literal tags
+                            case LITERAL:
+                                String type = rs.getString(name.replaceAll("#.*", "") + "#" + ResultTag.TYPE.getTag());
+                                rowData[idx] = new TypedLiteral(value.toString(), type);
+
+                                // ignore supplementary literal tags
                             case LANG:
+                            case TYPE:
                                 break;
                         }
                     }

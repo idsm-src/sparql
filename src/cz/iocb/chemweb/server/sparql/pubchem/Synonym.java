@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,14 +11,14 @@ class Synonym
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new IriClass("synonym", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("synonym", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_.*"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass synonym = config.getIriClass("synonym");
+        UserIriClass synonym = config.getIriClass("synonym");
         NodeMapping graph = config.createIriMapping("pubchem:synonym");
 
         {
@@ -33,7 +33,7 @@ class Synonym
             /* TODO:
             String table = "synonym_types";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

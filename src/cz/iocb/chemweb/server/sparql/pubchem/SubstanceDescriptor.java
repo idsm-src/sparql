@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -13,13 +13,14 @@ class SubstanceDescriptor
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID[0-9]+_";
 
-        config.addIriClass(new IriClass("substance_version", Arrays.asList("integer"), prefix + "Substance_Version"));
+        config.addIriClass(
+                new UserIriClass("substance_version", Arrays.asList("integer"), prefix + "Substance_Version"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass descriptorSubstanceVersion = config.getIriClass("substance_version");
+        UserIriClass descriptorSubstanceVersion = config.getIriClass("substance_version");
         NodeMapping graph = config.createIriMapping("descriptor:substance");
 
         {

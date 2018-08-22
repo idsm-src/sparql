@@ -1,5 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -8,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Stack;
+import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -15,9 +19,13 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimePatternClassWithConstantZone;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringPatternClassWithConstantTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
@@ -62,9 +70,8 @@ import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
-import cz.iocb.chemweb.server.sparql.translator.expression.TranslateRequest;
-import cz.iocb.chemweb.server.sparql.translator.expression.TranslatedExpression;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
@@ -78,6 +85,10 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 
 
@@ -89,7 +100,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
-    private final LinkedHashMap<String, IriClass> iriClasses;
+    private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
@@ -97,7 +108,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private Prologue prologue;
 
 
-    public TranslateVisitor(LinkedHashMap<String, IriClass> iriClasses, List<QuadMapping> mappings,
+    public TranslateVisitor(LinkedHashMap<String, UserIriClass> iriClasses, List<QuadMapping> mappings,
             DatabaseSchema schema, LinkedHashMap<String, ProcedureDefinition> procedures)
     {
         this.iriClasses = iriClasses;
@@ -270,11 +281,11 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         UsedVariables usedVariables = new UsedVariables();
 
 
-        ArrayList<Pair<String, ArrayList<ResourceClass>>> typedVariables = new ArrayList<>();
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
+        ArrayList<Pair<String, ArrayList<PatternResourceClass>>> typedVariables = new ArrayList<>();
+        ArrayList<ArrayList<Pair<Node, PatternResourceClass>>> typedValuesList = new ArrayList<>();
 
         for(int j = 0; j < values.getValuesLists().size(); j++)
-            typedValuesList.add(new ArrayList<Pair<Node, ResourceClass>>(size));
+            typedValuesList.add(new ArrayList<Pair<Node, PatternResourceClass>>(size));
 
 
         for(int i = 0; i < values.getVariables().size(); i++)
@@ -288,8 +299,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         values.getVariables().get(i).getRange(), variable));
 
 
-            ArrayList<ResourceClass> valueClasses = new ArrayList<ResourceClass>();
-            typedVariables.add(new Pair<String, ArrayList<ResourceClass>>(variable, valueClasses));
+            ArrayList<PatternResourceClass> valueClasses = new ArrayList<PatternResourceClass>();
+            typedVariables.add(new Pair<String, ArrayList<PatternResourceClass>>(variable, valueClasses));
 
 
             int valueCount = 0;
@@ -298,7 +309,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 ValuesList valuesList = values.getValuesLists().get(j);
                 Expression value = valuesList.getValues().get(i);
-                ResourceClass valueType = null;
+                PatternResourceClass valueType = null;
 
                 if(value != null)
                 {
@@ -306,32 +317,42 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                     if(value instanceof Literal)
                     {
-                        if(((Literal) value).getLanguageTag() != null)
+                        Literal literal = (Literal) value;
+
+                        if(literal.getLanguageTag() != null)
                         {
-                            valueType = BuiltinClasses.rdfLangString;
+                            valueType = new LangStringPatternClassWithConstantTag(literal.getLanguageTag());
                         }
                         else
                         {
                             valueType = BuiltinClasses.unsupportedLiteral;
 
-                            if(((Literal) value).getValue() != null)
+                            if(literal.getValue() != null)
                             {
-                                IRI iri = ((Literal) value).getTypeIri();
+                                IRI iri = literal.getTypeIri();
 
                                 if(iri != null)
-                                    for(LiteralClass literalClass : BuiltinClasses.getValuesClauseLiteralClasses())
+                                    for(PatternLiteralClass literalClass : BuiltinClasses.getPatternLiteralClasses())
                                         if(literalClass.getTypeIri().equals(iri))
                                             valueType = literalClass;
+
+                                if(valueType == xsdDateTime)
+                                    valueType = new DateTimePatternClassWithConstantZone(
+                                            ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
+
+                                if(valueType == xsdDate)
+                                    valueType = new DatePatternClassWithConstantZone(
+                                            DatePatternClassWithConstantZone.getZone(literal));
                             }
                         }
                     }
                     else if(value instanceof IRI)
                     {
-                        valueType = BuiltinClasses.iri;
+                        valueType = BuiltinClasses.unsupportedIri;
 
-                        for(ResourceClass resClass : iriClasses.values())
+                        for(PatternResourceClass resClass : iriClasses.values())
                             if(resClass instanceof IriClass)
-                                if(((IriClass) resClass).match((Node) value))
+                                if(resClass.match((Node) value))
                                     valueType = resClass;
                     }
                     else
@@ -343,7 +364,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         valueClasses.add(valueType);
                 }
 
-                typedValuesList.get(j).add(new Pair<Node, ResourceClass>((Node) value, valueType));
+                typedValuesList.get(j).add(new Pair<Node, PatternResourceClass>((Node) value, valueType));
             }
 
 
@@ -828,70 +849,57 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
             TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
     {
-        String condition = null;
+        ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
+                translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
+
+        List<SqlExpressionIntercode> conditions = null;
 
         if(!optionalFilters.isEmpty())
         {
             VariableAccessor variableAccessor = new LeftJoinVariableAccessor(
                     translatedGroupPattern.getIntercode().getVariables(),
                     translatedPattern.getIntercode().getVariables());
-            condition = translateLeftJoinFilters(optionalFilters, variableAccessor);
+            conditions = translateLeftJoinFilters(optionalFilters, variableAccessor);
 
-            if(condition == null)
-                return translatedGroupPattern;
+            if(conditions == null)
+                return new TranslatedSegment(variablesInScope, translatedGroupPattern.getIntercode());
+        }
+        else
+        {
+            conditions = new LinkedList<SqlExpressionIntercode>();
         }
 
         SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),
-                translatedPattern.getIntercode(), condition);
-        ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
-                translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
+                translatedPattern.getIntercode(), conditions);
 
         return new TranslatedSegment(variablesInScope, intercode);
     }
 
 
-    String translateLeftJoinFilters(LinkedList<Filter> optionalFilters, VariableAccessor variableAccessor)
+    List<SqlExpressionIntercode> translateLeftJoinFilters(LinkedList<Filter> optionalFilters,
+            VariableAccessor variableAccessor)
     {
-        StringBuilder builder = new StringBuilder();
-
-        boolean hasCondition = false;
+        List<SqlExpressionIntercode> expressions = new LinkedList<SqlExpressionIntercode>();
         boolean isFalse = false;
-
-        builder.append("(");
 
         for(Filter filter : optionalFilters)
         {
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this, variableAccessor);
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, iriClasses, mappings,
+                    schema, procedures);
 
-            TranslatedExpression translatedExpression = visitor.visitElement(filter.getConstraint(),
-                    TranslateRequest.EBV);
+            SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
+            expression = SqlEffectiveBooleanValue.create(expression);
 
-            if(translatedExpression == null || translatedExpression.isFalse())
-            {
+            if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
                 isFalse = true;
-            }
-            else
-            {
-                String condition = ExpressionTranslateVisitor.createEBV(translatedExpression).getCode();
-
-                if(hasCondition)
-                    builder.append(" AND ");
-
-                hasCondition = true;
-
-                builder.append("(");
-                builder.append(condition);
-                builder.append(")");
-            }
+            else if(expression != SqlEffectiveBooleanValue.trueValue)
+                expressions.add(expression);
         }
-
-        builder.append(")");
-
 
         if(isFalse)
             return null;
 
-        return builder.toString();
+        return expressions;
     }
 
 
@@ -904,15 +912,30 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateBind(Bind pattern, TranslatedSegment translatedGroupPattern)
+    private TranslatedSegment translateBind(Bind bind, TranslatedSegment translatedGroupPattern)
     {
-        // TODO
-        return null;
+        String variableName = bind.getVariable().getName();
+
+        if(translatedGroupPattern.getVariablesInScope().contains(variableName))
+            exceptions.add(new TranslateException(ErrorType.variableUsedBeforeBind, bind.getVariable().getRange(),
+                    variableName));
+
+        ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
+                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), iriClasses, mappings,
+                schema, procedures);
+
+        SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
+
+        ArrayList<String> variables = new ArrayList<String>(translatedGroupPattern.getVariablesInScope().size() + 1);
+        variables.addAll(translatedGroupPattern.getVariablesInScope());
+        variables.add(variableName);
+
+        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern.getIntercode());
+        return new TranslatedSegment(variables, intercode);
     }
 
 
-
-    private SqlIntercode translateFilters(LinkedList<Filter> filters, SqlIntercode child)
+    private SqlIntercode translateFilters(List<SqlExpressionIntercode> filterExpressions, SqlIntercode child)
     {
         if(child instanceof SqlNoSolution)
             return new SqlNoSolution();
@@ -923,53 +946,40 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             SqlIntercode union = new SqlNoSolution();
 
             for(SqlIntercode subChild : ((SqlUnion) child).getChilds())
-                union = SqlUnion.union(union, translateFilters(filters, subChild));
+            {
+                VariableAccessor accessor = new SimpleVariableAccessor(subChild.getVariables());
+
+                List<SqlExpressionIntercode> optimizedExpressions = filterExpressions.stream()
+                        .map(f -> SqlEffectiveBooleanValue.create(f.optimize(accessor))).collect(Collectors.toList());
+
+                union = SqlUnion.union(union, translateFilters(optimizedExpressions, subChild));
+            }
 
             return union;
         }
 
 
-        StringBuilder builder = new StringBuilder();
-
-        boolean hasCondition = false;
+        List<SqlExpressionIntercode> validExpressions = new LinkedList<SqlExpressionIntercode>();
         boolean isFalse = false;
 
-        builder.append("(");
-
-        for(Filter filter : filters)
+        for(SqlExpressionIntercode expression : filterExpressions)
         {
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(this,
-                    new SimpleVariableAccessor(child.getVariables()));
-
-            TranslatedExpression translatedExpression = visitor.visitElement(filter.getConstraint(),
-                    TranslateRequest.EBV);
-
-            if(translatedExpression == null || translatedExpression.isFalse())
-            {
+            if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
                 isFalse = true;
-            }
-            else
-            {
-                String condition = ExpressionTranslateVisitor.createEBV(translatedExpression).getCode();
-
-                if(hasCondition)
-                    builder.append(" AND ");
-
-                hasCondition = true;
-
-                builder.append("(");
-                builder.append(condition);
-                builder.append(")");
-            }
+            else if(expression instanceof SqlBinaryComparison
+                    && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
+                isFalse = true;
+            else if(expression != SqlEffectiveBooleanValue.trueValue)
+                validExpressions.add(expression);
         }
-
-        builder.append(")");
-
 
         if(isFalse)
             return new SqlNoSolution();
 
-        return new SqlFilter(child, builder.toString());
+        if(validExpressions.isEmpty())
+            return child;
+
+        return new SqlFilter(child, validExpressions);
     }
 
 
@@ -978,8 +988,23 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(filters.size() == 0)
             return groupPattern;
 
+
+        List<SqlExpressionIntercode> filterExpressions = new LinkedList<SqlExpressionIntercode>();
+
+        for(Filter filter : filters)
+        {
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
+                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), iriClasses, mappings,
+                    schema, procedures);
+
+            SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
+            expression = SqlEffectiveBooleanValue.create(expression);
+
+            filterExpressions.add(expression);
+        }
+
         return new TranslatedSegment(groupPattern.getVariablesInScope(),
-                translateFilters(filters, groupPattern.getIntercode()));
+                translateFilters(filterExpressions, groupPattern.getIntercode()));
     }
 
 
@@ -1152,7 +1177,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public final LinkedHashMap<String, IriClass> getIriClasses()
+    public final LinkedHashMap<String, UserIriClass> getIriClasses()
     {
         return iriClasses;
     }

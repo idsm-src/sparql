@@ -4,7 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFl
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -12,16 +12,16 @@ class Endpoint
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new IriClass("endpoint", Arrays.asList("integer", "integer", "integer"),
+        config.addIriClass(new UserIriClass("endpoint", Arrays.asList("integer", "integer", "integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/SID[0-9]+_AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
-        config.addIriClass(new IriClass("outcome", Arrays.asList("smallint"),
+        config.addIriClass(new UserIriClass("outcome", Arrays.asList("smallint"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#(active|inactive|inconclusive|unspecified|probe)"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass endpoint = config.getIriClass("endpoint");
+        UserIriClass endpoint = config.getIriClass("endpoint");
         NodeMapping graph = config.createIriMapping("pubchem:endpoint");
 
         {

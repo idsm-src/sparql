@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -100,7 +100,7 @@ public class SqlUnion extends SqlIntercode
             {
                 String varName = variable.getName();
 
-                for(ResourceClass resClass : variable.getClasses())
+                for(PatternResourceClass resClass : variable.getClasses())
                 {
                     boolean defined = child.getVariables().contains(varName, resClass);
 

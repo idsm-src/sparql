@@ -16,7 +16,7 @@ import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
@@ -66,46 +66,46 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
         queryFormatValues.add(sachem + "SMILES");
         queryFormatValues.add(sachem + "MolFile");
         queryFormatValues.add(sachem + "RGroup");
-        addIriClass(new IriClass("queryFormat", Arrays.asList("integer"), queryFormatValues));
+        addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatValues));
 
         HashSet<String> graphModeValues = new HashSet<String>();
         graphModeValues.add(sachem + "substructureSearch");
         graphModeValues.add(sachem + "exactSearch");
-        addIriClass(new IriClass("graphMode", Arrays.asList("integer"), graphModeValues));
+        addIriClass(new UserIriClass("graphMode", Arrays.asList("integer"), graphModeValues));
 
         HashSet<String> chargeModeValues = new HashSet<String>();
         chargeModeValues.add(sachem + "ignoreCharges");
         chargeModeValues.add(sachem + "defaultChargeAsZero");
         chargeModeValues.add(sachem + "defaultChargeAsAny");
-        addIriClass(new IriClass("chargeMode", Arrays.asList("integer"), chargeModeValues));
+        addIriClass(new UserIriClass("chargeMode", Arrays.asList("integer"), chargeModeValues));
 
         HashSet<String> isotopeModeValues = new HashSet<String>();
         isotopeModeValues.add(sachem + "ignoreIsotopes");
         isotopeModeValues.add(sachem + "defaultIsotopeAsStandard");
         isotopeModeValues.add(sachem + "defaultIsotopeAsAny");
-        addIriClass(new IriClass("isotopeMode", Arrays.asList("integer"), isotopeModeValues));
+        addIriClass(new UserIriClass("isotopeMode", Arrays.asList("integer"), isotopeModeValues));
 
         HashSet<String> stereoModeValues = new HashSet<String>();
         stereoModeValues.add(sachem + "ignoreStrereo");
         stereoModeValues.add(sachem + "strictStereo");
-        addIriClass(new IriClass("stereoMode", Arrays.asList("integer"), stereoModeValues));
+        addIriClass(new UserIriClass("stereoMode", Arrays.asList("integer"), stereoModeValues));
 
         HashSet<String> tautomerModeValues = new HashSet<String>();
         tautomerModeValues.add(sachem + "ignoreTautomers");
         tautomerModeValues.add(sachem + "inchiTautomers");
-        addIriClass(new IriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
+        addIriClass(new UserIriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
 
-        addIriClass(new IriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
-        addIriClass(new IriClass("compound_molfile", Arrays.asList("integer"), iriPrefix + idPattern + "_Molfile"));
+        addIriClass(new UserIriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
+        addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), iriPrefix + idPattern + "_Molfile"));
 
-        addIriClass(new IriClass("class", Arrays.asList("integer"), getIriValues("class_bases")));
-        addIriClass(new IriClass("property", Arrays.asList("integer"), getIriValues("property_bases")));
+        addIriClass(new UserIriClass("class", Arrays.asList("integer"), getIriValues("class_bases")));
+        addIriClass(new UserIriClass("property", Arrays.asList("integer"), getIriValues("property_bases")));
     }
 
 
     private void loadQuadMapping()
     {
-        IriClass compound = getIriClass("compound");
+        UserIriClass compound = getIriClass("compound");
 
         String table = "compounds";
         NodeMapping subject = createIriMapping("compound_molfile", "id");
@@ -120,7 +120,7 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
     private void loadProcedures()
     {
         String sachem = prefixes.get("sachem");
-        IriClass molClass = getIriClass("compound");
+        UserIriClass molClass = getIriClass("compound");
 
 
         /* orchem:substructureSearch */

@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -13,14 +13,14 @@ class Compound
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID[0-9]+";
 
-        config.addIriClass(new IriClass("compound", Arrays.asList("integer"), prefix));
-        config.addIriClass(new IriClass("compound_molfile", Arrays.asList("integer"), prefix + "_Molfile"));
+        config.addIriClass(new UserIriClass("compound", Arrays.asList("integer"), prefix));
+        config.addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), prefix + "_Molfile"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass compound = config.getIriClass("compound");
+        UserIriClass compound = config.getIriClass("compound");
         NodeMapping graph = config.createIriMapping("pubchem:compound");
 
         {

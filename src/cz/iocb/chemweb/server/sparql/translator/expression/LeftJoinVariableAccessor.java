@@ -1,8 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.parser.model.Variable;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -78,26 +77,26 @@ public class LeftJoinVariableAccessor extends SimpleVariableAccessor
 
 
     @Override
-    public String variableAccess(Variable variable, ResourceClass resourceClass, int i)
+    public String variableAccess(String variable, PatternResourceClass resourceClass, int i)
     {
-        UsedVariable leftVariable = left.get(variable.getName());
-        UsedVariable rightVariable = right.get(variable.getName());
+        UsedVariable leftVariable = left.get(variable);
+        UsedVariable rightVariable = right.get(variable);
 
 
         if(rightVariable == null || rightVariable != null && !rightVariable.containsClass(resourceClass)
                 || leftVariable != null && !leftVariable.canBeNull())
         {
-            return leftTable + "." + resourceClass.getSqlColumn(variable.getName(), i);
+            return leftTable + "." + resourceClass.getSqlColumn(variable, i);
         }
         else if(leftVariable == null || leftVariable != null && !leftVariable.containsClass(resourceClass)
                 || rightVariable != null && !rightVariable.canBeNull())
         {
-            return rightTable + "." + resourceClass.getSqlColumn(variable.getName(), i);
+            return rightTable + "." + resourceClass.getSqlColumn(variable, i);
         }
         else
         {
-            return "COALESCE(" + leftTable + "." + resourceClass.getSqlColumn(variable.getName(), i) + ", " + rightTable
-                    + "." + resourceClass.getSqlColumn(variable.getName(), i) + ")";
+            return "COALESCE(" + leftTable + "." + resourceClass.getSqlColumn(variable, i) + ", " + rightTable + "."
+                    + resourceClass.getSqlColumn(variable, i) + ")";
         }
     }
 }

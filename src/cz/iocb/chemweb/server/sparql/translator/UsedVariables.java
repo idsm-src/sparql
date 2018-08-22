@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
 
 
 

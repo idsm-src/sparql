@@ -18,9 +18,9 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -34,18 +34,18 @@ public abstract class SparqlDatabaseConfiguration
     protected ConnectionPool connectionPool;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
-    protected LinkedHashMap<String, IriClass> iriClasses = new LinkedHashMap<String, IriClass>();
+    protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
 
-    public void addIriClass(IriClass iriClass)
+    public void addIriClass(UserIriClass iriClass)
     {
         iriClasses.put(iriClass.getName(), iriClass);
     }
 
 
-    public NodeMapping createIriMapping(IriClass iriClass, String... columns)
+    public NodeMapping createIriMapping(UserIriClass iriClass, String... columns)
     {
         return new ParametrisedIriMapping(iriClass, Arrays.asList(columns));
     }
@@ -71,16 +71,16 @@ public abstract class SparqlDatabaseConfiguration
             iri = prefixes.get(parts[0]) + (parts.length > 1 ? parts[1] : "");
         }
 
-        IriClass iriClass = null;
+        UserIriClass iriClass = null;
 
         for(ResourceClass c : iriClasses.values())
         {
-            if(c instanceof IriClass && ((IriClass) c).match(iri))
+            if(c instanceof UserIriClass && ((UserIriClass) c).match(iri))
             {
                 if(iriClass != null)
                     throw new RuntimeException("ambigous iri class for " + value);
 
-                iriClass = (IriClass) c;
+                iriClass = (UserIriClass) c;
             }
         }
 
@@ -93,13 +93,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public NodeMapping createLiteralMapping(LiteralClass literalClass, String column)
+    public NodeMapping createLiteralMapping(PatternLiteralClass literalClass, String column)
     {
         return new ParametrisedLiteralMapping(literalClass, Arrays.asList(column));
     }
 
 
-    public NodeMapping createLiteralMapping(LiteralClass literalClass, List<String> columns)
+    public NodeMapping createLiteralMapping(PatternLiteralClass literalClass, List<String> columns)
     {
         return new ParametrisedLiteralMapping(literalClass, columns);
     }
@@ -151,7 +151,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public IriClass getIriClass(String name)
+    public UserIriClass getIriClass(String name)
     {
         return iriClasses.get(name);
     }
@@ -163,7 +163,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public LinkedHashMap<String, IriClass> getIriClasses()
+    public LinkedHashMap<String, UserIriClass> getIriClasses()
     {
         return iriClasses;
     }

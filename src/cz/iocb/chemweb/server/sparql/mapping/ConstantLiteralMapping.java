@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -14,7 +14,7 @@ public class ConstantLiteralMapping extends LiteralMapping implements ConstantMa
     private final Literal value;
 
 
-    public ConstantLiteralMapping(LiteralClass literalClass, Literal value)
+    public ConstantLiteralMapping(PatternLiteralClass literalClass, Literal value)
     {
         super(literalClass);
         this.value = value;

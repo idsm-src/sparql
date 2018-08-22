@@ -1,6 +1,8 @@
-package cz.iocb.chemweb.server.sparql.mapping.classes;
+package cz.iocb.chemweb.server.sparql.mapping.classes.bases;
 
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
@@ -9,19 +11,19 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public abstract class LiteralClass extends ResourceClass
+public abstract class PatternLiteralBaseClass extends PatternResourceBaseClass implements PatternLiteralClass
 {
     private final IRI typeIri;
 
 
-    protected LiteralClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)
+    protected PatternLiteralBaseClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)
     {
         super(name, sqlTypes, resultTags);
         this.typeIri = typeIri;
     }
 
 
-    public abstract String getSqlLiteralValue(Literal node, int part);
+    public abstract String getSqlPatternLiteralValue(Literal node, int part);
 
 
     @Override
@@ -30,7 +32,7 @@ public abstract class LiteralClass extends ResourceClass
         if(node instanceof VariableOrBlankNode)
             return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
         else
-            return getSqlLiteralValue((Literal) node, part);
+            return getSqlPatternLiteralValue((Literal) node, part);
     }
 
 
@@ -58,6 +60,7 @@ public abstract class LiteralClass extends ResourceClass
     }
 
 
+    @Override
     public final IRI getTypeIri()
     {
         return typeIri;

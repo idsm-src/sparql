@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,16 +11,16 @@ class Gene
 {
     static void addIriClasses(PubChemConfiguration config)
     {
+        config.addIriClass(new UserIriClass("gene", Arrays.asList("integer"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
         config.addIriClass(
-                new IriClass("gene", Arrays.asList("integer"), "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
-        config.addIriClass(
-                new IriClass("ensembl", Arrays.asList("varchar"), "http://rdf.ebi.ac.uk/resource/ensembl/.*"));
+                new UserIriClass("ensembl", Arrays.asList("varchar"), "http://rdf.ebi.ac.uk/resource/ensembl/.*"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass gene = config.getIriClass("gene");
+        UserIriClass gene = config.getIriClass("gene");
         NodeMapping graph = config.createIriMapping("pubchem:gene");
 
         {

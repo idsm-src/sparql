@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,15 +11,16 @@ class Ontology
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new IriClass("class", Arrays.asList("integer"), config.getIriValues("class_bases")));
-        config.addIriClass(new IriClass("property", Arrays.asList("integer"), config.getIriValues("property_bases")));
+        config.addIriClass(new UserIriClass("class", Arrays.asList("integer"), config.getIriValues("class_bases")));
+        config.addIriClass(
+                new UserIriClass("property", Arrays.asList("integer"), config.getIriValues("property_bases")));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass rdfclass = config.getIriClass("class");
-        IriClass property = config.getIriClass("property");
+        UserIriClass rdfclass = config.getIriClass("class");
+        UserIriClass property = config.getIriClass("property");
         NodeMapping graph = config.createIriMapping("pubchem:ontology");
 
         {

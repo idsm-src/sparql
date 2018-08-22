@@ -5,7 +5,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdSh
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -15,42 +15,44 @@ class CompoundDescriptor
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/CID[0-9]+_";
 
-        config.addIriClass(new IriClass("hydrogen_bond_acceptor_count", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("hydrogen_bond_acceptor_count", Arrays.asList("integer"),
                 prefix + "Hydrogen_Bond_Acceptor_Count"));
-        config.addIriClass(new IriClass("tautomer_count", Arrays.asList("integer"), prefix + "Tautomer_Count"));
-        config.addIriClass(new IriClass("defined_atom_stereo_count", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("tautomer_count", Arrays.asList("integer"), prefix + "Tautomer_Count"));
+        config.addIriClass(new UserIriClass("defined_atom_stereo_count", Arrays.asList("integer"),
                 prefix + "Defined_Atom_Stereo_Count"));
-        config.addIriClass(new IriClass("defined_bond_stereo_count", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("defined_bond_stereo_count", Arrays.asList("integer"),
                 prefix + "Defined_Bond_Stereo_Count"));
-        config.addIriClass(new IriClass("undefined_bond_stereo_count", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass("undefined_bond_stereo_count", Arrays.asList("integer"),
                 prefix + "Undefined_Bond_Stereo_Count"));
-        config.addIriClass(new IriClass("isotope_atom_count", Arrays.asList("integer"), prefix + "Isotope_Atom_Count"));
         config.addIriClass(
-                new IriClass("covalent_unit_count", Arrays.asList("integer"), prefix + "Covalent_Unit_Count"));
-        config.addIriClass(new IriClass("hydrogen_bond_donor_count", Arrays.asList("integer"),
+                new UserIriClass("isotope_atom_count", Arrays.asList("integer"), prefix + "Isotope_Atom_Count"));
+        config.addIriClass(
+                new UserIriClass("covalent_unit_count", Arrays.asList("integer"), prefix + "Covalent_Unit_Count"));
+        config.addIriClass(new UserIriClass("hydrogen_bond_donor_count", Arrays.asList("integer"),
                 prefix + "Hydrogen_Bond_Donor_Count"));
+        config.addIriClass(new UserIriClass("non_hydrogen_atom_count", Arrays.asList("integer"),
+                prefix + "Non-hydrogen_Atom_Count"));
         config.addIriClass(
-                new IriClass("non_hydrogen_atom_count", Arrays.asList("integer"), prefix + "Non-hydrogen_Atom_Count"));
-        config.addIriClass(
-                new IriClass("rotatable_bond_count", Arrays.asList("integer"), prefix + "Rotatable_Bond_Count"));
-        config.addIriClass(new IriClass("undefined_atom_stereo_count", Arrays.asList("integer"),
+                new UserIriClass("rotatable_bond_count", Arrays.asList("integer"), prefix + "Rotatable_Bond_Count"));
+        config.addIriClass(new UserIriClass("undefined_atom_stereo_count", Arrays.asList("integer"),
                 prefix + "Undefined_Atom_Stereo_Count"));
         config.addIriClass(
-                new IriClass("total_formal_charge", Arrays.asList("integer"), prefix + "Total_Formal_Charge"));
+                new UserIriClass("total_formal_charge", Arrays.asList("integer"), prefix + "Total_Formal_Charge"));
         config.addIriClass(
-                new IriClass("structure_complexity", Arrays.asList("integer"), prefix + "Structure_Complexity"));
+                new UserIriClass("structure_complexity", Arrays.asList("integer"), prefix + "Structure_Complexity"));
         config.addIriClass(
-                new IriClass("mono_isotopic_weight", Arrays.asList("integer"), prefix + "Mono_Isotopic_Weight"));
-        config.addIriClass(new IriClass("xlogp3_aa", Arrays.asList("integer"), prefix + "XLogP3-AA"));
-        config.addIriClass(new IriClass("exact_mass", Arrays.asList("integer"), prefix + "Exact_Mass"));
-        config.addIriClass(new IriClass("molecular_weight", Arrays.asList("integer"), prefix + "Molecular_Weight"));
-        config.addIriClass(new IriClass("tpsa", Arrays.asList("integer"), prefix + "TPSA"));
-        config.addIriClass(new IriClass("molecular_formula", Arrays.asList("integer"), prefix + "Molecular_Formula"));
-        config.addIriClass(new IriClass("isomeric_smiles", Arrays.asList("integer"), prefix + "Isomeric_SMILES"));
-        config.addIriClass(new IriClass("canonical_smiles", Arrays.asList("integer"), prefix + "Canonical_SMILES"));
-        config.addIriClass(new IriClass("iupac_inchi", Arrays.asList("integer"), prefix + "IUPAC_InChI"));
+                new UserIriClass("mono_isotopic_weight", Arrays.asList("integer"), prefix + "Mono_Isotopic_Weight"));
+        config.addIriClass(new UserIriClass("xlogp3_aa", Arrays.asList("integer"), prefix + "XLogP3-AA"));
+        config.addIriClass(new UserIriClass("exact_mass", Arrays.asList("integer"), prefix + "Exact_Mass"));
+        config.addIriClass(new UserIriClass("molecular_weight", Arrays.asList("integer"), prefix + "Molecular_Weight"));
+        config.addIriClass(new UserIriClass("tpsa", Arrays.asList("integer"), prefix + "TPSA"));
         config.addIriClass(
-                new IriClass("preferred_iupac_name", Arrays.asList("integer"), prefix + "Preferred_IUPAC_Name"));
+                new UserIriClass("molecular_formula", Arrays.asList("integer"), prefix + "Molecular_Formula"));
+        config.addIriClass(new UserIriClass("isomeric_smiles", Arrays.asList("integer"), prefix + "Isomeric_SMILES"));
+        config.addIriClass(new UserIriClass("canonical_smiles", Arrays.asList("integer"), prefix + "Canonical_SMILES"));
+        config.addIriClass(new UserIriClass("iupac_inchi", Arrays.asList("integer"), prefix + "IUPAC_InChI"));
+        config.addIriClass(
+                new UserIriClass("preferred_iupac_name", Arrays.asList("integer"), prefix + "Preferred_IUPAC_Name"));
     }
 
 

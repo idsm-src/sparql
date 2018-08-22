@@ -4,8 +4,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -38,7 +39,7 @@ public class SqlQuery extends SqlIntercode
         {
             UsedVariable variable = variables.get(variableName);
 
-            if(variable == null)
+            if(variable == null || variable.getClasses().isEmpty())
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
@@ -46,22 +47,22 @@ public class SqlQuery extends SqlIntercode
                 builder.append("NULL AS \"");
                 builder.append(variableName);
                 builder.append('#');
-                builder.append(ResultTag.RDFTERM.getTag());
+                builder.append(ResultTag.NULL.getTag());
                 builder.append('"');
             }
             else
             {
-                List<ResourceClass> classes = variable.getClasses();
+                Set<PatternResourceClass> classes = variable.getClasses();
 
-                LinkedHashMap<List<ResultTag>, List<ResourceClass>> resultClasses = new LinkedHashMap<>();
+                LinkedHashMap<List<ResultTag>, List<PatternResourceClass>> resultClasses = new LinkedHashMap<>();
 
-                for(ResourceClass resClass : classes)
+                for(PatternResourceClass resClass : classes)
                 {
-                    List<ResourceClass> list = resultClasses.get(resClass.getResultTags());
+                    List<PatternResourceClass> list = resultClasses.get(resClass.getResultTags());
 
                     if(list == null)
                     {
-                        list = new ArrayList<ResourceClass>();
+                        list = new ArrayList<PatternResourceClass>();
                         resultClasses.put(resClass.getResultTags(), list);
                     }
 
@@ -69,10 +70,10 @@ public class SqlQuery extends SqlIntercode
                 }
 
 
-                for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
+                for(Entry<List<ResultTag>, List<PatternResourceClass>> entry : resultClasses.entrySet())
                 {
                     List<ResultTag> tags = entry.getKey();
-                    List<ResourceClass> resClasses = entry.getValue();
+                    List<PatternResourceClass> resClasses = entry.getValue();
 
                     for(int part = 0; part < tags.size(); part++)
                     {
@@ -86,7 +87,7 @@ public class SqlQuery extends SqlIntercode
                         {
                             appendComma(builder, i > 0);
 
-                            ResourceClass resClass = resClasses.get(i);
+                            PatternResourceClass resClass = resClasses.get(i);
                             builder.append(resClass.getResultValue(variableName, part));
                         }
 
@@ -107,7 +108,7 @@ public class SqlQuery extends SqlIntercode
         if(!hasSelect)
         {
             builder.append("1 AS \"*#");
-            builder.append(ResultTag.RDFTERM.getTag());
+            builder.append(ResultTag.NULL.getTag());
             builder.append('"');
         }
 

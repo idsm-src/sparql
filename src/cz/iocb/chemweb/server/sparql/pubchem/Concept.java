@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.pubchem;
 import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
@@ -11,14 +11,14 @@ class Concept
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(
-                new IriClass("concept", Arrays.asList("smallint"), "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
+        config.addIriClass(new UserIriClass("concept", Arrays.asList("smallint"),
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*"));
     }
 
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        IriClass concept = config.getIriClass("concept");
+        UserIriClass concept = config.getIriClass("concept");
         NodeMapping graph = config.createIriMapping("pubchem:concept");
 
         {

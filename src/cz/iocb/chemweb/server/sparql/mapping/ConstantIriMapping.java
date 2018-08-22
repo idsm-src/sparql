@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -14,7 +14,7 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
     private final IRI value;
 
 
-    public ConstantIriMapping(IriClass iriClass, IRI iri)
+    public ConstantIriMapping(UserIriClass iriClass, IRI iri)
     {
         super(iriClass);
         value = iri;
