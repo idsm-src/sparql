@@ -887,6 +887,9 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
             if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
                 isFalse = true;
+            else if(expression instanceof SqlBinaryComparison
+                    && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
+                isFalse = true;
             else if(expression != SqlEffectiveBooleanValue.trueValue)
                 expressions.add(expression);
         }
