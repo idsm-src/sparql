@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.List;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -14,7 +11,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
 import cz.iocb.chemweb.server.db.BlankNode;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.IriNode;
 import cz.iocb.chemweb.server.db.LanguageTaggedLiteral;
 import cz.iocb.chemweb.server.db.Literal;
@@ -23,12 +19,9 @@ import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
@@ -132,13 +125,8 @@ public class EndpointServlet extends HttpServlet
 
         try
         {
-            DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
-            List<QuadMapping> mappings = dbConfig.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
-
             SelectQuery syntaxTree = parser.parse(query);
-            String code = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
+            String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             Result result = db.query(code);
 
@@ -160,7 +148,7 @@ public class EndpointServlet extends HttpServlet
                     res.setStatus(406);
             }
         }
-        catch(SQLException | TranslateExceptions | DatabaseException | ParseExceptions e)
+        catch(TranslateExceptions | DatabaseException | ParseExceptions e)
         {
             throw new IOException(e);
         }

@@ -3,11 +3,10 @@ package cz.iocb.chemweb.server.sparql.translator.expression;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
@@ -19,14 +18,14 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.FunctionCallExpress
 import cz.iocb.chemweb.server.sparql.parser.model.expression.InExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
+import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogical;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
-import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlFunctionCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlUnaryArithmetic;
@@ -38,20 +37,24 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionIntercode>
 {
     private final VariableAccessor variableAccessor;
+
+    private final SparqlDatabaseConfiguration configuration;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
-    private final List<QuadMapping> mappings;
-    private final DatabaseSchema schema;
-    private final LinkedHashMap<String, ProcedureDefinition> procedures;
+
+    private final Prologue prologue;
+    private final List<TranslateException> exceptions;
+    private final List<TranslateException> warnings;
 
 
-    public ExpressionTranslateVisitor(VariableAccessor variableAccessor, LinkedHashMap<String, UserIriClass> iriClasses,
-            List<QuadMapping> mappings, DatabaseSchema schema, LinkedHashMap<String, ProcedureDefinition> procedures)
+    public ExpressionTranslateVisitor(VariableAccessor variableAccessor, SparqlDatabaseConfiguration configuration,
+            Prologue prologue, List<TranslateException> exceptions, List<TranslateException> warnings)
     {
         this.variableAccessor = variableAccessor;
-        this.iriClasses = iriClasses;
-        this.mappings = mappings;
-        this.schema = schema;
-        this.procedures = procedures;
+        this.configuration = configuration;
+        this.iriClasses = configuration.getIriClasses();
+        this.prologue = prologue;
+        this.exceptions = exceptions;
+        this.warnings = warnings;
     }
 
 
@@ -155,7 +158,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
-        TranslateVisitor translator = new TranslateVisitor(iriClasses, mappings, schema, procedures);
+        TranslateVisitor translator = new TranslateVisitor(configuration);
         TranslatedSegment pattern = translator.visitElement(existsExpression.getPattern());
 
         return null; //SqlExists.create(pattern);

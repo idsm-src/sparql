@@ -99,6 +99,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
 
+    private final SparqlDatabaseConfiguration configuration;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
@@ -107,13 +108,13 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private Prologue prologue;
 
 
-    public TranslateVisitor(LinkedHashMap<String, UserIriClass> iriClasses, List<QuadMapping> mappings,
-            DatabaseSchema schema, LinkedHashMap<String, ProcedureDefinition> procedures)
+    public TranslateVisitor(SparqlDatabaseConfiguration configuration)
     {
-        this.iriClasses = iriClasses;
-        this.mappings = mappings;
-        this.schema = schema;
-        this.procedures = procedures;
+        this.configuration = configuration;
+        this.iriClasses = configuration.getIriClasses();
+        this.mappings = configuration.getMappings();
+        this.schema = configuration.getSchema();
+        this.procedures = configuration.getProcedures();
     }
 
 
@@ -879,8 +880,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(Filter filter : optionalFilters)
         {
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, iriClasses, mappings,
-                    schema, procedures);
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, configuration,
+                    prologue, exceptions, warnings);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
             expression = SqlEffectiveBooleanValue.create(expression);
@@ -919,8 +920,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     variableName));
 
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), iriClasses, mappings,
-                schema, procedures);
+                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), configuration,
+                prologue, exceptions, warnings);
 
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
@@ -992,8 +993,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         for(Filter filter : filters)
         {
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), iriClasses, mappings,
-                    schema, procedures);
+                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), configuration, prologue,
+                    exceptions, warnings);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
             expression = SqlEffectiveBooleanValue.create(expression);

@@ -10,7 +10,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -22,7 +21,6 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import cz.iocb.chemweb.server.Utils;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Literal;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
@@ -30,13 +28,10 @@ import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
 import cz.iocb.chemweb.server.services.SessionData;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -120,13 +115,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 syntaxTree.setSelect(limitedSelect);
             }
 
-            DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
-            List<QuadMapping> mappings = dbConfig.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
-            final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
-                    .translate(syntaxTree);
+            final String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             // TODO: log
             System.err.println(translatedQuery);
@@ -238,11 +228,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             e.printStackTrace();
             throw new QueryException();
         }
-        catch(SQLException e)
-        {
-            e.printStackTrace();
-            throw new DatabaseException(e);
-        }
+
 
         queryState.thread.start();
         return id;
@@ -319,13 +305,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             final SelectQuery syntaxTree = parser
                     .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
-            DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
-            List<QuadMapping> mappings = dbConfig.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
-
-            final String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures)
-                    .translate(syntaxTree);
+            final String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             //result = database.query("sparql define input:storage virtrdf:PubchemQuadStorage "
             //        + "SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
@@ -343,7 +323,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch(URISyntaxException | ParseExceptions | SQLException | TranslateExceptions e)
+        catch(URISyntaxException | ParseExceptions | TranslateExceptions e)
         {
             e.printStackTrace();
             throw new DatabaseException(e);

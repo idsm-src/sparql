@@ -8,24 +8,19 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -112,12 +107,8 @@ public class GenerateHints extends HttpServlet
         SparqlDatabaseConfiguration dbConfig = PubChemConfiguration.get();
         Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
         SelectQuery syntaxTree = parser.parse(query);
-        DatabaseSchema schema = dbConfig.getSchema();
-        LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
-        List<QuadMapping> mappings = dbConfig.getMappings();
-        LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
 
-        String translatedQuery = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
+        String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
 
         System.err.println(translatedQuery);

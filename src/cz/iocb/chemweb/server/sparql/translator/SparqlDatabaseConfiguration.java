@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -181,7 +180,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public DatabaseSchema getSchema() throws SQLException
+    public DatabaseSchema getSchema()
     {
         return schema;
     }

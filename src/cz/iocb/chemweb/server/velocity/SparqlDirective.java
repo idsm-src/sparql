@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.List;
 import org.apache.velocity.context.InternalContextAdapter;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
@@ -19,15 +17,11 @@ import org.apache.velocity.runtime.log.Log;
 import org.apache.velocity.runtime.parser.node.ASTReference;
 import org.apache.velocity.runtime.parser.node.Node;
 import org.apache.velocity.runtime.parser.node.SimpleNode;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -94,20 +88,15 @@ public class SparqlDirective extends Directive
 
         try
         {
-            DatabaseSchema schema = dbConfig.getSchema();
-            LinkedHashMap<String, UserIriClass> classes = dbConfig.getIriClasses();
-            List<QuadMapping> mappings = dbConfig.getMappings();
-            LinkedHashMap<String, ProcedureDefinition> procedures = dbConfig.getProcedures();
-
             SelectQuery syntaxTree = parser.parse(query);
-            String code = new TranslateVisitor(classes, mappings, schema, procedures).translate(syntaxTree);
+            String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             Result result = db.query(code);
 
             context.put(varName, result);
             return true;
         }
-        catch(DatabaseException | ParseExceptions | SQLException | TranslateExceptions e)
+        catch(DatabaseException | ParseExceptions | TranslateExceptions e)
         {
             log.error("sparql directive: " + e.getMessage());
             System.err.println(query);
