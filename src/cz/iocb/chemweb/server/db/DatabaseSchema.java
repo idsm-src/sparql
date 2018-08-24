@@ -111,6 +111,9 @@ public abstract class DatabaseSchema
 
     public List<List<KeyPair>> getForeignKeys(String parentTable, String foreignTable)
     {
+        if(parentTable == null || foreignTable == null)
+            return null;
+
         return foreignKeys.get(new KeyPair(parentTable, foreignTable));
     }
 }

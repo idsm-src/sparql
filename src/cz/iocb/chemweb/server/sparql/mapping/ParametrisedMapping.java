@@ -12,5 +12,7 @@ public interface ParametrisedMapping
 
     String getSqlValueAccess(int i);
 
+    String getSqlColumn(int i);
+
     NodeMapping remapColumns(List<KeyPair> columnMap);
 }

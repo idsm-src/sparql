@@ -61,4 +61,11 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
 
         return value.equals(other.value);
     }
+
+
+    @Override
+    public Node getValue()
+    {
+        return value;
+    }
 }

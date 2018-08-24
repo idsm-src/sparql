@@ -164,6 +164,10 @@ public class SqlJoin extends SqlIntercode
                     SqlTableAccess right = (SqlTableAccess) jSql;
 
 
+                    if(!SqlTableAccess.areCompatible(left, right))
+                        return new SqlNoSolution();
+
+
                     List<KeyPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
 
                     if(variantA != null)

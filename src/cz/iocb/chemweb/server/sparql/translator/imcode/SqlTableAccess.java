@@ -8,9 +8,8 @@ import java.util.List;
 import java.util.Map.Entry;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -41,7 +40,7 @@ public class SqlTableAccess extends SqlIntercode
     /**
      * List of mappings containing columns that have to be checked for not-null property
      */
-    private final ArrayList<ParametrisedLiteralMapping> notNullConditions = new ArrayList<ParametrisedLiteralMapping>();
+    private final ArrayList<ParametrisedMapping> notNullConditions = new ArrayList<ParametrisedMapping>();
 
     /**
      * List of pairs of non-variable nodes and their mappings that have to be checked for values equality
@@ -105,16 +104,16 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addNotNullCondition(ParametrisedLiteralMapping mapping)
+    public void addNotNullCondition(ParametrisedMapping mapping)
     {
         if(!notNullConditions.contains(mapping))
             notNullConditions.add(mapping);
     }
 
 
-    public void addNotNullConditions(List<ParametrisedLiteralMapping> mappings)
+    public void addNotNullConditions(List<ParametrisedMapping> mappings)
     {
-        for(ParametrisedLiteralMapping mapping : mappings)
+        for(ParametrisedMapping mapping : mappings)
             if(!notNullConditions.contains(mapping))
                 notNullConditions.add(mapping);
     }
@@ -139,14 +138,14 @@ public class SqlTableAccess extends SqlIntercode
 
     public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
-        // at this time, we allow merging only in the case that variables share the same classes
+        // currently, merging is allowed only in the case that variables are not joined by different resource classes
         for(UsedPairedVariable pairedVariable : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
             for(PairedClass p : pairedVariable.getClasses())
                 if(p.getLeftClass() != null && p.getRightClass() != null && p.getLeftClass() != p.getRightClass())
                     return false;
 
 
-        if(!left.table.equals(right.table))
+        if(left.table == null && right.table != null || left.table != null && !left.table.equals(right.table))
             return false;
 
 
@@ -167,14 +166,12 @@ public class SqlTableAccess extends SqlIntercode
                 {
                     assert leftMap.getResourceClass() == rightMap.getResourceClass();
 
-                    if(leftMap instanceof ParametrisedIriMapping && rightMap instanceof ParametrisedIriMapping
-                            || leftMap instanceof ParametrisedLiteralMapping
-                                    && rightMap instanceof ParametrisedLiteralMapping)
+                    if(leftMap instanceof ParametrisedMapping && rightMap instanceof ParametrisedMapping)
                     {
                         for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
                         {
-                            String leftColumn = leftMap.getSqlValueAccess(i);
-                            String rightColumn = rightMap.getSqlValueAccess(i);
+                            String leftColumn = ((ParametrisedMapping) leftMap).getSqlColumn(i);
+                            String rightColumn = ((ParametrisedMapping) rightMap).getSqlColumn(i);
 
                             if(leftColumn.equals(rightColumn))
                                 columns.add(leftColumn);
@@ -204,8 +201,8 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
                 {
-                    String leftColumn = leftMap.getSqlValueAccess(i);
-                    String rightColumn = rightMap.getSqlValueAccess(i);
+                    String leftColumn = leftMap.getSqlColumn(i);
+                    String rightColumn = rightMap.getSqlColumn(i);
 
                     if(leftColumn.equals(rightColumn))
                         columns.add(leftColumn);
@@ -214,7 +211,7 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        return schema.getCompatibleKey(left.table, columns) != null;
+        return left.table == null || schema.getCompatibleKey(left.table, columns) != null;
     }
 
 
@@ -230,9 +227,9 @@ public class SqlTableAccess extends SqlIntercode
         // we cannot be sure that all relevant columns are null for the same rows. Thus, the following
         // example cannot be simply optimized as self left join:
         // { ?S <ex:pred0> ?V } optional { ?S <ex:pred1> ?Literal1. ?S <ex:pred2> ?Literal2 }
-        ParametrisedLiteralMapping extraCondition = null;
+        ParametrisedMapping extraCondition = null;
 
-        for(ParametrisedLiteralMapping condition : right.notNullConditions)
+        for(ParametrisedMapping condition : right.notNullConditions)
         {
             if(!left.notNullConditions.contains(condition))
             {
@@ -274,7 +271,7 @@ public class SqlTableAccess extends SqlIntercode
 
     public static List<KeyPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess foreign)
     {
-        // at this time, we allow dropping only in the case that variables share the same classes
+        // currently, merging is allowed only in the case that variables are not joined by different resource classes
         for(UsedPairedVariable paired : UsedPairedVariable.getPairs(parent.getVariables(), foreign.getVariables()))
             for(PairedClass p : paired.getClasses())
                 if(p.getLeftClass() != null && p.getRightClass() != null && p.getLeftClass() != p.getRightClass())
@@ -301,7 +298,7 @@ public class SqlTableAccess extends SqlIntercode
             for(NodeMapping parentMap : parentMappings)
                 if(parentMap instanceof ParametrisedMapping)
                     for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
-                        parentColumns.add(parentMap.getSqlValueAccess(i));
+                        parentColumns.add(((ParametrisedMapping) parentMap).getSqlColumn(i));
 
 
             ArrayList<NodeMapping> foreignMappings = foreign.mappings.get(parentEntry.getKey());
@@ -316,14 +313,12 @@ public class SqlTableAccess extends SqlIntercode
                 {
                     assert parentMap.getResourceClass() == foreignMap.getResourceClass();
 
-                    if(parentMap instanceof ParametrisedIriMapping && foreignMap instanceof ParametrisedIriMapping
-                            || parentMap instanceof ParametrisedLiteralMapping
-                                    && foreignMap instanceof ParametrisedLiteralMapping)
+                    if(parentMap instanceof ParametrisedMapping && foreignMap instanceof ParametrisedMapping)
                     {
                         for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
                         {
-                            String parentColumn = parentMap.getSqlValueAccess(i);
-                            String foreignColumn = foreignMap.getSqlValueAccess(i);
+                            String parentColumn = ((ParametrisedMapping) parentMap).getSqlColumn(i);
+                            String foreignColumn = ((ParametrisedMapping) foreignMap).getSqlColumn(i);
 
                             columns.add(new KeyPair(parentColumn, foreignColumn));
                         }
@@ -352,8 +347,8 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
                 {
-                    String parentColumn = parentMap.getSqlValueAccess(i);
-                    String foreignColumn = foreignMap.getSqlValueAccess(i);
+                    String parentColumn = parentMap.getSqlColumn(i);
+                    String foreignColumn = foreignMap.getSqlColumn(i);
 
                     columns.add(new KeyPair(parentColumn, foreignColumn));
                 }
@@ -362,6 +357,33 @@ public class SqlTableAccess extends SqlIntercode
 
 
         return schema.getCompatibleForeignKey(parent.table, foreign.table, columns, parentColumns);
+    }
+
+
+    public static boolean areCompatible(SqlTableAccess left, SqlTableAccess right)
+    {
+        for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
+        {
+            ArrayList<NodeMapping> leftMappings = leftEntry.getValue();
+            ArrayList<NodeMapping> rightMappings = right.mappings.get(leftEntry.getKey());
+
+            if(rightMappings == null)
+                continue;
+
+            for(NodeMapping leftMap : leftMappings)
+            {
+                for(NodeMapping rightMap : rightMappings)
+                {
+                    assert leftMap.getResourceClass() == rightMap.getResourceClass();
+
+                    if(leftMap instanceof ConstantMapping && rightMap instanceof ConstantMapping
+                            && !((ConstantMapping) leftMap).getValue().equals(((ConstantMapping) rightMap).getValue()))
+                        return false;
+                }
+            }
+        }
+
+        return true;
     }
 
 
@@ -406,9 +428,9 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        merged.mappings.putAll(left.mappings);
-        merged.valueConditions.addAll(left.valueConditions);
-        merged.notNullConditions.addAll(left.notNullConditions);
+        merged.addMappings(left.mappings);
+        merged.addValueConditions(left.valueConditions);
+        merged.addNotNullConditions(left.notNullConditions);
 
         merged.addMappings(right.mappings);
         merged.addValueConditions(right.valueConditions);
@@ -452,9 +474,9 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        merged.mappings.putAll(left.mappings);
-        merged.valueConditions.addAll(left.valueConditions);
-        merged.notNullConditions.addAll(left.notNullConditions);
+        merged.addMappings(left.mappings);
+        merged.addValueConditions(left.valueConditions);
+        merged.addNotNullConditions(left.notNullConditions);
 
         merged.addMappings(right.mappings);
 
@@ -503,15 +525,15 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        merged.mappings.putAll(foreign.mappings);
-        merged.valueConditions.addAll(foreign.valueConditions);
-        merged.notNullConditions.addAll(foreign.notNullConditions);
+        merged.addMappings(foreign.mappings);
+        merged.addValueConditions(foreign.valueConditions);
+        merged.addNotNullConditions(foreign.notNullConditions);
 
         for(Pair<Node, ParametrisedMapping> cond : parent.valueConditions)
             merged.addValueCondition(cond.getLeft(), (ParametrisedMapping) cond.getRight().remapColumns(columnMap));
 
-        for(ParametrisedLiteralMapping mapping : parent.notNullConditions)
-            merged.addNotNullCondition((ParametrisedLiteralMapping) mapping.remapColumns(columnMap));
+        for(ParametrisedMapping mapping : parent.notNullConditions)
+            merged.addNotNullCondition((ParametrisedMapping) mapping.remapColumns(columnMap));
 
 
         for(Entry<String, ArrayList<NodeMapping>> entry : parent.mappings.entrySet())
@@ -628,7 +650,7 @@ public class SqlTableAccess extends SqlIntercode
             }
 
 
-            for(ParametrisedLiteralMapping mapping : notNullConditions)
+            for(ParametrisedMapping mapping : notNullConditions)
             {
                 appendAnd(builder, hasWhere);
                 hasWhere = true;

@@ -64,4 +64,11 @@ public class ConstantLiteralMapping extends LiteralMapping implements ConstantMa
 
         return value.equals(other.value);
     }
+
+
+    @Override
+    public Node getValue()
+    {
+        return value;
+    }
 }

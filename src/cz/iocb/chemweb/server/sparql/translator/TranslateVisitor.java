@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
@@ -817,8 +816,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     private void processNodeCondition(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
-        if(node instanceof VariableOrBlankNode && mapping instanceof ParametrisedLiteralMapping)
-            translated.addNotNullCondition((ParametrisedLiteralMapping) mapping);
+        if(node instanceof VariableOrBlankNode && mapping instanceof ParametrisedMapping)
+            translated.addNotNullCondition((ParametrisedMapping) mapping);
 
         if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
             translated.addValueCondition(node, (ParametrisedMapping) mapping);
@@ -863,10 +862,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
             if(conditions == null)
                 return new TranslatedSegment(variablesInScope, translatedGroupPattern.getIntercode());
-        }
-        else
-        {
-            conditions = new LinkedList<SqlExpressionIntercode>();
         }
 
         SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),

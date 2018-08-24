@@ -35,6 +35,13 @@ public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements Pa
 
 
     @Override
+    public String getSqlColumn(int i)
+    {
+        return columns.get(i);
+    }
+
+
+    @Override
     public NodeMapping remapColumns(List<KeyPair> columnMap)
     {
         ArrayList<String> remappedColumns = new ArrayList<String>();
