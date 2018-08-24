@@ -121,8 +121,13 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(SelectQuery selectQuery)
     {
+        Prologue original = prologue;
+        prologue = selectQuery.getPrologue();
+
         TranslatedSegment translatedSelect = visitElement(selectQuery.getSelect());
         SqlQuery intercode = new SqlQuery(translatedSelect.getVariablesInScope(), translatedSelect.getIntercode());
+
+        prologue = original;
 
         return new TranslatedSegment(translatedSelect.getVariablesInScope(), intercode);
     }
