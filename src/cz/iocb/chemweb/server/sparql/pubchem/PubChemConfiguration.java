@@ -31,9 +31,9 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
     private static PubChemConfiguration singleton;
 
-    static final LangStringPatternClassWithConstantTag rdfLangStringEn = new LangStringPatternClassWithConstantTag(
-            "en");
-    static final DatePatternClassWithConstantZone xsdDateM4 = new DatePatternClassWithConstantZone(-4 * 60 * 60);
+    static final LangStringPatternClassWithConstantTag rdfLangStringEn = LangStringPatternClassWithConstantTag
+            .get("en");
+    static final DatePatternClassWithConstantZone xsdDateM4 = DatePatternClassWithConstantZone.get(-4 * 60 * 60);
 
 
     public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException

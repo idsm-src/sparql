@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag
 import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.LANGSTRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
 import java.util.Arrays;
+import java.util.Hashtable;
 import cz.iocb.chemweb.server.sparql.mapping.classes.bases.PatternLiteralBaseClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.LangStringClass;
@@ -15,13 +16,37 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 public class LangStringPatternClassWithConstantTag extends PatternLiteralBaseClass implements LangStringClass
 {
+    private static final Hashtable<String, LangStringPatternClassWithConstantTag> instances = new Hashtable<String, LangStringPatternClassWithConstantTag>();
+
     private final String lang;
 
 
-    public LangStringPatternClassWithConstantTag(String lang)
+    LangStringPatternClassWithConstantTag(String lang)
     {
         super("lang-" + lang, Arrays.asList("varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
         this.lang = lang;
+    }
+
+
+    public static LangStringPatternClassWithConstantTag get(String lang)
+    {
+        LangStringPatternClassWithConstantTag instance = instances.get(lang);
+
+        if(instance == null)
+        {
+            synchronized(instances)
+            {
+                instance = instances.get(lang);
+
+                if(instance == null)
+                {
+                    instance = new LangStringPatternClassWithConstantTag(lang);
+                    instances.put(lang, instance);
+                }
+            }
+        }
+
+        return instance;
     }
 
 

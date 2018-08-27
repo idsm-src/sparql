@@ -326,7 +326,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                         if(literal.getLanguageTag() != null)
                         {
-                            valueType = new LangStringPatternClassWithConstantTag(literal.getLanguageTag());
+                            valueType = LangStringPatternClassWithConstantTag.get(literal.getLanguageTag());
                         }
                         else
                         {
@@ -342,12 +342,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                                             valueType = literalClass;
 
                                 if(valueType == xsdDateTime)
-                                    valueType = new DateTimePatternClassWithConstantZone(
-                                            ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
+                                    valueType = DateTimePatternClassWithConstantZone
+                                            .get(((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
 
                                 if(valueType == xsdDate)
-                                    valueType = new DatePatternClassWithConstantZone(
-                                            DatePatternClassWithConstantZone.getZone(literal));
+                                    valueType = DatePatternClassWithConstantZone
+                                            .get(DatePatternClassWithConstantZone.getZone(literal));
                             }
                         }
                     }

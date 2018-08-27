@@ -66,13 +66,13 @@ public class SqlLiteral extends SqlNodeValue
         PatternResourceClass patternResourceClass = resourceClass.getPatternResourceClass();
 
         if(patternResourceClass == rdfLangString)
-            patternResourceClass = new LangStringPatternClassWithConstantTag(literal.getLanguageTag());
+            patternResourceClass = LangStringPatternClassWithConstantTag.get(literal.getLanguageTag());
         else if(patternResourceClass == xsdDateTime)
-            patternResourceClass = new DateTimePatternClassWithConstantZone(
-                    ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
+            patternResourceClass = DateTimePatternClassWithConstantZone
+                    .get(((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
         else if(patternResourceClass == xsdDate)
-            patternResourceClass = new DatePatternClassWithConstantZone(
-                    DatePatternClassWithConstantZone.getZone(literal));
+            patternResourceClass = DatePatternClassWithConstantZone
+                    .get(DatePatternClassWithConstantZone.getZone(literal));
 
         Set<PatternResourceClass> patternResourceClasses = new HashSet<PatternResourceClass>();
         patternResourceClasses.add(patternResourceClass);

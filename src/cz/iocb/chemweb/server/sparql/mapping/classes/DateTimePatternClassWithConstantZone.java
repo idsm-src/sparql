@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateTimeIri;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
+import java.util.Hashtable;
 import cz.iocb.chemweb.server.sparql.mapping.classes.bases.PatternLiteralBaseClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateTimeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
@@ -15,13 +16,37 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 public class DateTimePatternClassWithConstantZone extends PatternLiteralBaseClass implements DateTimeClass
 {
+    private static final Hashtable<Integer, DateTimePatternClassWithConstantZone> instances = new Hashtable<Integer, DateTimePatternClassWithConstantZone>();
+
     private final int zone;
 
 
-    public DateTimePatternClassWithConstantZone(int zone)
+    DateTimePatternClassWithConstantZone(int zone)
     {
         super("datetime$" + zone, Arrays.asList("timestamptz"), Arrays.asList(DATETIME), xsdDateTimeIri);
         this.zone = zone;
+    }
+
+
+    public static DateTimePatternClassWithConstantZone get(int zone)
+    {
+        DateTimePatternClassWithConstantZone instance = instances.get(zone);
+
+        if(instance == null)
+        {
+            synchronized(instances)
+            {
+                instance = instances.get(zone);
+
+                if(instance == null)
+                {
+                    instance = new DateTimePatternClassWithConstantZone(zone);
+                    instances.put(zone, instance);
+                }
+            }
+        }
+
+        return instance;
     }
 
 

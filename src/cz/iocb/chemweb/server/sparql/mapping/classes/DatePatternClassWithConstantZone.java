@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.DATE;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
 import java.util.Arrays;
+import java.util.Hashtable;
 import cz.iocb.chemweb.server.sparql.mapping.classes.bases.PatternLiteralBaseClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
@@ -14,13 +15,37 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 public class DatePatternClassWithConstantZone extends PatternLiteralBaseClass implements DateClass
 {
+    private static final Hashtable<Integer, DatePatternClassWithConstantZone> instances = new Hashtable<Integer, DatePatternClassWithConstantZone>();
+
     private final int zone;
 
 
-    public DatePatternClassWithConstantZone(int zone)
+    DatePatternClassWithConstantZone(int zone)
     {
         super("date$" + zone, Arrays.asList("date"), Arrays.asList(DATE), xsdDateIri);
         this.zone = zone;
+    }
+
+
+    public static DatePatternClassWithConstantZone get(int zone)
+    {
+        DatePatternClassWithConstantZone instance = instances.get(zone);
+
+        if(instance == null)
+        {
+            synchronized(instances)
+            {
+                instance = instances.get(zone);
+
+                if(instance == null)
+                {
+                    instance = new DatePatternClassWithConstantZone(zone);
+                    instances.put(zone, instance);
+                }
+            }
+        }
+
+        return instance;
     }
 
 
