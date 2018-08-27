@@ -163,13 +163,13 @@ public class PostgresDatabase
                                 break;
 
                             case INTEGER:
-                                rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toString(),
-                                        xsdIntegerIri);
+                                rowData[idx] = new TypedLiteral(
+                                        ((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdIntegerIri);
                                 break;
 
                             case DECIMAL:
-                                rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toString(),
-                                        xsdDecimalIri);
+                                rowData[idx] = new TypedLiteral(
+                                        ((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdDecimalIri);
                                 break;
 
                             case DATETIME:
