@@ -6,6 +6,8 @@ public enum ErrorType
 {
     unimplementedFunction("Function '%s' is not implemented."),
 
+    wrongCountOfParameters("Function '%s' requires %d parameter(s)"),
+
     invalidExistsExpressionTranslation("Invalid translation of ExistsExpression."),
 
     unsupportedFunctionCall("Call of FunctionCallExpression is not supported."),

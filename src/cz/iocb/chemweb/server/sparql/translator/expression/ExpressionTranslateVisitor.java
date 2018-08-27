@@ -3,7 +3,10 @@ package cz.iocb.chemweb.server.sparql.translator.expression;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
@@ -21,13 +24,16 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
+import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogical;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlCast;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlUnaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlUnaryLogical;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
@@ -174,7 +180,26 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : functionCallExpression.getArguments())
             arguemnts.add(visitElement(expression));
 
-        return null; //SqlFunctionCall.create(function, arguemnts);
+        Optional<ExpressionLiteralClass> resourceClass = BuiltinClasses.getExpressionLiteralClasses().stream()
+                .filter(r -> r.getTypeIri().equals(function)).findFirst();
+
+        if(!resourceClass.isPresent())
+        {
+            exceptions.add(new TranslateException(ErrorType.unimplementedFunction, function.getRange(),
+                    function.toString(prologue)));
+
+            return SqlNull.get();
+        }
+
+        if(arguemnts.size() != 1)
+        {
+            exceptions.add(new TranslateException(ErrorType.wrongCountOfParameters, function.getRange(),
+                    function.toString(prologue), 1));
+
+            return SqlNull.get();
+        }
+
+        return SqlCast.create(resourceClass.get(), arguemnts.get(0));
     }
 
 
