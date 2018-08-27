@@ -53,7 +53,7 @@ public class CommonIriClass extends IriClass implements ExpressionResourceClass
     @Override
     public ExpressionResourceClass getExpressionResourceClass()
     {
-        return this;
+        return BuiltinClasses.iri;
     }
 
 
