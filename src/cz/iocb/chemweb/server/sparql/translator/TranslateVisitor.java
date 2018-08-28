@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -343,7 +342,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                                 if(valueType == xsdDateTime)
                                     valueType = DateTimePatternClassWithConstantZone
-                                            .get(((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
+                                            .get(DateTimePatternClassWithConstantZone.getZone(literal));
 
                                 if(valueType == xsdDate)
                                     valueType = DatePatternClassWithConstantZone

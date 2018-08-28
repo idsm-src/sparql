@@ -88,12 +88,7 @@ public class DateTimePatternClassWithConstantZone extends PatternLiteralBaseClas
         if(!(node instanceof Literal))
             return true;
 
-        Literal literal = (Literal) node;
-
-        int zone = Integer.MIN_VALUE;
-
-        if(literal.getValue() instanceof OffsetDateTime)
-            zone = ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds();
+        int zone = DateTimePatternClassWithConstantZone.getZone((Literal) node);
 
         if(zone != this.zone)
             return false;
@@ -105,5 +100,14 @@ public class DateTimePatternClassWithConstantZone extends PatternLiteralBaseClas
     public int getZone()
     {
         return zone;
+    }
+
+
+    public static int getZone(Literal literal)
+    {
+        if(literal.getValue() instanceof OffsetDateTime)
+            return ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds();
+
+        return Integer.MIN_VALUE;
     }
 }

@@ -5,7 +5,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
@@ -69,7 +68,7 @@ public class SqlLiteral extends SqlNodeValue
             patternResourceClass = LangStringPatternClassWithConstantTag.get(literal.getLanguageTag());
         else if(patternResourceClass == xsdDateTime)
             patternResourceClass = DateTimePatternClassWithConstantZone
-                    .get(((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds());
+                    .get(DateTimePatternClassWithConstantZone.getZone(literal));
         else if(patternResourceClass == xsdDate)
             patternResourceClass = DatePatternClassWithConstantZone
                     .get(DatePatternClassWithConstantZone.getZone(literal));
