@@ -92,11 +92,8 @@ public class SqlNumeric extends SqlUnary
             if(compatibleClasses.size() > 1)
                 builder.append("COALESCE(");
 
-            for(ExpressionResourceClass resourceClass : variable.getResourceClasses())
+            for(ExpressionResourceClass resourceClass : compatibleClasses)
             {
-                if(!compatibleClasses.contains(resourceClass))
-                    continue;
-
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
