@@ -29,6 +29,7 @@ import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogical;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlCast;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
@@ -152,12 +153,12 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(BuiltInCallExpression builtInCallExpression)
     {
         String function = builtInCallExpression.getFunctionName();
-        List<SqlExpressionIntercode> arguemnts = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> arguments = new LinkedList<SqlExpressionIntercode>();
 
         for(Expression expression : builtInCallExpression.getArguments())
-            arguemnts.add(visitElement(expression));
+            arguments.add(visitElement(expression));
 
-        return null; //SqlBuiltinCall.create(function, arguemnts);
+        return SqlBuiltinCall.create(function.toLowerCase(), arguments);
     }
 
 
