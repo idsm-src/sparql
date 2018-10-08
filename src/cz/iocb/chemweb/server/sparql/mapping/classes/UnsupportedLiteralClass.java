@@ -1,17 +1,14 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.LITERAL;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.TYPE;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LITERAL;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.TYPE;
 import java.util.Arrays;
-import cz.iocb.chemweb.server.sparql.mapping.classes.bases.PatternLiteralBaseClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
-public class UnsupportedLiteralClass extends PatternLiteralBaseClass
+public class UnsupportedLiteralClass extends LiteralClass
 {
     UnsupportedLiteralClass()
     {
@@ -20,14 +17,7 @@ public class UnsupportedLiteralClass extends PatternLiteralBaseClass
 
 
     @Override
-    public String getResultValue(String variable, int part)
-    {
-        return getSqlColumn(variable, 0);
-    }
-
-
-    @Override
-    public String getSqlPatternLiteralValue(Literal literal, int part)
+    public String getLiteralPatternCode(Literal literal, int part)
     {
         if(part == 0)
             return "'" + literal.getStringValue().replaceAll("'", "''") + "'::varchar";
@@ -37,16 +27,36 @@ public class UnsupportedLiteralClass extends PatternLiteralBaseClass
 
 
     @Override
-    public ExpressionResourceClass getExpressionResourceClass()
+    public String getPatternCode(String column, int part, boolean isBoxed)
     {
-        return unsupportedLiteralExpr;
+        if(isBoxed == false)
+            throw new IllegalArgumentException();
+
+        return "sparql.rdfbox_extract_typed_literal_" + (part == 0 ? "literal" : "type") + "(" + column + ")";
     }
 
 
     @Override
-    public String getSqlExpressionValue(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public String getExpressionCode(Literal literal)
     {
-        return "sparql.cast_as_rdfbox_from_typed_literal(" + variableAccessor.variableAccess(variable, this, 0) + ", "
-                + variableAccessor.variableAccess(variable, this, 1) + ")";
+        String value = literal.getStringValue().replaceAll("'", "''");
+
+        return "sparql.cast_as_rdfbox_from_typed_literal('" + value + "', '" + literal.getTypeIri().getUri().toString()
+                + "')";
+    }
+
+
+    @Override
+    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    {
+        return "sparql.cast_as_rdfbox_from_typed_literal(" + variableAccessor.getSqlVariableAccess(variable, this, 0)
+                + ", " + variableAccessor.getSqlVariableAccess(variable, this, 1) + ")";
+    }
+
+
+    @Override
+    public String getResultCode(String variable, int part)
+    {
+        return getSqlColumn(variable, 0);
     }
 }

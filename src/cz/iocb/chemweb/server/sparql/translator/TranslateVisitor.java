@@ -17,13 +17,13 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimePatternClassWithConstantZone;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringPatternClassWithConstantTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
@@ -285,11 +285,11 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         UsedVariables usedVariables = new UsedVariables();
 
 
-        ArrayList<Pair<String, ArrayList<PatternResourceClass>>> typedVariables = new ArrayList<>();
-        ArrayList<ArrayList<Pair<Node, PatternResourceClass>>> typedValuesList = new ArrayList<>();
+        ArrayList<Pair<String, ArrayList<ResourceClass>>> typedVariables = new ArrayList<>();
+        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
 
         for(int j = 0; j < values.getValuesLists().size(); j++)
-            typedValuesList.add(new ArrayList<Pair<Node, PatternResourceClass>>(size));
+            typedValuesList.add(new ArrayList<Pair<Node, ResourceClass>>(size));
 
 
         for(int i = 0; i < values.getVariables().size(); i++)
@@ -303,8 +303,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         values.getVariables().get(i).getRange(), variable));
 
 
-            ArrayList<PatternResourceClass> valueClasses = new ArrayList<PatternResourceClass>();
-            typedVariables.add(new Pair<String, ArrayList<PatternResourceClass>>(variable, valueClasses));
+            ArrayList<ResourceClass> valueClasses = new ArrayList<ResourceClass>();
+            typedVariables.add(new Pair<String, ArrayList<ResourceClass>>(variable, valueClasses));
 
 
             int valueCount = 0;
@@ -313,7 +313,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 ValuesList valuesList = values.getValuesLists().get(j);
                 Expression value = valuesList.getValues().get(i);
-                PatternResourceClass valueType = null;
+                ResourceClass valueType = null;
 
                 if(value != null)
                 {
@@ -325,7 +325,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                         if(literal.getLanguageTag() != null)
                         {
-                            valueType = LangStringPatternClassWithConstantTag.get(literal.getLanguageTag());
+                            valueType = LangStringConstantTagClass.get(literal.getLanguageTag());
                         }
                         else
                         {
@@ -336,17 +336,16 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                                 IRI iri = literal.getTypeIri();
 
                                 if(iri != null)
-                                    for(PatternLiteralClass literalClass : BuiltinClasses.getPatternLiteralClasses())
+                                    for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
                                         if(literalClass.getTypeIri().equals(iri))
                                             valueType = literalClass;
 
                                 if(valueType == xsdDateTime)
-                                    valueType = DateTimePatternClassWithConstantZone
-                                            .get(DateTimePatternClassWithConstantZone.getZone(literal));
+                                    valueType = DateTimeConstantZoneClass
+                                            .get(DateTimeConstantZoneClass.getZone(literal));
 
                                 if(valueType == xsdDate)
-                                    valueType = DatePatternClassWithConstantZone
-                                            .get(DatePatternClassWithConstantZone.getZone(literal));
+                                    valueType = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
                             }
                         }
                     }
@@ -354,7 +353,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     {
                         valueType = BuiltinClasses.unsupportedIri;
 
-                        for(PatternResourceClass resClass : iriClasses.values())
+                        for(ResourceClass resClass : iriClasses.values())
                             if(resClass instanceof IriClass)
                                 if(resClass.match((Node) value))
                                     valueType = resClass;
@@ -368,7 +367,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         valueClasses.add(valueType);
                 }
 
-                typedValuesList.get(j).add(new Pair<Node, PatternResourceClass>((Node) value, valueType));
+                typedValuesList.get(j).add(new Pair<Node, ResourceClass>((Node) value, valueType));
             }
 
 

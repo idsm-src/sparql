@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -13,7 +13,7 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
     private final List<String> columns;
 
 
-    public ParametrisedLiteralMapping(PatternLiteralClass literalClass, List<String> columns)
+    public ParametrisedLiteralMapping(LiteralClass literalClass, List<String> columns)
     {
         super(literalClass);
         this.columns = columns;
@@ -28,16 +28,16 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
 
 
     @Override
-    public String getSqlValueAccess(int i)
+    public String getSqlValueAccess(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 
     @Override
-    public String getSqlColumn(int i)
+    public String getSqlColumn(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 

@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.bases.BlankNodeBaseClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -13,7 +13,7 @@ public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements Pa
     private final List<String> columns;
 
 
-    public ParametrisedBlankNodeMapping(BlankNodeBaseClass blankNodeClass, List<String> columns)
+    public ParametrisedBlankNodeMapping(BlankNodeClass blankNodeClass, List<String> columns)
     {
         super(blankNodeClass);
         this.columns = columns;
@@ -28,16 +28,16 @@ public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements Pa
 
 
     @Override
-    public String getSqlValueAccess(int i)
+    public String getSqlValueAccess(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 
     @Override
-    public String getSqlColumn(int i)
+    public String getSqlColumn(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 

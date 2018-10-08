@@ -1,13 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangStringExpr;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTimeExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
@@ -17,53 +15,53 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimePatternClassWithConstantZone;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UnsupportedLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateTimeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.LangStringClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
 public class SqlCast extends SqlUnary
 {
-    private final ExpressionResourceClass resourceClass;
+    private final ResourceClass resourceClass;
 
 
-    protected SqlCast(SqlExpressionIntercode operand, Set<ExpressionResourceClass> resourceClasses, boolean canBeNull)
+    protected SqlCast(SqlExpressionIntercode operand, ResourceClass resourceClass, Set<ResourceClass> resourceClasses,
+            boolean canBeNull)
     {
         super(operand, resourceClasses, false, canBeNull);
-        resourceClass = resourceClasses.iterator().next();
+        this.resourceClass = resourceClass;
     }
 
 
-    public static SqlExpressionIntercode create(ExpressionResourceClass resourceClass, SqlExpressionIntercode operand)
+    public static SqlExpressionIntercode create(ResourceClass resourceClass, SqlExpressionIntercode operand)
     {
-        if(operand.isBoxed() == false && operand.getResourceClasses().contains(resourceClass))
+        if(operand.getResourceClasses().size() == 1 && operand.getResourceClasses().contains(resourceClass))
             return operand;
 
-        Set<ExpressionResourceClass> compatible = operand.getResourceClasses().stream()
-                .filter(r -> canBeCast(r, resourceClass)).collect(Collectors.toSet());
+        if(resourceClass == xsdDateTime && operand.getResourceClasses().stream().allMatch(r -> isDateTime(r)))
+            return operand;
 
-        if(compatible.isEmpty())
+        if(resourceClass == xsdDate && operand.getResourceClasses().stream().allMatch(r -> isDate(r)))
+            return operand;
+
+
+        Set<ResourceClass> resultClasses = operand.getResourceClasses().stream()
+                .map(r -> resultCastClass(r, resourceClass)).filter(r -> r != null).collect(Collectors.toSet());
+
+        if(resultClasses.isEmpty())
             return SqlNull.get();
 
         boolean canBeNull = operand.getResourceClasses().stream().anyMatch(r -> canBeNull(r, resourceClass));
 
-        Set<ExpressionResourceClass> resourceClasses = new HashSet<ExpressionResourceClass>();
-        resourceClasses.add(resourceClass);
-
-        return new SqlCast(operand, resourceClasses, operand.canBeNull() || canBeNull);
+        return new SqlCast(operand, resourceClass, resultClasses, operand.canBeNull() || canBeNull);
     }
 
 
@@ -77,144 +75,259 @@ public class SqlCast extends SqlUnary
     @Override
     public String translate()
     {
-        if(getOperand().isBoxed() == false && getOperand().getResourceClasses().contains(iri))
-            return getOperand().translate();
+        if(getOperand().isBoxed() == false && getOperand().getResourceClasses().stream().allMatch(r -> isIri(r)))
+            return getOperand().translate(); // iri is already a string
 
-        if(getOperand() instanceof SqlVariable)
+
+        if(!(getOperand() instanceof SqlVariable))
         {
-            SqlVariable variable = (SqlVariable) getOperand();
-
-            Set<PatternResourceClass> convertible = variable.getPatternResourceClasses().stream()
-                    .filter(r -> canBeCast(r.getExpressionResourceClass(), resourceClass)).collect(Collectors.toSet());
-
+            ResourceClass operandClass = getOperand().getExpressionResourceClass();
             StringBuilder builder = new StringBuilder();
 
-            if(convertible.size() > 1)
-                builder.append("COALESCE(");
-
-            boolean hasAlternative = false;
-            for(PatternResourceClass resClass : convertible)
+            if(operandClass instanceof DateTimeConstantZoneClass)
             {
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                if(resClass == resourceClass)
-                {
-                    builder.append(variable.getExpressionValue(resClass, false));
-                }
-                else if(resClass instanceof ExpressionLiteralClass)
-                {
-                    builder.append("sparql.cast_as_");
-                    builder.append(getResourceName());
-                    builder.append("_from_");
-                    builder.append(resClass.getName());
-                    builder.append("(");
-                    builder.append(variable.getExpressionValue(resClass, false));
-                    builder.append(")");
-                }
-                else if(resClass instanceof DateTimeClass && resourceClass == xsdDateTimeExpr)
-                {
-                    builder.append("sparql.zoneddatetime_create(");
-                    builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 0));
-                    builder.append(", ");
-
-                    if(resClass == xsdDateTime)
-                        builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 1));
-                    else
-                        builder.append("'" + ((DateTimePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-
-                    builder.append(")");
-                }
-                else if(resClass instanceof DateClass && resourceClass == xsdDateExpr)
-                {
-                    builder.append("sparql.zoneddate_create(");
-                    builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 0));
-                    builder.append(", ");
-
-                    if(resClass == xsdDate)
-                        builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 1));
-                    else
-                        builder.append("'" + ((DatePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-
-                    builder.append(")");
-                }
-                else if(resClass instanceof DateTimeClass || resClass instanceof DateClass)
-                {
-                    builder.append("sparql.cast_as_");
-                    builder.append(getResourceName());
-                    builder.append("_from_");
-                    builder.append(resClass.getExpressionResourceClass().getName());
-                    builder.append("(");
-                    builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 0));
-                    builder.append(", ");
-
-                    if(resClass == xsdDateTime || resClass == xsdDate)
-                        builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 1));
-                    else if(resClass instanceof DateTimePatternClassWithConstantZone)
-                        builder.append("'" + ((DateTimePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-                    else if(resClass instanceof DatePatternClassWithConstantZone)
-                        builder.append("'" + ((DatePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-
-                    builder.append(")");
-                }
-                else if(resClass instanceof LangStringClass || resClass instanceof UnsupportedLiteralClass)
-                {
-                    builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 0));
-                }
-                else if(resClass instanceof IriClass)
-                {
-                    builder.append(variable.getExpressionValue(resClass, false));
-                }
-
-                assert false;
+                builder.append("sparql.cast_as_");
+                builder.append(getResourceName());
+                builder.append("_from_datetime(");
+                builder.append(getOperand().translate());
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) operandClass).getZone());
+                builder.append("'::int4)");
             }
-
-            if(convertible.size() > 1)
+            else if(operandClass instanceof DateConstantZoneClass)
+            {
+                builder.append("sparql.cast_as_");
+                builder.append(getResourceName());
+                builder.append("_from_date(");
+                builder.append(getOperand().translate());
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) operandClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(operandClass instanceof DateConstantZoneClass)
+            {
+                builder.append(getOperand().translate());
+            }
+            else
+            {
+                builder.append("sparql.cast_as_");
+                builder.append(getResourceName());
+                builder.append("_from_");
+                builder.append(getOperand().getResourceName());
+                builder.append("(");
+                builder.append(getOperand().translate());
                 builder.append(")");
+            }
 
             return builder.toString();
         }
 
-        return "sparql.cast_as_" + getResourceName() + "_from_" + getOperand().getResourceName() + "("
-                + getOperand().translate() + ")";
+
+
+        SqlVariable variable = (SqlVariable) getOperand();
+        ResourceClass castClass = getExpressionResourceClass();
+        StringBuilder builder = new StringBuilder();
+
+        Set<ResourceClass> convertible = variable.getResourceClasses().stream()
+                .filter(r -> resultCastClass(r, resourceClass) != null).collect(Collectors.toSet());
+
+        if(convertible.size() > 1)
+            builder.append("COALESCE(");
+
+        boolean hasAlternative = false;
+
+        for(ResourceClass resClass : convertible)
+        {
+            appendComma(builder, hasAlternative);
+            hasAlternative = true;
+
+            /* identity cats */
+            if(resClass == castClass)
+            {
+                builder.append(variable.getExpressionValue(resClass, false));
+            }
+
+            /* special casts from datetime */
+            else if(resClass == xsdDateTime && castClass == xsdDate)
+            {
+                builder.append("sparql.cast_as_date_from_datetime(");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(", ");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(")");
+            }
+            else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdDate)
+            {
+                builder.append("sparql.cast_as_date_from_datetime(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdDateTime)
+            {
+                builder.append("sparql.zoneddatetime_create(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof DateTimeConstantZoneClass && castClass instanceof DateConstantZoneClass)
+            {
+                builder.append("sparql.cast_as_plain_date_from_datetime(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+
+            /* special casts from date */
+            else if(resClass == xsdDate && castClass == xsdDateTime)
+            {
+                builder.append("sparql.cast_as_datetime_from_date(");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(", ");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(")");
+            }
+            else if(resClass instanceof DateConstantZoneClass && castClass == xsdDateTime)
+            {
+                builder.append("sparql.cast_as_datetime_from_date(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof DateConstantZoneClass && castClass == xsdDate)
+            {
+                builder.append("sparql.zoneddate_create(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof DateConstantZoneClass && castClass instanceof DateTimeConstantZoneClass)
+            {
+                builder.append("sparql.cast_as_plain_datetime_from_date(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+
+            /* special to-string casts */
+            else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdString)
+            {
+                builder.append("sparql.cast_as_string_from_datetime(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof DateConstantZoneClass && castClass == xsdString)
+            {
+                builder.append("sparql.cast_as_string_from_date(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) resClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resClass instanceof LangStringConstantTagClass || resClass instanceof IriClass)
+            {
+                builder.append(variable.getExpressionValue(resClass, false));
+            }
+            else if(resClass == rdfLangString || resClass == unsupportedLiteral)
+            {
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+            }
+
+            /* standard literal casts */
+            else if(resClass instanceof LiteralClass)
+            {
+                builder.append("sparql.cast_as_");
+                builder.append(getResourceName());
+                builder.append("_from_");
+                builder.append(resClass.getName());
+                builder.append("(");
+                builder.append(variable.getExpressionValue(resClass, false));
+                builder.append(")");
+            }
+            else
+            {
+                assert false;
+            }
+        }
+
+        if(convertible.size() > 1)
+            builder.append(")");
+
+        return builder.toString();
     }
 
 
-    // https://www.w3.org/TR/xpath-functions/#casting-from-primitive-to-primitive
-    private static boolean canBeCast(ExpressionResourceClass from, ExpressionResourceClass to)
+    private static ResourceClass resultCastClass(ResourceClass from, ResourceClass to)
     {
-        if((from == rdfLangStringExpr || from == unsupportedLiteralExpr || from == iri) && to == xsdString)
-            return true;
+        assert BuiltinClasses.getLiteralClasses().contains(to);
 
-        if(!BuiltinClasses.getExpressionLiteralClasses().contains(from))
-            return false;
+        if((from == rdfLangString || from == unsupportedLiteral || isIri(from)) && to == xsdString)
+            return xsdString;
+
+        if(!BuiltinClasses.getLiteralClasses().contains(from) && !isDateTime(from) && !isDate(from))
+            return null;
 
         if(from == to)
-            return true;
+            return to;
 
         if(from == xsdString || to == xsdString)
-            return true;
+            return to;
 
         if(from == xsdDayTimeDuration || to == xsdDayTimeDuration)
-            return false;
+            return null;
 
-        if(from == xsdDateTimeExpr || from == xsdDateExpr)
-            return to == xsdDateTimeExpr || to == xsdDateExpr;
+        if(isDateTime(from))
+        {
+            if(to == xsdDateTime)
+                return from;
 
-        if(to == xsdDateTimeExpr || to == xsdDateExpr)
-            return false;
+            if(to == xsdDate && from == xsdDateTime)
+                return to;
 
-        return true;
+            if(to == xsdDate)
+                return DateConstantZoneClass.get(((DateTimeConstantZoneClass) from).getZone());
+
+            return null;
+        }
+
+        if(isDate(from))
+        {
+            if(to == xsdDate)
+                return from;
+
+            if(to == xsdDateTime && from == xsdDate)
+                return to;
+
+            if(to == xsdDateTime)
+                return DateTimeConstantZoneClass.get(((DateConstantZoneClass) from).getZone());
+
+            return null;
+        }
+
+        if(to == xsdDateTime || to == xsdDate)
+            return null;
+
+        return to;
     }
 
 
-    // https://www.w3.org/TR/xpath-functions/#casting-from-primitive-to-primitive
-    private static boolean canBeNull(ExpressionResourceClass from, ExpressionResourceClass to)
+    private static boolean canBeNull(ResourceClass from, ResourceClass to)
     {
-        if((from == rdfLangStringExpr || from == unsupportedLiteralExpr || from == iri) && to == xsdString)
+        // https://www.w3.org/TR/xpath-functions/#casting-from-primitive-to-primitive
+
+
+        if((isLangString(from) || from == unsupportedLiteral || from == iri) && to == xsdString)
             return false;
 
-        if(!BuiltinClasses.getExpressionLiteralClasses().contains(from))
+        if(!BuiltinClasses.getLiteralClasses().contains(from))
             return true;
 
         if(from == to)
@@ -223,7 +336,10 @@ public class SqlCast extends SqlUnary
         if(to == xsdString)
             return false;
 
-        if((from == xsdDateTimeExpr || from == xsdDateExpr) && (to == xsdDateTimeExpr || to == xsdDateExpr))
+        if(isDate(from) && isDateTime(to))
+            return true;
+
+        if((isDateTime(from) || isDate(from)) && (isDateTime(to) || isDate(to)))
             return false;
 
         if(isNumeric(from) && to == xsdBoolean || from == xsdBoolean && isNumeric(to))

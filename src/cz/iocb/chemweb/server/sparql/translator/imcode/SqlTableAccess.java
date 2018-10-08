@@ -11,7 +11,7 @@ import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -56,7 +56,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addVariableClass(String variable, PatternResourceClass resourceClass)
+    public void addVariableClass(String variable, ResourceClass resourceClass)
     {
         UsedVariable other = variables.get(variable);
 
@@ -168,7 +168,7 @@ public class SqlTableAccess extends SqlIntercode
 
                     if(leftMap instanceof ParametrisedMapping && rightMap instanceof ParametrisedMapping)
                     {
-                        for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
+                        for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
                         {
                             String leftColumn = ((ParametrisedMapping) leftMap).getSqlColumn(i);
                             String rightColumn = ((ParametrisedMapping) rightMap).getSqlColumn(i);
@@ -199,7 +199,7 @@ public class SqlTableAccess extends SqlIntercode
                 if(leftMap.getResourceClass() != rightMap.getResourceClass())
                     continue;
 
-                for(int i = 0; i < leftMap.getResourceClass().getPartsCount(); i++)
+                for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
                 {
                     String leftColumn = leftMap.getSqlColumn(i);
                     String rightColumn = rightMap.getSqlColumn(i);
@@ -297,7 +297,7 @@ public class SqlTableAccess extends SqlIntercode
 
             for(NodeMapping parentMap : parentMappings)
                 if(parentMap instanceof ParametrisedMapping)
-                    for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
+                    for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
                         parentColumns.add(((ParametrisedMapping) parentMap).getSqlColumn(i));
 
 
@@ -315,7 +315,7 @@ public class SqlTableAccess extends SqlIntercode
 
                     if(parentMap instanceof ParametrisedMapping && foreignMap instanceof ParametrisedMapping)
                     {
-                        for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
+                        for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
                         {
                             String parentColumn = ((ParametrisedMapping) parentMap).getSqlColumn(i);
                             String foreignColumn = ((ParametrisedMapping) foreignMap).getSqlColumn(i);
@@ -345,7 +345,7 @@ public class SqlTableAccess extends SqlIntercode
                 if(parentMap.getResourceClass() != foreignMap.getResourceClass())
                     continue;
 
-                for(int i = 0; i < parentMap.getResourceClass().getPartsCount(); i++)
+                for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
                 {
                     String parentColumn = parentMap.getSqlColumn(i);
                     String foreignColumn = foreignMap.getSqlColumn(i);
@@ -575,9 +575,9 @@ public class SqlTableAccess extends SqlIntercode
             hasSelect = true;
 
             ArrayList<NodeMapping> mappings = entry.getValue();
-            PatternResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
+            ResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
 
-            for(int i = 0; i < resourceClass.getPartsCount(); i++)
+            for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
             {
                 appendComma(builder, i > 0);
 
@@ -640,12 +640,12 @@ public class SqlTableAccess extends SqlIntercode
                 appendAnd(builder, hasWhere);
                 hasWhere = true;
 
-                for(int i = 0; i < mapping.getResourceClass().getPartsCount(); i++)
+                for(int i = 0; i < mapping.getResourceClass().getPatternPartsCount(); i++)
                 {
                     appendAnd(builder, i > 0);
                     builder.append(mapping.getSqlValueAccess(i));
                     builder.append(" = ");
-                    builder.append(mapping.getResourceClass().getSqlValue(node, i));
+                    builder.append(mapping.getResourceClass().getPatternCode(node, i));
                 }
             }
 
@@ -655,7 +655,7 @@ public class SqlTableAccess extends SqlIntercode
                 appendAnd(builder, hasWhere);
                 hasWhere = true;
 
-                for(int i = 0; i < mapping.getResourceClass().getPartsCount(); i++)
+                for(int i = 0; i < mapping.getResourceClass().getPatternPartsCount(); i++)
                 {
                     appendAnd(builder, i > 0);
                     builder.append(mapping.getSqlValueAccess(i));
@@ -676,7 +676,7 @@ public class SqlTableAccess extends SqlIntercode
 
                     assert map1.getResourceClass() == map2.getResourceClass();
 
-                    for(int i = 0; i < map1.getResourceClass().getPartsCount(); i++)
+                    for(int i = 0; i < map1.getResourceClass().getPatternPartsCount(); i++)
                     {
                         appendAnd(builder, i > 0);
 

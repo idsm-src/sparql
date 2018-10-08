@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 
@@ -31,9 +31,9 @@ public class SqlFilter extends SqlIntercode
 
         for(UsedVariable variable : child.variables.getValues())
         {
-            for(PatternResourceClass resClass : variable.getClasses())
+            for(ResourceClass resClass : variable.getClasses())
             {
-                for(int i = 0; i < resClass.getPartsCount(); i++)
+                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
@@ -42,9 +42,6 @@ public class SqlFilter extends SqlIntercode
                 }
             }
         }
-
-        if(!hasSelect)
-            builder.append("1");
 
         if(!hasSelect)
             builder.append("1");

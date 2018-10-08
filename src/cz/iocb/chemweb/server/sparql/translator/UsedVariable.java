@@ -3,8 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
@@ -12,10 +11,10 @@ public class UsedVariable
 {
     private final String name;
     private final boolean canBeNull;
-    private final Set<PatternResourceClass> classes = new HashSet<PatternResourceClass>();
+    private final Set<ResourceClass> classes = new HashSet<ResourceClass>();
 
 
-    public UsedVariable(String name, Set<PatternResourceClass> mapClasses, boolean canBeNull)
+    public UsedVariable(String name, Set<ResourceClass> mapClasses, boolean canBeNull)
     {
         this.name = name;
         this.canBeNull = canBeNull;
@@ -23,7 +22,7 @@ public class UsedVariable
     }
 
 
-    public UsedVariable(String name, PatternResourceClass mapClass, boolean canBeNull)
+    public UsedVariable(String name, ResourceClass mapClass, boolean canBeNull)
     {
         this.name = name;
         this.canBeNull = canBeNull;
@@ -38,13 +37,13 @@ public class UsedVariable
     }
 
 
-    public void addClass(PatternResourceClass mapClass)
+    public void addClass(ResourceClass mapClass)
     {
         classes.add(mapClass);
     }
 
 
-    public void addClasses(List<PatternResourceClass> mapClasses)
+    public void addClasses(List<ResourceClass> mapClasses)
     {
         classes.addAll(mapClasses);
     }
@@ -72,7 +71,7 @@ public class UsedVariable
     }
 
 
-    public final Set<PatternResourceClass> getClasses()
+    public final Set<ResourceClass> getClasses()
     {
         return classes;
     }

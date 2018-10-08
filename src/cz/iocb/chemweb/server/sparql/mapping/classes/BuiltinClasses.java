@@ -1,15 +1,15 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.BOOLEAN;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.DAYTIMEDURATION;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.DECIMAL;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.DOUBLE;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.FLOAT;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.INT;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.INTEGER;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.LONG;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.SHORT;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag.STRING;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.BOOLEAN;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DAYTIMEDURATION;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DECIMAL;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DOUBLE;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.FLOAT;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.INT;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.INTEGER;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LONG;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.SHORT;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.STRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDayTimeDurationIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
@@ -22,8 +22,6 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdShortIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.util.Arrays;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
 
 
 
@@ -41,15 +39,10 @@ public class BuiltinClasses
     public static final SimpleLiteralClass xsdDayTimeDuration = new SimpleLiteralClass(DAYTIMEDURATION, "int8",
             xsdDayTimeDurationIri);
 
-    public static final DateTimePatternClass xsdDateTime = new DateTimePatternClass();
-    public static final DatePatternClass xsdDate = new DatePatternClass();
-    public static final LangStringPatternClass rdfLangString = new LangStringPatternClass();
+    public static final DateTimeClass xsdDateTime = new DateTimeClass();
+    public static final DateClass xsdDate = new DateClass();
+    public static final LangStringClass rdfLangString = new LangStringClass();
     public static final UnsupportedLiteralClass unsupportedLiteral = new UnsupportedLiteralClass();
-
-    public static final DateTimeExpressionClass xsdDateTimeExpr = new DateTimeExpressionClass();
-    public static final DateExpressionClass xsdDateExpr = new DateExpressionClass();
-    public static final LangStringExpressionClass rdfLangStringExpr = new LangStringExpressionClass();
-    public static final UnsupportedLiteralExpressionClass unsupportedLiteralExpr = new UnsupportedLiteralExpressionClass();
 
     public static final BlankNodeIntClass intBlankNode = new BlankNodeIntClass();
     public static final BlankNodeStrClass strBlankNode = new BlankNodeStrClass();
@@ -57,22 +50,12 @@ public class BuiltinClasses
     public static final CommonIriClass unsupportedIri = new CommonIriClass();
 
 
-    private static final List<PatternLiteralClass> patternLiteralClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt,
-            xsdLong, xsdFloat, xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
-
-    private static final List<ExpressionLiteralClass> expressionLiteralClasses = Arrays.asList(xsdBoolean, xsdShort,
-            xsdInt, xsdLong, xsdFloat, xsdDouble, xsdInteger, xsdDecimal, xsdDateTimeExpr, xsdDateExpr,
-            xsdDayTimeDuration, xsdString);
+    private static final List<LiteralClass> literalClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong,
+            xsdFloat, xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
 
 
-    public static List<PatternLiteralClass> getPatternLiteralClasses()
+    public static List<LiteralClass> getLiteralClasses()
     {
-        return patternLiteralClasses;
-    }
-
-
-    public static List<ExpressionLiteralClass> getExpressionLiteralClasses()
-    {
-        return expressionLiteralClasses;
+        return literalClasses;
     }
 }

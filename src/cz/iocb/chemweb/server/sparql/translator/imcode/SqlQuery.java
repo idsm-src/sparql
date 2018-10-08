@@ -5,8 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -52,17 +52,17 @@ public class SqlQuery extends SqlIntercode
             }
             else
             {
-                Set<PatternResourceClass> classes = variable.getClasses();
+                Set<ResourceClass> classes = variable.getClasses();
 
-                LinkedHashMap<List<ResultTag>, List<PatternResourceClass>> resultClasses = new LinkedHashMap<>();
+                LinkedHashMap<List<ResultTag>, List<ResourceClass>> resultClasses = new LinkedHashMap<>();
 
-                for(PatternResourceClass resClass : classes)
+                for(ResourceClass resClass : classes)
                 {
-                    List<PatternResourceClass> list = resultClasses.get(resClass.getResultTags());
+                    List<ResourceClass> list = resultClasses.get(resClass.getResultTags());
 
                     if(list == null)
                     {
-                        list = new ArrayList<PatternResourceClass>();
+                        list = new ArrayList<ResourceClass>();
                         resultClasses.put(resClass.getResultTags(), list);
                     }
 
@@ -70,10 +70,10 @@ public class SqlQuery extends SqlIntercode
                 }
 
 
-                for(Entry<List<ResultTag>, List<PatternResourceClass>> entry : resultClasses.entrySet())
+                for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
                 {
                     List<ResultTag> tags = entry.getKey();
-                    List<PatternResourceClass> resClasses = entry.getValue();
+                    List<ResourceClass> resClasses = entry.getValue();
 
                     for(int part = 0; part < tags.size(); part++)
                     {
@@ -87,8 +87,8 @@ public class SqlQuery extends SqlIntercode
                         {
                             appendComma(builder, i > 0);
 
-                            PatternResourceClass resClass = resClasses.get(i);
-                            builder.append(resClass.getResultValue(variableName, part));
+                            ResourceClass resClass = resClasses.get(i);
+                            builder.append(resClass.getResultCode(variableName, part));
                         }
 
                         if(resClasses.size() > 1)

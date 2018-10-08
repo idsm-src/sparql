@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -63,9 +63,9 @@ public class SqlSelect extends SqlIntercode
             if(variable == null)
                 continue;
 
-            for(PatternResourceClass resClass : variable.getClasses())
+            for(ResourceClass resClass : variable.getClasses())
             {
-                for(int i = 0; i < resClass.getPartsCount(); i++)
+                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;

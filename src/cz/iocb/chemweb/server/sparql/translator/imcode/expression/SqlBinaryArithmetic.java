@@ -8,8 +8,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -21,7 +21,7 @@ public class SqlBinaryArithmetic extends SqlBinary
 
 
     public SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
-            Set<ExpressionResourceClass> resourceClasses, boolean canBeNull)
+            Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(left, right, resourceClasses, resourceClasses.size() > 1, canBeNull);
         this.operator = operator;
@@ -31,10 +31,10 @@ public class SqlBinaryArithmetic extends SqlBinary
     public static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
-        Set<ExpressionResourceClass> resultClasses = new HashSet<ExpressionResourceClass>();
+        Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
 
-        for(ExpressionResourceClass leftClass : left.getResourceClasses())
-            for(ExpressionResourceClass rightClass : right.getResourceClasses())
+        for(ResourceClass leftClass : left.getResourceClasses())
+            for(ResourceClass rightClass : right.getResourceClasses())
                 if(isNumeric(leftClass) && isNumeric(rightClass))
                     resultClasses.add(determineResultClass(operator, leftClass, rightClass));
 
@@ -42,7 +42,7 @@ public class SqlBinaryArithmetic extends SqlBinary
             return SqlNull.get();
 
 
-        ExpressionResourceClass requestedClass = null;
+        ResourceClass requestedClass = null;
 
         if(resultClasses.size() == 1)
             requestedClass = resultClasses.iterator().next();
@@ -83,8 +83,8 @@ public class SqlBinaryArithmetic extends SqlBinary
     }
 
 
-    private static ExpressionResourceClass determineResultClass(Operator operator, ExpressionResourceClass leftClass,
-            ExpressionResourceClass rightClass)
+    private static ResourceClass determineResultClass(Operator operator, ResourceClass leftClass,
+            ResourceClass rightClass)
     {
         if(leftClass == xsdDouble || rightClass == xsdDouble)
             return xsdDouble;

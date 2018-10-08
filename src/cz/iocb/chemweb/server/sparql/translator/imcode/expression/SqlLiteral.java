@@ -1,20 +1,15 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangStringExpr;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringPatternClassWithConstantTag;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -23,61 +18,36 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 public class SqlLiteral extends SqlNodeValue
 {
     private final Literal literal;
-    private final Set<PatternResourceClass> patternResourceClasses;
 
 
-    protected SqlLiteral(Literal literal, Set<ExpressionResourceClass> resourceClasses,
-            Set<PatternResourceClass> patternResourceClasses, boolean isBoxed)
+    protected SqlLiteral(Literal literal, Set<ResourceClass> resourceClasses, boolean isBoxed)
     {
         super(resourceClasses, isBoxed, false);
         this.literal = literal;
-        this.patternResourceClasses = patternResourceClasses;
     }
 
 
     public static SqlExpressionIntercode create(Literal literal)
     {
-        ExpressionResourceClass resourceClass = unsupportedLiteralExpr;
+        ResourceClass resourceClass = unsupportedLiteral;
 
         if(literal.getLanguageTag() != null)
         {
-            resourceClass = rdfLangStringExpr;
+            resourceClass = LangStringConstantTagClass.get(literal.getLanguageTag());
         }
-        else
+        else if(literal.getValue() != null && literal.getTypeIri() != null)
         {
-            if(literal.getValue() != null)
-            {
-                IRI iri = literal.getTypeIri();
+            for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
+                if(literalClass.getTypeIri().equals(literal.getTypeIri()))
+                    resourceClass = literalClass;
 
-                if(iri != null)
-                    for(ExpressionLiteralClass literalClass : BuiltinClasses.getExpressionLiteralClasses())
-                        if(literalClass.getTypeIri().equals(iri))
-                            resourceClass = literalClass;
-            }
+            if(resourceClass == xsdDateTime)
+                resourceClass = DateTimeConstantZoneClass.get(DateTimeConstantZoneClass.getZone(literal));
+            else if(resourceClass == xsdDate)
+                resourceClass = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
         }
 
-        Set<ExpressionResourceClass> resourceClasses = new HashSet<ExpressionResourceClass>();
-        resourceClasses.add(resourceClass);
-
-        boolean isBoxed = resourceClass == rdfLangStringExpr || resourceClass == unsupportedLiteralExpr;
-
-
-        PatternResourceClass patternResourceClass = resourceClass.getPatternResourceClass();
-
-        if(patternResourceClass == rdfLangString)
-            patternResourceClass = LangStringPatternClassWithConstantTag.get(literal.getLanguageTag());
-        else if(patternResourceClass == xsdDateTime)
-            patternResourceClass = DateTimePatternClassWithConstantZone
-                    .get(DateTimePatternClassWithConstantZone.getZone(literal));
-        else if(patternResourceClass == xsdDate)
-            patternResourceClass = DatePatternClassWithConstantZone
-                    .get(DatePatternClassWithConstantZone.getZone(literal));
-
-        Set<PatternResourceClass> patternResourceClasses = new HashSet<PatternResourceClass>();
-        patternResourceClasses.add(patternResourceClass);
-
-
-        return new SqlLiteral(literal, resourceClasses, patternResourceClasses, isBoxed);
+        return new SqlLiteral(literal, asSet(resourceClass), resourceClass == unsupportedLiteral);
     }
 
 
@@ -91,9 +61,9 @@ public class SqlLiteral extends SqlNodeValue
     @Override
     public String translate()
     {
-        ExpressionLiteralClass resourceClass = (ExpressionLiteralClass) getResourceClasses().iterator().next();
+        LiteralClass resourceClass = (LiteralClass) getResourceClasses().iterator().next();
 
-        return resourceClass.getSqlLiteralValue(literal);
+        return resourceClass.getExpressionCode(literal);
     }
 
 
@@ -104,15 +74,8 @@ public class SqlLiteral extends SqlNodeValue
 
 
     @Override
-    public Set<PatternResourceClass> getPatternResourceClasses()
+    public String getNodeAccess(ResourceClass resourceClass, int part)
     {
-        return patternResourceClasses;
-    }
-
-
-    @Override
-    public String nodeAccess(PatternResourceClass resourceClass, int part)
-    {
-        return resourceClass.getSqlValue(literal, part);
+        return resourceClass.getPatternCode(literal, part);
     }
 }

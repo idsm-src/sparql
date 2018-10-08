@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -51,29 +49,7 @@ public class UserIriClass extends IriClass
 
 
     @Override
-    public String getResultValue(String var, int part)
-    {
-        StringBuffer strBuf = new StringBuffer();
-
-        strBuf.append(function);
-        strBuf.append("(");
-
-        for(int i = 0; i < getPartsCount(); i++)
-        {
-            if(i > 0)
-                strBuf.append(", ");
-
-            strBuf.append(getSqlColumn(var, i));
-        }
-
-        strBuf.append(")");
-
-        return strBuf.toString();
-    }
-
-
-    @Override
-    public String getSqlValue(Node node, int part)
+    public String getPatternCode(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
             return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
@@ -85,14 +61,17 @@ public class UserIriClass extends IriClass
 
 
     @Override
-    public ExpressionResourceClass getExpressionResourceClass()
+    public String getPatternCode(String column, int part, boolean isBoxed)
     {
-        return BuiltinClasses.iri;
+        if(isBoxed)
+            return inverseFunction.get(part) + "(sparql.rdfbox_extract_iri(\"" + column + "\"))";
+
+        return inverseFunction.get(part) + "(\"" + column + "\")";
     }
 
 
     @Override
-    public String getSqlExpressionValue(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
     {
         StringBuffer strBuf = new StringBuffer();
 
@@ -102,18 +81,40 @@ public class UserIriClass extends IriClass
         strBuf.append(function);
         strBuf.append("(");
 
-        for(int i = 0; i < getPartsCount(); i++)
+        for(int i = 0; i < getPatternPartsCount(); i++)
         {
             if(i > 0)
                 strBuf.append(", ");
 
-            strBuf.append(variableAccessor.variableAccess(variable, this, i));
+            strBuf.append(variableAccessor.getSqlVariableAccess(variable, this, i));
         }
 
         strBuf.append(")");
 
         if(rdfbox)
             strBuf.append(")");
+
+        return strBuf.toString();
+    }
+
+
+    @Override
+    public String getResultCode(String var, int part)
+    {
+        StringBuffer strBuf = new StringBuffer();
+
+        strBuf.append(function);
+        strBuf.append("(");
+
+        for(int i = 0; i < getPatternPartsCount(); i++)
+        {
+            if(i > 0)
+                strBuf.append(", ");
+
+            strBuf.append(getSqlColumn(var, i));
+        }
+
+        strBuf.append(")");
 
         return strBuf.toString();
     }
@@ -141,17 +142,5 @@ public class UserIriClass extends IriClass
             return true;
 
         return false;
-    }
-
-
-    public final String getFunction()
-    {
-        return function;
-    }
-
-
-    public String getInverseFunction(int part)
-    {
-        return inverseFunction.get(part);
     }
 }

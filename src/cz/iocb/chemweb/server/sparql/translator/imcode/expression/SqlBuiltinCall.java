@@ -1,11 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangStringExpr;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTimeExpr;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
@@ -17,14 +13,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimePatternClassWithConstantZone;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.SimpleLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.DateTimeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
@@ -35,11 +27,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     private final List<SqlExpressionIntercode> arguments;
 
 
-    SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments,
-            Set<ExpressionResourceClass> resourceClasses, boolean canBeNull)
+    SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments, Set<ResourceClass> resourceClasses,
+            boolean isBoxed, boolean canBeNull)
     {
-        super(resourceClasses, resourceClasses.size() > 1 || resourceClasses.contains(rdfLangStringExpr)
-                || resourceClasses.contains(unsupportedLiteralExpr), canBeNull);
+        super(resourceClasses, isBoxed, canBeNull);
         this.function = function;
         this.arguments = arguments;
     }
@@ -51,7 +42,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         {
             // functions on numerics
             case "rand":
-                return new SqlBuiltinCall(function, arguments, asSet(xsdDouble), false);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdDouble), false, false);
 
             case "abs":
             case "round":
@@ -59,22 +50,22 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "floor":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
-                Set<ExpressionResourceClass> resourceClasses = operand.getResourceClasses();
+                Set<ResourceClass> resourceClasses = operand.getResourceClasses();
 
                 if(resourceClasses.stream().noneMatch(r -> isNumeric(r)))
                     return SqlNull.get();
 
-                Set<ExpressionResourceClass> resultClasses = resourceClasses.stream().filter(r -> isNumeric(r))
+                Set<ResourceClass> resultClasses = resourceClasses.stream().filter(r -> isNumeric(r))
                         .map(r -> determineNumericResultClass(r)).collect(Collectors.toSet());
 
-                return new SqlBuiltinCall(function, arguments, resultClasses,
+                return new SqlBuiltinCall(function, arguments, resultClasses, resultClasses.size() > 1,
                         operand.canBeNull() || resourceClasses.stream().anyMatch(r -> !isNumeric(r)));
             }
 
 
             // functions on dates and times:
             case "now":
-                return new SqlBuiltinCall(function, arguments, asSet(xsdDateTimeExpr), false);
+                return new SqlBuiltinCall(function, arguments, asSet(DateTimeConstantZoneClass.get(0)), false, false);
 
             case "year":
             case "month":
@@ -83,22 +74,21 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "tz":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
-                Set<ExpressionResourceClass> resourceClasses = operand.getResourceClasses();
+                Set<ResourceClass> resourceClasses = operand.getResourceClasses();
 
-                if(!resourceClasses.contains(xsdDateTimeExpr) && !resourceClasses.contains(xsdDateExpr))
+                if(resourceClasses.stream().noneMatch(r -> isDateTime(r) || isDate(r)))
                     return SqlNull.get();
 
-                if(function.equals("timezone") && operand instanceof SqlVariable && ((SqlVariable) operand)
-                        .getPatternResourceClasses().stream()
-                        .allMatch(r -> !(r instanceof DateTimeClass || r instanceof DateClass)
-                                || r instanceof DateTimePatternClassWithConstantZone
-                                        && ((DateTimePatternClassWithConstantZone) r).getZone() == Integer.MIN_VALUE
-                                || r instanceof DatePatternClassWithConstantZone
-                                        && ((DatePatternClassWithConstantZone) r).getZone() == Integer.MIN_VALUE))
+                if(function.equals("timezone") && operand.getResourceClasses().stream()
+                        .allMatch(r -> !(isDateTime(r) || isDate(r))
+                                || r instanceof DateTimeConstantZoneClass
+                                        && ((DateTimeConstantZoneClass) r).getZone() == Integer.MIN_VALUE
+                                || r instanceof DateConstantZoneClass
+                                        && ((DateConstantZoneClass) r).getZone() == Integer.MIN_VALUE))
                     return SqlNull.get();
 
 
-                Set<ExpressionResourceClass> resultClasses = new HashSet<ExpressionResourceClass>();
+                Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
 
                 if(function.equals("timezone"))
                     resultClasses.add(xsdDayTimeDuration);
@@ -108,19 +98,17 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     resultClasses.add(xsdInteger);
 
 
-                boolean canBeNull = resourceClasses.stream().anyMatch(r -> r != xsdDateTimeExpr && r != xsdDateExpr);
+                boolean canBeNull = resourceClasses.stream().anyMatch(r -> !isDateTime(r) && !isDate(r));
 
                 if(function.equals("timezone"))
-                    canBeNull |= !(operand instanceof SqlVariable) || ((SqlVariable) operand)
-                            .getPatternResourceClasses().stream()
+                    canBeNull |= operand.getResourceClasses().stream()
                             .anyMatch(r -> r == xsdDateTime || r == xsdDate
-                                    || r instanceof DateTimePatternClassWithConstantZone
-                                            && ((DateTimePatternClassWithConstantZone) r).getZone() == Integer.MIN_VALUE
-                                    || r instanceof DatePatternClassWithConstantZone
-                                            && ((DatePatternClassWithConstantZone) r).getZone() == Integer.MIN_VALUE);
+                                    || r instanceof DateTimeConstantZoneClass
+                                            && ((DateTimeConstantZoneClass) r).getZone() == Integer.MIN_VALUE
+                                    || r instanceof DateConstantZoneClass
+                                            && ((DateConstantZoneClass) r).getZone() == Integer.MIN_VALUE);
 
-
-                return new SqlBuiltinCall(function, arguments, resultClasses, operand.canBeNull() || canBeNull);
+                return new SqlBuiltinCall(function, arguments, resultClasses, false, operand.canBeNull() || canBeNull);
             }
 
             case "hours":
@@ -128,14 +116,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "seconds":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
-                Set<ExpressionResourceClass> resourceClasses = operand.getResourceClasses();
+                Set<ResourceClass> resourceClasses = operand.getResourceClasses();
 
-                if(!resourceClasses.contains(xsdDateTimeExpr))
+                if(resourceClasses.stream().noneMatch(r -> isDateTime(r)))
                     return SqlNull.get();
 
                 return new SqlBuiltinCall(function, arguments,
-                        asSet(function.equals("seconds") ? xsdDecimal : xsdInteger),
-                        operand.canBeNull() || resourceClasses.stream().anyMatch(r -> r != xsdDateTimeExpr));
+                        asSet(function.equals("seconds") ? xsdDecimal : xsdInteger), false,
+                        operand.canBeNull() || resourceClasses.stream().anyMatch(r -> !isDateTime(r)));
             }
 
 
@@ -151,7 +139,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!operand.getResourceClasses().contains(xsdString))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString),
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false,
                         operand.canBeNull() || operand.getResourceClasses().size() > 1);
             }
         }
@@ -205,8 +193,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     SqlVariable variable = (SqlVariable) operand;
 
-                    List<PatternResourceClass> compatible = variable.getPatternResourceClasses().stream()
-                            .filter(r -> isNumeric(r)).collect(Collectors.toList());
+                    List<ResourceClass> compatible = variable.getResourceClasses().stream().filter(r -> isNumeric(r))
+                            .collect(Collectors.toList());
 
                     StringBuilder builder = new StringBuilder();
 
@@ -215,12 +203,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     boolean hasAlternative = false;
 
-                    for(PatternResourceClass resClass : compatible)
+                    for(ResourceClass resClass : compatible)
                     {
                         appendComma(builder, hasAlternative);
                         hasAlternative = true;
 
-                        PatternResourceClass effectiveClass = determineNumericResultClass(resClass);
+                        ResourceClass effectiveClass = determineNumericResultClass(resClass);
 
                         String code = variable.getExpressionValue(resClass, false);
 
@@ -245,7 +233,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
             // functions on dates and times:
             case "now":
-                return "sparql.zoneddatetime_create(now(), 0)";
+                return "now()";
 
             case "year":
             case "month":
@@ -258,55 +246,91 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode operand = arguments.get(0);
 
-                if(!(operand instanceof SqlVariable))
-                    return "sparql." + function + "_" + operand.getResourceName() + "(" + operand.translate() + ")";
-
-                SqlVariable variable = (SqlVariable) operand;
-
-                List<PatternResourceClass> compatible;
-
-                if(function.equals("hours") || function.equals("minutes") || function.equals("seconds"))
-                    compatible = variable.getPatternResourceClasses().stream().filter(r -> r instanceof DateTimeClass)
-                            .collect(Collectors.toList());
-                else
-                    compatible = variable.getPatternResourceClasses().stream()
-                            .filter(r -> r instanceof DateTimeClass || r instanceof DateClass)
-                            .collect(Collectors.toList());
-
-
                 StringBuilder builder = new StringBuilder();
 
-                if(compatible.size() > 1)
-                    builder.append("COALESCE(");
-
-                boolean hasAlternative = false;
-
-                for(PatternResourceClass resClass : compatible)
+                if(!(operand instanceof SqlVariable))
                 {
-                    appendComma(builder, hasAlternative);
-                    hasAlternative = true;
+                    ResourceClass expressionClass = operand.getExpressionResourceClass();
 
-                    builder.append("sparql.");
-                    builder.append(function);
-                    builder.append("_");
-                    builder.append(resClass.getExpressionResourceClass().getName());
-                    builder.append("(");
-
-                    builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 0));
-                    builder.append(", ");
-
-                    if(resClass == xsdDateTime || resClass == xsdDate)
-                        builder.append(variable.getVariableAccessor().variableAccess(variable.getName(), resClass, 1));
-                    else if(resClass instanceof DateTimePatternClassWithConstantZone)
-                        builder.append("'" + ((DateTimePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-                    else if(resClass instanceof DatePatternClassWithConstantZone)
-                        builder.append("'" + ((DatePatternClassWithConstantZone) resClass).getZone() + "'::int4");
-
-                    builder.append(")");
+                    if(expressionClass instanceof DateTimeConstantZoneClass)
+                    {
+                        builder.append("sparql.");
+                        builder.append(function);
+                        builder.append("_datetime(");
+                        builder.append(operand.translate());
+                        builder.append(", '");
+                        builder.append(((DateTimeConstantZoneClass) expressionClass).getZone());
+                        builder.append("'::int4)");
+                    }
+                    else if(expressionClass instanceof DateConstantZoneClass)
+                    {
+                        builder.append("sparql.");
+                        builder.append(function);
+                        builder.append("_date(");
+                        builder.append(operand.translate());
+                        builder.append(", '");
+                        builder.append(((DateConstantZoneClass) expressionClass).getZone());
+                        builder.append("'::int4)");
+                    }
+                    else
+                    {
+                        builder.append("sparql.");
+                        builder.append(function);
+                        builder.append("_");
+                        builder.append(operand.getResourceName());
+                        builder.append("(");
+                        builder.append(operand.translate());
+                        builder.append(")");
+                    }
                 }
+                else
+                {
+                    SqlVariable variable = (SqlVariable) operand;
 
-                if(compatible.size() > 1)
-                    builder.append(")");
+                    List<ResourceClass> compatible;
+
+                    if(function.equals("hours") || function.equals("minutes") || function.equals("seconds"))
+                        compatible = variable.getResourceClasses().stream().filter(r -> isDateTime(r))
+                                .collect(Collectors.toList());
+                    else
+                        compatible = variable.getResourceClasses().stream().filter(r -> isDateTime(r) || isDate(r))
+                                .collect(Collectors.toList());
+
+
+                    if(compatible.size() > 1)
+                        builder.append("COALESCE(");
+
+                    boolean hasAlternative = false;
+
+                    for(ResourceClass resClass : compatible)
+                    {
+                        appendComma(builder, hasAlternative);
+                        hasAlternative = true;
+
+                        builder.append("sparql.");
+                        builder.append(function);
+                        builder.append("_");
+                        builder.append(isDateTime(resClass) ? "datetime" : "date");
+                        builder.append("(");
+
+                        builder.append(
+                                variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                        builder.append(", ");
+
+                        if(resClass == xsdDateTime || resClass == xsdDate)
+                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(),
+                                    resClass, 1));
+                        else if(resClass instanceof DateTimeConstantZoneClass)
+                            builder.append("'" + ((DateTimeConstantZoneClass) resClass).getZone() + "'::int4");
+                        else if(resClass instanceof DateConstantZoneClass)
+                            builder.append("'" + ((DateConstantZoneClass) resClass).getZone() + "'::int4");
+
+                        builder.append(")");
+                    }
+
+                    if(compatible.size() > 1)
+                        builder.append(")");
+                }
 
                 return builder.toString();
             }
@@ -332,17 +356,6 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         }
 
         return null;
-    }
-
-
-    private static Set<ExpressionResourceClass> asSet(ExpressionResourceClass... resourceClasses)
-    {
-        Set<ExpressionResourceClass> set = new HashSet<ExpressionResourceClass>();
-
-        for(ExpressionResourceClass resourceClass : resourceClasses)
-            set.add(resourceClass);
-
-        return set;
     }
 
 

@@ -2,15 +2,14 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.booleanClassSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
 public class SqlUnaryLogical extends SqlUnary
 {
-    protected SqlUnaryLogical(SqlExpressionIntercode operand, Set<ExpressionResourceClass> resourceClasses,
-            boolean canBeNull)
+    protected SqlUnaryLogical(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(operand, resourceClasses, false, canBeNull);
     }

@@ -1,7 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
@@ -11,10 +15,14 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLo
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
 
@@ -27,10 +35,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     protected final boolean canBeNull;
     protected final boolean isBoxed;
-    protected final Set<ExpressionResourceClass> resourceClasses;
+    protected final Set<ResourceClass> resourceClasses;
 
 
-    protected SqlExpressionIntercode(Set<ExpressionResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
     {
         this.canBeNull = canBeNull;
         this.isBoxed = isBoxed;
@@ -56,9 +64,34 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public Set<ExpressionResourceClass> getResourceClasses()
+    public Set<ResourceClass> getResourceClasses()
     {
         return resourceClasses;
+    }
+
+
+    public ResourceClass getExpressionResourceClass()
+    {
+        if(isBoxed)
+            return null;
+
+        if(resourceClasses.size() == 1)
+            return resourceClasses.iterator().next();
+
+        if(resourceClasses.stream().allMatch(r -> isDateTime(r)))
+            return xsdDateTime;
+
+        if(resourceClasses.stream().allMatch(r -> isDate(r)))
+            return xsdDate;
+
+        if(resourceClasses.stream().allMatch(r -> isLangString(r)))
+            return rdfLangString;
+
+        if(resourceClasses.stream().allMatch(r -> isIri(r)))
+            return iri;
+
+        assert false;
+        return null;
     }
 
 
@@ -67,7 +100,45 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(isBoxed)
             return "rdfbox";
 
-        return resourceClasses.iterator().next().getName();
+        ResourceClass resourceClass = getExpressionResourceClass();
+
+        if(resourceClass instanceof DateTimeConstantZoneClass)
+            return "plain_datetime";
+
+        if(resourceClass instanceof DateConstantZoneClass)
+            return "plain_date";
+
+        if(resourceClass instanceof LangStringConstantTagClass)
+            return "plain_lang_string";
+
+        if(resourceClass instanceof IriClass)
+            return "iri";
+
+        return resourceClass.getName();
+    }
+
+
+    protected static boolean isIri(ResourceClass resClass)
+    {
+        return resClass instanceof IriClass;
+    }
+
+
+    protected static boolean isDateTime(ResourceClass resClass)
+    {
+        return resClass == xsdDateTime || resClass instanceof DateTimeConstantZoneClass;
+    }
+
+
+    protected static boolean isDate(ResourceClass resClass)
+    {
+        return resClass == xsdDate || resClass instanceof DateConstantZoneClass;
+    }
+
+
+    protected static boolean isLangString(ResourceClass resClass)
+    {
+        return resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
     }
 
 
@@ -92,5 +163,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static boolean isEffectiveBooleanClass(ResourceClass resClass)
     {
         return isNumeric(resClass) || resClass == xsdBoolean || resClass == xsdString || resClass == unsupportedLiteral;
+    }
+
+
+    protected static Set<ResourceClass> asSet(ResourceClass... resourceClasses)
+    {
+        Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+        for(ResourceClass resourceClass : resourceClasses)
+            set.add(resourceClass);
+
+        return set;
     }
 }

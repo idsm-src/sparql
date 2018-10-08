@@ -15,8 +15,8 @@ import java.util.Properties;
 import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DatePatternClassWithConstantZone;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringPatternClassWithConstantTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -31,9 +31,8 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
     private static PubChemConfiguration singleton;
 
-    static final LangStringPatternClassWithConstantTag rdfLangStringEn = LangStringPatternClassWithConstantTag
-            .get("en");
-    static final DatePatternClassWithConstantZone xsdDateM4 = DatePatternClassWithConstantZone.get(-4 * 60 * 60);
+    static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
+    static final DateConstantZoneClass xsdDateM4 = DateConstantZoneClass.get(-4 * 60 * 60);
 
 
     public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException

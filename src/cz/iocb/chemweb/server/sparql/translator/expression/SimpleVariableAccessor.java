@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -25,8 +25,8 @@ public class SimpleVariableAccessor extends VariableAccessor
 
 
     @Override
-    public String variableAccess(String variable, PatternResourceClass resourceClass, int i)
+    public String getSqlVariableAccess(String variable, ResourceClass resourceClass, int part)
     {
-        return resourceClass.getSqlColumn(variable, i);
+        return resourceClass.getSqlColumn(variable, part);
     }
 }

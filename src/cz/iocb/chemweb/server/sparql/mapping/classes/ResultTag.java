@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.mapping.classes.interfaces;
+package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 
 

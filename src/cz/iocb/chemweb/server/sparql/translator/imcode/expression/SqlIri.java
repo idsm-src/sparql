@@ -6,9 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -17,14 +16,14 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 public class SqlIri extends SqlNodeValue
 {
     private final IRI iri;
-    private final Set<PatternResourceClass> patternResourceClasses;
+    private final Set<ResourceClass> patternResourceClasses;
 
 
-    protected SqlIri(IRI iri, IriClass iriClass, Set<ExpressionResourceClass> resourceClasses)
+    protected SqlIri(IRI iri, IriClass iriClass, Set<ResourceClass> resourceClasses)
     {
         super(resourceClasses, false, false);
         this.iri = iri;
-        this.patternResourceClasses = new HashSet<PatternResourceClass>();
+        this.patternResourceClasses = new HashSet<ResourceClass>();
         this.patternResourceClasses.add(iriClass);
     }
 
@@ -37,7 +36,7 @@ public class SqlIri extends SqlNodeValue
             if(userClass.match(iri))
                 iriClass = userClass;
 
-        Set<ExpressionResourceClass> resourceClasses = new HashSet<ExpressionResourceClass>();
+        Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.add(BuiltinClasses.iri);
 
         return new SqlIri(iri, iriClass, resourceClasses);
@@ -54,21 +53,14 @@ public class SqlIri extends SqlNodeValue
     @Override
     public String translate()
     {
-        return BuiltinClasses.iri.getSqlValue(iri, 0);
+        return BuiltinClasses.iri.getPatternCode(iri, 0);
     }
 
 
     @Override
-    public Set<PatternResourceClass> getPatternResourceClasses()
+    public String getNodeAccess(ResourceClass resourceClass, int part)
     {
-        return patternResourceClasses;
-    }
-
-
-    @Override
-    public String nodeAccess(PatternResourceClass resourceClass, int part)
-    {
-        return resourceClass.getSqlValue(iri, part);
+        return resourceClass.getPatternCode(iri, part);
     }
 
 

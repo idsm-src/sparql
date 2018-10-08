@@ -2,17 +2,17 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
 public abstract class NodeMapping
 {
-    protected final PatternResourceClass resourceClass;
+    protected final ResourceClass resourceClass;
 
 
-    protected NodeMapping(PatternResourceClass resourceClass)
+    protected NodeMapping(ResourceClass resourceClass)
     {
         this.resourceClass = resourceClass;
     }
@@ -20,12 +20,12 @@ public abstract class NodeMapping
 
     public abstract boolean match(Node node);
 
-    public abstract String getSqlValueAccess(int i);
+    public abstract String getSqlValueAccess(int part);
 
     public abstract NodeMapping remapColumns(List<KeyPair> columnMap);
 
 
-    public final PatternResourceClass getResourceClass()
+    public final ResourceClass getResourceClass()
     {
         return resourceClass;
     }

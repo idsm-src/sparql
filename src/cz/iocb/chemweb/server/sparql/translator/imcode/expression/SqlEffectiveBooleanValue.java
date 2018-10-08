@@ -26,9 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
@@ -42,12 +40,12 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
     public static final SqlEffectiveBooleanValue trueValue;
     public static final SqlEffectiveBooleanValue falseValue;
-    public static final Set<ExpressionResourceClass> booleanClassSet;
+    public static final Set<ResourceClass> booleanClassSet;
 
 
     static
     {
-        booleanClassSet = new HashSet<ExpressionResourceClass>();
+        booleanClassSet = new HashSet<ResourceClass>();
         booleanClassSet.add(xsdBoolean);
 
         SqlExpressionIntercode trueOperand = SqlLiteral.create(new Literal("true", xsdBooleanIri));
@@ -108,13 +106,13 @@ public class SqlEffectiveBooleanValue extends SqlUnary
             return SqlNull.get();
 
 
-        Set<ExpressionResourceClass> operandClasses = operand.getResourceClasses();
+        Set<ResourceClass> operandClasses = operand.getResourceClasses();
 
         if(!operand.isBoxed() && operandClasses.contains(xsdBoolean))
             return operand;
 
 
-        Set<ExpressionResourceClass> compatibleClasses = operandClasses.stream().filter(r -> isEffectiveBooleanClass(r))
+        Set<ResourceClass> compatibleClasses = operandClasses.stream().filter(r -> isEffectiveBooleanClass(r))
                 .collect(Collectors.toSet());
 
         if(compatibleClasses.isEmpty())
@@ -164,7 +162,7 @@ public class SqlEffectiveBooleanValue extends SqlUnary
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                String code = variable.getExpressionValue((PatternResourceClass) resourceClass, isBoxed());
+                String code = variable.getExpressionValue(resourceClass, isBoxed());
 
                 if(resourceClass != xsdBoolean)
                 {

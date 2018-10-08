@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFl
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
 import java.util.HashSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
@@ -16,8 +16,8 @@ public class SqlUnaryArithmetic extends SqlUnary
     private final boolean isMinus;
 
 
-    protected SqlUnaryArithmetic(boolean isMinus, SqlExpressionIntercode operand,
-            Set<ExpressionResourceClass> resourceClasses, boolean canBeNull)
+    protected SqlUnaryArithmetic(boolean isMinus, SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses,
+            boolean canBeNull)
     {
         super(operand, resourceClasses, resourceClasses.size() > 1, canBeNull);
         this.isMinus = isMinus;
@@ -26,9 +26,9 @@ public class SqlUnaryArithmetic extends SqlUnary
 
     public static SqlExpressionIntercode create(boolean isMinus, SqlExpressionIntercode operand)
     {
-        Set<ExpressionResourceClass> resultClasses = new HashSet<ExpressionResourceClass>();
+        Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
 
-        for(ExpressionResourceClass operandClass : operand.getResourceClasses())
+        for(ResourceClass operandClass : operand.getResourceClasses())
             if(isNumeric(operandClass))
                 resultClasses.add(determineResultClass(operandClass));
 
@@ -36,7 +36,7 @@ public class SqlUnaryArithmetic extends SqlUnary
             return SqlNull.get();
 
 
-        ExpressionResourceClass requestedClass = null;
+        ResourceClass requestedClass = null;
 
         if(resultClasses.size() == 1)
             requestedClass = resultClasses.iterator().next();
@@ -49,7 +49,7 @@ public class SqlUnaryArithmetic extends SqlUnary
     }
 
 
-    private static ExpressionResourceClass determineResultClass(ExpressionResourceClass operandClass)
+    private static ResourceClass determineResultClass(ResourceClass operandClass)
     {
         if(operandClass == xsdDouble || operandClass == xsdFloat || operandClass == xsdDecimal)
             return operandClass;

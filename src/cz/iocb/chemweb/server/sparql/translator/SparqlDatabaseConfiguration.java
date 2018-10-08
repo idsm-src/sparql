@@ -17,9 +17,9 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -92,13 +92,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public NodeMapping createLiteralMapping(PatternLiteralClass literalClass, String column)
+    public NodeMapping createLiteralMapping(LiteralClass literalClass, String column)
     {
         return new ParametrisedLiteralMapping(literalClass, Arrays.asList(column));
     }
 
 
-    public NodeMapping createLiteralMapping(PatternLiteralClass literalClass, List<String> columns)
+    public NodeMapping createLiteralMapping(LiteralClass literalClass, List<String> columns)
     {
         return new ParametrisedLiteralMapping(literalClass, columns);
     }

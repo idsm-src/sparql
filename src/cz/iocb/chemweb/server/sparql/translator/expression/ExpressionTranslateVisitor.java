@@ -5,8 +5,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
@@ -181,7 +181,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : functionCallExpression.getArguments())
             arguemnts.add(visitElement(expression));
 
-        Optional<ExpressionLiteralClass> resourceClass = BuiltinClasses.getExpressionLiteralClasses().stream()
+        Optional<LiteralClass> resourceClass = BuiltinClasses.getLiteralClasses().stream()
                 .filter(r -> r.getTypeIri().equals(function)).findFirst();
 
         if(!resourceClass.isPresent())

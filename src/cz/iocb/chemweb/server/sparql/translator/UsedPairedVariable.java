@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
@@ -11,24 +11,24 @@ public class UsedPairedVariable
 {
     public static class PairedClass
     {
-        private final PatternResourceClass leftClass;
-        private final PatternResourceClass rightClass;
+        private final ResourceClass leftClass;
+        private final ResourceClass rightClass;
 
 
-        public PairedClass(PatternResourceClass leftClass, PatternResourceClass rightClass)
+        public PairedClass(ResourceClass leftClass, ResourceClass rightClass)
         {
             this.leftClass = leftClass;
             this.rightClass = rightClass;
         }
 
 
-        public final PatternResourceClass getLeftClass()
+        public final ResourceClass getLeftClass()
         {
             return leftClass;
         }
 
 
-        public final PatternResourceClass getRightClass()
+        public final ResourceClass getRightClass()
         {
             return rightClass;
         }
@@ -49,7 +49,7 @@ public class UsedPairedVariable
     }
 
 
-    public void addClasses(PatternResourceClass l, PatternResourceClass r)
+    public void addClasses(ResourceClass l, ResourceClass r)
     {
         classes.add(new PairedClass(l, r));
     }
@@ -78,28 +78,28 @@ public class UsedPairedVariable
 
             if(leftVar == null)
             {
-                for(PatternResourceClass resClass : rightVar.getClasses())
+                for(ResourceClass resClass : rightVar.getClasses())
                     paired.addClasses(null, resClass);
             }
             else if(rightVar == null)
             {
-                for(PatternResourceClass resClass : leftVar.getClasses())
+                for(ResourceClass resClass : leftVar.getClasses())
                     paired.addClasses(resClass, null);
             }
             else
             {
-                LinkedHashSet<PatternResourceClass> classes = new LinkedHashSet<PatternResourceClass>();
+                LinkedHashSet<ResourceClass> classes = new LinkedHashSet<ResourceClass>();
 
-                for(PatternResourceClass resClass : leftVar.getClasses())
+                for(ResourceClass resClass : leftVar.getClasses())
                     classes.add(resClass);
 
-                for(PatternResourceClass resClass : rightVar.getClasses())
+                for(ResourceClass resClass : rightVar.getClasses())
                     classes.add(resClass);
 
-                for(PatternResourceClass resClass : classes)
+                for(ResourceClass resClass : classes)
                 {
-                    PatternResourceClass l = leftVar.containsClass(resClass) ? resClass : null;
-                    PatternResourceClass r = rightVar.containsClass(resClass) ? resClass : null;
+                    ResourceClass l = leftVar.containsClass(resClass) ? resClass : null;
+                    ResourceClass r = rightVar.containsClass(resClass) ? resClass : null;
 
                     paired.addClasses(l, r);
                 }

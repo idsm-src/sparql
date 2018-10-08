@@ -1,8 +1,6 @@
-package cz.iocb.chemweb.server.sparql.mapping.classes.bases;
+package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
@@ -11,29 +9,45 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public abstract class PatternLiteralBaseClass extends PatternResourceBaseClass implements PatternLiteralClass
+public abstract class LiteralClass extends ResourceClass
 {
     private final IRI typeIri;
 
 
-    protected PatternLiteralBaseClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)
+    protected LiteralClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)
     {
         super(name, sqlTypes, resultTags);
         this.typeIri = typeIri;
     }
 
 
-    public abstract String getSqlPatternLiteralValue(Literal node, int part);
-
-
     @Override
-    public final String getSqlValue(Node node, int part)
+    public final String getPatternCode(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
             return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
         else
-            return getSqlPatternLiteralValue((Literal) node, part);
+            return getLiteralPatternCode((Literal) node, part);
     }
+
+
+    /**
+     * Gets SQL code to obtain the given part of the pattern representation for the given SPARQL literal.
+     *
+     * @param node SPARQL literal
+     * @param part part index
+     * @return SQL code
+     */
+    public abstract String getLiteralPatternCode(Literal literal, int part);
+
+
+    /**
+     * Gets SQL code to obtain the expression representation for the given literal node.
+     *
+     * @param literal SPARQL literal node
+     * @return SQL code
+     */
+    public abstract String getExpressionCode(Literal literal);
 
 
     @Override
@@ -60,7 +74,6 @@ public abstract class PatternLiteralBaseClass extends PatternResourceBaseClass i
     }
 
 
-    @Override
     public final IRI getTypeIri()
     {
         return typeIri;

@@ -32,9 +32,9 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
 
 
     @Override
-    public String getSqlValueAccess(int i)
+    public String getSqlValueAccess(int part)
     {
-        return getIriClass().getInverseFunction(i) + "('" + value.getUri().toString() + "')";
+        return getIriClass().getPatternCode(value, part);
     }
 
 

@@ -4,7 +4,7 @@ import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffe
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -16,7 +16,7 @@ public class SqlBinaryLogical extends SqlBinary
 
 
     public SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
-            Set<ExpressionResourceClass> resourceClasses, boolean canBeNull)
+            Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(left, right, resourceClasses, false, canBeNull);
         this.operator = operator;

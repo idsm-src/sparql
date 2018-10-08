@@ -1,11 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangStringExpr;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteralExpr;
-import java.util.HashSet;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -18,7 +18,7 @@ public class SqlVariable extends SqlNodeValue
 
 
     protected SqlVariable(UsedVariable usedVariable, VariableAccessor variableAccessor,
-            Set<ExpressionResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+            Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
     {
         super(resourceClasses, isBoxed, canBeNull);
         this.usedVariable = usedVariable;
@@ -33,15 +33,13 @@ public class SqlVariable extends SqlNodeValue
         if(usedVariable == null)
             return SqlNull.get();
 
-        Set<ExpressionResourceClass> cleasses = new HashSet<ExpressionResourceClass>();
+        Set<ResourceClass> classes = usedVariable.getClasses();
 
-        for(PatternResourceClass resourceClass : usedVariable.getClasses())
-            cleasses.add(resourceClass.getExpressionResourceClass());
+        boolean isBoxed = classes.size() > 1 && !classes.stream().allMatch(r -> isDateTime(r))
+                && !classes.stream().allMatch(r -> isDate(r)) || classes.contains(rdfLangString)
+                || classes.contains(unsupportedLiteral);
 
-        boolean isBoxed = cleasses.size() > 1 || cleasses.contains(rdfLangStringExpr)
-                || cleasses.contains(unsupportedLiteralExpr);
-
-        return new SqlVariable(usedVariable, variableAccessor, cleasses, isBoxed, usedVariable.canBeNull());
+        return new SqlVariable(usedVariable, variableAccessor, classes, isBoxed, usedVariable.canBeNull());
     }
 
 
@@ -58,41 +56,53 @@ public class SqlVariable extends SqlNodeValue
         StringBuilder builder = new StringBuilder();
         boolean hasAlternative = false;
 
-        if(usedVariable.getClasses().size() > 1)
+        if(getResourceClasses().size() > 1)
             builder.append("COALESCE(");
 
-        for(PatternResourceClass resourceClass : usedVariable.getClasses())
+        for(ResourceClass resourceClass : usedVariable.getClasses())
         {
             appendComma(builder, hasAlternative);
             hasAlternative = true;
 
-            builder.append(resourceClass.getSqlExpressionValue(usedVariable.getName(), variableAccessor, isBoxed()));
+            if(resourceClass instanceof DateTimeConstantZoneClass && getResourceClasses().size() > 1 && !isBoxed())
+            {
+                builder.append("sparql.zoneddatetime_create(");
+                builder.append(getExpressionValue(resourceClass, false));
+                builder.append(", '");
+                builder.append(((DateTimeConstantZoneClass) resourceClass).getZone());
+                builder.append("'::int4)");
+            }
+            else if(resourceClass instanceof DateConstantZoneClass && getResourceClasses().size() > 1 && !isBoxed())
+            {
+                builder.append("sparql.zoneddate_create(");
+                builder.append(getExpressionValue(resourceClass, false));
+                builder.append(", '");
+                builder.append(((DateConstantZoneClass) resourceClass).getZone());
+                builder.append("'::int4)");
+            }
+            else
+            {
+                builder.append(resourceClass.getExpressionCode(usedVariable.getName(), variableAccessor, isBoxed()));
+            }
         }
 
-        if(usedVariable.getClasses().size() > 1)
+        if(getResourceClasses().size() > 1)
             builder.append(")");
 
         return builder.toString();
     }
 
 
-    String getExpressionValue(PatternResourceClass resourceClass, boolean isBoxed)
+    String getExpressionValue(ResourceClass resourceClass, boolean isBoxed)
     {
-        return resourceClass.getSqlExpressionValue(usedVariable.getName(), variableAccessor, isBoxed);
+        return resourceClass.getExpressionCode(usedVariable.getName(), variableAccessor, isBoxed);
     }
 
 
     @Override
-    public Set<PatternResourceClass> getPatternResourceClasses()
+    public String getNodeAccess(ResourceClass resourceClass, int part)
     {
-        return usedVariable.getClasses();
-    }
-
-
-    @Override
-    public String nodeAccess(PatternResourceClass resourceClass, int part)
-    {
-        return variableAccessor.variableAccess(usedVariable.getName(), resourceClass, part);
+        return variableAccessor.getSqlVariableAccess(usedVariable.getName(), resourceClass, part);
     }
 
 

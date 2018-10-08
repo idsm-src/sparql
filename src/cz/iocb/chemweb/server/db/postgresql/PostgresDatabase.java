@@ -30,7 +30,7 @@ import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 
 

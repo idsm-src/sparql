@@ -3,8 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -214,10 +213,10 @@ public class SqlLeftJoin extends SqlIntercode
                 }
 
 
-                PatternResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
+                ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
                         : pairedClass.getRightClass();
 
-                for(int i = 0; i < resClass.getPartsCount(); i++)
+                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
@@ -265,9 +264,9 @@ public class SqlLeftJoin extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(PatternResourceClass resClass : leftVariable.getClasses())
+                    for(ResourceClass resClass : leftVariable.getClasses())
                     {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, use);
                             use = true;
@@ -291,9 +290,9 @@ public class SqlLeftJoin extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(PatternResourceClass resClass : rightVariable.getClasses())
+                    for(ResourceClass resClass : rightVariable.getClasses())
                     {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, use);
                             use = true;
@@ -313,14 +312,14 @@ public class SqlLeftJoin extends SqlIntercode
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
                         assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        PatternResourceClass resClass = pairedClass.getLeftClass();
+                        ResourceClass resClass = pairedClass.getLeftClass();
 
                         appendOr(builder, restricted);
                         restricted = true;
 
                         builder.append("(");
 
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, i > 0);
 

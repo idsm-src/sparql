@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
@@ -208,10 +208,10 @@ public class SqlProcedureCall extends SqlIntercode
 
             ResultDefinition definition = entry.getKey();
 
-            PatternResourceClass resultClass = definition.getResultClass();
+            ResourceClass resultClass = definition.getResultClass();
             String[] fields = definition.getSqlTypeFields();
 
-            for(int i = 0; i < resultClass.getPartsCount(); i++)
+            for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
@@ -225,9 +225,9 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
-            for(PatternResourceClass resClass : variables.get(variable.getName()).getClasses())
+            for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
             {
-                for(int i = 0; i < resClass.getPartsCount(); i++)
+                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
@@ -262,7 +262,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             ResultDefinition definition = entry.getKey();
             String[] fields = definition.getSqlTypeFields();
-            PatternResourceClass resultClass = definition.getResultClass();
+            ResourceClass resultClass = definition.getResultClass();
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -271,7 +271,7 @@ public class SqlProcedureCall extends SqlIntercode
 
                 if(context.getVariables().get(name) != null)
                 {
-                    for(int i = 0; i < resultClass.getPartsCount(); i++)
+                    for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
                     {
                         appendAnd(builder, hasWhere);
                         hasWhere = true;
@@ -283,7 +283,7 @@ public class SqlProcedureCall extends SqlIntercode
                 }
                 else if(previousDefinition != null)
                 {
-                    for(int i = 0; i < resultClass.getPartsCount(); i++)
+                    for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
                     {
                         appendAnd(builder, hasWhere);
                         hasWhere = true;
@@ -300,14 +300,14 @@ public class SqlProcedureCall extends SqlIntercode
             }
             else
             {
-                for(int i = 0; i < resultClass.getPartsCount(); i++)
+                for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
                 {
                     appendAnd(builder, hasWhere);
                     hasWhere = true;
 
                     builder.append(getSqlResultColumn(fields, i));
                     builder.append(" = ");
-                    builder.append(resultClass.getSqlValue(node, i));
+                    builder.append(resultClass.getPatternCode(node, i));
                 }
             }
         }
@@ -336,15 +336,15 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
         {
-            PatternResourceClass resClass = entry.getKey().getParameterClass();
+            ResourceClass resClass = entry.getKey().getParameterClass();
 
             appendComma(builder, hasParameter);
             hasParameter = true;
 
-            for(int i = 0; i < resClass.getPartsCount(); i++)
+            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
             {
                 appendComma(builder, i > 0);
-                builder.append(resClass.getSqlValue(entry.getValue(), i));
+                builder.append(resClass.getPatternCode(entry.getValue(), i));
             }
         }
 
@@ -356,9 +356,9 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
-            for(PatternResourceClass resClass : variables.get(variable.getName()).getClasses())
+            for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
             {
-                for(int i = 0; i < resClass.getPartsCount(); i++)
+                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, true);
                     builder.append(resClass.getSqlColumn(variable.getName(), i));
@@ -389,12 +389,12 @@ public class SqlProcedureCall extends SqlIntercode
                     continue;
 
 
-                PatternResourceClass parameterClass = entry.getKey().getParameterClass();
+                ResourceClass parameterClass = entry.getKey().getParameterClass();
 
                 appendAnd(builder, hasWhere);
                 hasWhere = true;
 
-                for(int i = 0; i < parameterClass.getPartsCount(); i++)
+                for(int i = 0; i < parameterClass.getPatternPartsCount(); i++)
                 {
                     appendAnd(builder, hasWhere);
                     builder.append(parameterClass.getSqlColumn(variable.getName(), i));

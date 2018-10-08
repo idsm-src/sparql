@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -77,7 +77,7 @@ public class LeftJoinVariableAccessor extends SimpleVariableAccessor
 
 
     @Override
-    public String variableAccess(String variable, PatternResourceClass resourceClass, int i)
+    public String getSqlVariableAccess(String variable, ResourceClass resourceClass, int part)
     {
         UsedVariable leftVariable = left.get(variable);
         UsedVariable rightVariable = right.get(variable);
@@ -86,17 +86,17 @@ public class LeftJoinVariableAccessor extends SimpleVariableAccessor
         if(rightVariable == null || rightVariable != null && !rightVariable.containsClass(resourceClass)
                 || leftVariable != null && !leftVariable.canBeNull())
         {
-            return leftTable + "." + resourceClass.getSqlColumn(variable, i);
+            return leftTable + "." + resourceClass.getSqlColumn(variable, part);
         }
         else if(leftVariable == null || leftVariable != null && !leftVariable.containsClass(resourceClass)
                 || rightVariable != null && !rightVariable.canBeNull())
         {
-            return rightTable + "." + resourceClass.getSqlColumn(variable, i);
+            return rightTable + "." + resourceClass.getSqlColumn(variable, part);
         }
         else
         {
-            return "COALESCE(" + leftTable + "." + resourceClass.getSqlColumn(variable, i) + ", " + rightTable + "."
-                    + resourceClass.getSqlColumn(variable, i) + ")";
+            return "COALESCE(" + leftTable + "." + resourceClass.getSqlColumn(variable, part) + ", " + rightTable + "."
+                    + resourceClass.getSqlColumn(variable, part) + ")";
         }
     }
 }

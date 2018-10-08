@@ -28,16 +28,16 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
 
 
     @Override
-    public String getSqlValueAccess(int i)
+    public String getSqlValueAccess(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 
     @Override
-    public String getSqlColumn(int i)
+    public String getSqlColumn(int part)
     {
-        return columns.get(i);
+        return columns.get(part);
     }
 
 

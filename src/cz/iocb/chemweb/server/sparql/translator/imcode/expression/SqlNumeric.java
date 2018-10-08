@@ -3,19 +3,18 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
 public class SqlNumeric extends SqlUnary
 {
-    private final ExpressionResourceClass requestedClass;
+    private final ResourceClass requestedClass;
 
 
-    protected SqlNumeric(ExpressionResourceClass requestedClass, SqlExpressionIntercode operand,
-            Set<ExpressionResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+    protected SqlNumeric(ResourceClass requestedClass, SqlExpressionIntercode operand,
+            Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
     {
         super(operand, resourceClasses, isBoxed, canBeNull);
         this.requestedClass = requestedClass;
@@ -34,19 +33,19 @@ public class SqlNumeric extends SqlUnary
      * @param requestedClass Requested numeric class
      * @return Instance of SqlExpressionIntercode
      */
-    public static SqlExpressionIntercode create(SqlExpressionIntercode operand, ExpressionResourceClass requestedClass)
+    public static SqlExpressionIntercode create(SqlExpressionIntercode operand, ResourceClass requestedClass)
     {
         if(operand == SqlNull.get())
             return SqlNull.get();
 
 
-        Set<ExpressionResourceClass> operandClasses = operand.getResourceClasses();
+        Set<ResourceClass> operandClasses = operand.getResourceClasses();
 
         if(requestedClass != null && !operand.isBoxed() && operandClasses.contains(requestedClass))
             return operand; // operand already has requested numeric class
 
 
-        Set<ExpressionResourceClass> compatibleClasses = operandClasses.stream()
+        Set<ResourceClass> compatibleClasses = operandClasses.stream()
                 .filter(r -> isNumericCompatibleWith(r, requestedClass)).collect(Collectors.toSet());
 
         if(compatibleClasses.isEmpty())
@@ -56,7 +55,7 @@ public class SqlNumeric extends SqlUnary
             return operand; // rdfbox to rdfbox cast is not needed
 
 
-        Set<ExpressionResourceClass> resultClasses = new HashSet<ExpressionResourceClass>();
+        Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
 
         if(requestedClass == null)
             resultClasses.addAll(compatibleClasses);
@@ -82,7 +81,7 @@ public class SqlNumeric extends SqlUnary
         {
             SqlVariable variable = (SqlVariable) getOperand();
 
-            Set<ExpressionResourceClass> compatibleClasses = variable.getResourceClasses().stream()
+            Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> isNumericCompatibleWith(r, requestedClass)).collect(Collectors.toSet());
 
 
@@ -92,12 +91,12 @@ public class SqlNumeric extends SqlUnary
             if(compatibleClasses.size() > 1)
                 builder.append("COALESCE(");
 
-            for(ExpressionResourceClass resourceClass : compatibleClasses)
+            for(ResourceClass resourceClass : compatibleClasses)
             {
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                String code = variable.getExpressionValue((PatternResourceClass) resourceClass, isBoxed());
+                String code = variable.getExpressionValue(resourceClass, isBoxed());
 
                 if(!isBoxed() && resourceClass != requestedClass)
                 {

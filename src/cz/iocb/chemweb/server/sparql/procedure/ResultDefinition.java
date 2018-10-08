@@ -1,17 +1,17 @@
 package cz.iocb.chemweb.server.sparql.procedure;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
 public class ResultDefinition
 {
     private final String resultName;
-    private final PatternResourceClass resultClass;
+    private final ResourceClass resultClass;
     private final String[] sqlTypeFields;
 
 
-    public ResultDefinition(String resultName, PatternResourceClass resultClass, String[] sqlTypeFields)
+    public ResultDefinition(String resultName, ResourceClass resultClass, String[] sqlTypeFields)
     {
         this.resultName = resultName;
         this.resultClass = resultClass;
@@ -19,7 +19,7 @@ public class ResultDefinition
     }
 
 
-    public ResultDefinition(String resultName, PatternResourceClass resultClass, String sqlTypeField)
+    public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
         String[] sqlTypeFields = { sqlTypeField };
 
@@ -29,7 +29,7 @@ public class ResultDefinition
     }
 
 
-    public ResultDefinition(PatternResourceClass resultClass)
+    public ResultDefinition(ResourceClass resultClass)
     {
         this.resultName = null;
         this.resultClass = resultClass;
@@ -43,7 +43,7 @@ public class ResultDefinition
     }
 
 
-    public final PatternResourceClass getResultClass()
+    public final ResourceClass getResultClass()
     {
         return resultClass;
     }

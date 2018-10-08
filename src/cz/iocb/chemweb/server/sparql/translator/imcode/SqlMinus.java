@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -53,9 +53,9 @@ public class SqlMinus extends SqlIntercode
         {
             String varName = variable.getName();
 
-            for(PatternResourceClass resClass : variable.getClasses())
+            for(ResourceClass resClass : variable.getClasses())
             {
-                for(int j = 0; j < resClass.getPartsCount(); j++)
+                for(int j = 0; j < resClass.getPatternPartsCount(); j++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
@@ -116,9 +116,9 @@ public class SqlMinus extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(PatternResourceClass resClass : leftVariable.getClasses())
+                    for(ResourceClass resClass : leftVariable.getClasses())
                     {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, use);
                             use = true;
@@ -142,9 +142,9 @@ public class SqlMinus extends SqlIntercode
                     boolean use = false;
                     builder.append("(");
 
-                    for(PatternResourceClass resClass : rightVariable.getClasses())
+                    for(ResourceClass resClass : rightVariable.getClasses())
                     {
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, use);
                             use = true;
@@ -164,14 +164,14 @@ public class SqlMinus extends SqlIntercode
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
                         assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        PatternResourceClass resClass = pairedClass.getLeftClass();
+                        ResourceClass resClass = pairedClass.getLeftClass();
 
                         appendOr(builder, restricted);
                         restricted = true;
 
                         builder.append("(");
 
-                        for(int i = 0; i < resClass.getPartsCount(); i++)
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
                             appendAnd(builder, i > 0);
 
@@ -214,9 +214,9 @@ public class SqlMinus extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(PatternResourceClass resClass : leftVariable.getClasses())
+                        for(ResourceClass resClass : leftVariable.getClasses())
                         {
-                            for(int i = 0; i < resClass.getPartsCount(); i++)
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                             {
                                 appendOr(builder, use);
                                 use = true;
@@ -239,9 +239,9 @@ public class SqlMinus extends SqlIntercode
                         boolean use = false;
                         builder.append("(");
 
-                        for(PatternResourceClass resClass : rightVariable.getClasses())
+                        for(ResourceClass resClass : rightVariable.getClasses())
                         {
-                            for(int i = 0; i < resClass.getPartsCount(); i++)
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                             {
                                 appendOr(builder, use);
                                 use = true;

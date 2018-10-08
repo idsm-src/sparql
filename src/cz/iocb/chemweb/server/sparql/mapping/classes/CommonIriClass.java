@@ -1,9 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.Arrays;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ResultTag;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -11,7 +8,7 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
-public class CommonIriClass extends IriClass implements ExpressionResourceClass
+public class CommonIriClass extends IriClass
 {
     CommonIriClass()
     {
@@ -20,14 +17,7 @@ public class CommonIriClass extends IriClass implements ExpressionResourceClass
 
 
     @Override
-    public String getResultValue(String var, int part)
-    {
-        return getSqlColumn(var, 0);
-    }
-
-
-    @Override
-    public String getSqlValue(Node node, int part)
+    public String getPatternCode(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
             return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
@@ -39,9 +29,19 @@ public class CommonIriClass extends IriClass implements ExpressionResourceClass
 
 
     @Override
-    public String getSqlExpressionValue(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public String getPatternCode(String column, int part, boolean isBoxed)
     {
-        String code = variableAccessor.variableAccess(variable, this, 0);
+        if(isBoxed == false)
+            throw new IllegalArgumentException();
+
+        return "sparql.rdfbox_extract_iri" + "(" + column + ")";
+    }
+
+
+    @Override
+    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    {
+        String code = variableAccessor.getSqlVariableAccess(variable, this, 0);
 
         if(rdfbox)
             code = "sparql.cast_as_rdfbox_from_iri(" + code + ")";
@@ -51,9 +51,9 @@ public class CommonIriClass extends IriClass implements ExpressionResourceClass
 
 
     @Override
-    public ExpressionResourceClass getExpressionResourceClass()
+    public String getResultCode(String var, int part)
     {
-        return BuiltinClasses.iri;
+        return getSqlColumn(var, 0);
     }
 
 
@@ -61,22 +61,5 @@ public class CommonIriClass extends IriClass implements ExpressionResourceClass
     public boolean match(Node node)
     {
         return false;
-    }
-
-
-    @Override
-    public PatternResourceClass getPatternResourceClass()
-    {
-        return this;
-    }
-
-
-    @Override
-    public String getSqlPatternValue(String column, int part, boolean isBoxed)
-    {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
-
-        return "sparql.rdfbox_extract_iri" + "(" + column + ")";
     }
 }

@@ -1,20 +1,19 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternLiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 
 
 
 public abstract class LiteralMapping extends NodeMapping
 {
-    protected LiteralMapping(PatternLiteralClass literalClass)
+    protected LiteralMapping(LiteralClass literalClass)
     {
-        super((PatternResourceClass) literalClass);
+        super(literalClass);
     }
 
 
-    public final PatternLiteralClass getLiteralClass()
+    public final LiteralClass getLiteralClass()
     {
-        return (PatternLiteralClass) resourceClass;
+        return (LiteralClass) resourceClass;
     }
 }

@@ -1,20 +1,19 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.sparql.mapping.classes.bases.BlankNodeBaseClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.PatternResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 
 
 
 public abstract class BlankNodeMapping extends NodeMapping
 {
-    protected BlankNodeMapping(BlankNodeBaseClass blankNodeClass)
+    protected BlankNodeMapping(BlankNodeClass blankNodeClass)
     {
-        super((PatternResourceClass) blankNodeClass);
+        super(blankNodeClass);
     }
 
 
-    public final BlankNodeBaseClass getBlankNodeClass()
+    public final BlankNodeClass getBlankNodeClass()
     {
-        return (BlankNodeBaseClass) resourceClass;
+        return (BlankNodeClass) resourceClass;
     }
 }

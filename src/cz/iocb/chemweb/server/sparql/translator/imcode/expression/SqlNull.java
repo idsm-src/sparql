@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import java.util.HashSet;
-import cz.iocb.chemweb.server.sparql.mapping.classes.interfaces.ExpressionResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
@@ -13,7 +13,7 @@ public class SqlNull extends SqlExpressionIntercode
 
     private SqlNull()
     {
-        super(new HashSet<ExpressionResourceClass>(), false, true);
+        super(new HashSet<ResourceClass>(), false, true);
     }
 
 
