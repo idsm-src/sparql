@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.db;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Vector;
 
 
@@ -11,13 +12,15 @@ public class Result implements Collection<Row>
 {
     private final Vector<String> heads;
     private final ArrayList<Row> rows;
+    private final List<String> warnings;
     private Row currentRow;
 
 
-    public Result(Vector<String> heads, ArrayList<Row> rows)
+    public Result(Vector<String> heads, ArrayList<Row> rows, List<String> warnings)
     {
         this.heads = heads;
         this.rows = rows;
+        this.warnings = warnings;
 
         if(!rows.isEmpty())
             currentRow = rows.get(0);
@@ -134,5 +137,11 @@ public class Result implements Collection<Row>
     public Object[] toArray(Object[] arg0)
     {
         return rows.toArray(arg0);
+    }
+
+
+    public List<String> getWarnings()
+    {
+        return warnings;
     }
 }

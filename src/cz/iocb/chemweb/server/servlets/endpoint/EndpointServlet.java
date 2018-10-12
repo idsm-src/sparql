@@ -117,6 +117,7 @@ public class EndpointServlet extends HttpServlet
 
 
         // IOCB SPARQL protocol extension
+        String warnings = req.getParameter("warnings");
         String filename = req.getParameter("filename");
 
         if(filename != null)
@@ -129,14 +130,16 @@ public class EndpointServlet extends HttpServlet
             String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             Result result = db.query(code);
+            boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
+
 
             switch(detectOutputType(req))
             {
                 case JSON:
-                    writeJson(res, result);
+                    writeJson(res, result, includeWarnings);
                     break;
                 case XML:
-                    writeXml(res, result);
+                    writeXml(res, result, includeWarnings);
                     break;
                 case TSV:
                     writeTsv(res, result);
@@ -211,7 +214,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeXml(HttpServletResponse res, Result result) throws IOException
+    private static void writeXml(HttpServletResponse res, Result result, boolean includeWarnings) throws IOException
     {
         res.setHeader("content-type", "application/sparql-results+xml");
         res.setCharacterEncoding("UTF-8");
@@ -292,11 +295,26 @@ public class EndpointServlet extends HttpServlet
         }
 
         out.println("\t</results>");
+
+        if(includeWarnings)
+        {
+            out.println("\t<warnings>");
+
+            for(String warning : result.getWarnings())
+            {
+                out.print("\t\t<warning>");
+                writeXmlValue(out, warning);
+                out.println("</warning>");
+            }
+
+            out.println("\t</warnings>");
+        }
+
         out.println("</sparql>");
     }
 
 
-    private static void writeJson(HttpServletResponse res, Result result) throws IOException
+    private static void writeJson(HttpServletResponse res, Result result, boolean includeWarnings) throws IOException
     {
         res.setHeader("content-type", "application/sparql-results+json");
         res.setCharacterEncoding("UTF-8");
@@ -319,7 +337,7 @@ public class EndpointServlet extends HttpServlet
             out.print('"');
         }
 
-        out.println(" ]},\n\t\"results\": {\"bindings\":[");
+        out.println(" ]},\n\t\"results\": { \"bindings\": [");
 
 
         boolean hasResult = false;
@@ -391,7 +409,30 @@ public class EndpointServlet extends HttpServlet
             out.print("\n\t}");
         }
 
-        out.print("\n]}}");
+        out.print("\n\t]}");
+
+        if(includeWarnings)
+        {
+            out.print(",\n\t\"warnings\": { \"messages\": [\n");
+
+            boolean hasWarning = false;
+
+            for(String warning : result.getWarnings())
+            {
+                if(hasWarning)
+                    out.print(",\n");
+                else
+                    hasWarning = true;
+
+                out.print("\t\t\"");
+                writeJsonValue(out, warning);
+                out.print("\"");
+            }
+
+            out.print("\n\t]}");
+        }
+
+        out.print("\n}");
     }
 
 

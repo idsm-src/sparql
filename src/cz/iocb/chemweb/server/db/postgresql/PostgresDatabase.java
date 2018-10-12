@@ -17,11 +17,13 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Vector;
 import cz.iocb.chemweb.server.db.BlankNode;
 import cz.iocb.chemweb.server.db.IriNode;
@@ -209,6 +211,12 @@ public class PostgresDatabase
             }
 
 
+            LinkedList<String> warnings = new LinkedList<String>();
+
+            for(SQLWarning warning = stmt.getWarnings(); warning != null; warning = warning.getNextWarning())
+                warnings.add(warning.getMessage());
+
+
             Connection conn = stmt.getConnection();
 
             rs.close();
@@ -223,7 +231,7 @@ public class PostgresDatabase
                 System.err.println("slow query (" + time / 1000.0 + "s)");
             }
 
-            return new Result(heads, rows);
+            return new Result(heads, rows, warnings);
         }
         catch(Exception e)
         {
