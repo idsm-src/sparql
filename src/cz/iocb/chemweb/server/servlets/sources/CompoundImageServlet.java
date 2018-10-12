@@ -169,7 +169,7 @@ public class CompoundImageServlet extends HttpServlet
         }
 
         //if(size != 80 && size != 200)
-        if(size < 40 || size > 800)
+        if(size < 40 || size > 1600)
             throw new ServletException("an invalid value of the 'w' argument");
 
 
@@ -352,7 +352,7 @@ public class CompoundImageServlet extends HttpServlet
 
             /*
             boolean addToRemove = false;
-
+            
             if(suppressibleHydrogen(org, atom))
             {
                 // test whether connected to a single hetero atom only, otherwise keep
@@ -364,18 +364,18 @@ public class CompoundImageServlet extends HttpServlet
                     if(stereoParity == null || stereoParity == 0)
                     {
                         addToRemove = true;
-
+            
                         // keep if any of the bonds of the hetero atom have stereo information
                         for(IBond bond : org.getConnectedBondsList(neighbour))
                         {
                             IBond.Stereo bondStereo = bond.getStereo();
-
+            
                             if(bondStereo != null && bondStereo != IBond.Stereo.NONE)
                             {
                                 addToRemove = false;
                                 System.err.println(bondStereo.name());
                             }
-
+            
                             IAtom neighboursNeighbour = bond.getConnectedAtom(neighbour);
                             // remove in any case if the hetero atom is connected to more than one hydrogen
                             if(neighboursNeighbour.getSymbol().equals("H") && neighboursNeighbour != atom)
