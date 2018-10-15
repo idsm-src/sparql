@@ -517,24 +517,32 @@ public class CompoundImageServlet extends HttpServlet
      */
     private static boolean suppressibleHydrogen(final IAtomContainer container, final IAtom atom)
     {
-        // is the atom a hydrogen
-        if(!"H".equals(atom.getSymbol()))
+        // is not hydrogen
+        if(atom.getAtomicNumber() != 1)
             return false;
-        // is the hydrogen an ion?
+
+        // is hydrogen ion
         if(atom.getFormalCharge() != null && atom.getFormalCharge() != 0)
             return false;
-        // is the hydrogen deuterium / tritium?
+
+        // is hydrogen isotope
         if(atom.getMassNumber() != null && atom.getMassNumber() != 1)
             return false;
-        // molecule hydrogen with implicit H?
+
+        // is dihydrogen with implicit H
         if(atom.getImplicitHydrogenCount() != null && atom.getImplicitHydrogenCount() != 0)
             return false;
-        // molecule hydrogen
+
         List<IAtom> neighbors = container.getConnectedAtomsList(atom);
-        if(neighbors.size() == 1 && neighbors.get(0).getSymbol().equals("H"))
+
+        // is multivalent hydrogen
+        if(neighbors.size() > 1)
             return false;
-        // what about bridging hydrogens?
-        // hydrogens with atom-atom mapping?
+
+        // is dihydrogen
+        if(neighbors.size() == 1 && neighbors.get(0).getAtomicNumber() <= 1)
+            return false;
+
         return true;
     }
 
