@@ -868,6 +868,9 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 return new TranslatedSegment(variablesInScope, translatedGroupPattern.getIntercode());
         }
 
+        if(conditions == null)
+            conditions = new LinkedList<SqlExpressionIntercode>();
+
         SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),
                 translatedPattern.getIntercode(), conditions);
 
