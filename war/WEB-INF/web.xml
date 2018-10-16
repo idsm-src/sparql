@@ -235,17 +235,6 @@
     <url-pattern>/chemweb/details</url-pattern>
   </servlet-mapping>
 
-  <!--
-  <servlet>
-    <servlet-name>Sources</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.sources.SourceServlet</servlet-class>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>Sources</servlet-name>
-    <url-pattern>/sources</url-pattern>
-  </servlet-mapping>
- -->
-
   <servlet>
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>

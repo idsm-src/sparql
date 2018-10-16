@@ -1,6 +1,5 @@
 #macro( escapeHTML $entity )$utils.escapeHtml($entity)#end
 #macro( escapeIRI $entity )$utils.prefixedIRI($entity)#end
-#macro( escapeChEBI $entity )$utils.chebiXmlToHtml($entity)#end
 #macro( entityID $entity )$utils.nodeId($entity)#end
 
 #macro( escapeVal $node )
