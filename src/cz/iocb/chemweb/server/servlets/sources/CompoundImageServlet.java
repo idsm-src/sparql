@@ -535,6 +535,10 @@ public class CompoundImageServlet extends HttpServlet
 
         List<IAtom> neighbors = container.getConnectedAtomsList(atom);
 
+        // single hydrogen
+        if(neighbors.size() == 0)
+            return false;
+
         // is multivalent hydrogen
         if(neighbors.size() > 1)
             return false;
