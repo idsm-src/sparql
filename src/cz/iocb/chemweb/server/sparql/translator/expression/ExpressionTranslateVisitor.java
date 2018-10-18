@@ -117,7 +117,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
                 result = SqlBinaryLogical.create(logicalOperator, result, compare);
         }
 
-        return null;
+        return result;
     }
 
 
