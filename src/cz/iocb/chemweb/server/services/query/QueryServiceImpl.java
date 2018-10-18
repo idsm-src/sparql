@@ -11,8 +11,6 @@ import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.Vector;
 import javax.servlet.http.HttpSession;
 import org.apache.log4j.Logger;
@@ -58,8 +56,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     }
 
     private static final long serialVersionUID = 1L;
-    //private static final int timeout = 40 * 60 * 1000; // 40 minutes
-    private static final int timeout = 24 * 60 * 60 * 1000;
+    private static final int timeout = 20 * 60 * 1000; // 20 minutes
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
 
@@ -124,8 +121,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             queryState.thread = new Thread()
             {
-                final Timer timer = new Timer();
-
                 @Override
                 public void run()
                 {
@@ -140,25 +135,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                         Template template = ve.getTemplate("node.vm");
 
 
-                        // query timeout
-                        timer.schedule(new TimerTask()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                try
-                                {
-                                    queryState.handler.cancel();
-                                }
-                                catch(DatabaseException e)
-                                {
-                                    e.printStackTrace();
-                                }
-                            }
-                        }, timeout);
-
-
-                        Result result = database.rawQuery(translatedQuery, queryState.handler);
+                        Result result = database.query(translatedQuery, timeout, queryState.handler);
 
 
                         Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
@@ -199,8 +176,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                             items.add(stringRow);
                         }
 
-                        timer.cancel();
-
 
                         boolean truncated = false;
 
@@ -213,10 +188,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
                         queryState.result = new QueryResult(result.getHeads(), items, truncated);
                     }
-                    catch(Throwable e) // (SQLException | IOException e)
+                    catch(Throwable e)
                     {
-                        timer.cancel();
-
                         e.printStackTrace();
                         queryState.exception = e;
                     }
@@ -230,7 +203,20 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
 
 
-        queryState.thread.start();
+        synchronized(queryState.handler)
+        {
+            queryState.thread.start();
+
+            try
+            {
+                queryState.handler.wait();
+            }
+            catch(InterruptedException e)
+            {
+                new DatabaseException(e);
+            }
+        }
+
         return id;
     }
 

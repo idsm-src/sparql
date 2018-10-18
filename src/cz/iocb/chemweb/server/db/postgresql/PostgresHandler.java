@@ -8,12 +8,17 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 public class PostgresHandler
 {
-    Statement stmt;
+    private Statement statement;
 
 
-    public PostgresHandler(Statement stmt)
+    PostgresHandler()
     {
-        this.stmt = stmt;
+    }
+
+
+    void setStatement(Statement statement)
+    {
+        this.statement = statement;
     }
 
 
@@ -21,7 +26,7 @@ public class PostgresHandler
     {
         try
         {
-            stmt.cancel();
+            statement.cancel();
         }
         catch(SQLException e)
         {

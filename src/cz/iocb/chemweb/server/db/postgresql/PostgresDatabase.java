@@ -68,173 +68,186 @@ public class PostgresDatabase
     }
 
 
-    public Result rawQuery(String query, PostgresHandler handler) throws DatabaseException
+    public Result query(String query, int timeout, PostgresHandler handler) throws DatabaseException
     {
-        try
+        try(Connection connection = connectionPool.getConnection())
         {
-            Statement stmt = handler.stmt;
-
-            long time = System.currentTimeMillis();
-            ResultSet rs = stmt.executeQuery(query);
-
-
-            ResultSetMetaData metadata = rs.getMetaData();
-
-            final Vector<String> heads = new Vector<String>();
-            final HashMap<String, Integer> columnNames = new HashMap<String, Integer>();
-            final HashMap<String, Integer> varNames = new HashMap<String, Integer>();
-
-            String lastName = null;
-
-            for(int i = 0; i < metadata.getColumnCount(); i++)
+            try(Statement statement = connection.createStatement())
             {
-                String var = metadata.getColumnName(i + 1);
-                String name = var.replaceAll("#.*", "");
-
-                if(!name.equals(lastName))
+                if(handler != null)
                 {
-                    lastName = name;
-
-                    columnNames.put(name, heads.size());
-                    heads.add(name);
-                }
-
-                varNames.put(var, heads.size() - 1);
-            }
-
-
-            final ArrayList<Row> rows = new ArrayList<Row>();
-
-            while(rs.next())
-            {
-                RdfNode[] rowData = new RdfNode[heads.size()];
-
-                for(int i = 0; i < metadata.getColumnCount(); i++)
-                {
-                    String name = metadata.getColumnName(i + 1);
-                    String tagName = name.replaceAll(".*#", "");
-                    String lexical = rs.getString(i + 1);
-                    Object value = rs.getObject(i + 1);
-                    int idx = varNames.get(name);
-
-                    ResultTag tag = ResultTag.get(tagName);
-
-                    if(lexical != null)
+                    synchronized(handler)
                     {
-                        switch(tag)
-                        {
-                            case NULL:
-                                rowData[idx] = null;
-                                break;
-
-                            case BLANKNODEINT:
-                                rowData[idx] = new BlankNode("I" + value);
-                                break;
-
-                            case BLANKNODESTR:
-                                rowData[idx] = new BlankNode(encodeBlankNodeLabel((String) value));
-                                break;
-
-                            case IRI:
-                                rowData[idx] = new IriNode((String) value);
-                                break;
-
-                            case BOOLEAN:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanIri);
-                                break;
-
-                            case SHORT:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdShortIri);
-                                break;
-
-                            case INT:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdIntIri);
-                                break;
-
-                            case LONG:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdLongIri);
-                                break;
-
-                            case FLOAT:
-                                Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
-                                rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatIri);
-                                break;
-
-                            case DOUBLE:
-                                rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleIri);
-                                break;
-
-                            case INTEGER:
-                                rowData[idx] = new TypedLiteral(
-                                        ((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdIntegerIri);
-                                break;
-
-                            case DECIMAL:
-                                rowData[idx] = new TypedLiteral(
-                                        ((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdDecimalIri);
-                                break;
-
-                            case DATETIME:
-                                rowData[idx] = new TypedLiteral(lexical, xsdDateTimeIri);
-                                break;
-
-                            case DATE:
-                                rowData[idx] = new TypedLiteral(lexical, xsdDateIri);
-                                break;
-
-                            case DAYTIMEDURATION:
-                                rowData[idx] = new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
-                                break;
-
-                            case STRING:
-                                rowData[idx] = new TypedLiteral(value.toString(), xsdStringIri);
-                                break;
-
-                            case LANGSTRING:
-                                String lang = rs.getString(name.replaceAll("#.*", "") + "#" + ResultTag.LANG.getTag());
-                                rowData[idx] = new LanguageTaggedLiteral(value.toString(), lang);
-                                break;
-
-                            case LITERAL:
-                                String type = rs.getString(name.replaceAll("#.*", "") + "#" + ResultTag.TYPE.getTag());
-                                rowData[idx] = new TypedLiteral(value.toString(), type);
-
-                                // ignore supplementary literal tags
-                            case LANG:
-                            case TYPE:
-                                break;
-                        }
+                        handler.setStatement(statement);
+                        handler.notifyAll();
                     }
                 }
 
-                rows.add(new Row(columnNames, rowData));
+                statement.setQueryTimeout(timeout);
+
+                long time = System.currentTimeMillis();
+
+                final Vector<String> heads = new Vector<String>();
+                final ArrayList<Row> rows = new ArrayList<Row>();
+
+                try(ResultSet rs = statement.executeQuery(query))
+                {
+                    final HashMap<String, Integer> columnNames = new HashMap<String, Integer>();
+                    final HashMap<String, Integer> varNames = new HashMap<String, Integer>();
+
+                    ResultSetMetaData metadata = rs.getMetaData();
+                    String lastName = null;
+
+                    for(int i = 0; i < metadata.getColumnCount(); i++)
+                    {
+                        String var = metadata.getColumnName(i + 1);
+                        String name = var.replaceAll("#.*", "");
+
+                        if(!name.equals(lastName))
+                        {
+                            lastName = name;
+
+                            columnNames.put(name, heads.size());
+                            heads.add(name);
+                        }
+
+                        varNames.put(var, heads.size() - 1);
+                    }
+
+
+                    while(rs.next())
+                    {
+                        RdfNode[] rowData = new RdfNode[heads.size()];
+
+                        for(int i = 0; i < metadata.getColumnCount(); i++)
+                        {
+                            String name = metadata.getColumnName(i + 1);
+                            String tagName = name.replaceAll(".*#", "");
+                            String lexical = rs.getString(i + 1);
+                            Object value = rs.getObject(i + 1);
+                            int idx = varNames.get(name);
+
+                            ResultTag tag = ResultTag.get(tagName);
+
+                            if(lexical != null)
+                            {
+                                switch(tag)
+                                {
+                                    case NULL:
+                                        rowData[idx] = null;
+                                        break;
+
+                                    case BLANKNODEINT:
+                                        rowData[idx] = new BlankNode("I" + value);
+                                        break;
+
+                                    case BLANKNODESTR:
+                                        rowData[idx] = new BlankNode(encodeBlankNodeLabel((String) value));
+                                        break;
+
+                                    case IRI:
+                                        rowData[idx] = new IriNode((String) value);
+                                        break;
+
+                                    case BOOLEAN:
+                                        rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanIri);
+                                        break;
+
+                                    case SHORT:
+                                        rowData[idx] = new TypedLiteral(value.toString(), xsdShortIri);
+                                        break;
+
+                                    case INT:
+                                        rowData[idx] = new TypedLiteral(value.toString(), xsdIntIri);
+                                        break;
+
+                                    case LONG:
+                                        rowData[idx] = new TypedLiteral(value.toString(), xsdLongIri);
+                                        break;
+
+                                    case FLOAT:
+                                        Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString())
+                                                : value;
+                                        rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatIri);
+                                        break;
+
+                                    case DOUBLE:
+                                        rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleIri);
+                                        break;
+
+                                    case INTEGER:
+                                        rowData[idx] = new TypedLiteral(
+                                                ((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                                xsdIntegerIri);
+                                        break;
+
+                                    case DECIMAL:
+                                        rowData[idx] = new TypedLiteral(
+                                                ((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                                xsdDecimalIri);
+                                        break;
+
+                                    case DATETIME:
+                                        rowData[idx] = new TypedLiteral(lexical, xsdDateTimeIri);
+                                        break;
+
+                                    case DATE:
+                                        rowData[idx] = new TypedLiteral(lexical, xsdDateIri);
+                                        break;
+
+                                    case DAYTIMEDURATION:
+                                        rowData[idx] = new TypedLiteral(durationToString((Long) value),
+                                                xsdDayTimeDurationIri);
+                                        break;
+
+                                    case STRING:
+                                        rowData[idx] = new TypedLiteral(value.toString(), xsdStringIri);
+                                        break;
+
+                                    case LANGSTRING:
+                                        String lang = rs
+                                                .getString(name.replaceAll("#.*", "") + "#" + ResultTag.LANG.getTag());
+                                        rowData[idx] = new LanguageTaggedLiteral(value.toString(), lang);
+                                        break;
+
+                                    case LITERAL:
+                                        String type = rs
+                                                .getString(name.replaceAll("#.*", "") + "#" + ResultTag.TYPE.getTag());
+                                        rowData[idx] = new TypedLiteral(value.toString(), type);
+
+                                    case LANG:
+                                    case TYPE:
+                                        // ignore supplementary literal tags
+                                        break;
+                                }
+                            }
+                        }
+
+                        rows.add(new Row(columnNames, rowData));
+                    }
+                }
+
+                LinkedList<String> warnings = new LinkedList<String>();
+
+                for(SQLWarning warning = statement.getWarnings(); warning != null; warning = warning.getNextWarning())
+                    warnings.add(warning.getMessage());
+
+                time = System.currentTimeMillis() - time;
+
+                if(time > 500)
+                {
+                    //System.err.println(query.replaceAll("\n", "\\\\n"));
+                    System.err.println("slow query (" + time / 1000.0 + "s)");
+                }
+
+                return new Result(heads, rows, warnings);
             }
-
-
-            LinkedList<String> warnings = new LinkedList<String>();
-
-            for(SQLWarning warning = stmt.getWarnings(); warning != null; warning = warning.getNextWarning())
-                warnings.add(warning.getMessage());
-
-
-            Connection conn = stmt.getConnection();
-
-            rs.close();
-            stmt.close();
-            conn.close();
-
-            time = System.currentTimeMillis() - time;
-
-            if(time > 500)
-            {
-                //System.err.println(query.replaceAll("\n", "\\\\n"));
-                System.err.println("slow query (" + time / 1000.0 + "s)");
-            }
-
-            return new Result(heads, rows, warnings);
         }
         catch(Exception e)
         {
+            if(handler != null)
+                handler.notifyAll();
+
             e.printStackTrace();
             System.err.println(query);
 
@@ -243,23 +256,21 @@ public class PostgresDatabase
     }
 
 
-    public Result query(String query) throws DatabaseException
+    public Result query(String query, int timeout) throws DatabaseException
     {
-        return rawQuery(query, getHandler());
+        return query(query, timeout, null);
     }
 
 
-    public PostgresHandler getHandler() throws DatabaseException
+    public Result query(String query) throws DatabaseException
     {
-        try
-        {
-            Statement stmt = connectionPool.getConnection().createStatement();
-            return new PostgresHandler(stmt);
-        }
-        catch(Exception e)
-        {
-            throw new DatabaseException(e);
-        }
+        return query(query, 0, null);
+    }
+
+
+    public PostgresHandler getHandler()
+    {
+        return new PostgresHandler();
     }
 
 
