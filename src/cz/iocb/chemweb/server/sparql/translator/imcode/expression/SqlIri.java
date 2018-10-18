@@ -37,7 +37,7 @@ public class SqlIri extends SqlNodeValue
                 iriClass = userClass;
 
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
-        resourceClasses.add(BuiltinClasses.iri);
+        resourceClasses.add(iriClass);
 
         return new SqlIri(iri, iriClass, resourceClasses);
     }
