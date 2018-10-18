@@ -418,6 +418,12 @@
   </servlet-mapping>
 
 
+  <!-- Servlet context listeners -->
+  <listener>
+    <listener-class>cz.iocb.chemweb.server.Utils</listener-class>
+  </listener>
+
+
   <!-- Default page to serve -->
   <welcome-file-list>
     <welcome-file>Chemweb.html</welcome-file>
