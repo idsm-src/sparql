@@ -1,12 +1,18 @@
-<project name="tmc" basedir="." default="default">
- 
-    <target name="default" depends="buildwar,deploy"></target>
- 
-    <target name="buildwar">
-        <war basedir="war" destfile="chemweb.war" webxml="war/WEB-INF/web.xml"/>
-    </target>
- 
-    <target name="deploy">
-        <copy file="chemweb.war" todir="." />
-    </target>
+<project name="chemweb" basedir="." default="default">
+  <target name="default" depends="buildwar, buildjar"></target>
+
+  <target name="buildwar-devel">
+    <war basedir="war" destfile="chemweb-devel.war" webxml="war/WEB-INF/web.xml"
+        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**" />
+  </target>
+
+  <target name="buildwar">
+    <war basedir="war" destfile="chemweb.war" webxml="war/WEB-INF/web.xml"
+        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**" />
+  </target>
+
+  <target name="buildjar">
+    <jar destfile="memory-leak-protection.jar" basedir="war/WEB-INF/classes"
+        includes="cz/iocb/tomcat/*.class"/>
+  </target>
 </project>
