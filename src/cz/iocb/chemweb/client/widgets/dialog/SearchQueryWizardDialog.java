@@ -403,8 +403,9 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(!limit.isEmpty())
             {
-                query.append(";\n      sachem:topn ");
+                query.append(";\n      sachem:topn \"");
                 query.append(limit);
+                query.append("\"^^xsd:int");
             }
 
             if(method == Methods.EXACTSEARCH)
