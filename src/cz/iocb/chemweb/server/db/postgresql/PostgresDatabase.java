@@ -80,6 +80,7 @@ public class PostgresDatabase
                     {
                         handler.setStatement(statement);
                         handler.notifyAll();
+                        handler = null;
                     }
                 }
 
@@ -245,13 +246,17 @@ public class PostgresDatabase
         }
         catch(Exception e)
         {
-            if(handler != null)
-                handler.notifyAll();
-
-            e.printStackTrace();
-            System.err.println(query);
-
             throw new DatabaseException(e);
+        }
+        finally
+        {
+            if(handler != null)
+            {
+                synchronized(handler)
+                {
+                    handler.notifyAll();
+                }
+            }
         }
     }
 
