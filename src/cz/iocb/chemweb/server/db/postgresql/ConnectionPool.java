@@ -3,28 +3,41 @@ package cz.iocb.chemweb.server.db.postgresql;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
-import org.postgresql.ds.PGPoolingDataSource;
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.apache.tomcat.jdbc.pool.PoolProperties;
 
 
 
-@SuppressWarnings("deprecation")
 public class ConnectionPool
 {
-    private PGPoolingDataSource pool = null;
+    public DataSource pool = null;
 
 
     public ConnectionPool(Properties properties)
     {
-        pool = new PGPoolingDataSource();
-        pool.setServerName(properties.getProperty("host"));
-        pool.setPortNumber(Integer.parseInt(properties.getProperty("port")));
-        pool.setDatabaseName(properties.getProperty("database"));
-        pool.setUser(properties.getProperty("username"));
-        pool.setPassword(properties.getProperty("password"));
-        pool.setSocketTimeout(Integer.parseInt(properties.getProperty("socketTimeout")));
-        pool.setTcpKeepAlive(properties.getProperty("tcpKeepAlive").equals("true"));
-        pool.setAssumeMinServerVersion(properties.getProperty("assumeMinServerVersion"));
-        pool.setMaxConnections(Integer.parseInt(properties.getProperty("maxConnections")));
+        PoolProperties p = new PoolProperties();
+
+        p.setDriverClassName("org.postgresql.Driver");
+        p.setUrl("jdbc:postgresql://" + properties.getProperty("database"));
+        p.setUsername(properties.getProperty("username"));
+        p.setPassword(properties.getProperty("password"));
+
+        int connections = Integer.parseInt(properties.getProperty("connections"));
+        p.setInitialSize(connections);
+        p.setMaxActive(connections);
+
+        p.setMaxWait(-1);
+        p.setTestOnBorrow(true);
+        p.setValidationQuery("SELECT 1");
+
+        p.setTestWhileIdle(false);
+        p.setRemoveAbandoned(false);
+        p.setTimeBetweenEvictionRunsMillis(0);
+
+        DataSource datasource = new DataSource();
+        datasource.setPoolProperties(p);
+
+        pool = datasource;
     }
 
 
