@@ -25,6 +25,8 @@ public class ConnectionPool
         int connections = Integer.parseInt(properties.getProperty("connections"));
         p.setInitialSize(connections);
         p.setMaxActive(connections);
+        p.setMaxIdle(connections);
+        p.setMinIdle(connections);
 
         p.setMaxWait(-1);
         p.setTestOnBorrow(true);
