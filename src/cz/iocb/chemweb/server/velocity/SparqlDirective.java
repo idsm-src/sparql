@@ -1,11 +1,8 @@
 package cz.iocb.chemweb.server.velocity;
 
-import java.beans.PropertyVetoException;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.sql.SQLException;
 import org.apache.velocity.context.InternalContextAdapter;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
@@ -22,7 +19,6 @@ import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
@@ -32,19 +28,13 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 public class SparqlDirective extends Directive
 {
-    private final SparqlDatabaseConfiguration dbConfig;
-    private final Parser parser;
-    private final PostgresDatabase db;
+    public static final String SPARQL_CONFIG = "SPARQL_CONFIG";
+
+    private SparqlDatabaseConfiguration dbConfig;
+    private Parser parser;
+    private PostgresDatabase db;
     private Log log;
 
-
-    public SparqlDirective()
-            throws FileNotFoundException, IOException, SQLException, PropertyVetoException, DatabaseException
-    {
-        dbConfig = PubChemConfiguration.get();
-        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-        db = new PostgresDatabase(dbConfig.getConnectionPool());
-    }
 
     @Override
     public String getName()
@@ -65,6 +55,10 @@ public class SparqlDirective extends Directive
     {
         super.init(rs, context, node);
         log = rs.getLog();
+
+        dbConfig = (SparqlDatabaseConfiguration) rs.getApplicationAttribute(SPARQL_CONFIG);
+        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+        db = new PostgresDatabase(dbConfig.getConnectionPool());
     }
 
 

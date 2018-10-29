@@ -2,14 +2,17 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Properties;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
+import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -36,6 +39,13 @@ public abstract class SparqlDatabaseConfiguration
     protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
+
+
+    protected SparqlDatabaseConfiguration(Properties properties) throws SQLException
+    {
+        connectionPool = new ConnectionPool(properties);
+        schema = new PostgresSchema(connectionPool);
+    }
 
 
     public void addIriClass(UserIriClass iriClass)
@@ -189,5 +199,11 @@ public abstract class SparqlDatabaseConfiguration
     public ConnectionPool getConnectionPool()
     {
         return connectionPool;
+    }
+
+
+    public void close()
+    {
+        connectionPool.close();
     }
 }

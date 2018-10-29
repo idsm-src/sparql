@@ -1,14 +1,17 @@
 package cz.iocb.chemweb.server.servlets.hints;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -21,7 +24,6 @@ import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
@@ -31,8 +33,6 @@ import cz.iocb.chemweb.shared.services.DatabaseException;
 
 public class GenerateHints extends HttpServlet
 {
-    private static final long serialVersionUID = 1L;
-
     private static class Item
     {
         String type;
@@ -40,32 +40,60 @@ public class GenerateHints extends HttpServlet
         String info;
     }
 
-    private static String hintsJS;
+
+    private static final long serialVersionUID = 1L;
+    private static HashMap<String, String> hintsMap = new HashMap<String, String>();
+
+    private String hintsJS;
 
 
-    public GenerateHints() throws DatabaseException, FileNotFoundException, TranslateExceptions, ParseExceptions,
-            SQLException, IOException
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        if(hintsJS == null)
-            generateHints();
+        String resourceName = config.getInitParameter("resource");
+
+        if(resourceName == null || resourceName.isEmpty())
+            throw new ServletException("Resource name is not set");
+
+
+        synchronized(hintsMap)
+        {
+            hintsJS = hintsMap.get(resourceName);
+
+            if(hintsJS == null)
+            {
+                try
+                {
+                    Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+                    SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+
+                    hintsJS = generateHints(dbConfig);
+                    hintsMap.put(resourceName, hintsJS);
+                }
+                catch(NamingException | DatabaseException | TranslateExceptions | ParseExceptions e)
+                {
+                    throw new ServletException(e);
+                }
+            }
+        }
     }
 
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
+    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
         processRequest(req, res);
     }
 
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
+    protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
         processRequest(req, res);
     }
 
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
         PrintWriter out = res.getWriter();
         out.print(hintsJS);
@@ -73,12 +101,9 @@ public class GenerateHints extends HttpServlet
     }
 
 
-    private static synchronized void generateHints() throws DatabaseException, TranslateExceptions, ParseExceptions,
-            FileNotFoundException, SQLException, IOException
+    private static String generateHints(SparqlDatabaseConfiguration dbConfig)
+            throws DatabaseException, TranslateExceptions, ParseExceptions
     {
-        if(hintsJS != null)
-            return;
-
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);
 
@@ -104,14 +129,11 @@ public class GenerateHints extends HttpServlet
                 + "}                                                          ";
 
 
-        SparqlDatabaseConfiguration dbConfig = PubChemConfiguration.get();
         Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
         SelectQuery syntaxTree = parser.parse(query);
 
         String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
-
-        System.err.println(translatedQuery);
 
         PostgresDatabase database = new PostgresDatabase(dbConfig.getConnectionPool());
         Result result = database.query(translatedQuery);
@@ -207,7 +229,7 @@ public class GenerateHints extends HttpServlet
 
 
         out.close();
-        hintsJS = stringWriter.toString();
+        return stringWriter.toString();
     }
 
 

@@ -8,8 +8,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,6 +15,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -73,10 +74,10 @@ public class CompoundImageServlet extends HttpServlet
     @Override
     public void init(ServletConfig config) throws ServletException
     {
-        String configClassName = config.getInitParameter("configClass");
+        String resourceName = config.getInitParameter("resource");
 
-        if(configClassName == null || configClassName.isEmpty())
-            throw new IllegalArgumentException("Config class is not set");
+        if(resourceName == null || resourceName.isEmpty())
+            throw new ServletException("Resource name is not set");
 
 
         String table = config.getInitParameter("table");
@@ -85,7 +86,7 @@ public class CompoundImageServlet extends HttpServlet
             table = "compounds";
 
         if(!table.matches("^[a-zA-Z0-9_]+$"))
-            throw new IllegalArgumentException("Table name is not set properly");
+            throw new ServletException("Table name is not set properly");
 
 
         String column = config.getInitParameter("column");
@@ -94,7 +95,7 @@ public class CompoundImageServlet extends HttpServlet
             column = "molfile";
 
         if(!column.matches("^[a-zA-Z0-9_]+$"))
-            throw new IllegalArgumentException("Column name is not set properly");
+            throw new ServletException("Column name is not set properly");
 
 
         queryPattern = "select " + column + " from " + table + " where id = ?";
@@ -102,14 +103,11 @@ public class CompoundImageServlet extends HttpServlet
 
         try
         {
-            Class<?> configClass = Class.forName(configClassName);
-            Method method = configClass.getMethod("get");
-            SparqlDatabaseConfiguration configuration = (SparqlDatabaseConfiguration) method.invoke(null);
-
-            connectionPool = configuration.getConnectionPool();
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+            connectionPool = dbConfig.getConnectionPool();
         }
-        catch(ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
-                | IllegalArgumentException | InvocationTargetException e)
+        catch(NamingException e)
         {
             throw new ServletException(e);
         }

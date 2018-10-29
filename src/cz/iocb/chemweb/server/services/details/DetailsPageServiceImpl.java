@@ -1,20 +1,24 @@
 package cz.iocb.chemweb.server.services.details;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import org.apache.log4j.Logger;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.IriNode;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
+import cz.iocb.chemweb.server.velocity.SparqlDirective;
 import cz.iocb.chemweb.server.velocity.UrlDirective;
 import cz.iocb.chemweb.shared.services.details.DetailsPageService;
 
@@ -26,16 +30,39 @@ public class DetailsPageServiceImpl extends RemoteServiceServlet implements Deta
     private static final Logger logger = Logger.getLogger(DetailsPageServiceImpl.class);
 
     //private final VelocityEngine ve;
-    private final Properties properties;
+    private Properties properties;
+    private SparqlDatabaseConfiguration dbConfig;
 
-    public DetailsPageServiceImpl() throws FileNotFoundException, IOException
+
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        /*Properties*/properties = new Properties();
-        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/velocity.properties"));
-        properties.put("file.resource.loader.path", Utils.getConfigDirectory() + "/templates");
+        String resourceName = config.getInitParameter("resource");
+
+        if(resourceName == null || resourceName.isEmpty())
+            throw new ServletException("Resource name is not set");
+
+        try
+        {
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+        }
+        catch(NamingException e)
+        {
+            throw new ServletException(e);
+        }
+
+
+        properties = new Properties();
+        properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
+        properties.put("file.resource.loader.path", config.getServletContext().getRealPath("/templates"));
+        properties.put("userdirective",
+                "cz.iocb.chemweb.server.velocity.SparqlDirective,cz.iocb.chemweb.server.velocity.UrlDirective");
 
         //ve = new VelocityEngine(properties);
         //ve.init();
+
+        super.init(config);
     }
 
 
@@ -48,14 +75,14 @@ public class DetailsPageServiceImpl extends RemoteServiceServlet implements Deta
             URI uri = new URI(iriText);
 
             VelocityEngine ve = new VelocityEngine(properties);
-            ve.init();
+            ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, dbConfig);
 
             StringWriter writer = new StringWriter();
             Template template = ve.getTemplate("detail.vm");
 
             VelocityContext context = new VelocityContext();
             context.put("urlContext", UrlDirective.Context.DETAILS);
-            context.put("utils", NodeUtils.class);
+            context.put("utils", new NodeUtils(dbConfig.getPrefixes()));
             context.put("entity", new IriNode(uri.toString()));
 
             template.merge(context, writer);

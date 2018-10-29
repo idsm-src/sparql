@@ -5,16 +5,10 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Properties;
-import cz.iocb.chemweb.server.Utils;
-import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -29,41 +23,18 @@ import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
-    private static PubChemConfiguration singleton;
-
     static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
     static final DateConstantZoneClass xsdDateM4 = DateConstantZoneClass.get(-4 * 60 * 60);
 
 
-    public PubChemConfiguration() throws FileNotFoundException, IOException, SQLException
+    public PubChemConfiguration(Properties properties) throws SQLException
     {
-        Properties properties = new Properties();
-        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/datasource-rdf.properties"));
-
-        connectionPool = new ConnectionPool(properties);
-        schema = new PostgresSchema(connectionPool);
+        super(properties);
 
         loadPrefixes();
         loadClasses();
         loadQuadMapping();
         loadProcedures();
-    }
-
-
-    public static PubChemConfiguration get() throws FileNotFoundException, IOException, SQLException
-    {
-        if(singleton != null)
-            return singleton;
-
-        synchronized(PubChemConfiguration.class)
-        {
-            if(singleton != null)
-                return singleton;
-
-            singleton = new PubChemConfiguration();
-        }
-
-        return singleton;
     }
 
 

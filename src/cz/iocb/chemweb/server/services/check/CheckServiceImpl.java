@@ -1,19 +1,18 @@
 package cz.iocb.chemweb.server.services.check;
 
-import java.beans.PropertyVetoException;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.SQLException;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import cz.iocb.chemweb.server.sparql.parser.ParseResult;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
 import cz.iocb.chemweb.shared.services.check.CheckService;
 import cz.iocb.chemweb.shared.services.check.CheckerWarning;
@@ -24,17 +23,31 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 {
     private static final long serialVersionUID = 1L;
 
-    private final SparqlDatabaseConfiguration dbConfig;
-    private final Parser parser;
+    private SparqlDatabaseConfiguration dbConfig;
+    private Parser parser;
 
 
-    public CheckServiceImpl() throws FileNotFoundException, IOException, ClassNotFoundException, PropertyVetoException,
-            DatabaseException, SQLException
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        dbConfig = PubChemConfiguration.get();
-        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-    }
+        String resourceName = config.getInitParameter("resource");
 
+        if(resourceName == null || resourceName.isEmpty())
+            throw new ServletException("Resource name is not set");
+
+        try
+        {
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+        }
+        catch(NamingException e)
+        {
+            throw new ServletException(e);
+        }
+
+        super.init(config);
+    }
 
 
     @Override

@@ -1,21 +1,26 @@
 package cz.iocb.chemweb.server.velocity;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.StringEscapeUtils;
 import cz.iocb.chemweb.server.db.Literal;
 import cz.iocb.chemweb.server.db.ReferenceNode;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
 public class NodeUtils
 {
-    public static String escapeHtml(Literal node)
+    private HashMap<String, String> prefixes;
+
+
+    public NodeUtils(HashMap<String, String> prefixes)
+    {
+        this.prefixes = prefixes;
+    }
+
+
+    public String escapeHtml(Literal node)
     {
         if(node == null)
             return null;
@@ -24,13 +29,11 @@ public class NodeUtils
     }
 
 
-    public static String prefixedIRI(ReferenceNode node) throws FileNotFoundException, IOException, SQLException
+    public String prefixedIRI(ReferenceNode node)
     {
-        SparqlDatabaseConfiguration dbConfig = PubChemConfiguration.get();
-
         String result = node.getValue();
 
-        for(Entry<String, String> prefix : dbConfig.getPrefixes().entrySet())
+        for(Entry<String, String> prefix : prefixes.entrySet())
             if(result.startsWith(prefix.getValue()))
                 return result.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
 
@@ -38,7 +41,7 @@ public class NodeUtils
     }
 
 
-    public static String nodeId(ReferenceNode node)
+    public String nodeId(ReferenceNode node)
     {
         try
         {

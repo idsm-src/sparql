@@ -1,24 +1,23 @@
 package cz.iocb.chemweb.server.services.query;
 
-import java.beans.PropertyVetoException;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpSession;
 import org.apache.log4j.Logger;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import cz.iocb.chemweb.server.Utils;
 import cz.iocb.chemweb.server.db.Literal;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
@@ -30,11 +29,11 @@ import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
+import cz.iocb.chemweb.server.velocity.SparqlDirective;
 import cz.iocb.chemweb.server.velocity.UrlDirective;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.SessionException;
@@ -60,32 +59,53 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
 
-    private final SparqlDatabaseConfiguration dbConfig;
-    private final Parser parser;
-    private final PostgresDatabase database;
+    private SparqlDatabaseConfiguration dbConfig;
+    private Parser parser;
+    private PostgresDatabase database;
+    private Properties properties;
 
     LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
 
 
-
-    public QueryServiceImpl()
-            throws DatabaseException, FileNotFoundException, IOException, SQLException, PropertyVetoException
+    @Override
+    public void init(ServletConfig config) throws ServletException
     {
-        dbConfig = PubChemConfiguration.get();
-        database = new PostgresDatabase(dbConfig.getConnectionPool());
-        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+        String resourceName = config.getInitParameter("resource");
+
+        if(resourceName == null || resourceName.isEmpty())
+            throw new ServletException("Resource name is not set");
+
+        try
+        {
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+            database = new PostgresDatabase(dbConfig.getConnectionPool());
+            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+        }
+        catch(NamingException e)
+        {
+            throw new ServletException(e);
+        }
+
+        properties = new Properties();
+        properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
+        properties.put("file.resource.loader.path", config.getServletContext().getRealPath("/templates"));
+        properties.put("userdirective",
+                "cz.iocb.chemweb.server.velocity.SparqlDirective,cz.iocb.chemweb.server.velocity.UrlDirective");
+
+        super.init(config);
     }
 
 
     @Override
-    public long query(String query) throws SessionException, QueryException, DatabaseException
+    public long query(String query) throws QueryException
     {
         return query(query, 0, -1);
     }
 
 
     @Override
-    public long query(String query, int offset, int limit) throws SessionException, QueryException, DatabaseException
+    public long query(String query, int offset, int limit) throws QueryException
     {
         final HttpSession httpSession = this.getThreadLocalRequest().getSession(true);
         final QueryState queryState = new QueryState();
@@ -126,12 +146,9 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 {
                     try
                     {
-                        Properties properties = new Properties();
-                        properties.load(new FileInputStream(Utils.getConfigDirectory() + "/velocity.properties"));
-                        properties.put("file.resource.loader.path", Utils.getConfigDirectory() + "/templates");
-
                         // TODO: use pool
                         final VelocityEngine ve = new VelocityEngine(properties);
+                        ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, dbConfig);
                         Template template = ve.getTemplate("node.vm");
 
 
@@ -162,7 +179,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                                 {
                                     VelocityContext context = new VelocityContext();
                                     context.put("urlContext", UrlDirective.Context.NODE);
-                                    context.put("utils", NodeUtils.class);
+                                    context.put("utils", new NodeUtils(dbConfig.getPrefixes()));
                                     context.put("entity", row.getRdfNodes()[i]);
 
                                     StringWriter writer = new StringWriter();

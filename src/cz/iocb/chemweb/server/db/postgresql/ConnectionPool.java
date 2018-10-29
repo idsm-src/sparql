@@ -41,6 +41,12 @@ public class ConnectionPool
     }
 
 
+    public void close()
+    {
+        pool.close();
+    }
+
+
     public Connection getConnection() throws SQLException
     {
         return pool.getConnection();

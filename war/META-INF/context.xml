@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+
+  <Resource name="sparql/pubchem" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/pubchem" username="SPARQL" password="%password%" connections="5" 
+      singleton="true" closeMethod="close" />
+
+  <Resource name="sachem/chebi" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/chebi" username="SPARQL" password="%password%" connections="5"
+      singleton="true" closeMethod="close" />
+
+  <Resource name="sachem/chembl" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/chembl" username="SPARQL" password="%password%" connections="5"
+      singleton="true" closeMethod="close" />
+
+  <Resource name="sachem/drugbank" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/drugbank" username="SPARQL" password="%password%" connections="5"
+      singleton="true" closeMethod="close" />
+
+  <Resource name="sachem/pubchem" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/pubchem" username="SPARQL" password="%password%" connections="5"
+      singleton="true" closeMethod="close" />
+      
+  <Resource name="sparql/empty" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      database="localhost:5432/empty" username="SPARQL" password="%password%" connections="5" 
+      singleton="true" closeMethod="close" />
+
+</Context>

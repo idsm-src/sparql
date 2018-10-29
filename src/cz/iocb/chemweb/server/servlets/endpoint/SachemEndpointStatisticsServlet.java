@@ -7,21 +7,81 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.TimeZone;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
-import cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration;
-import cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration;
-import cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration;
-import cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
 @SuppressWarnings("serial")
 public class SachemEndpointStatisticsServlet extends HttpServlet
 {
+    static private final SimpleDateFormat dateFormatGmt;
+
+    private ConnectionPool chebiPool;
+    private ConnectionPool chemblPool;
+    private ConnectionPool drugbankPool;
+    private ConnectionPool pubchemPool;
+
+
+    static
+    {
+        dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
+
+
+    @Override
+    public void init(ServletConfig config) throws ServletException
+    {
+        String chebiResourceName = config.getInitParameter("resource-chebi");
+
+        if(chebiResourceName == null || chebiResourceName.isEmpty())
+            throw new ServletException("ChEBI resource name is not set");
+
+
+        String chemblResourceName = config.getInitParameter("resource-chembl");
+
+        if(chemblResourceName == null || chemblResourceName.isEmpty())
+            throw new ServletException("ChEMBL resource name is not set");
+
+
+        String drugbankResourceName = config.getInitParameter("resource-drugbank");
+
+        if(drugbankResourceName == null || drugbankResourceName.isEmpty())
+            throw new ServletException("DrugBank resource name is not set");
+
+
+        String pubchemResourceName = config.getInitParameter("resource-pubchem");
+
+        if(pubchemResourceName == null || pubchemResourceName.isEmpty())
+            throw new ServletException("PubChem resource name is not set");
+
+
+        try
+        {
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+
+            chebiPool = ((SparqlDatabaseConfiguration) context.lookup(chebiResourceName)).getConnectionPool();
+            chemblPool = ((SparqlDatabaseConfiguration) context.lookup(chemblResourceName)).getConnectionPool();
+            drugbankPool = ((SparqlDatabaseConfiguration) context.lookup(drugbankResourceName)).getConnectionPool();
+            pubchemPool = ((SparqlDatabaseConfiguration) context.lookup(pubchemResourceName)).getConnectionPool();
+        }
+        catch(NamingException e)
+        {
+            throw new ServletException(e);
+        }
+    }
+
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
@@ -49,11 +109,6 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
 
     private void writeDrugbank(ServletOutputStream out) throws IOException, SQLException
     {
-        SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        ConnectionPool drugbankPool = DrugbankConfiguration.get().getConnectionPool();
-
         try(Connection connection = drugbankPool.getConnection())
         {
             try(Statement statement = connection.createStatement())
@@ -76,11 +131,6 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
 
     private void writePubChem(ServletOutputStream out) throws IOException, SQLException
     {
-        SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        ConnectionPool pubchemPool = PubChemConfiguration.get().getConnectionPool();
-
         try(Connection connection = pubchemPool.getConnection())
         {
             try(Statement statement = connection.createStatement())
@@ -103,13 +153,6 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
 
     private void writeChembl(ServletOutputStream out) throws IOException, SQLException
     {
-        SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        ConnectionPool chemblPool = ChemblConfiguration.get().getConnectionPool();
-
         try(Connection connection = chemblPool.getConnection())
         {
             try(Statement statement = connection.createStatement())
@@ -134,13 +177,7 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
 
     private void writeChebi(ServletOutputStream out) throws IOException, SQLException
     {
-        SimpleDateFormat dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
         SimpleDateFormat versionFormatGmt = new SimpleDateFormat("yyyy-MM-dd");
-        dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        ConnectionPool chebiPool = ChebiConfiguration.get().getConnectionPool();
 
         try(Connection connection = chebiPool.getConnection())
         {
