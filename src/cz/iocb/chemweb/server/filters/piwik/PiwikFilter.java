@@ -15,6 +15,7 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.conn.HttpHostConnectException;
 import org.piwik.java.tracking.PiwikRequest;
 import org.piwik.java.tracking.PiwikTracker;
 
@@ -215,6 +216,14 @@ public class PiwikFilter implements Filter
 
 
         PiwikTracker tracker = new PiwikTracker(hostUrl);
-        /*HttpResponse piwikResponse =*/ tracker.sendRequest(piwikRequest);
+
+        try
+        {
+            /*HttpResponse piwikResponse =*/ tracker.sendRequest(piwikRequest);
+        }
+        catch(HttpHostConnectException e)
+        {
+            System.err.println("PiwikFilter: " + e.getMessage());
+        }
     }
 }
