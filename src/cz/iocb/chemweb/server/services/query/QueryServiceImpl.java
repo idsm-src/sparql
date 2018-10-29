@@ -62,9 +62,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private SparqlDatabaseConfiguration dbConfig;
     private Parser parser;
     private PostgresDatabase database;
-    private Properties properties;
-
-    LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
+    private VelocityEngine ve;
+    private LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
 
 
     @Override
@@ -87,11 +86,14 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             throw new ServletException(e);
         }
 
-        properties = new Properties();
+        Properties properties = new Properties();
         properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
         properties.put("file.resource.loader.path", config.getServletContext().getRealPath("/templates"));
         properties.put("userdirective",
                 "cz.iocb.chemweb.server.velocity.SparqlDirective,cz.iocb.chemweb.server.velocity.UrlDirective");
+
+        ve = new VelocityEngine(properties);
+        ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, dbConfig);
 
         super.init(config);
     }
@@ -146,14 +148,9 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 {
                     try
                     {
-                        // TODO: use pool
-                        final VelocityEngine ve = new VelocityEngine(properties);
-                        ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, dbConfig);
                         Template template = ve.getTemplate("node.vm");
 
-
                         Result result = database.query(translatedQuery, timeout, queryState.handler);
-
 
                         Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
 
