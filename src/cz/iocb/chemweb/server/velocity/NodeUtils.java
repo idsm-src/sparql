@@ -43,15 +43,6 @@ public class NodeUtils
 
     public String nodeId(ReferenceNode node)
     {
-        try
-        {
-            return "NODE_" + Encode.base32m(node.getValue());
-        }
-        catch(Throwable e)
-        {
-            System.err.println("#" + node.getValue() + "#"); // FIXME: log error
-
-            return "NODE_";
-        }
+        return "NODE_" + Encode.base32m(node.getValue());
     }
 }

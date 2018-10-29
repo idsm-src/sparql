@@ -187,8 +187,7 @@ public class CompoundImageServlet extends HttpServlet
         }
         catch(CDKException e)
         {
-            e.printStackTrace();
-            throw new ServletException("cannot generate image output");
+            throw new ServletException("cannot generate image output", e);
         }
     }
 

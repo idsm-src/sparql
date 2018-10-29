@@ -89,7 +89,7 @@ public class GenerateExamples extends HttpServlet
         }
         catch(ParserConfigurationException | SAXException | IOException e)
         {
-            e.printStackTrace();
+            throw new ServletException(e);
         }
 
         out.print("];");

@@ -86,8 +86,6 @@ public class PostgresDatabase
 
                 statement.setQueryTimeout(timeout);
 
-                long time = System.currentTimeMillis();
-
                 final Vector<String> heads = new Vector<String>();
                 final ArrayList<Row> rows = new ArrayList<Row>();
 
@@ -232,14 +230,6 @@ public class PostgresDatabase
 
                 for(SQLWarning warning = statement.getWarnings(); warning != null; warning = warning.getNextWarning())
                     warnings.add(warning.getMessage());
-
-                time = System.currentTimeMillis() - time;
-
-                if(time > 500)
-                {
-                    //System.err.println(query.replaceAll("\n", "\\\\n"));
-                    System.err.println("slow query (" + time / 1000.0 + "s)");
-                }
 
                 return new Result(heads, rows, warnings);
             }

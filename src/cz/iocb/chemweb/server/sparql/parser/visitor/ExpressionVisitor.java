@@ -137,8 +137,6 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 
     private static Position moveByOneCharacter(Position original)
     {
-        System.err.println(original.getLineNumber() + ":" + original.getPositionInLine());
-
         return new Position(original.getLineNumber(), original.getPositionInLine() + 1);
     }
 

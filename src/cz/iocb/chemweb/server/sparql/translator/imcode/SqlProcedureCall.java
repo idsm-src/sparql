@@ -100,7 +100,6 @@ public class SqlProcedureCall extends SqlIntercode
             }
             else if(node == null || !definition.getResultClass().match(node))
             {
-                System.err.println("A");
                 hasSolution = false;
             }
         }

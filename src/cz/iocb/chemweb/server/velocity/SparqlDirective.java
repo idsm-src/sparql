@@ -93,8 +93,6 @@ public class SparqlDirective extends Directive
         catch(DatabaseException | ParseExceptions | TranslateExceptions e)
         {
             log.error("sparql directive: " + e.getMessage());
-            System.err.println(query);
-            e.printStackTrace();
 
             context.put(varName, null);
             return false;

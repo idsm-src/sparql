@@ -26,8 +26,7 @@ public class DownloadServlet extends HttpServlet
         }
         catch(Exception e)
         {
-            e.printStackTrace();
-            throw new ServletException();
+            throw new ServletException(e);
         }
     }
 
@@ -41,8 +40,7 @@ public class DownloadServlet extends HttpServlet
         }
         catch(Exception e)
         {
-            e.printStackTrace();
-            throw new ServletException();
+            throw new ServletException(e);
         }
     }
 

@@ -792,9 +792,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 TranslatedSegment translatedPattern = visitElement(pattern);
 
-                if(translatedPattern == null)
-                    System.err.println(pattern.getClass().getCanonicalName());
-
                 SqlIntercode intercode = SqlJoin.join(schema, translatedGroupPattern.getIntercode(),
                         translatedPattern.getIntercode());
                 ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(

@@ -137,10 +137,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             final String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
-            // TODO: log
-            System.err.println(translatedQuery);
-
-
             queryState.thread = new Thread()
             {
                 @Override
@@ -204,7 +200,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                     }
                     catch(Throwable e)
                     {
-                        e.printStackTrace();
                         queryState.exception = e;
                     }
                 }
@@ -212,7 +207,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
         catch(ParseExceptions | TranslateExceptions e)
         {
-            e.printStackTrace();
             throw new QueryException();
         }
 
@@ -255,7 +249,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
         catch(InterruptedException e)
         {
-            e.printStackTrace();
             throw new DatabaseException(e); //FIXME: use different exception
         }
         finally
@@ -288,8 +281,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         if(queryState == null)
             throw new SessionException("Your server session does not contain the requested query ID.");
 
-
-        System.err.println("cancel query");
         queryState.handler.cancel();
     }
 
@@ -325,7 +316,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
         catch(URISyntaxException | ParseExceptions | TranslateExceptions e)
         {
-            e.printStackTrace();
             throw new DatabaseException(e);
         }
     }

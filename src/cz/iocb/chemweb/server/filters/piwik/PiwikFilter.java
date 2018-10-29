@@ -192,8 +192,7 @@ public class PiwikFilter implements Filter
                 }
                 catch(UnknownHostException e)
                 {
-
-                    e.printStackTrace();
+                    request.getServletContext().log("PiwikFilter: UnknownHostException: " + e.getMessage());
                 }
             }
         }
@@ -223,7 +222,7 @@ public class PiwikFilter implements Filter
         }
         catch(HttpHostConnectException e)
         {
-            System.err.println("PiwikFilter: " + e.getMessage());
+            request.getServletContext().log("PiwikFilter: HttpHostConnectException: " + e.getMessage());
         }
     }
 }
