@@ -9,12 +9,6 @@
   </welcome-file-list>
 
 
-  <!-- Servlet Context Listeners -->
-  <listener>
-    <listener-class>cz.iocb.chemweb.server.Utils</listener-class>
-  </listener>
-
-
   <!-- Cache Filter -->
   <filter>
     <filter-name>CacheFilter</filter-name>

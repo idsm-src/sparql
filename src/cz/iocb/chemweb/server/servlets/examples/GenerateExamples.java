@@ -13,7 +13,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-import cz.iocb.chemweb.server.Utils;
 
 
 
@@ -54,7 +53,7 @@ public class GenerateExamples extends HttpServlet
             DocumentBuilder db = dbf.newDocumentBuilder();
 
             //parse using builder to get DOM representation of the XML file
-            Document dom = db.parse(Utils.getConfigDirectory() + "/examples.xml");
+            Document dom = db.parse(req.getServletContext().getResourceAsStream("/examples.xml"));
 
 
             Element docEle = dom.getDocumentElement();
