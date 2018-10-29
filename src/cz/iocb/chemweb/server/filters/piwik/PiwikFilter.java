@@ -1,12 +1,10 @@
 package cz.iocb.chemweb.server.filters.piwik;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.util.Properties;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -19,7 +17,6 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.piwik.java.tracking.PiwikRequest;
 import org.piwik.java.tracking.PiwikTracker;
-import cz.iocb.chemweb.server.Utils;
 
 
 
@@ -57,7 +54,7 @@ public class PiwikFilter implements Filter
         String siteIdString = config.getInitParameter("siteId");
 
         if(siteIdString == null || siteIdString.isEmpty())
-            throw new IllegalArgumentException("Site ID not set, please set init-param 'siteId' in web.xml");
+            throw new ServletException("Site ID not set, please set init-param 'siteId' in web.xml");
 
         siteId = Integer.parseInt(siteIdString);
 
@@ -66,7 +63,7 @@ public class PiwikFilter implements Filter
         hostUrl = config.getInitParameter("hostUrl");
 
         if(hostUrl == null || hostUrl.isEmpty())
-            throw new IllegalArgumentException("Host URL not set, please set init-param 'hostUrl' in web.xml");
+            throw new ServletException("Host URL not set, please set init-param 'hostUrl' in web.xml");
 
 
         /* obtain the value of parameter filterName */
@@ -79,15 +76,15 @@ public class PiwikFilter implements Filter
         if(replace != null)
         {
             if(replace.length() < 4)
-                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
 
             if(replace.charAt(0) != replace.charAt(replace.length() - 1))
-                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
 
             int delimiter = replace.indexOf(replace.charAt(0), 1);
 
             if(delimiter == -1 || replace.indexOf(replace.charAt(0), delimiter + 1) != replace.length() - 1)
-                throw new IllegalArgumentException("Invalid value of init-param 'replaceUrl' in web.xml");
+                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
 
             replaceUrl = new String[] { replace.substring(1, delimiter),
                     replace.substring(delimiter + 1, replace.length() - 1) };
@@ -102,38 +99,27 @@ public class PiwikFilter implements Filter
 
 
         /* obtain the value of parameter authToken */
-        String authTokenFile = config.getInitParameter("authToken");
+        String authTokenParameter = config.getInitParameter("authToken");
 
-        if(authTokenFile == null || authTokenFile.isEmpty())
-            throw new IllegalArgumentException(
-                    "AuthToken property file not set, please set init-param 'authToken' in web.xml");
+        if(authTokenParameter == null || authTokenParameter.isEmpty())
+            throw new ServletException("AuthToken property not set, please set init-param 'authToken' in web.xml");
 
-        try
-        {
-            if(!authTokenFile.startsWith("/"))
-                authTokenFile = Utils.getConfigDirectory() + "/" + authTokenFile;
-
-            Properties properties = new Properties();
-            properties.load(new FileInputStream(authTokenFile));
-            authToken = properties.getProperty("authToken");
-        }
-        catch(IOException e)
-        {
-            throw new IllegalArgumentException("Cannot load authToken property file " + authTokenFile);
-        }
+        authToken = config.getServletContext().getInitParameter(authTokenParameter);
 
         if(authToken == null || authToken.isEmpty())
-            throw new IllegalArgumentException("AuthToken property file " + authTokenFile + " is not valid");
+            throw new ServletException("AuthToken property " + authTokenParameter + " is not valid");
 
 
         cookieName = "_pk_id." + siteId + ".";
     }
+
 
     @Override
     public void destroy()
     {
 
     }
+
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Context>
 
+  <Parameter name="piwikAuthToken" value="%token%" override="false"/>
+
   <Resource name="sparql/pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"

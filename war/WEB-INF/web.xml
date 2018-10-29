@@ -43,7 +43,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>rpc</param-name><param-value>true</param-value></init-param>
   </filter>
   <filter-mapping>
@@ -57,7 +57,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>actionName</param-name><param-value>ChEBI SPARQL Endpoint</param-value></init-param>
     <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
   </filter>
@@ -72,7 +72,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>actionName</param-name><param-value>ChEMBL SPARQL Endpoint</param-value></init-param>
     <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
   </filter>
@@ -87,7 +87,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>actionName</param-name><param-value>DrugBank SPARQL Endpoint</param-value></init-param>
     <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
   </filter>
@@ -102,7 +102,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>actionName</param-name><param-value>PubChem SPARQL Endpoint</param-value></init-param>
     <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
   </filter>
@@ -117,7 +117,7 @@
     <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
     <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
     <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwik.properties</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
     <init-param><param-name>actionName</param-name><param-value>Empty SPARQL Endpoint</param-value></init-param>
     <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
   </filter>
