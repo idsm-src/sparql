@@ -15,6 +15,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.piwik.java.tracking.PiwikRequest;
 import org.piwik.java.tracking.PiwikTracker;
@@ -32,6 +33,21 @@ public class PiwikFilter implements Filter
     private boolean rpc = false;
 
     private String cookieName = null;
+
+
+    static
+    {
+        /* memory leak protection*/
+        ClassLoader active = Thread.currentThread().getContextClassLoader();
+        ClassLoader root = active;
+
+        while(root.getParent() != null)
+            root = root.getParent();
+
+        Thread.currentThread().setContextClassLoader(root);
+        DatatypeConverter.printHexBinary(new byte[0]);
+        Thread.currentThread().setContextClassLoader(active);
+    }
 
 
     @Override
