@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.pubchem;
+package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;

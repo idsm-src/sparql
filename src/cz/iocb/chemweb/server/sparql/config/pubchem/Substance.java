@@ -1,6 +1,6 @@
-package cz.iocb.chemweb.server.sparql.pubchem;
+package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration.xsdDateM4;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;

@@ -321,7 +321,7 @@
   <resource-env-ref>
     <description>PubChem SPARQL configuration</description>
     <resource-env-ref-name>sparql/pubchem</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration</resource-env-ref-type>
+    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>

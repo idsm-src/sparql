@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.pubchem;
+package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;

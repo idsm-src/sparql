@@ -4,7 +4,7 @@
   <Parameter name="piwikAuthToken" value="%token%" override="false"/>
 
   <Resource name="sparql/pubchem" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.pubchem.PubChemConfiguration"
+      type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       database="localhost:5432/pubchem" username="SPARQL" password="%password%" connections="5" 
       singleton="true" closeMethod="close" />
