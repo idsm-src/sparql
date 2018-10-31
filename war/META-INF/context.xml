@@ -52,6 +52,38 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
+  <Resource name="jdbc:images-chebi" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/chebi" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:images-chembl" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/chembl" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:images-drugbank" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/drugbank" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:images-pubchem" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/pubchem" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
 
   <Resource name="sparql:pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"

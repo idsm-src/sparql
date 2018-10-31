@@ -17,7 +17,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
@@ -70,10 +69,10 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
 
-            chebiPool = ((SparqlDatabaseConfiguration) context.lookup(chebiResourceName)).getConnectionPool();
-            chemblPool = ((SparqlDatabaseConfiguration) context.lookup(chemblResourceName)).getConnectionPool();
-            drugbankPool = ((SparqlDatabaseConfiguration) context.lookup(drugbankResourceName)).getConnectionPool();
-            pubchemPool = ((SparqlDatabaseConfiguration) context.lookup(pubchemResourceName)).getConnectionPool();
+            chebiPool = ((DataSource) context.lookup(chebiResourceName));
+            chemblPool = ((DataSource) context.lookup(chemblResourceName));
+            drugbankPool = ((DataSource) context.lookup(drugbankResourceName));
+            pubchemPool = ((DataSource) context.lookup(pubchemResourceName));
         }
         catch(NamingException e)
         {

@@ -60,7 +60,6 @@ import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
@@ -104,8 +103,7 @@ public class CompoundImageServlet extends HttpServlet
         try
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
-            SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-            connectionPool = dbConfig.getConnectionPool();
+            connectionPool = (DataSource) context.lookup(resourceName);
         }
         catch(NamingException e)
         {

@@ -157,7 +157,7 @@
   <servlet>
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>CompoundImage</servlet-name>
@@ -264,7 +264,7 @@
   <servlet>
     <servlet-name>ChebiCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-chebi</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChebiCompoundImage</servlet-name>
@@ -274,7 +274,7 @@
   <servlet>
     <servlet-name>ChemblCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-chembl</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChemblCompoundImage</servlet-name>
@@ -284,7 +284,7 @@
   <servlet>
     <servlet-name>DrugbankCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-drugbank</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>DrugbankCompoundImage</servlet-name>
@@ -294,7 +294,7 @@
   <servlet>
     <servlet-name>PubChemCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>PubChemCompoundImage</servlet-name>
@@ -306,10 +306,10 @@
   <servlet>
     <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.SachemEndpointStatisticsServlet</servlet-class>
-    <init-param><param-name>resource-chebi</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
-    <init-param><param-name>resource-chembl</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
-    <init-param><param-name>resource-drugbank</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
-    <init-param><param-name>resource-pubchem</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
+    <init-param><param-name>resource-chebi</param-name><param-value>jdbc:sachem-chebi</param-value></init-param>
+    <init-param><param-name>resource-chembl</param-name><param-value>jdbc:sachem-chembl</param-value></init-param>
+    <init-param><param-name>resource-drugbank</param-name><param-value>jdbc:sachem-drugbank</param-value></init-param>
+    <init-param><param-name>resource-pubchem</param-name><param-value>jdbc:sachem-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
