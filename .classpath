@@ -6,16 +6,11 @@
 			<attribute name="owner.project.facets" value="java"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/velocity-1.7.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/log4j-1.2.17.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/piwik-java-tracker-1.2.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/antlr4-runtime-4.5.3.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-lang-2.6.jar"/>
-	<classpathentry kind="lib" path="gwt/RetinaImages.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/postgresql-42.1.4.jar"/>
-	<classpathentry kind="con" path="com.gwtplugins.gwt.eclipse.core.GWT_CONTAINER"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/cdk-2.1.1.jar"/>
-	<classpathentry kind="lib" path="war/WEB-INF/lib/tomcat-jdbc-8.5.34.jar"/>
+	<classpathentry kind="con" path="com.gwtplugins.gwt.eclipse.core.GWT_CONTAINER">
+		<attributes>
+			<attribute name="org.eclipse.jst.component.nondependency" value=""/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
 	<classpathentry kind="output" path="war/WEB-INF/classes"/>

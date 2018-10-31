@@ -3,12 +3,12 @@
 
   <target name="buildwar-devel">
     <war basedir="war" destfile="chemweb-devel.war" webxml="war/WEB-INF/web.xml"
-        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**,WEB-INF/lib/tomcat-jdbc*.jar" />
+        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**,WEB-INF/lib/RetinaImages.jar,WEB-INF/lib/tomcat-jdbc*.jar" />
   </target>
 
   <target name="buildwar">
     <war basedir="war" destfile="chemweb.war" webxml="war/WEB-INF/web.xml"
-        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**,WEB-INF/lib/tomcat-jdbc*.jar" />
+        excludes="WEB-INF/classes/cz/iocb/tomcat/**,WEB-INF/classes/cz/iocb/chemweb/client/**,WEB-INF/lib/RetinaImages.jar,WEB-INF/lib/tomcat-jdbc*.jar" />
   </target>
 
   <target name="buildjar">

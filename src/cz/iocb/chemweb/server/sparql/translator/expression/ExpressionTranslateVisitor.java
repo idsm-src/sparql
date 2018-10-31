@@ -22,8 +22,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.InExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
@@ -45,23 +43,23 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 {
     private final VariableAccessor variableAccessor;
 
-    private final SparqlDatabaseConfiguration configuration;
+    //private final SparqlDatabaseConfiguration configuration;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
 
     private final Prologue prologue;
     private final List<TranslateException> exceptions;
-    private final List<TranslateException> warnings;
+    //private final List<TranslateException> warnings;
 
 
     public ExpressionTranslateVisitor(VariableAccessor variableAccessor, SparqlDatabaseConfiguration configuration,
             Prologue prologue, List<TranslateException> exceptions, List<TranslateException> warnings)
     {
         this.variableAccessor = variableAccessor;
-        this.configuration = configuration;
+        //this.configuration = configuration;
         this.iriClasses = configuration.getIriClasses();
         this.prologue = prologue;
         this.exceptions = exceptions;
-        this.warnings = warnings;
+        //this.warnings = warnings;
     }
 
 
@@ -165,8 +163,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
-        TranslateVisitor translator = new TranslateVisitor(configuration);
-        TranslatedSegment pattern = translator.visitElement(existsExpression.getPattern());
+        //TranslateVisitor translator = new TranslateVisitor(configuration);
+        //TranslatedSegment pattern = translator.visitElement(existsExpression.getPattern());
 
         return null; //SqlExists.create(pattern);
     }
