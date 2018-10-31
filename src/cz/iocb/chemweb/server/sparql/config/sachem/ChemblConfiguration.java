@@ -1,14 +1,14 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
 import java.sql.SQLException;
-import java.util.Properties;
+import javax.sql.DataSource;
 
 
 
 public class ChemblConfiguration extends SachemConfiguration
 {
-    public ChemblConfiguration(Properties properties) throws SQLException
+    public ChemblConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(properties, "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[0-9]+");
+        super(connectionPool, "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[0-9]+");
     }
 }

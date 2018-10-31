@@ -9,9 +9,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Properties;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
@@ -33,7 +32,7 @@ import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 public abstract class SparqlDatabaseConfiguration
 {
     protected DatabaseSchema schema;
-    protected ConnectionPool connectionPool;
+    protected DataSource connectionPool;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
     protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
@@ -41,9 +40,9 @@ public abstract class SparqlDatabaseConfiguration
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
 
-    protected SparqlDatabaseConfiguration(Properties properties) throws SQLException
+    protected SparqlDatabaseConfiguration(DataSource connectionPool) throws SQLException
     {
-        connectionPool = new ConnectionPool(properties);
+        this.connectionPool = connectionPool;
         schema = new PostgresSchema(connectionPool);
     }
 
@@ -196,14 +195,8 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public ConnectionPool getConnectionPool()
+    public DataSource getConnectionPool()
     {
         return connectionPool;
-    }
-
-
-    public void close()
-    {
-        connectionPool.close();
     }
 }

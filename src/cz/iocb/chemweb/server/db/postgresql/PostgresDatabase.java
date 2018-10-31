@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Vector;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.db.BlankNode;
 import cz.iocb.chemweb.server.db.IriNode;
 import cz.iocb.chemweb.server.db.LanguageTaggedLiteral;
@@ -48,7 +49,7 @@ public class PostgresDatabase
     private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
             'E', 'F' };
 
-    private final ConnectionPool connectionPool;
+    private final DataSource connectionPool;
 
 
     static
@@ -62,7 +63,7 @@ public class PostgresDatabase
     }
 
 
-    public PostgresDatabase(ConnectionPool connectionPool)
+    public PostgresDatabase(DataSource connectionPool)
     {
         this.connectionPool = connectionPool;
     }

@@ -8,7 +8,7 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Properties;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -22,9 +22,9 @@ import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 {
-    protected SachemConfiguration(Properties properties, String iriPrefix, String idPattern) throws SQLException
+    protected SachemConfiguration(DataSource connectionPool, String iriPrefix, String idPattern) throws SQLException
     {
-        super(properties);
+        super(connectionPool);
 
         loadPrefixes(iriPrefix);
         loadClasses(iriPrefix, idPattern);

@@ -6,13 +6,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 
 
 
 public class PostgresSchema extends DatabaseSchema
 {
-    public PostgresSchema(ConnectionPool connectionPool) throws SQLException
+    public PostgresSchema(DataSource connectionPool) throws SQLException
     {
         try(Connection connection = connectionPool.getConnection())
         {

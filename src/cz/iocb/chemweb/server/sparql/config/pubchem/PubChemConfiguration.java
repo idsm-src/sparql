@@ -8,7 +8,7 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Properties;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -27,9 +27,9 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
     static final DateConstantZoneClass xsdDateM4 = DateConstantZoneClass.get(-4 * 60 * 60);
 
 
-    public PubChemConfiguration(Properties properties) throws SQLException
+    public PubChemConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(properties);
+        super(connectionPool);
 
         loadPrefixes();
         loadClasses();

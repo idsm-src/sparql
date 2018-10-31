@@ -24,6 +24,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 import javax.vecmath.Point2d;
 import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.aromaticity.Aromaticity;
@@ -59,7 +60,6 @@ import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
-import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
@@ -67,7 +67,7 @@ import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 @SuppressWarnings("serial")
 public class CompoundImageServlet extends HttpServlet
 {
-    private ConnectionPool connectionPool;
+    private DataSource connectionPool;
     private String queryPattern;
 
 

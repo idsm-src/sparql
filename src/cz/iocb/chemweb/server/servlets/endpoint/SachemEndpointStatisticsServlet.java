@@ -16,7 +16,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import cz.iocb.chemweb.server.db.postgresql.ConnectionPool;
+import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
@@ -26,10 +26,10 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
 {
     static private final SimpleDateFormat dateFormatGmt;
 
-    private ConnectionPool chebiPool;
-    private ConnectionPool chemblPool;
-    private ConnectionPool drugbankPool;
-    private ConnectionPool pubchemPool;
+    private DataSource chebiPool;
+    private DataSource chemblPool;
+    private DataSource drugbankPool;
+    private DataSource pubchemPool;
 
 
     static

@@ -1,14 +1,14 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
 import java.sql.SQLException;
-import java.util.Properties;
+import javax.sql.DataSource;
 
 
 
 public class ChebiConfiguration extends SachemConfiguration
 {
-    public ChebiConfiguration(Properties properties) throws SQLException
+    public ChebiConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(properties, "http://purl.obolibrary.org/obo/CHEBI_", "[0-9]+");
+        super(connectionPool, "http://purl.obolibrary.org/obo/CHEBI_", "[0-9]+");
     }
 }

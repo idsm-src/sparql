@@ -1,14 +1,14 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
 import java.sql.SQLException;
-import java.util.Properties;
+import javax.sql.DataSource;
 
 
 
 public class PubChemConfiguration extends SachemConfiguration
 {
-    public PubChemConfiguration(Properties properties) throws SQLException
+    public PubChemConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(properties, "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID[0-9]+");
+        super(connectionPool, "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID[0-9]+");
     }
 }
