@@ -12,6 +12,14 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
+  <Resource name="jdbc:empty" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/empty" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
   <Resource name="jdbc:sachem-chebi" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
       type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
@@ -44,43 +52,35 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
-  <Resource name="jdbc:empty" auth="Container"
-      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
-      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
-      url="jdbc:postgresql://localhost:5432/empty" username="SPARQL" password="%password%"
-      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
-      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
-      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
-
-  <Resource name="sparql/pubchem" auth="Container"
+  <Resource name="sparql:pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:pubchem" singleton="true" />
 
-  <Resource name="sachem/chebi" auth="Container"
+  <Resource name="sparql:empty" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      datasource="jdbc:empty" singleton="true" />
+
+  <Resource name="sparql:sachem-chebi" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chebi" singleton="true" />
 
-  <Resource name="sachem/chembl" auth="Container"
+  <Resource name="sparql:sachem-chembl" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chembl" singleton="true" />
 
-  <Resource name="sachem/drugbank" auth="Container"
+  <Resource name="sparql:sachem-drugbank" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-drugbank" singleton="true" />
 
-  <Resource name="sachem/pubchem" auth="Container"
+  <Resource name="sparql:sachem-pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-pubchem" singleton="true" />
-
-  <Resource name="sparql/empty" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
-      datasource="jdbc:empty" singleton="true" />
 
 </Context>

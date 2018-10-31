@@ -127,7 +127,7 @@
   <servlet>
     <servlet-name>CheckServiceServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.services.check.CheckServiceImpl</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>CheckServiceServlet</servlet-name>
@@ -137,7 +137,7 @@
   <servlet>
     <servlet-name>QueryServiceServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.services.query.QueryServiceImpl</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>QueryServiceServlet</servlet-name>
@@ -147,7 +147,7 @@
   <servlet>
     <servlet-name>DetailsPageServiceServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.services.details.DetailsPageServiceImpl</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>DetailsPageServiceServlet</servlet-name>
@@ -157,7 +157,7 @@
   <servlet>
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>CompoundImage</servlet-name>
@@ -167,7 +167,7 @@
   <servlet>
     <servlet-name>Hints</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.hints.GenerateHints</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>Hints</servlet-name>
@@ -177,7 +177,7 @@
   <servlet>
     <servlet-name>Config</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.config.GenerateConfig</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>Config</servlet-name>
@@ -207,7 +207,7 @@
   <servlet>
     <servlet-name>ChebiEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/chebi</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChebiEndpointServlet</servlet-name>
@@ -218,7 +218,7 @@
   <servlet>
     <servlet-name>ChemblEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/chembl</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChemblEndpointServlet</servlet-name>
@@ -229,7 +229,7 @@
   <servlet>
     <servlet-name>DrugbankEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/drugbank</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>DrugbankEndpointServlet</servlet-name>
@@ -240,7 +240,7 @@
   <servlet>
     <servlet-name>PubChemEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>PubChemEndpointServlet</servlet-name>
@@ -251,7 +251,7 @@
   <servlet>
     <servlet-name>EmptyEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql/empty</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:empty</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>EmptyEndpointServlet</servlet-name>
@@ -264,7 +264,7 @@
   <servlet>
     <servlet-name>ChebiCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/chebi</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChebiCompoundImage</servlet-name>
@@ -274,7 +274,7 @@
   <servlet>
     <servlet-name>ChemblCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/chembl</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChemblCompoundImage</servlet-name>
@@ -284,7 +284,7 @@
   <servlet>
     <servlet-name>DrugbankCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/drugbank</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>DrugbankCompoundImage</servlet-name>
@@ -294,7 +294,7 @@
   <servlet>
     <servlet-name>PubChemCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sachem/pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>PubChemCompoundImage</servlet-name>
@@ -306,10 +306,10 @@
   <servlet>
     <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.SachemEndpointStatisticsServlet</servlet-class>
-    <init-param><param-name>resource-chebi</param-name><param-value>sachem/chebi</param-value></init-param>
-    <init-param><param-name>resource-chembl</param-name><param-value>sachem/chembl</param-value></init-param>
-    <init-param><param-name>resource-drugbank</param-name><param-value>sachem/drugbank</param-value></init-param>
-    <init-param><param-name>resource-pubchem</param-name><param-value>sachem/pubchem</param-value></init-param>
+    <init-param><param-name>resource-chebi</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
+    <init-param><param-name>resource-chembl</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
+    <init-param><param-name>resource-drugbank</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
+    <init-param><param-name>resource-pubchem</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
@@ -320,37 +320,37 @@
   <!-- SPARQL Configurations -->
   <resource-env-ref>
     <description>PubChem SPARQL configuration</description>
-    <resource-env-ref-name>sparql/pubchem</resource-env-ref-name>
+    <resource-env-ref-name>sparql:pubchem</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>
     <description>Sachem/ChEBI SPARQL configuration</description>
-    <resource-env-ref-name>sachem/chebi</resource-env-ref-name>
+    <resource-env-ref-name>sparql:sachem-chebi</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>
     <description>Sachem/ChEMBL SPARQL configuration</description>
-    <resource-env-ref-name>sachem/chembl</resource-env-ref-name>
+    <resource-env-ref-name>sparql:sachem-chembl</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>
     <description>Sachem/DrugBank SPARQL configuration</description>
-    <resource-env-ref-name>sachem/drugbank</resource-env-ref-name>
+    <resource-env-ref-name>sparql:sachem-drugbank</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>
     <description>Sachem/PubChem SPARQL configuration</description>
-    <resource-env-ref-name>sachem/pubchem</resource-env-ref-name>
+    <resource-env-ref-name>sparql:sachem-pubchem</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
   <resource-env-ref>
     <description>Empty SPARQL configuration</description>
-    <resource-env-ref-name>sparql/empty</resource-env-ref-name>
+    <resource-env-ref-name>sparql:empty</resource-env-ref-name>
     <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration</resource-env-ref-type>
   </resource-env-ref>
 
