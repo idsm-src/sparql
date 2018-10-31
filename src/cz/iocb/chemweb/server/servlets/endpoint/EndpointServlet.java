@@ -2,8 +2,9 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -35,7 +36,7 @@ public class EndpointServlet extends HttpServlet
     static enum OutputType
     {
         NONE, XML, JSON, TSV, CSV
-    };
+    }
 
 
     private SparqlDatabaseConfiguration dbConfig;
@@ -46,23 +47,20 @@ public class EndpointServlet extends HttpServlet
     @Override
     public void init(ServletConfig config) throws ServletException
     {
-        String configClassName = config.getInitParameter("configClass");
+        String resourceName = config.getInitParameter("resource");
 
-        if(configClassName == null || configClassName.isEmpty())
-            throw new IllegalArgumentException("Config class is not set");
+        if(resourceName == null || resourceName.isEmpty())
+            throw new IllegalArgumentException("Resource name is not set");
 
 
         try
         {
-            Class<?> configClass = Class.forName(configClassName);
-            Method method = configClass.getMethod("get");
-
-            dbConfig = (SparqlDatabaseConfiguration) method.invoke(null);
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
             parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
             db = new PostgresDatabase(dbConfig.getConnectionPool());
         }
-        catch(ClassNotFoundException | NoSuchMethodException | SecurityException | IllegalAccessException
-                | IllegalArgumentException | InvocationTargetException e)
+        catch(NamingException e)
         {
             throw new ServletException(e);
         }
