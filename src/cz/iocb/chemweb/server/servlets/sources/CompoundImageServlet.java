@@ -145,6 +145,8 @@ public class CompoundImageServlet extends HttpServlet
     {
         int id;
         int size;
+        Color background = null;
+
 
         try
         {
@@ -155,6 +157,7 @@ public class CompoundImageServlet extends HttpServlet
             throw new ServletException("an invalid value of the 'id' argument");
         }
 
+
         try
         {
             size = Integer.parseInt(req.getParameter("w"));
@@ -164,9 +167,23 @@ public class CompoundImageServlet extends HttpServlet
             throw new ServletException("an invalid value of the 'w' argument");
         }
 
-
         if(size < 40 || size > 1600)
             throw new ServletException("an invalid value of the 'w' argument");
+
+
+        String backgroundParameter = req.getParameter("background");
+
+        if(backgroundParameter != null)
+        {
+            try
+            {
+                background = new Color(Integer.parseInt(backgroundParameter, 16));
+            }
+            catch(NumberFormatException e)
+            {
+                throw new ServletException("an invalid value of the 'background' argument");
+            }
+        }
 
 
         try
@@ -180,7 +197,7 @@ public class CompoundImageServlet extends HttpServlet
 
             try(ServletOutputStream out = res.getOutputStream())
             {
-                generateImage(out, molecule, size, size);
+                generateImage(out, molecule, size, size, background != null ? background : new Color(0, 0, 0, 0));
             }
         }
         catch(CDKException e)
