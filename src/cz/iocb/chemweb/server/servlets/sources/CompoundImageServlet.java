@@ -195,6 +195,11 @@ public class CompoundImageServlet extends HttpServlet
 
             res.setContentType("image/png");
 
+            String filename = req.getParameter("filename");
+
+            if(filename != null)
+                res.setHeader("Content-Disposition", "attachment;filename=\"" + filename + "\"");
+
             try(ServletOutputStream out = res.getOutputStream())
             {
                 generateImage(out, molecule, size, size, background != null ? background : new Color(0, 0, 0, 0));
