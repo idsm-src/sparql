@@ -30,6 +30,8 @@ class Reference
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Reference.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:date"),

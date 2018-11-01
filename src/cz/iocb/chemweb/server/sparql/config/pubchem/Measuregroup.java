@@ -27,6 +27,8 @@ class Measuregroup
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bao:BAO_0000040"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Measuregroup.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),

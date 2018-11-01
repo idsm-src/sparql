@@ -27,6 +27,8 @@ class Source
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("dcterms:Dataset"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Source.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
         }

@@ -27,6 +27,8 @@ class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Protein"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Protein.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
@@ -125,7 +127,7 @@ class Protein
             /* TODO:
             String table = "protein_types";
             NodeMapping subject = config.createIriMapping(protein, "protein");
-
+            
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("class", "type"));
             */

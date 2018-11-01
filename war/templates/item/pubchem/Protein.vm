@@ -1,9 +1,9 @@
-#set($BAO = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+#set($ID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
 
 #sparql($title)
   SELECT ?TITLE  WHERE
   {
-    GRAPH pubchem:bioassay
+    GRAPH pubchem:protein
     {
       $entity dcterms:title ?TITLE
     }
@@ -13,7 +13,7 @@
 <table style="width:100%">
   <tbody>
     <tr><td>
-      <b>$BAO</b>
+      <b>$ID</b>
     </td></tr>
     #if($title.TITLE)
     <tr><td>
