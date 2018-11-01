@@ -22,9 +22,13 @@
   <div class="VET-BoxedSection">
     <div class="VET-Header">Property</div>
     <div>
+      #if($info.LABEL)
       <b>#escapeHTML($info.LABEL)</b>
       <br/>
       <small>#escapeIRI($entity)</small>
+      #else
+      <b>#escapeIRI($entity)</b>
+      #end
 
 
       #sparql($domains)
@@ -83,7 +87,9 @@
     <ul class="hierarchy">
       <li>
         #url($property)#escapeIRI($property)#end
+        #if($info.LABEL)
         (#escapeHTML($info.LABEL))
+        #end
       <li>
       #foreach($s in $super)
       <li>#superlevel($s.PROPERTY)<li>
@@ -118,7 +124,9 @@
     <ul class="hierarchy">
       <li>
         #url($property)#escapeIRI($property)#end
+        #if($info.LABEL)
         (#escapeHTML($info.LABEL))
+        #end
       <li>
       #foreach($s in $super)
       <li>#sublevel($s.PROPERTY)<li>

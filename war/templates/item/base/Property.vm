@@ -11,11 +11,17 @@
 
 <table style="width:100%">
   <tbody>
+    #if($info.LABEL)
     <tr>
       <td>#escapeHTML($info.LABEL)</td>
     </tr>
     <tr>
       <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
+    #else
+    <tr>
+      <td>#escapeIRI($entity)</td>
+    </tr>
+    #end
   </tbody>
 </table>
