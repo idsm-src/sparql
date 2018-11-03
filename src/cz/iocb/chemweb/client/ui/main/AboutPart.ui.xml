@@ -14,7 +14,7 @@
 
     <b>Authors:</b>
     <ul>
-      <li>Jakub Galgonek</li>
+      <li><a href="mailto:Jakub Galgonek &lt;jakub.galgonek@uochb.cas.cz&gt;?subject=IOCB RDF Platform">Jakub Galgonek</a></li>
       <li>Tomáš Hurt</li>
       <li>Vendula Michlíková</li>
       <li>Petr Onderka</li>
@@ -28,16 +28,16 @@
       <li><a href="http://velocity.apache.org/" target="_blank">Apache Velocity</a></li>
       <li><a href="http://www.antlr.org/" target="_blank">ANTLR</a></li>
       <li><a href="https://code.google.com/p/sparkle-g/" target="_blank">Sparkle-g Lexer and Parser</a></li>
-      <li><a href="http://virtuoso.openlinksw.com/" target="_blank">OpenLink Software Virtuoso</a></li>
+      <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a></li>
       <li><a href="https://jena.apache.org/" target="_blank">Apache Jena</a></li>
-      <li><a href="http://orchem.sourceforge.net/" target="_blank">Orchem</a></li>
+      <li><a href="http://bioinfo.uochb.cas.cz/sachem/" target="_blank">Sachem</a></li>
       <li><a href="http://tomcat.apache.org/" target="_blank">Apache Tomcat</a></li>
     </ul>
 
     <b>Data:</b>
     <ul>
+      <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a></li>
       <li><a href="http://www.kde.org/" target="_blank">KDE</a> <a href="https://techbase.kde.org/Projects/Oxygen" target="_blank">Oxygen Icons</a> (licensed under the <a href="http://www.gnu.org/licenses/lgpl-3.0.html" target="_blank">LGPLv3</a>)</li>
-      <li><a href="http://www.famfamfam.com/lab/icons/flags/" target="_blank">Mark James's Flag icons</a></li>
     </ul>
 
   </g:HTML>
