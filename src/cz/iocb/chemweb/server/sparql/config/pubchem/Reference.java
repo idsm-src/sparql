@@ -26,10 +26,8 @@ class Reference
             String table = "reference_bases";
             NodeMapping subject = config.createIriMapping(reference, "id");
 
-            /* TODO:
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("class", "type"));
-            */
+                    config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "type_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Reference.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),

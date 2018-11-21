@@ -14,8 +14,6 @@ class Endpoint
     {
         config.addIriClass(new UserIriClass("endpoint", Arrays.asList("integer", "integer", "integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/SID[0-9]+_AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
-        config.addIriClass(new UserIriClass("outcome", Arrays.asList("smallint"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#(active|inactive|inconclusive|unspecified|probe)"));
     }
 
 
@@ -31,7 +29,7 @@ class Endpoint
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:IAO_0000136"),
                     config.createIriMapping("substance", "substance"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:PubChemAssayOutcome"),
-                    config.createIriMapping("outcome", "outcome"));
+                    config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "outcome_id"));
         }
 
         {
@@ -40,10 +38,8 @@ class Endpoint
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-unit"),
                     config.createIriMapping("obo:UO_0000064"));
-            /* TODO:
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("class", "class"));
-            */
+                    config.createIriMapping("ontology_resource", Ontology.unitBAO, "type_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(rdfLangStringEn, "label"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
@@ -56,18 +52,6 @@ class Endpoint
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:citesAsDataSource"),
                     config.createIriMapping("reference", "reference"));
-        }
-
-        {
-            String table = "endpoint_outcomes__reftable";
-            NodeMapping subject = config.createIriMapping("outcome", "id");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("vocab:PubChemBioAssayOutcomeCategory"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/PubChemBioAssayOutcomeCategory.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
-                    config.createLiteralMapping("pubchem/PubChemBioAssayOutcomeCategory.vm"));
         }
     }
 }

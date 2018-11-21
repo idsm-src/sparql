@@ -50,12 +50,10 @@ class Bioassay
 
         {
             String table = "bioassay_data";
-            NodeMapping subject = config.createIriMapping("bioassay_data", "bioassay", "type");
+            NodeMapping subject = config.createIriMapping("bioassay_data", "bioassay", "type_id");
 
-            /* TODO:
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping(rdfclass, "type"));
-            */
+                    config.createIriMapping("ontology_resource", Ontology.unitSIO, "type_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping(bioassay, "bioassay"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),

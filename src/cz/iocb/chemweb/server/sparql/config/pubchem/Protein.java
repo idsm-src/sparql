@@ -32,7 +32,8 @@ class Protein
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("taxonomy", "organism"), "organism is not null");
+                    config.createIriMapping("ontology_resource", Ontology.unitTaxonomy, "organism_id"),
+                    "organism_id is not null");
         }
 
         {
@@ -92,15 +93,15 @@ class Protein
         }
 
         {
-            String table = "protein_participates_goes";
+            String table = "protein_processes";
             NodeMapping subject = config.createIriMapping(protein, "protein");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
-                    config.createIriMapping("go", "participation"));
+                    config.createIriMapping("ontology_resource", Ontology.unitGO, "process_id"));
         }
 
         {
-            String table = "protein_participates_biosystems";
+            String table = "protein_biosystems";
             NodeMapping subject = config.createIriMapping(protein, "protein");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
@@ -112,7 +113,7 @@ class Protein
             NodeMapping subject = config.createIriMapping(protein, "protein");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000160"),
-                    config.createIriMapping("go", "gofunction"));
+                    config.createIriMapping("ontology_resource", Ontology.unitGO, "function_id"));
         }
 
         {
@@ -120,17 +121,15 @@ class Protein
             NodeMapping subject = config.createIriMapping(protein, "protein");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000171"),
-                    config.createIriMapping("go", "location"));
+                    config.createIriMapping("ontology_resource", Ontology.unitGO, "location_id"));
         }
 
         {
-            /* TODO:
             String table = "protein_types";
             NodeMapping subject = config.createIriMapping(protein, "protein");
-            
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("class", "type"));
-            */
+                    config.createIriMapping("ontology_resource", Ontology.unitPR, "type_id"));
         }
 
         {

@@ -159,6 +159,39 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public String getPattern(String table)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        try(Connection connection = connectionPool.getConnection())
+        {
+            try(PreparedStatement statement = connection.prepareStatement("select pattern from " + table))
+            {
+                try(java.sql.ResultSet result = statement.executeQuery())
+                {
+                    boolean hasResult = false;
+
+                    while(result.next())
+                    {
+                        if(hasResult)
+                            builder.append("|");
+
+                        hasResult = true;
+
+                        builder.append("(" + result.getString(1) + ")");
+                    }
+                }
+            }
+        }
+        catch(Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        return builder.toString();
+    }
+
+
     public UserIriClass getIriClass(String name)
     {
         return iriClasses.get(name);

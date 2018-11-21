@@ -48,13 +48,20 @@ class Compound
         }
 
         {
-            /* TODO:
             String table = "compound_relations";
             NodeMapping subject = config.createIriMapping(compound, "compound_from");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(property, "relation"),
+            config.addQuadMapping(table, graph, subject,
+                    config.createIriMapping("ontology_resource", "relation_unit", "relation_id"),
                     config.createIriMapping(compound, "compound_to"));
-            */
+        }
+
+        {
+            String table = "compound_roles";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:has-role"), config
+                    .createIriMapping(config.getIriClass("ontology_resource"), Ontology.unitUncategorized, "role_id"));
         }
 
         {
@@ -66,23 +73,19 @@ class Compound
         }
 
         {
-            /* TODO:
             String table = "compound_types";
             NodeMapping subject = config.createIriMapping(compound, "compound");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping(rdfclass, "type"));
-            */
+                    config.createIriMapping("ontology_resource", "type_unit", "type_id"));
         }
 
         {
-            /* TODO:
             String table = "compound_active_ingredients";
             NodeMapping subject = config.createIriMapping(compound, "compound");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:is_active_ingredient_of"),
-                    config.createIriMapping(rdfclass, "ingredient"));
-            */
+                    config.createIriMapping("ontology_resource", "ingredient_unit", "ingredient_id"));
         }
 
         {
