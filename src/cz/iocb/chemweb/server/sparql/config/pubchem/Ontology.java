@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -10,6 +11,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 class Ontology
 {
     public static final String unitUncategorized = "0::smallint";
+    public static final String unitBlank = "1::smallint";
     public static final String unitSIO = "2::smallint";
     public static final String unitCHEMINF = "3::smallint";
     public static final String unitBAO = "4::smallint";
@@ -105,6 +107,66 @@ class Ontology
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:range"),
                     config.createIriMapping(rdfResource, "range_unit", "range_id"));
+        }
+
+        {
+            String table = "ontology_resource_somevaluesfrom_restrictions";
+            NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Restriction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:onProperty"),
+                    config.createIriMapping(rdfResource, "property_unit", "property_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:someValuesFrom"),
+                    config.createIriMapping(rdfResource, "class_unit", "class_id"));
+        }
+
+        {
+            String table = "ontology_resource_allvaluesfrom_restrictions";
+            NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Restriction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:onProperty"),
+                    config.createIriMapping(rdfResource, "property_unit", "property_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:allValuesFrom"),
+                    config.createIriMapping(rdfResource, "class_unit", "class_id"));
+        }
+
+        {
+            String table = "ontology_resource_cardinality_restrictions";
+            NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Restriction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:onProperty"),
+                    config.createIriMapping(rdfResource, "property_unit", "property_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:cardinality"),
+                    config.createLiteralMapping(xsdInt, "cardinality"));
+        }
+
+        {
+            String table = "ontology_resource_mincardinality_restrictions";
+            NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Restriction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:onProperty"),
+                    config.createIriMapping(rdfResource, "property_unit", "property_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:minCardinality"),
+                    config.createLiteralMapping(xsdInt, "cardinality"));
+        }
+
+        {
+            String table = "ontology_resource_maxcardinality_restrictions";
+            NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("owl:Restriction"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:onProperty"),
+                    config.createIriMapping(rdfResource, "property_unit", "property_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:maxCardinality"),
+                    config.createLiteralMapping(xsdInt, "cardinality"));
         }
     }
 }
