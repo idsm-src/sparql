@@ -330,14 +330,16 @@ public class SqlTableAccess extends SqlIntercode
 
         for(Pair<Node, ParametrisedMapping> parentEntry : parent.valueConditions)
         {
+            Node parentNode = parentEntry.getLeft();
+            ParametrisedMapping parentMap = parentEntry.getRight();
+
+            for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
+                parentColumns.add(parentMap.getSqlColumn(i));
+
             for(Pair<Node, ParametrisedMapping> foreignEntry : foreign.valueConditions)
             {
-                Node parentNode = parentEntry.getLeft();
                 Node foreignNode = foreignEntry.getLeft();
-
-                ParametrisedMapping parentMap = parentEntry.getRight();
                 ParametrisedMapping foreignMap = foreignEntry.getRight();
-
 
                 if(!parentNode.equals(foreignNode))
                     continue;
