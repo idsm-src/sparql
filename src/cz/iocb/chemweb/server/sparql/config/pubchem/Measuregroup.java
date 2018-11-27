@@ -32,7 +32,7 @@ class Measuregroup
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
-                    config.createIriMapping("source", "source"), "source is not null");
+                    config.createIriMapping("source", "source"));
         }
 
         {

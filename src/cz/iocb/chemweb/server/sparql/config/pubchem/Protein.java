@@ -32,8 +32,7 @@ class Protein
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology_resource", Ontology.unitTaxonomy, "organism_id"),
-                    "organism_id is not null");
+                    config.createIriMapping("ontology_resource", Ontology.unitTaxonomy, "organism_id"));
         }
 
         {

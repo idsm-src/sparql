@@ -93,48 +93,41 @@ class Compound
             NodeMapping subject = config.createIriMapping(compound, "compound");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("hydrogen_bond_acceptor_count", "compound"),
-                    "hydrogen_bond_acceptor_count is not null");
+                    config.createIriMapping("hydrogen_bond_acceptor_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("tautomer_count", "compound"), "tautomer_count is not null");
+                    config.createIriMapping("tautomer_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("defined_atom_stereo_count", "compound"),
-                    "defined_atom_stereo_count is not null");
+                    config.createIriMapping("defined_atom_stereo_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("defined_bond_stereo_count", "compound"),
-                    "defined_bond_stereo_count is not null");
+                    config.createIriMapping("defined_bond_stereo_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("undefined_bond_stereo_count", "compound"),
-                    "undefined_bond_stereo_count is not null");
+                    config.createIriMapping("undefined_bond_stereo_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("isotope_atom_count", "compound"), "isotope_atom_count is not null");
+                    config.createIriMapping("isotope_atom_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("covalent_unit_count", "compound"), "covalent_unit_count is not null");
+                    config.createIriMapping("covalent_unit_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("hydrogen_bond_donor_count", "compound"),
-                    "hydrogen_bond_donor_count is not null");
+                    config.createIriMapping("hydrogen_bond_donor_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("non_hydrogen_atom_count", "compound"),
-                    "non_hydrogen_atom_count is not null");
+                    config.createIriMapping("non_hydrogen_atom_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("rotatable_bond_count", "compound"), "rotatable_bond_count is not null");
+                    config.createIriMapping("rotatable_bond_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("undefined_atom_stereo_count", "compound"),
-                    "undefined_atom_stereo_count is not null");
+                    config.createIriMapping("undefined_atom_stereo_count", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("total_formal_charge", "compound"), "total_formal_charge is not null");
+                    config.createIriMapping("total_formal_charge", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("structure_complexity", "compound"), "structure_complexity is not null");
+                    config.createIriMapping("structure_complexity", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("mono_isotopic_weight", "compound"), "mono_isotopic_weight is not null");
+                    config.createIriMapping("mono_isotopic_weight", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("xlogp3_aa", "compound"), "xlogp3_aa is not null");
+                    config.createIriMapping("xlogp3_aa", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("exact_mass", "compound"), "exact_mass is not null");
+                    config.createIriMapping("exact_mass", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("molecular_weight", "compound"), "molecular_weight is not null");
+                    config.createIriMapping("molecular_weight", "compound"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("tpsa", "compound"), "tpsa is not null");
+                    config.createIriMapping("tpsa", "compound"));
         }
 
         {

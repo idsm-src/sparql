@@ -69,239 +69,203 @@ class CompoundDescriptor
         {
             String table = "descriptor_compound_bases";
             String field = "hydrogen_bond_acceptor_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("hydrogen_bond_acceptor_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "tautomer_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("tautomer_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "defined_atom_stereo_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("defined_atom_stereo_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "defined_bond_stereo_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("defined_bond_stereo_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "undefined_bond_stereo_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("undefined_bond_stereo_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "isotope_atom_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("isotope_atom_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "covalent_unit_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("covalent_unit_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "hydrogen_bond_donor_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("hydrogen_bond_donor_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "non_hydrogen_atom_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("non_hydrogen_atom_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "rotatable_bond_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("rotatable_bond_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "undefined_atom_stereo_count";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("undefined_atom_stereo_count", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "total_formal_charge";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("total_formal_charge", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "structure_complexity";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("structure_complexity", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "mono_isotopic_weight";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("mono_isotopic_weight", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"), condition);
+            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "xlogp3_aa";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("xlogp3_aa", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "exact_mass";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("exact_mass", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"), condition);
+            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "molecular_weight";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("molecular_weight", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"), condition);
+            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
         }
 
         {
             String table = "descriptor_compound_bases";
             String field = "tpsa";
-            String condition = field + " is not null";
             NodeMapping subject = config.createIriMapping("tpsa", "compound");
 
-            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"),
-                    condition);
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"));
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), condition);
+                    config.createLiteralMapping(directory + field + ".vm"));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"), condition);
+            config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"));
         }
 
         {

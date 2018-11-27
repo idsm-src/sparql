@@ -36,7 +36,7 @@ class Substance
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:modified"),
                     config.createLiteralMapping(xsdDateM4, "modified"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
-                    config.createIriMapping("compound", "compound"), "compound is not null");
+                    config.createIriMapping("compound", "compound"));
         }
 
         {
