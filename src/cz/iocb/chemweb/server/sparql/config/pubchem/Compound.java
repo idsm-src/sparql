@@ -48,12 +48,43 @@ class Compound
         }
 
         {
-            String table = "compound_relations";
-            NodeMapping subject = config.createIriMapping(compound, "compound_from");
+            String table = "compound_components";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
 
-            config.addQuadMapping(table, graph, subject,
-                    config.createIriMapping("ontology_resource", "relation_unit", "relation_id"),
-                    config.createIriMapping(compound, "compound_to"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000480"),
+                    config.createIriMapping(compound, "component"));
+        }
+
+        {
+            String table = "compound_isotopologues";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000455"),
+                    config.createIriMapping(compound, "isotopologue"));
+        }
+
+        {
+            String table = "compound_parents";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:has_parent"),
+                    config.createIriMapping(compound, "parent"));
+        }
+
+        {
+            String table = "compound_stereoisomers";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000461"),
+                    config.createIriMapping(compound, "isomer"));
+        }
+
+        {
+            String table = "compound_same_connectivities";
+            NodeMapping subject = config.createIriMapping(compound, "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000462"),
+                    config.createIriMapping(compound, "isomer"));
         }
 
         {
