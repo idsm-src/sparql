@@ -26,14 +26,13 @@ public class IriHelper
     }
 
 
-    static private final RegExp BNreqexp = RegExp.compile("^(nodeID://[a-zA-Z0-90]+)$");
-    static private final RegExp URLreqexp = RegExp.compile(
-            "^((ftp|http|https)://[\\w@.\\-\\_]+\\.[a-zA-Z]{2,}(:\\d{1,5})?(/[\\w#!:.?+=&%@!\\_\\-/]+)*){1}$");;
+    static private final RegExp URLreqexp = RegExp
+            .compile("^((ftp|http|https)://[\\w@.\\-\\_]+(:\\d{1,5})?(/[\\w#!:.?+=&%@!\\_\\-/]+)*){1}$");
 
 
     static public boolean isValid(String value)
     {
-        return URLreqexp.exec(value) != null || BNreqexp.exec(value) != null;
+        return URLreqexp.exec(value) != null;
     }
 
 
