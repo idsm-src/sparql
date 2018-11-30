@@ -29,6 +29,8 @@ class Substance
             String table = "substance_bases";
             NodeMapping subject = config.createIriMapping(substance, "id");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Substance.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
                     config.createLiteralMapping(xsdDateM4, "available"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),

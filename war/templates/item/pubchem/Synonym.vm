@@ -1,0 +1,20 @@
+#sparql($synonym)
+  SELECT ?VALUE WHERE
+  {
+    GRAPH pubchem:synonym
+    {
+      $entity sio:has-value ?VALUE
+    }
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td>#escapeHTML($synonym.VALUE)</td>
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

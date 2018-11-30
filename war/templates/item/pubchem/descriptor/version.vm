@@ -1,0 +1,15 @@
+#parse("common/utils.vm")
+
+#sparql($data)
+  SELECT ?VALUE WHERE
+  {
+    GRAPH descriptor:substance
+    {
+      $entity sio:has-value ?VALUE.
+    }
+  }
+#end
+
+<span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($data.VALUE)</span>
+<br/>
+<small style="color:gray">version number<small>

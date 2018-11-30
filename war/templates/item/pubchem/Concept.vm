@@ -1,0 +1,20 @@
+#sparql($concept)
+  SELECT ?LABEL WHERE
+  {
+    GRAPH pubchem:concept
+    {
+      $entity skos:prefLabel ?LABEL
+    }
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td>#escapeHTML($concept.LABEL)</td>
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

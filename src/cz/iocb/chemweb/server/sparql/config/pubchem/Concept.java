@@ -32,6 +32,8 @@ class Concept
             String table = "concept_bases";
             NodeMapping subject = config.createIriMapping(concept, "id");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Concept.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
                     config.createLiteralMapping(rdfLangStringEn, "label"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:inScheme"),

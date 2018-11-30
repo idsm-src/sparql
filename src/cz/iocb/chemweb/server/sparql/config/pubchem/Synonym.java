@@ -22,6 +22,14 @@ class Synonym
         NodeMapping graph = config.createIriMapping("pubchem:synonym");
 
         {
+            String table = "synonym_bases";
+            NodeMapping subject = config.createIriMapping(synonym, "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Synonym.vm"));
+        }
+
+        {
             String table = "synonym_values";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
