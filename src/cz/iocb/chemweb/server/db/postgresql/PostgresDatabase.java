@@ -59,7 +59,7 @@ public class PostgresDatabase
         symbols.setExponentSeparator("E");
         symbols.setInfinity("INF");
         symbols.setNaN("NaN");
-        decimalFormat = new DecimalFormat("0.0################################E0", symbols);
+        decimalFormat = new DecimalFormat("################0.0################", symbols);
     }
 
 
