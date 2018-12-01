@@ -153,10 +153,14 @@ public class SqlTableAccess extends SqlIntercode
 
         for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
         {
+            String variable = leftEntry.getKey();
             ArrayList<NodeMapping> leftMappings = leftEntry.getValue();
-            ArrayList<NodeMapping> rightMappings = right.mappings.get(leftEntry.getKey());
+            ArrayList<NodeMapping> rightMappings = right.mappings.get(variable);
 
             if(rightMappings == null)
+                continue;
+
+            if(left.variables.get(variable).canBeNull() || right.variables.get(variable).canBeNull())
                 continue;
 
 
@@ -293,6 +297,7 @@ public class SqlTableAccess extends SqlIntercode
 
         for(Entry<String, ArrayList<NodeMapping>> parentEntry : parent.mappings.entrySet())
         {
+            String variable = parentEntry.getKey();
             ArrayList<NodeMapping> parentMappings = parentEntry.getValue();
 
             for(NodeMapping parentMap : parentMappings)
@@ -301,9 +306,12 @@ public class SqlTableAccess extends SqlIntercode
                         parentColumns.add(((ParametrisedMapping) parentMap).getSqlColumn(i));
 
 
-            ArrayList<NodeMapping> foreignMappings = foreign.mappings.get(parentEntry.getKey());
+            ArrayList<NodeMapping> foreignMappings = foreign.mappings.get(variable);
 
             if(foreignMappings == null)
+                continue;
+
+            if(parent.variables.get(variable).canBeNull() || foreign.variables.get(variable).canBeNull())
                 continue;
 
 
@@ -368,10 +376,14 @@ public class SqlTableAccess extends SqlIntercode
 
         for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
         {
+            String variable = leftEntry.getKey();
             ArrayList<NodeMapping> leftMappings = leftEntry.getValue();
-            ArrayList<NodeMapping> rightMappings = right.mappings.get(leftEntry.getKey());
+            ArrayList<NodeMapping> rightMappings = right.mappings.get(variable);
 
             if(rightMappings == null)
+                continue;
+
+            if(left.variables.get(variable).canBeNull() || right.variables.get(variable).canBeNull())
                 continue;
 
 
