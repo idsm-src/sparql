@@ -7,7 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
+import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
@@ -269,7 +269,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static List<KeyPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess foreign)
+    public static List<ColumnPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess foreign)
     {
         // currently, merging is allowed only in the case that variables are not joined by different resource classes
         for(UsedPairedVariable paired : UsedPairedVariable.getPairs(parent.getVariables(), foreign.getVariables()))
@@ -278,7 +278,7 @@ public class SqlTableAccess extends SqlIntercode
                     return null;
 
 
-        List<List<KeyPair>> keys = schema.getForeignKeys(parent.table, foreign.table);
+        List<List<ColumnPair>> keys = schema.getForeignKeys(parent.table, foreign.table);
 
         if(keys == null)
             return null;
@@ -288,7 +288,7 @@ public class SqlTableAccess extends SqlIntercode
             return null;
 
 
-        ArrayList<KeyPair> columns = new ArrayList<KeyPair>();
+        ArrayList<ColumnPair> columns = new ArrayList<ColumnPair>();
         LinkedHashSet<String> parentColumns = new LinkedHashSet<String>();
 
         for(Entry<String, ArrayList<NodeMapping>> parentEntry : parent.mappings.entrySet())
@@ -320,7 +320,7 @@ public class SqlTableAccess extends SqlIntercode
                             String parentColumn = ((ParametrisedMapping) parentMap).getSqlColumn(i);
                             String foreignColumn = ((ParametrisedMapping) foreignMap).getSqlColumn(i);
 
-                            columns.add(new KeyPair(parentColumn, foreignColumn));
+                            columns.add(new ColumnPair(parentColumn, foreignColumn));
                         }
                     }
                 }
@@ -352,7 +352,7 @@ public class SqlTableAccess extends SqlIntercode
                     String parentColumn = parentMap.getSqlColumn(i);
                     String foreignColumn = foreignMap.getSqlColumn(i);
 
-                    columns.add(new KeyPair(parentColumn, foreignColumn));
+                    columns.add(new ColumnPair(parentColumn, foreignColumn));
                 }
             }
         }
@@ -362,8 +362,10 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static boolean areCompatible(SqlTableAccess left, SqlTableAccess right)
+    public static boolean areCompatible(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
+        List<ColumnPair> columnPairs = new ArrayList<ColumnPair>();
+
         for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
         {
             ArrayList<NodeMapping> leftMappings = leftEntry.getValue();
@@ -371,6 +373,7 @@ public class SqlTableAccess extends SqlIntercode
 
             if(rightMappings == null)
                 continue;
+
 
             for(NodeMapping leftMap : leftMappings)
             {
@@ -381,9 +384,17 @@ public class SqlTableAccess extends SqlIntercode
                     if(leftMap instanceof ConstantMapping && rightMap instanceof ConstantMapping
                             && !((ConstantMapping) leftMap).getValue().equals(((ConstantMapping) rightMap).getValue()))
                         return false;
+
+                    if(leftMap instanceof ParametrisedMapping && rightMap instanceof ParametrisedMapping)
+                        for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
+                            columnPairs.add(new ColumnPair(((ParametrisedMapping) leftMap).getSqlColumn(i),
+                                    ((ParametrisedMapping) rightMap).getSqlColumn(i)));
                 }
             }
         }
+
+        if(schema.getUnjoinableColumns(left.table, right.table, columnPairs) != null)
+            return false;
 
         return true;
     }
@@ -486,7 +497,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<KeyPair> columnMap)
+    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<ColumnPair> columnMap)
     {
         String condition = null;
 

@@ -24,7 +24,7 @@ public class PostgresSchema extends DatabaseSchema
                 while(tables.next())
                 {
                     String table = tables.getString("TABLE_NAME");
-                    List<List<String>> pkeys = new ArrayList<List<String>>();
+
 
                     try(ResultSet indexes = metaData.getIndexInfo(null, null, table, true, false))
                     {
@@ -39,22 +39,26 @@ public class PostgresSchema extends DatabaseSchema
 
                             if(position == 1)
                             {
+                                if(columns != null)
+                                    addPrimaryKeys(table, columns);
+
                                 columns = new ArrayList<String>();
-                                pkeys.add(columns);
                             }
 
                             columns.add(indexes.getString("COLUMN_NAME"));
                         }
-                    }
 
-                    primaryKeys.put(table, pkeys);
+                        if(columns != null)
+                            addPrimaryKeys(table, columns);
+                    }
 
 
                     try(ResultSet indexes = metaData.getCrossReference(null, null, table, null, null, null))
                     {
-                        List<List<KeyPair>> fkeys = null;
-                        List<KeyPair> columns = null;
-                        String lastFkTable = null;
+                        String foreignTable = null;
+                        List<String> parentColumns = new ArrayList<String>();
+                        List<String> foreignColumns = new ArrayList<String>();
+
 
                         while(indexes.next())
                         {
@@ -62,23 +66,23 @@ public class PostgresSchema extends DatabaseSchema
 
                             if(seq == 1)
                             {
-                                String fktable = indexes.getString("FKTABLE_NAME");
-
-                                if(!fktable.equals(lastFkTable))
+                                if(foreignTable != null)
                                 {
-                                    fkeys = new ArrayList<List<KeyPair>>();
-                                    foreignKeys.put(new KeyPair(table, fktable), fkeys);
-                                    lastFkTable = fktable;
+                                    addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
+
+                                    parentColumns = new ArrayList<String>();
+                                    foreignColumns = new ArrayList<String>();
                                 }
 
-                                columns = new ArrayList<KeyPair>();
-                                fkeys.add(columns);
+                                foreignTable = indexes.getString("FKTABLE_NAME");
                             }
 
-
-                            columns.add(new KeyPair(indexes.getString("PKCOLUMN_NAME"),
-                                    indexes.getString("FKCOLUMN_NAME")));
+                            parentColumns.add(indexes.getString("PKCOLUMN_NAME"));
+                            foreignColumns.add(indexes.getString("FKCOLUMN_NAME"));
                         }
+
+                        if(foreignTable != null)
+                            addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
                     }
                 }
             }

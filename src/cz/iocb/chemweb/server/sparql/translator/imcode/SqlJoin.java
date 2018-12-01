@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
+import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -164,11 +164,11 @@ public class SqlJoin extends SqlIntercode
                     SqlTableAccess right = (SqlTableAccess) jSql;
 
 
-                    if(!SqlTableAccess.areCompatible(left, right))
+                    if(!SqlTableAccess.areCompatible(schema, left, right))
                         return new SqlNoSolution();
 
 
-                    List<KeyPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
+                    List<ColumnPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
 
                     if(variantA != null)
                     {
@@ -179,7 +179,7 @@ public class SqlJoin extends SqlIntercode
                     }
 
 
-                    List<KeyPair> variantB = SqlTableAccess.canBeDroped(schema, right, left);
+                    List<ColumnPair> variantB = SqlTableAccess.canBeDroped(schema, right, left);
 
                     if(variantB != null)
                     {

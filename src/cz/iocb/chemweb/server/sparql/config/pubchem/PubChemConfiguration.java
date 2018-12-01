@@ -5,9 +5,13 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -35,6 +39,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         loadClasses();
         loadQuadMapping();
         loadProcedures();
+        loadConstraints();
     }
 
 
@@ -233,5 +238,50 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
+    }
+
+
+    private void loadConstraints() throws SQLException
+    {
+        try(Connection connection = getConnectionPool().getConnection())
+        {
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement.executeQuery(
+                        "select parent_table, parent_columns, foreign_table, foreign_columns from schema_foreign_keys"))
+                {
+                    while(result.next())
+                    {
+                        String parentTable = result.getString(1);
+                        List<String> parentColumns = Arrays.asList((String[]) result.getArray(2).getArray());
+
+                        String foreignTable = result.getString(3);
+                        List<String> foreignColumns = Arrays.asList((String[]) result.getArray(4).getArray());
+
+                        schema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
+                    }
+                }
+            }
+
+
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement.executeQuery(
+                        "select left_table, left_columns, right_table, right_columns from schema_unjoinable_columns"))
+                {
+                    while(result.next())
+                    {
+                        String leftTable = result.getString(1);
+                        List<String> leftColumns = Arrays.asList((String[]) result.getArray(2).getArray());
+
+                        String rightTable = result.getString(3);
+                        List<String> rightColumns = Arrays.asList((String[]) result.getArray(4).getArray());
+
+                        schema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
+                        schema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
+                    }
+                }
+            }
+        }
     }
 }

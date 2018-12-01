@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.ArrayList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
+import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -42,13 +42,13 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
 
 
     @Override
-    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    public NodeMapping remapColumns(List<ColumnPair> columnMap)
     {
         ArrayList<String> remappedColumns = new ArrayList<String>();
 
         for(String col : columns)
         {
-            String remapped = columnMap.stream().filter(s -> s.getParent().equals(col)).findAny().get().getForeign();
+            String remapped = columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight();
             assert remapped != null;
             remappedColumns.add(remapped);
         }

@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema.KeyPair;
+import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
@@ -39,7 +39,7 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
 
 
     @Override
-    public NodeMapping remapColumns(List<KeyPair> columnMap)
+    public NodeMapping remapColumns(List<ColumnPair> columnMap)
     {
         return this;
     }
