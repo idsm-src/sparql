@@ -1,7 +1,296 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <examples>
   <example>
-    <description></description>
-    <code></code>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 1:</div>
+      <p lang="en" class="exampleDescription">
+        What protein targets does donepezil (CHEBI_53289) inhibit with an IC<sub>50</sub> less than 10 &micro;M?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?protein ?title
+FROM pubchem:protein
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:substance
+WHERE
+{
+  ?sub rdf:type obo:CHEBI_53289;
+     obo:BFO_0000056 ?mg.
+  ?mg obo:BFO_0000057 ?protein;
+    obo:OBI_0000299 ?ep.
+  ?protein rdf:type bp:Protein;
+    dcterms:title ?title.
+  ?ep rdf:type bao:BAO_0000190;
+    obo:IAO_0000136 ?sub;
+    sio:has-value ?value.
+
+  filter (?value < 10)
+}
+    ]]></code>
   </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 2:</div>
+      <p lang="en" class="exampleDescription">
+        What pharmacological roles of SID46505803 are defined by ChEBI?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?rolelabel
+FROM pubchem:substance
+FROM pubchem:compound
+FROM pubchem:ontology
+WHERE
+{
+  substance:SID46505803 sio:CHEMINF_000477 ?comp.
+  ?comp rdf:type ?chebi.
+  ?chebi rdfs:subClassOf [
+    a owl:Restriction;
+    owl:onProperty obo:RO_0000087;
+    owl:someValuesFrom ?role ].
+  ?role rdfs:label ?rolelabel.
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 3:</div>
+      <p lang="en" class="exampleDescription">
+        What compound have a pharmacological role of NSAID as defined by ChEBI and molecular weight less than 200 g/mol?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?compound
+FROM pubchem:compound
+FROM pubchem:ontology
+FROM descriptor:compound
+WHERE
+{
+  ?compound rdf:type ?chebi.
+  ?chebi rdfs:subClassOf [
+    a owl:Restriction;
+    owl:onProperty obo:RO_0000087;
+    owl:someValuesFrom obo:CHEBI_35475 ].
+  ?compound sio:has-attribute ?MW.
+  ?MW rdf:type sio:CHEMINF_000334.
+  ?MW sio:has-value ?MWValue.
+
+  filter (?MWValue < 200)
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 4:</div>
+      <p lang="en" class="exampleDescription">
+        What substances have a pharmacological role of NSAID as defined by ChEBI and the depositor-provided chemical vendor information?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?substance ?source
+FROM pubchem:substance
+FROM pubchem:source
+FROM pubchem:ontology
+WHERE
+{
+  ?substance dcterms:source ?source.
+  ?source dcterms:subject concept:Chemical_Vendors.
+  ?substance rdf:type ?chebi.
+  ?chebi rdfs:subClassOf [
+    a owl:Restriction;
+    owl:onProperty obo:RO_0000087;
+    owl:someValuesFrom obo:CHEBI_35475 ].
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 5:</div>
+      <p lang="en" class="exampleDescription">
+        What protein targets are inhibited by substances with an IC<sub>50</sub> less than 10 &micro;M and have a pharmacological role of cholinesterase inhibitors as defined by ChEBI?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?title
+FROM pubchem:substance
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:protein
+FROM pubchem:ontology
+WHERE
+{
+  ?chebi rdfs:subClassOf [
+    a owl:Restriction;
+    owl:onProperty obo:RO_0000087;
+    owl:someValuesFrom obo:CHEBI_37733 ].
+  ?sub rdf:type ?chebi;
+    obo:BFO_0000056 ?mg.
+  ?mg obo:BFO_0000057 ?protein;
+    obo:OBI_0000299 ?ep.
+  ?protein rdf:type bp:Protein;
+    dcterms:title ?title.
+  ?ep rdf:type bao:BAO_0000190;
+    obo:IAO_0000136 ?sub;
+    sio:has-value ?value.
+
+  filter (?value < 10)
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 6:</div>
+      <p lang="en" class="exampleDescription">
+        Which substances inhibit protein targets similar to GI129900 and have the function domain PSSMID188648?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?substance ?protein ?value
+FROM pubchem:substance
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:protein
+FROM pubchem:conserveddomain
+WHERE
+{
+  ?substance obo:BFO_0000056 ?measuregroup.
+  ?measuregroup obo:BFO_0000057 ?protein.
+  protein:GI129900 vocab:hasSimilarProtein ?protein.
+  ?protein obo:BFO_0000110 conserveddomain:PSSMID188648.
+  ?measuregroup obo:OBI_0000299 ?endpoint.
+  ?endpoint obo:IAO_0000136 ?substance.
+  ?endpoint rdf:type bao:BAO_0000190.
+  ?endpoint sio:has-value ?value.
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 7:</div>
+      <p lang="en" class="exampleDescription">
+        What protein targets are inhibited by substances with IC<sub>50</sub> less than 10 &micro;M and have the same standardized chemical structure (CID3152)?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?sub ?protein ?title
+FROM pubchem:protein
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:substance
+WHERE
+{
+  ?sub sio:CHEMINF_000477 compound:CID3152;
+    obo:BFO_0000056 ?mg.
+  ?mg obo:BFO_0000057 ?protein;
+    obo:OBI_0000299 ?ep.
+  ?protein rdf:type bp:Protein;
+    dcterms:title ?title.
+  ?ep rdf:type bao:BAO_0000190;
+    obo:IAO_0000136 ?sub;
+    sio:has-value ?value.
+
+  filter (?value < 10)
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 8:</div>
+      <p lang="en" class="exampleDescription">
+         What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO_0001516), with an IC<sub>50</sub> less than 10 &micro;M?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?substance ?protein
+FROM pubchem:substance
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:protein
+FROM pubchem:biosystem
+WHERE
+{
+  ?substance obo:BFO_0000056 ?measuregroup.
+  ?measuregroup obo:BFO_0000057 ?protein.
+  ?protein rdf:type bp:Protein.
+  ?protein obo:BFO_0000056 obo:GO_0001516.
+  ?measuregroup obo:OBI_0000299 ?endpoint.
+  ?endpoint obo:IAO_0000136 ?substance.
+  ?endpoint rdf:type bao:BAO_0000190.
+  ?endpoint sio:has-value ?value.
+
+  filter (?value < 10)
+}
+    ]]></code>
+  </example>
+
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 9:</div>
+      <p lang="en" class="exampleDescription">
+        What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target GI17531135 with an IC<sub>50</sub> less than 10 &micro;M?
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT DISTINCT ?rolelabel
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:substance
+FROM pubchem:ontology
+WHERE
+{
+  ?sub obo:BFO_0000056 ?mg.
+  ?mg obo:BFO_0000057 protein:GI7531135;
+    obo:OBI_0000299 ?ep.
+  ?sub rdf:type ?chebi.
+  ?chebi rdfs:subClassOf [
+    a owl:Restriction;
+    owl:onProperty obo:RO_0000087;
+    owl:someValuesFrom ?role ].
+  ?role rdfs:label ?rolelabel.
+  ?ep obo:IAO_0000136 ?sub;
+    rdf:type bao:BAO_0000190;
+    sio:has-value ?value.
+
+  filter (?value < 10)
+}
+    ]]></code>
+  </example>
+
+  <!--
+  <example>
+    <description><![CDATA[
+      <div lang="en" class="exampleTitle">PubChem Case 10:</div>
+      <p lang="en" class="exampleDescription">
+        Summarize the statistics about the total number of substances tested in the PubChem database against each protein target.
+      </p>
+    ]]></description>
+    <code><![CDATA[
+SELECT (count(?sub) as ?subcnt) ?protein
+FROM pubchem:substance
+FROM pubchem:measuregroup
+FROM pubchem:endpoint
+FROM pubchem:protein
+WHERE
+{
+  ?sub obo:BFO_0000056 ?mg.
+  ?mg obo:BFO_0000057 ?protein.
+  ?protein rdf:type bp:Protein.
+  ?mg obo:OBI_0000299 ?ep.
+  ?ep rdf:type bao:BAO_0000190;
+    obo:IAO_0000136 ?sub;
+    sio:has-value ?value.
+}
+GROUP BY ?protein
+ORDER BY count(?sub)
+    ]]></code>
+  </example>
+   -->
 </examples>

@@ -32,7 +32,7 @@
         <i:FileUploadImageButton ui:field="openButton" src="{res.open.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
           Open
         </i:FileUploadImageButton>
-        <i:ImageButton ui:field="examplesButton" src="{res.remoteOpen.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}" visible="false">
+        <i:ImageButton ui:field="examplesButton" src="{res.remoteOpen.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
           Examples
         </i:ImageButton>
         <i:ImageButton ui:field="wizardButton" src="{res.wizard.getSafeUri}" position="top 2px center" addStyleNames="{style.ToolbarButton}">
