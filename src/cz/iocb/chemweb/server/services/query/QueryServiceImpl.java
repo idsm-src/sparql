@@ -128,6 +128,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             {
                 Select originalSelect = syntaxTree.getSelect();
                 Select limitedSelect = new Select();
+                limitedSelect.getDataSets().addAll(originalSelect.getDataSets());
                 limitedSelect.setPattern(originalSelect);
                 limitedSelect.setOffset(BigInteger.valueOf(offset));
                 limitedSelect.setLimit(BigInteger.valueOf(limit + 1));

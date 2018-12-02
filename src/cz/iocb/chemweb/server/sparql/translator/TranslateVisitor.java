@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
@@ -92,7 +93,6 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 {
-    private final Stack<List<DataSet>> selectDatasets = new Stack<>();
     private final Stack<GraphOrServiceRestriction> graphOrServiceRestrictions = new Stack<>();
 
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
@@ -104,6 +104,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
 
+    private List<DataSet> datasets;
     private Prologue prologue;
 
 
@@ -120,13 +121,11 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(SelectQuery selectQuery)
     {
-        Prologue original = prologue;
         prologue = selectQuery.getPrologue();
+        datasets = selectQuery.getSelect().getDataSets();
 
         TranslatedSegment translatedSelect = visitElement(selectQuery.getSelect());
         SqlQuery intercode = new SqlQuery(translatedSelect.getVariablesInScope(), translatedSelect.getIntercode());
-
-        prologue = original;
 
         return new TranslatedSegment(translatedSelect.getVariablesInScope(), intercode);
     }
@@ -145,9 +144,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
         checkProjectionVariables(select);
-
-        // register information about datasets used in this SELECT (sub)query
-        selectDatasets.push(select.getDataSets()); // TODO: datasets are not supported
 
         // translate the WHERE clause
         TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
@@ -211,9 +207,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(select.getOffset() != null)
             sqlSelect.setOffset(select.getOffset());
 
-
-        // clear information about datasets of this SELECT (sub)query
-        selectDatasets.pop();
 
         return new TranslatedSegment(variablesInScope, sqlSelect);
     }
@@ -413,6 +406,22 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(QuadMapping mapping : mappings)
         {
+            if(!datasets.isEmpty())
+            {
+                ConstantIriMapping graphMapping = (ConstantIriMapping) mapping.getGraph();
+
+                if(graphMapping == null)
+                    continue;
+
+                IRI graphIri = ((IRI) graphMapping.getValue());
+                boolean useDefaultDataset = graph == null;
+
+                if(datasets.stream().filter(d -> d.isDefault() == useDefaultDataset)
+                        .noneMatch(d -> d.getSourceSelector().equals(graphIri)))
+                    continue;
+            }
+
+
             if(mapping.match(graph, subject, predicate, object))
             {
                 SqlTableAccess translated = new SqlTableAccess(mapping.getTable(), mapping.getCondition());

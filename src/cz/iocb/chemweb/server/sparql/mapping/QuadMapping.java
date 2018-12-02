@@ -23,6 +23,10 @@ public class QuadMapping
     public QuadMapping(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object,
             String condition)
     {
+        //TODO: add support for ParametrisedIriMapping graphs
+        if(!(graph instanceof ConstantIriMapping))
+            throw new IllegalArgumentException();
+
         this.table = table;
         this.graph = graph;
         this.subject = subject;
