@@ -24,7 +24,7 @@ public class QuadMapping
             String condition)
     {
         //TODO: add support for ParametrisedIriMapping graphs
-        if(!(graph instanceof ConstantIriMapping))
+        if(graph != null && !(graph instanceof ConstantIriMapping))
             throw new IllegalArgumentException();
 
         this.table = table;
