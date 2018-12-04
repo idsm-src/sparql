@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -12,7 +13,7 @@ class InchiKey
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("inchikey", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*", config.getConnectionPool(), SqlCheck.IF_MATCH));
     }
 
 

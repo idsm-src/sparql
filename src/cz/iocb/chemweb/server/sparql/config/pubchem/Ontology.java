@@ -2,6 +2,10 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -21,11 +25,36 @@ class Ontology
     public static final String unitTaxonomy = "11::smallint";
 
 
-    static void addIriClasses(PubChemConfiguration config)
+    static void addIriClasses(PubChemConfiguration config) throws SQLException
     {
-        config.addIriClass(new UserIriClass("ontology_resource", Arrays.asList("smallint", "integer"),
-                config.getPattern("ontology_resource_categories__reftable"),
-                config.getIriValues("ontology_resources__reftable")));
+        StringBuilder builder = new StringBuilder();
+
+        try(Connection connection = config.getConnectionPool().getConnection())
+        {
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement
+                        .executeQuery("select pattern from ontology_resource_categories__reftable"))
+                {
+                    boolean hasResult = false;
+
+                    while(result.next())
+                    {
+                        if(hasResult)
+                            builder.append("|");
+
+                        hasResult = true;
+
+                        builder.append("(" + result.getString(1) + ")");
+                    }
+                }
+            }
+        }
+
+        String ontologyPattern = builder.toString();
+
+        config.addIriClass(new UserIriClass("ontology_resource", Arrays.asList("smallint", "integer"), ontologyPattern,
+                config.getConnectionPool(), UserIriClass.SqlCheck.IF_NOT_MATCH));
     }
 
 

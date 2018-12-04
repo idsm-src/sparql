@@ -1,12 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import javax.sql.DataSource;
@@ -132,63 +129,6 @@ public abstract class SparqlDatabaseConfiguration
     {
         QuadMapping map = new QuadMapping(table, graph, subject, predicate, object, condition);
         mappings.add(map);
-    }
-
-
-    public HashSet<String> getIriValues(String table)
-    {
-        HashSet<String> set = new HashSet<String>();
-
-        try(Connection connection = connectionPool.getConnection())
-        {
-            try(PreparedStatement statement = connection.prepareStatement("select iri from " + table))
-            {
-                try(java.sql.ResultSet result = statement.executeQuery())
-                {
-                    while(result.next())
-                        set.add(result.getString(1));
-                }
-            }
-        }
-        catch(Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-
-        return set;
-    }
-
-
-    public String getPattern(String table)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        try(Connection connection = connectionPool.getConnection())
-        {
-            try(PreparedStatement statement = connection.prepareStatement("select pattern from " + table))
-            {
-                try(java.sql.ResultSet result = statement.executeQuery())
-                {
-                    boolean hasResult = false;
-
-                    while(result.next())
-                    {
-                        if(hasResult)
-                            builder.append("|");
-
-                        hasResult = true;
-
-                        builder.append("(" + result.getString(1) + ")");
-                    }
-                }
-            }
-        }
-        catch(Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-
-        return builder.toString();
     }
 
 

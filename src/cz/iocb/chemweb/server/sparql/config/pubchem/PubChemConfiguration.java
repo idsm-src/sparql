@@ -10,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
@@ -97,7 +96,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
     }
 
 
-    private void loadClasses()
+    private void loadClasses() throws SQLException
     {
         Bioassay.addIriClasses(this);
         Biosystem.addIriClasses(this);
@@ -121,39 +120,23 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
         String sachem = prefixes.get("sachem");
 
-        HashSet<String> queryFormatValues = new HashSet<String>();
-        queryFormatValues.add(sachem + "UnspecifiedFormat");
-        queryFormatValues.add(sachem + "SMILES");
-        queryFormatValues.add(sachem + "MolFile");
-        queryFormatValues.add(sachem + "RGroup");
-        addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatValues));
+        String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
+        addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatPattern));
 
-        HashSet<String> graphModeValues = new HashSet<String>();
-        graphModeValues.add(sachem + "substructureSearch");
-        graphModeValues.add(sachem + "exactSearch");
-        addIriClass(new UserIriClass("graphMode", Arrays.asList("integer"), graphModeValues));
+        String graphModePattern = sachem + "(substructureSearch|exactSearch)";
+        addIriClass(new UserIriClass("graphMode", Arrays.asList("integer"), graphModePattern));
 
-        HashSet<String> chargeModeValues = new HashSet<String>();
-        chargeModeValues.add(sachem + "ignoreCharges");
-        chargeModeValues.add(sachem + "defaultChargeAsZero");
-        chargeModeValues.add(sachem + "defaultChargeAsAny");
-        addIriClass(new UserIriClass("chargeMode", Arrays.asList("integer"), chargeModeValues));
+        String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
+        addIriClass(new UserIriClass("chargeMode", Arrays.asList("integer"), chargeModePattern));
 
-        HashSet<String> isotopeModeValues = new HashSet<String>();
-        isotopeModeValues.add(sachem + "ignoreIsotopes");
-        isotopeModeValues.add(sachem + "defaultIsotopeAsStandard");
-        isotopeModeValues.add(sachem + "defaultIsotopeAsAny");
-        addIriClass(new UserIriClass("isotopeMode", Arrays.asList("integer"), isotopeModeValues));
+        String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
+        addIriClass(new UserIriClass("isotopeMode", Arrays.asList("integer"), isotopeModePattern));
 
-        HashSet<String> stereoModeValues = new HashSet<String>();
-        stereoModeValues.add(sachem + "ignoreStrereo");
-        stereoModeValues.add(sachem + "strictStereo");
-        addIriClass(new UserIriClass("stereoMode", Arrays.asList("integer"), stereoModeValues));
+        String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
+        addIriClass(new UserIriClass("stereoMode", Arrays.asList("integer"), stereoModePattern));
 
-        HashSet<String> tautomerModeValues = new HashSet<String>();
-        tautomerModeValues.add(sachem + "ignoreTautomers");
-        tautomerModeValues.add(sachem + "inchiTautomers");
-        addIriClass(new UserIriClass("tautomerMode", Arrays.asList("integer"), tautomerModeValues));
+        String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
+        addIriClass(new UserIriClass("tautomerMode", Arrays.asList("integer"), tautomerModePattern));
     }
 
 

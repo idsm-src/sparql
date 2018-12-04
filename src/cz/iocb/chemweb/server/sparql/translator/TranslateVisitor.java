@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.SQLRuntimeException;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -1173,19 +1174,33 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     public String translate(SelectQuery sparqlQuery) throws TranslateExceptions, SQLException
     {
-        TranslatedSegment segment = visitElement(sparqlQuery);
+        try
+        {
+            TranslatedSegment segment = visitElement(sparqlQuery);
 
-        if(!exceptions.isEmpty())
-            throw new TranslateExceptions(exceptions);
+            if(!exceptions.isEmpty())
+                throw new TranslateExceptions(exceptions);
 
-        return segment.getIntercode().translate();
+            return segment.getIntercode().translate();
+        }
+        catch(SQLRuntimeException e)
+        {
+            throw(SQLException) e.getCause();
+        }
     }
 
 
     public TranslateResult tryTranslate(SelectQuery sparqlQuery) throws SQLException
     {
-        visitElement(sparqlQuery);
-        return new TranslateResult(null, exceptions, warnings);
+        try
+        {
+            visitElement(sparqlQuery);
+            return new TranslateResult(null, exceptions, warnings);
+        }
+        catch(SQLRuntimeException e)
+        {
+            throw(SQLException) e.getCause();
+        }
     }
 
 
