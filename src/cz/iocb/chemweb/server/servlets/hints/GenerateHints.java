@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.servlets.hints;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,7 +28,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
@@ -70,7 +70,7 @@ public class GenerateHints extends HttpServlet
                     hintsJS = generateHints(dbConfig);
                     hintsMap.put(resourceName, hintsJS);
                 }
-                catch(NamingException | DatabaseException | TranslateExceptions | ParseExceptions e)
+                catch(NamingException | ParseExceptions | TranslateExceptions | SQLException e)
                 {
                     throw new ServletException(e);
                 }
@@ -102,7 +102,7 @@ public class GenerateHints extends HttpServlet
 
 
     private static String generateHints(SparqlDatabaseConfiguration dbConfig)
-            throws DatabaseException, TranslateExceptions, ParseExceptions
+            throws ParseExceptions, TranslateExceptions, SQLException
     {
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);

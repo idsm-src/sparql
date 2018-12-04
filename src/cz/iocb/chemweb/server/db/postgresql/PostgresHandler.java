@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.db.postgresql;
 
 import java.sql.SQLException;
 import java.sql.Statement;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
@@ -22,15 +21,8 @@ public class PostgresHandler
     }
 
 
-    public void cancel() throws DatabaseException
+    public void cancel() throws SQLException
     {
-        try
-        {
-            statement.cancel();
-        }
-        catch(SQLException e)
-        {
-            throw new DatabaseException(e);
-        }
+        statement.cancel();
     }
 }

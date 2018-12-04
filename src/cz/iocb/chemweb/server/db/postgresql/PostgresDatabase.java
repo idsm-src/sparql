@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.text.DecimalFormat;
@@ -34,7 +35,6 @@ import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
@@ -69,7 +69,7 @@ public class PostgresDatabase
     }
 
 
-    public Result query(String query, int timeout, PostgresHandler handler) throws DatabaseException
+    public Result query(String query, int timeout, PostgresHandler handler) throws SQLException
     {
         try(Connection connection = connectionPool.getConnection())
         {
@@ -235,10 +235,6 @@ public class PostgresDatabase
                 return new Result(heads, rows, warnings);
             }
         }
-        catch(Exception e)
-        {
-            throw new DatabaseException(e);
-        }
         finally
         {
             if(handler != null)
@@ -252,13 +248,13 @@ public class PostgresDatabase
     }
 
 
-    public Result query(String query, int timeout) throws DatabaseException
+    public Result query(String query, int timeout) throws SQLException
     {
         return query(query, timeout, null);
     }
 
 
-    public Result query(String query) throws DatabaseException
+    public Result query(String query) throws SQLException
     {
         return query(query, 0, null);
     }

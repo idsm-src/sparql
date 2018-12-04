@@ -4,6 +4,7 @@ import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
@@ -100,14 +101,14 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
 
     @Override
-    public long query(String query) throws QueryException
+    public long query(String query) throws QueryException, DatabaseException
     {
         return query(query, 0, -1);
     }
 
 
     @Override
-    public long query(String query, int offset, int limit) throws QueryException
+    public long query(String query, int offset, int limit) throws QueryException, DatabaseException
     {
         final HttpSession httpSession = this.getThreadLocalRequest().getSession(true);
         final QueryState queryState = new QueryState();
@@ -210,6 +211,10 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         {
             throw new QueryException();
         }
+        catch(SQLException e)
+        {
+            throw new DatabaseException(e);
+        }
 
 
         synchronized(queryState.handler)
@@ -282,7 +287,14 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         if(queryState == null)
             throw new SessionException("Your server session does not contain the requested query ID.");
 
-        queryState.handler.cancel();
+        try
+        {
+            queryState.handler.cancel();
+        }
+        catch(SQLException e)
+        {
+            throw new DatabaseException(e);
+        }
     }
 
 
@@ -315,7 +327,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch(URISyntaxException | ParseExceptions | TranslateExceptions e)
+        catch(URISyntaxException | ParseExceptions | TranslateExceptions | SQLException e)
         {
             throw new DatabaseException(e);
         }

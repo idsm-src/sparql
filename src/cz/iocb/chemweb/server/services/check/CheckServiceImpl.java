@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.services.check;
 
+import java.sql.SQLException;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -13,6 +14,7 @@ import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
+import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
 import cz.iocb.chemweb.shared.services.check.CheckService;
 import cz.iocb.chemweb.shared.services.check.CheckerWarning;
@@ -51,7 +53,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
 
     @Override
-    public CheckResult check(String code)
+    public CheckResult check(String code) throws DatabaseException
     {
         CheckResult result = new CheckResult();
 
@@ -67,13 +69,20 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 
 
         /* translator */
-        TranslateResult translateResult = new TranslateVisitor(dbConfig).tryTranslate(parseResult.getResult());
+        try
+        {
+            TranslateResult translateResult = new TranslateVisitor(dbConfig).tryTranslate(parseResult.getResult());
 
-        for(TranslateException err : translateResult.getExceptions())
-            addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));
+            for(TranslateException err : translateResult.getExceptions())
+                addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));
 
-        for(TranslateException err : translateResult.getWarnings())
-            addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
+            for(TranslateException err : translateResult.getWarnings())
+                addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
+        }
+        catch(SQLException e)
+        {
+            throw new DatabaseException(e);
+        }
 
         return result;
     }

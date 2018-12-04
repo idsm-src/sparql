@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.velocity;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.sql.SQLException;
 import org.apache.velocity.context.InternalContextAdapter;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
@@ -22,7 +23,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
@@ -90,7 +90,7 @@ public class SparqlDirective extends Directive
             context.put(varName, result);
             return true;
         }
-        catch(DatabaseException | ParseExceptions | TranslateExceptions e)
+        catch(ParseExceptions | TranslateExceptions | SQLException e)
         {
             log.error("sparql directive: " + e.getMessage());
 

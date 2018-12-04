@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1170,7 +1171,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public String translate(SelectQuery sparqlQuery) throws TranslateExceptions
+    public String translate(SelectQuery sparqlQuery) throws TranslateExceptions, SQLException
     {
         TranslatedSegment segment = visitElement(sparqlQuery);
 
@@ -1181,7 +1182,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public TranslateResult tryTranslate(SelectQuery sparqlQuery)
+    public TranslateResult tryTranslate(SelectQuery sparqlQuery) throws SQLException
     {
         visitElement(sparqlQuery);
         return new TranslateResult(null, exceptions, warnings);

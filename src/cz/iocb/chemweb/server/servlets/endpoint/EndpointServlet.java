@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.SQLException;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -26,7 +27,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
-import cz.iocb.chemweb.shared.services.DatabaseException;
 
 
 
@@ -149,7 +149,7 @@ public class EndpointServlet extends HttpServlet
                     res.setStatus(406);
             }
         }
-        catch(TranslateExceptions | DatabaseException | ParseExceptions e)
+        catch(ParseExceptions | TranslateExceptions | SQLException e)
         {
             throw new IOException(e);
         }
