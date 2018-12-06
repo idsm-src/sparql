@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -13,8 +14,8 @@ class Gene
     {
         config.addIriClass(new UserIriClass("gene", Arrays.asList("integer"),
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
-        config.addIriClass(
-                new UserIriClass("ensembl", Arrays.asList("varchar"), "http://rdf.ebi.ac.uk/resource/ensembl/.*"));
+        config.addIriClass(new UserIriClass("ensembl", Arrays.asList("varchar"),
+                "http://rdf.ebi.ac.uk/resource/ensembl/.*", config.getConnectionPool(), SqlCheck.IF_MATCH));
     }
 
 
