@@ -18,7 +18,6 @@ import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
  */
 public class Prologue extends BaseElement
 {
-    private final List<Define> defines;
     private IRI base;
     private final List<PrefixDefinition> prefixDefinitions;
     private final LinkedHashMap<String, Prefix> userPrefixes;
@@ -27,7 +26,6 @@ public class Prologue extends BaseElement
 
     public Prologue(List<Prefix> predefinedPrefixes)
     {
-        this.defines = new ArrayList<>();
         setBase(new IRI(""));
 
         prefixDefinitions = new ArrayList<>();
@@ -36,14 +34,6 @@ public class Prologue extends BaseElement
 
         for(Prefix prefix : predefinedPrefixes)
             allPrefixes.put(prefix.getName(), prefix);
-    }
-
-    /**
-     * DEFINE is a Virtuoso extension.
-     */
-    public List<Define> getDefines()
-    {
-        return defines;
     }
 
     /**

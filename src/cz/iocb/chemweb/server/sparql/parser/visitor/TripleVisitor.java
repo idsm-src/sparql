@@ -38,7 +38,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNodePropertyList;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.ComplexNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.ComplexTriple;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.NodeOptions;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Property;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RdfCollection;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
@@ -91,23 +90,6 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
     {
         //ComplexNode node = super.visitObjectPath(ctx);
         ComplexNode node = visit(ctx.graphNodePath());
-
-
-        if(ctx.tripleOptions() != null)
-        {
-            String value = ctx.tripleOptions().tableOption().string().getText();
-
-            if(!value.equals("loop") && !value.equals("hash"))
-            {
-                // Range range = Range.compute(ctx.tripleOptions().tableOption().string());
-                // TODO: add error report ...
-            }
-
-            NodeOptions options = new NodeOptions();
-            options.setTableOption(value);
-
-            node.setNodeOptions(options);
-        }
 
         return node;
     }

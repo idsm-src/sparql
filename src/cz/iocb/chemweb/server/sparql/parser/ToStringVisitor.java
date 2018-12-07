@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
-import cz.iocb.chemweb.server.sparql.parser.model.Define;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -155,8 +154,6 @@ public class ToStringVisitor extends ElementVisitor<Void>
     {
         this.prologue = prologue;
 
-        visitElements(prologue.getDefines());
-
         if(!prologue.getBase().getUri().toString().equals(""))
         {
             word("BASE");
@@ -168,34 +165,6 @@ public class ToStringVisitor extends ElementVisitor<Void>
 
         if(stringBuilder.length() > 0)
             newLine();
-
-        return null;
-    }
-
-    @Override
-    public Void visit(Define define)
-    {
-        word("DEFINE");
-        visit(define.getKey());
-        word();
-        visitElements(define.getValues());
-        newLine();
-
-        return null;
-    }
-
-    @Override
-    public Void visit(Define.StringValue stringValue)
-    {
-        write(stringValue.getValue());
-
-        return null;
-    }
-
-    @Override
-    public Void visit(Define.IntegerValue integerValue)
-    {
-        write(integerValue.getValue().toString());
 
         return null;
     }

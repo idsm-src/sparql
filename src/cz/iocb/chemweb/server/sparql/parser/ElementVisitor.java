@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
-import cz.iocb.chemweb.server.sparql.parser.model.Define;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -103,22 +102,7 @@ public abstract class ElementVisitor<T>
 
     public T visit(Prologue prologue)
     {
-        return aggregateResult(visitElements(prologue.getDefines()), visitElements(prologue.getPrefixes()));
-    }
-
-    public T visit(Define define)
-    {
-        return aggregateResult(visitElement(define.getKey()), visitElements(define.getValues()));
-    }
-
-    public T visit(Define.StringValue stringValue)
-    {
-        return defaultResult();
-    }
-
-    public T visit(Define.IntegerValue integerValue)
-    {
-        return defaultResult();
+        return aggregateResult(visitElements(prologue.getPrefixes()));
     }
 
     public T visit(PrefixedName prefixedName)

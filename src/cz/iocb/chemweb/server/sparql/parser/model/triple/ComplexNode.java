@@ -13,7 +13,4 @@ import cz.iocb.chemweb.server.sparql.parser.Parser;
  */
 public interface ComplexNode extends Element
 {
-    NodeOptions getNodeOptions();
-
-    void setNodeOptions(NodeOptions options);
 }

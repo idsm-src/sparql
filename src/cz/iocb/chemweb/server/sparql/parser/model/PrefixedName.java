@@ -13,10 +13,9 @@ import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
  * A shortened form of IRI, represented using a prefix (see {@link PrefixDefinition}) and a local name.
  *
  * <p>
- * In the final AST, PrefixedName can appear only as a {@link Define.DefineValue}. In other cases, it is expanded to the
- * full {@link IRI}.
+ * In the final AST, it is expanded to the full {@link IRI}.
  */
-public class PrefixedName extends BaseElement implements Define.DefineValue
+public class PrefixedName extends BaseElement
 {
     private String prefix;
     private String localName;

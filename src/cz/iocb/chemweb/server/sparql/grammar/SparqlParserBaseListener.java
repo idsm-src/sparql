@@ -1,4 +1,4 @@
-// Generated from SparqlParser.g4 by ANTLR 4.5.3
+// Generated from SparqlParser.g4 by ANTLR 4.5.1
  package cz.iocb.chemweb.server.sparql.grammar; 
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -35,30 +35,6 @@ public class SparqlParserBaseListener implements SparqlParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitPrologue(SparqlParser.PrologueContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDefineDecl(SparqlParser.DefineDeclContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDefineDecl(SparqlParser.DefineDeclContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDefineValue(SparqlParser.DefineValueContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDefineValue(SparqlParser.DefineValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -1079,30 +1055,6 @@ public class SparqlParserBaseListener implements SparqlParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitObjectPath(SparqlParser.ObjectPathContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTripleOptions(SparqlParser.TripleOptionsContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTripleOptions(SparqlParser.TripleOptionsContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTableOption(SparqlParser.TableOptionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTableOption(SparqlParser.TableOptionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

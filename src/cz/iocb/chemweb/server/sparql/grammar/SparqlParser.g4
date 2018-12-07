@@ -35,15 +35,7 @@ query
     ;
 
 prologue
-    : defineDecl* (baseDecl | prefixDecl)*
-    ;
-
-defineDecl
-    : DEFINE prefixedName defineValue (',' defineValue)*
-    ;
-
-defineValue
-    : iri | string | INTEGER
+    : (baseDecl | prefixDecl)*
     ;
 
 baseDecl
@@ -386,15 +378,7 @@ objectListPath
     ;
 
 objectPath
-    : graphNodePath tripleOptions?
-    ;
-
-tripleOptions
-    : OPTION '(' tableOption ')'
-    ;
-
-tableOption
-    : TABLE_OPTION string
+    : graphNodePath
     ;
 
 path

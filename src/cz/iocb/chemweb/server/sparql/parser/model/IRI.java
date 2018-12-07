@@ -15,7 +15,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
 /**
  * Identifier used to represent a resource.
  */
-public final class IRI extends BaseComplexNode implements VarOrIri, Path, Define.DefineValue
+public final class IRI extends BaseComplexNode implements VarOrIri, Path
 {
     private URI uri;
 

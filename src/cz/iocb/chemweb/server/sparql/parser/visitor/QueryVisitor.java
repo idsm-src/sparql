@@ -19,8 +19,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.CollectionPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DatasetClauseContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DefineDeclContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DefineValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.FilterContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GraphGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GroupClauseContext;
@@ -63,7 +61,6 @@ import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
 import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
-import cz.iocb.chemweb.server.sparql.parser.model.Define;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -373,56 +370,16 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 class PrologueVisitor extends BaseVisitor<Void>
 {
-    private final QueryVisitorContext context;
-
     private final Prologue prologue;
 
     public PrologueVisitor(QueryVisitorContext context)
     {
-        this.context = context;
         prologue = new Prologue(context.getPredefinedPrefixes());
     }
 
     public Prologue getPrologue()
     {
         return prologue;
-    }
-
-    @Override
-    public Void visitDefineDecl(DefineDeclContext ctx)
-    {
-        PrefixedName key = IriVisitor.parsePrefixedName(ctx.prefixedName());
-
-        List<Define.DefineValue> defineValues = mapList(ctx.defineValue(), this::parseDefineValue);
-
-        Define result = withRange(new Define(key, defineValues), ctx);
-
-        prologue.getDefines().add(result);
-
-        return null;
-    }
-
-    private Define.DefineValue parseDefineValue(DefineValueContext ctx)
-    {
-        Define.DefineValue value;
-
-        if(ctx.iri() != null)
-        {
-            IriContext iriCtx = ctx.iri();
-
-            // can't use IriVisitor.visit for both, because prefixed name has to
-            // use PrefixedName here, not IRI
-            if(iriCtx.IRIREF() != null)
-                value = new IriVisitor(context).visit(iriCtx);
-            else
-                value = IriVisitor.parsePrefixedName(iriCtx.prefixedName());
-        }
-        else if(ctx.string() != null)
-            value = new Define.StringValue(ctx.string().getText());
-        else
-            value = new Define.IntegerValue(ctx.INTEGER().getText());
-
-        return withRange(value, ctx);
     }
 
     @Override
@@ -446,7 +403,7 @@ class PrologueVisitor extends BaseVisitor<Void>
         /*
         java.util.Optional<PrefixDefinition> existingPrefix = prologue.getPrefixes().stream()
                 .filter(p -> p.getName().equals(result.getName())).findFirst();
-
+        
         if(existingPrefix.isPresent())
         {
             // this should probably be a warning
@@ -504,7 +461,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
      */
     private Stream<Pattern> repairExpandedProcedureCalls(Stream<Pattern> stream)
     {
-        List<Pattern> patterns = stream.collect(Collectors.toList());;
+        List<Pattern> patterns = stream.collect(Collectors.toList());
         LinkedList<Pattern> removed = new LinkedList<Pattern>();
 
 
@@ -799,7 +756,6 @@ class TripleExpander extends ComplexElementVisitor<Node>
     public Node visit(BlankNodePropertyList blankNodePropertyList)
     {
         BlankNode blankNode = getNewBlankNode();
-        blankNode.setNodeOptions(blankNodePropertyList.getNodeOptions());
         blankNode.setRange(blankNodePropertyList.getRange());
 
         // take advantage of triple processing
@@ -817,7 +773,6 @@ class TripleExpander extends ComplexElementVisitor<Node>
             return new IRI(Rdf.NIL);
 
         BlankNode firstNode = getNewBlankNode();
-        firstNode.setNodeOptions(rdfCollection.getNodeOptions());
         firstNode.setRange(rdfCollection.getRange());
 
         BlankNode currentNode = firstNode;

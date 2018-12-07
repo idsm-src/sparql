@@ -1,4 +1,4 @@
-// Generated from SparqlParser.g4 by ANTLR 4.5.3
+// Generated from SparqlParser.g4 by ANTLR 4.5.1
  package cz.iocb.chemweb.server.sparql.grammar; 
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -22,18 +22,6 @@ public interface SparqlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitPrologue(SparqlParser.PrologueContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link SparqlParser#defineDecl}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDefineDecl(SparqlParser.DefineDeclContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link SparqlParser#defineValue}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDefineValue(SparqlParser.DefineValueContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link SparqlParser#baseDecl}.
 	 * @param ctx the parse tree
@@ -544,18 +532,6 @@ public interface SparqlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitObjectPath(SparqlParser.ObjectPathContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link SparqlParser#tripleOptions}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitTripleOptions(SparqlParser.TripleOptionsContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link SparqlParser#tableOption}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitTableOption(SparqlParser.TableOptionContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link SparqlParser#path}.
 	 * @param ctx the parse tree

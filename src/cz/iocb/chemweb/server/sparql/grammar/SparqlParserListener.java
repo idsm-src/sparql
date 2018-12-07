@@ -1,4 +1,4 @@
-// Generated from SparqlParser.g4 by ANTLR 4.5.3
+// Generated from SparqlParser.g4 by ANTLR 4.5.1
  package cz.iocb.chemweb.server.sparql.grammar; 
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -27,26 +27,6 @@ public interface SparqlParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitPrologue(SparqlParser.PrologueContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link SparqlParser#defineDecl}.
-	 * @param ctx the parse tree
-	 */
-	void enterDefineDecl(SparqlParser.DefineDeclContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link SparqlParser#defineDecl}.
-	 * @param ctx the parse tree
-	 */
-	void exitDefineDecl(SparqlParser.DefineDeclContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link SparqlParser#defineValue}.
-	 * @param ctx the parse tree
-	 */
-	void enterDefineValue(SparqlParser.DefineValueContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link SparqlParser#defineValue}.
-	 * @param ctx the parse tree
-	 */
-	void exitDefineValue(SparqlParser.DefineValueContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link SparqlParser#baseDecl}.
 	 * @param ctx the parse tree
@@ -897,26 +877,6 @@ public interface SparqlParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitObjectPath(SparqlParser.ObjectPathContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link SparqlParser#tripleOptions}.
-	 * @param ctx the parse tree
-	 */
-	void enterTripleOptions(SparqlParser.TripleOptionsContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link SparqlParser#tripleOptions}.
-	 * @param ctx the parse tree
-	 */
-	void exitTripleOptions(SparqlParser.TripleOptionsContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link SparqlParser#tableOption}.
-	 * @param ctx the parse tree
-	 */
-	void enterTableOption(SparqlParser.TableOptionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link SparqlParser#tableOption}.
-	 * @param ctx the parse tree
-	 */
-	void exitTableOption(SparqlParser.TableOptionContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link SparqlParser#path}.
 	 * @param ctx the parse tree
