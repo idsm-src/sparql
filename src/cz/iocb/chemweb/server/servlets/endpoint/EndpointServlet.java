@@ -3,6 +3,8 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -23,6 +25,8 @@ import cz.iocb.chemweb.server.db.TypedLiteral;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
+import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -107,7 +111,31 @@ public class EndpointServlet extends HttpServlet
     public void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs) throws IOException
     {
-        /* TODO: take defaultGraphs and namedGraphs into the account */
+        if(query == null)
+        {
+            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
+
+        List<DataSet> dataSets = new ArrayList<>();
+
+        try
+        {
+            if(defaultGraphs != null)
+                for(String defaultGraph : defaultGraphs)
+                    dataSets.add(new DataSet(new IRI(defaultGraph), true));
+
+            if(namedGraphs != null)
+                for(String namedGraph : namedGraphs)
+                    dataSets.add(new DataSet(new IRI(namedGraph), false));
+        }
+        catch(IllegalArgumentException e)
+        {
+            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
 
         res.setHeader("access-control-allow-headers",
                 "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
@@ -125,6 +153,10 @@ public class EndpointServlet extends HttpServlet
         try
         {
             SelectQuery syntaxTree = parser.parse(query);
+
+            if(!dataSets.isEmpty())
+                syntaxTree.getSelect().setDataSets(dataSets);
+
             String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
 
             Result result = db.query(code);
@@ -146,12 +178,18 @@ public class EndpointServlet extends HttpServlet
                     writeCsv(res, result);
                     break;
                 default:
-                    res.setStatus(406);
+                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
             }
         }
-        catch(ParseExceptions | TranslateExceptions | SQLException e)
+        catch(ParseExceptions | TranslateExceptions e)
         {
-            throw new IOException(e);
+            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+        catch(SQLException e)
+        {
+            res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            return;
         }
     }
 

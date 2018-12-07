@@ -76,6 +76,11 @@ public class Select extends BaseElement implements GraphPattern
         return dataSets;
     }
 
+    public void setDataSets(List<DataSet> dataSets)
+    {
+        this.dataSets = dataSets;
+    }
+
     public GraphPattern getPattern()
     {
         return pattern;
