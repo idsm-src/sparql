@@ -233,14 +233,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_query; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuery(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuery(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuery(this);
 			else return visitor.visitChildren(this);
@@ -343,14 +335,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_prologue; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPrologue(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPrologue(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPrologue(this);
 			else return visitor.visitChildren(this);
@@ -412,14 +396,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_baseDecl; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBaseDecl(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBaseDecl(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBaseDecl(this);
 			else return visitor.visitChildren(this);
@@ -457,14 +433,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_prefixDecl; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPrefixDecl(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPrefixDecl(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPrefixDecl(this);
@@ -517,14 +485,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_selectQuery; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSelectQuery(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSelectQuery(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSelectQuery(this);
@@ -590,14 +550,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_subSelect; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSubSelect(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSubSelect(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSubSelect(this);
 			else return visitor.visitChildren(this);
@@ -645,14 +597,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_selectClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSelectClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSelectClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSelectClause(this);
@@ -740,14 +684,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_selectVariable; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSelectVariable(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSelectVariable(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSelectVariable(this);
 			else return visitor.visitChildren(this);
@@ -823,14 +759,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_constructQuery; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConstructQuery(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConstructQuery(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConstructQuery(this);
@@ -950,14 +878,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_describeQuery; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDescribeQuery(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDescribeQuery(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDescribeQuery(this);
 			else return visitor.visitChildren(this);
@@ -1063,14 +983,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_askQuery; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterAskQuery(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitAskQuery(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitAskQuery(this);
 			else return visitor.visitChildren(this);
@@ -1128,14 +1040,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_datasetClause; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDatasetClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDatasetClause(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDatasetClause(this);
 			else return visitor.visitChildren(this);
@@ -1184,14 +1088,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_whereClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterWhereClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitWhereClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitWhereClause(this);
@@ -1247,14 +1143,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_solutionModifier; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSolutionModifier(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSolutionModifier(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSolutionModifier(this);
@@ -1332,14 +1220,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_groupClause; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupClause(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupClause(this);
 			else return visitor.visitChildren(this);
@@ -1402,14 +1282,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_groupCondition; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupCondition(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupCondition(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupCondition(this);
@@ -1558,14 +1430,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_havingClause; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterHavingClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitHavingClause(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitHavingClause(this);
 			else return visitor.visitChildren(this);
@@ -1617,14 +1481,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_havingCondition; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterHavingCondition(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitHavingCondition(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitHavingCondition(this);
 			else return visitor.visitChildren(this);
@@ -1665,14 +1521,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_orderClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterOrderClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitOrderClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitOrderClause(this);
@@ -1734,14 +1582,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_orderCondition; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterOrderCondition(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitOrderCondition(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitOrderCondition(this);
@@ -1881,14 +1721,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_limitOffsetClauses; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterLimitOffsetClauses(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitLimitOffsetClauses(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitLimitOffsetClauses(this);
 			else return visitor.visitChildren(this);
@@ -1957,14 +1789,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_limitClause; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterLimitClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitLimitClause(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitLimitClause(this);
 			else return visitor.visitChildren(this);
@@ -2001,14 +1825,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_offsetClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterOffsetClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitOffsetClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitOffsetClause(this);
@@ -2048,14 +1864,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_valuesClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterValuesClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitValuesClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitValuesClause(this);
@@ -2111,14 +1919,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_updateCommand; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUpdateCommand(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUpdateCommand(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUpdateCommand(this);
@@ -2227,14 +2027,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_update; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUpdate(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUpdate(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUpdate(this);
@@ -2353,14 +2145,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_load; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterLoad(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitLoad(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitLoad(this);
 			else return visitor.visitChildren(this);
@@ -2422,14 +2206,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_clear; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterClear(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitClear(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitClear(this);
 			else return visitor.visitChildren(this);
@@ -2480,14 +2256,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_drop; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDrop(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDrop(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDrop(this);
 			else return visitor.visitChildren(this);
@@ -2537,14 +2305,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_create; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterCreate(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitCreate(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitCreate(this);
@@ -2599,14 +2359,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_add; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterAdd(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitAdd(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitAdd(this);
@@ -2666,14 +2418,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_move; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterMove(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitMove(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitMove(this);
 			else return visitor.visitChildren(this);
@@ -2732,14 +2476,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_copy; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterCopy(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitCopy(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitCopy(this);
 			else return visitor.visitChildren(this);
@@ -2794,14 +2530,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_insertData; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInsertData(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInsertData(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInsertData(this);
 			else return visitor.visitChildren(this);
@@ -2844,14 +2572,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_deleteData; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDeleteData(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDeleteData(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDeleteData(this);
 			else return visitor.visitChildren(this);
@@ -2893,14 +2613,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_deleteWhere; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDeleteWhere(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDeleteWhere(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDeleteWhere(this);
@@ -2958,14 +2670,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_modify; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterModify(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitModify(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitModify(this);
@@ -3058,14 +2762,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_deleteClause; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDeleteClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDeleteClause(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDeleteClause(this);
 			else return visitor.visitChildren(this);
@@ -3104,14 +2800,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_insertClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInsertClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInsertClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInsertClause(this);
@@ -3152,14 +2840,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_usingClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUsingClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUsingClause(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUsingClause(this);
@@ -3210,14 +2890,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_graphOrDefault; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphOrDefault(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphOrDefault(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphOrDefault(this);
@@ -3283,14 +2955,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_graphRef; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphRef(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphRef(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphRef(this);
 			else return visitor.visitChildren(this);
@@ -3331,14 +2995,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_graphRefAll; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphRefAll(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphRefAll(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphRefAll(this);
@@ -3404,14 +3060,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_quadPattern; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuadPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuadPattern(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuadPattern(this);
 			else return visitor.visitChildren(this);
@@ -3451,14 +3099,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_quadData; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuadData(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuadData(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuadData(this);
@@ -3505,14 +3145,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_quads; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuads(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuads(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuads(this);
@@ -3575,14 +3207,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_quadsDetails; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuadsDetails(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuadsDetails(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuadsDetails(this);
 			else return visitor.visitChildren(this);
@@ -3642,14 +3266,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_quadsNotTriples; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterQuadsNotTriples(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitQuadsNotTriples(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitQuadsNotTriples(this);
 			else return visitor.visitChildren(this);
@@ -3704,14 +3320,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_triplesTemplate; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesTemplate(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesTemplate(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesTemplate(this);
@@ -3775,14 +3383,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_groupGraphPattern; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupGraphPattern(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupGraphPattern(this);
@@ -3876,14 +3476,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_groupGraphPatternSub; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupGraphPatternSub(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupGraphPatternSub(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupGraphPatternSub(this);
 			else return visitor.visitChildren(this);
@@ -3945,14 +3537,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_groupGraphPatternSubList; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupGraphPatternSubList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupGraphPatternSubList(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupGraphPatternSubList(this);
 			else return visitor.visitChildren(this);
@@ -4010,14 +3594,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_triplesBlock; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesBlock(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesBlock(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesBlock(this);
@@ -4099,14 +3675,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_graphPatternNotTriples; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphPatternNotTriples(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphPatternNotTriples(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphPatternNotTriples(this);
@@ -4201,14 +3769,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_optionalGraphPattern; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterOptionalGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitOptionalGraphPattern(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitOptionalGraphPattern(this);
 			else return visitor.visitChildren(this);
@@ -4250,14 +3810,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_graphGraphPattern; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphGraphPattern(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphGraphPattern(this);
@@ -4303,14 +3855,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_serviceGraphPattern; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterServiceGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitServiceGraphPattern(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitServiceGraphPattern(this);
@@ -4367,14 +3911,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_bind; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBind(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBind(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBind(this);
 			else return visitor.visitChildren(this);
@@ -4422,14 +3958,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_inlineData; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInlineData(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInlineData(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInlineData(this);
 			else return visitor.visitChildren(this);
@@ -4470,14 +3998,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_dataBlock; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDataBlock(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDataBlock(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDataBlock(this);
@@ -4535,14 +4055,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_inlineDataOneVar; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInlineDataOneVar(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInlineDataOneVar(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInlineDataOneVar(this);
@@ -4607,14 +4119,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_inlineDataFull; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInlineDataFull(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInlineDataFull(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInlineDataFull(this);
@@ -4690,14 +4194,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_dataBlockValues; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDataBlockValues(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDataBlockValues(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDataBlockValues(this);
 			else return visitor.visitChildren(this);
@@ -4760,14 +4256,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_dataBlockValue; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterDataBlockValue(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitDataBlockValue(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitDataBlockValue(this);
@@ -4855,14 +4343,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_minusGraphPattern; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterMinusGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitMinusGraphPattern(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitMinusGraphPattern(this);
 			else return visitor.visitChildren(this);
@@ -4907,14 +4387,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_groupOrUnionGraphPattern; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGroupOrUnionGraphPattern(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGroupOrUnionGraphPattern(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGroupOrUnionGraphPattern(this);
@@ -4970,14 +4442,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_filter; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterFilter(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitFilter(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitFilter(this);
 			else return visitor.visitChildren(this);
@@ -5021,14 +4485,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_constraint; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConstraint(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConstraint(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConstraint(this);
@@ -5156,14 +4612,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_functionCall; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterFunctionCall(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitFunctionCall(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitFunctionCall(this);
 			else return visitor.visitChildren(this);
@@ -5202,14 +4650,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_argList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterArgList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitArgList(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitArgList(this);
@@ -5362,14 +4802,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_expressionList; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterExpressionList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitExpressionList(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitExpressionList(this);
 			else return visitor.visitChildren(this);
@@ -5422,14 +4854,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_constructTemplate; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConstructTemplate(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConstructTemplate(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConstructTemplate(this);
@@ -5484,14 +4908,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_constructTriples; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConstructTriples(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConstructTriples(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConstructTriples(this);
@@ -5565,14 +4981,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_triplesSameSubject; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesSameSubject(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesSameSubject(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesSameSubject(this);
 			else return visitor.visitChildren(this);
@@ -5624,14 +5032,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_propertyList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPropertyList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPropertyList(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPropertyList(this);
@@ -5685,14 +5085,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_propertyListNotEmpty; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPropertyListNotEmpty(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPropertyListNotEmpty(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPropertyListNotEmpty(this);
@@ -5759,14 +5151,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_verb; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVerb(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVerb(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVerb(this);
 			else return visitor.visitChildren(this);
@@ -5824,14 +5208,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_objectList; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterObjectList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitObjectList(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitObjectList(this);
 			else return visitor.visitChildren(this);
@@ -5885,14 +5261,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_object; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterObject(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitObject(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitObject(this);
 			else return visitor.visitChildren(this);
@@ -5937,14 +5305,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_triplesSameSubjectPath; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesSameSubjectPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesSameSubjectPath(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesSameSubjectPath(this);
@@ -5997,14 +5357,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_propertyListPath; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPropertyListPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPropertyListPath(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPropertyListPath(this);
@@ -6061,14 +5413,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_propertyListPathNotEmpty; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPropertyListPathNotEmpty(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPropertyListPathNotEmpty(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPropertyListPathNotEmpty(this);
@@ -6160,14 +5504,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_propertyListPathNotEmptyList; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPropertyListPathNotEmptyList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPropertyListPathNotEmptyList(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPropertyListPathNotEmptyList(this);
 			else return visitor.visitChildren(this);
@@ -6228,14 +5564,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_verbPath; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVerbPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVerbPath(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVerbPath(this);
 			else return visitor.visitChildren(this);
@@ -6271,14 +5599,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_verbSimple; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVerbSimple(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVerbSimple(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVerbSimple(this);
@@ -6318,14 +5638,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_objectListPath; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterObjectListPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitObjectListPath(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitObjectListPath(this);
@@ -6380,14 +5692,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_objectPath; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterObjectPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitObjectPath(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitObjectPath(this);
 			else return visitor.visitChildren(this);
@@ -6423,14 +5727,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_path; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPath(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPath(this);
@@ -6470,14 +5766,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_pathAlternative; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathAlternative(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathAlternative(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathAlternative(this);
@@ -6535,14 +5823,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_pathSequence; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathSequence(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathSequence(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathSequence(this);
 			else return visitor.visitChildren(this);
@@ -6599,14 +5879,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_pathElt; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathElt(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathElt(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathElt(this);
 			else return visitor.visitChildren(this);
@@ -6654,14 +5926,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_pathEltOrInverse; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathEltOrInverse(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathEltOrInverse(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathEltOrInverse(this);
 			else return visitor.visitChildren(this);
@@ -6705,14 +5969,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_pathMod; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathMod(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathMod(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathMod(this);
@@ -6763,14 +6019,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_pathPrimary; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathPrimary(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathPrimary(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathPrimary(this);
@@ -6846,14 +6094,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_pathNegatedPropertySet; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathNegatedPropertySet(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathNegatedPropertySet(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathNegatedPropertySet(this);
@@ -6939,14 +6179,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_pathOneInPropertySet; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPathOneInPropertySet(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPathOneInPropertySet(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPathOneInPropertySet(this);
 			else return visitor.visitChildren(this);
@@ -7008,14 +6240,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_integer; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterInteger(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitInteger(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitInteger(this);
 			else return visitor.visitChildren(this);
@@ -7054,14 +6278,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_triplesNode; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesNode(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesNode(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesNode(this);
@@ -7113,14 +6329,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_blankNodePropertyList; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBlankNodePropertyList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBlankNodePropertyList(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBlankNodePropertyList(this);
 			else return visitor.visitChildren(this);
@@ -7163,14 +6371,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_triplesNodePath; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterTriplesNodePath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitTriplesNodePath(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitTriplesNodePath(this);
@@ -7222,14 +6422,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_blankNodePropertyListPath; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBlankNodePropertyListPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBlankNodePropertyListPath(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBlankNodePropertyListPath(this);
 			else return visitor.visitChildren(this);
@@ -7272,14 +6464,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_collection; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterCollection(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitCollection(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitCollection(this);
@@ -7337,14 +6521,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_collectionPath; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterCollectionPath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitCollectionPath(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitCollectionPath(this);
 			else return visitor.visitChildren(this);
@@ -7401,14 +6577,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_graphNode; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphNode(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphNode(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphNode(this);
 			else return visitor.visitChildren(this);
@@ -7460,14 +6628,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_graphNodePath; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphNodePath(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphNodePath(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphNodePath(this);
 			else return visitor.visitChildren(this);
@@ -7518,14 +6678,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_varOrTerm; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVarOrTerm(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVarOrTerm(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVarOrTerm(this);
@@ -7601,14 +6753,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_varOrIRI; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVarOrIRI(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVarOrIRI(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVarOrIRI(this);
 			else return visitor.visitChildren(this);
@@ -7660,14 +6804,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_var; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterVar(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitVar(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitVar(this);
@@ -7725,14 +6861,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_graphTerm; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterGraphTerm(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitGraphTerm(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitGraphTerm(this);
@@ -7824,14 +6952,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_nil; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNil(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNil(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNil(this);
 			else return visitor.visitChildren(this);
@@ -7881,14 +7001,6 @@ public class SparqlParser extends Parser {
 		}
 		public UnarySignedLiteralExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUnarySignedLiteralExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUnarySignedLiteralExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUnarySignedLiteralExpression(this);
 			else return visitor.visitChildren(this);
@@ -7902,14 +7014,6 @@ public class SparqlParser extends Parser {
 			return getRuleContext(ExpressionContext.class,i);
 		}
 		public ConditionalOrExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConditionalOrExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConditionalOrExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConditionalOrExpression(this);
@@ -7926,14 +7030,6 @@ public class SparqlParser extends Parser {
 		}
 		public AdditiveExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterAdditiveExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitAdditiveExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitAdditiveExpression(this);
 			else return visitor.visitChildren(this);
@@ -7945,14 +7041,6 @@ public class SparqlParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public UnaryAdditiveExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUnaryAdditiveExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUnaryAdditiveExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUnaryAdditiveExpression(this);
@@ -7968,14 +7056,6 @@ public class SparqlParser extends Parser {
 			return getRuleContext(ExpressionContext.class,i);
 		}
 		public RelationalExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterRelationalExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitRelationalExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitRelationalExpression(this);
@@ -7993,14 +7073,6 @@ public class SparqlParser extends Parser {
 		}
 		public RelationalSetExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterRelationalSetExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitRelationalSetExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitRelationalSetExpression(this);
 			else return visitor.visitChildren(this);
@@ -8011,14 +7083,6 @@ public class SparqlParser extends Parser {
 			return getRuleContext(PrimaryExpressionContext.class,0);
 		}
 		public BaseExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBaseExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBaseExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBaseExpression(this);
@@ -8035,14 +7099,6 @@ public class SparqlParser extends Parser {
 		}
 		public MultiplicativeExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterMultiplicativeExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitMultiplicativeExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitMultiplicativeExpression(this);
 			else return visitor.visitChildren(this);
@@ -8057,14 +7113,6 @@ public class SparqlParser extends Parser {
 		}
 		public ConditionalAndExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterConditionalAndExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitConditionalAndExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitConditionalAndExpression(this);
 			else return visitor.visitChildren(this);
@@ -8075,14 +7123,6 @@ public class SparqlParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public UnaryNegationExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUnaryNegationExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUnaryNegationExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUnaryNegationExpression(this);
@@ -8402,14 +7442,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_unaryLiteralExpression; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUnaryLiteralExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUnaryLiteralExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUnaryLiteralExpression(this);
 			else return visitor.visitChildren(this);
@@ -8484,14 +7516,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_unaryExpression; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterUnaryExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitUnaryExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitUnaryExpression(this);
 			else return visitor.visitChildren(this);
@@ -8561,14 +7585,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_primaryExpression; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPrimaryExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPrimaryExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPrimaryExpression(this);
@@ -8809,14 +7825,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_builtInCall; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBuiltInCall(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBuiltInCall(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBuiltInCall(this);
@@ -9601,14 +8609,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_regexExpression; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterRegexExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitRegexExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitRegexExpression(this);
 			else return visitor.visitChildren(this);
@@ -9671,14 +8671,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_subStringExpression; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterSubStringExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitSubStringExpression(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitSubStringExpression(this);
 			else return visitor.visitChildren(this);
@@ -9740,14 +8732,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_strReplaceExpression; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterStrReplaceExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitStrReplaceExpression(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitStrReplaceExpression(this);
@@ -9812,14 +8796,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_existsFunction; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterExistsFunction(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitExistsFunction(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitExistsFunction(this);
 			else return visitor.visitChildren(this);
@@ -9859,14 +8835,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_notExistsFunction; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNotExistsFunction(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNotExistsFunction(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNotExistsFunction(this);
@@ -9920,14 +8888,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_aggregate; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterAggregate(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitAggregate(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitAggregate(this);
@@ -10237,14 +9197,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_iriRefOrFunction; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterIriRefOrFunction(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitIriRefOrFunction(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitIriRefOrFunction(this);
 			else return visitor.visitChildren(this);
@@ -10293,14 +9245,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_rdfLiteral; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterRdfLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitRdfLiteral(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitRdfLiteral(this);
@@ -10362,14 +9306,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_numericLiteral; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNumericLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNumericLiteral(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNumericLiteral(this);
@@ -10434,14 +9370,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_numericLiteralUnsigned; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNumericLiteralUnsigned(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNumericLiteralUnsigned(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNumericLiteralUnsigned(this);
 			else return visitor.visitChildren(this);
@@ -10483,14 +9411,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_numericLiteralPositive; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNumericLiteralPositive(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNumericLiteralPositive(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNumericLiteralPositive(this);
@@ -10534,14 +9454,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_numericLiteralNegative; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterNumericLiteralNegative(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitNumericLiteralNegative(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitNumericLiteralNegative(this);
 			else return visitor.visitChildren(this);
@@ -10582,14 +9494,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_booleanLiteral; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBooleanLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBooleanLiteral(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBooleanLiteral(this);
@@ -10634,14 +9538,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_string; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterString(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitString(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitString(this);
 			else return visitor.visitChildren(this);
@@ -10684,14 +9580,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_iri; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterIri(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitIri(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitIri(this);
@@ -10743,14 +9631,6 @@ public class SparqlParser extends Parser {
 		}
 		@Override public int getRuleIndex() { return RULE_prefixedName; }
 		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterPrefixedName(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitPrefixedName(this);
-		}
-		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitPrefixedName(this);
 			else return visitor.visitChildren(this);
@@ -10793,14 +9673,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_blankNode; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterBlankNode(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitBlankNode(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitBlankNode(this);
@@ -10848,14 +9720,6 @@ public class SparqlParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_anon; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).enterAnon(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof SparqlParserListener ) ((SparqlParserListener)listener).exitAnon(this);
-		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof SparqlParserVisitor ) return ((SparqlParserVisitor<? extends T>)visitor).visitAnon(this);
