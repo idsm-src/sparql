@@ -11,7 +11,7 @@ class SubstanceDescriptor
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID[0-9]+_";
+        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID[1-9][0-9]*_";
 
         config.addIriClass(
                 new UserIriClass("substance_version", Arrays.asList("integer"), prefix + "Substance_Version"));

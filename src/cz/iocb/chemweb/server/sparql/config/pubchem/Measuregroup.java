@@ -12,7 +12,7 @@ class Measuregroup
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("measuregroup", Arrays.asList("integer", "integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/measuregroup/AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/measuregroup/AID[0-9]+(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?"));
     }
 
 

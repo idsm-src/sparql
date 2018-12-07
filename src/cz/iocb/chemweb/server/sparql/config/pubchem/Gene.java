@@ -13,7 +13,7 @@ class Gene
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("gene", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[0-9]+"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID[1-9][0-9]*"));
         config.addIriClass(new UserIriClass("ensembl", Arrays.asList("varchar"),
                 "http://rdf.ebi.ac.uk/resource/ensembl/.*", config.getConnectionPool(), SqlCheck.IF_MATCH));
     }

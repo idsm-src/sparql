@@ -13,7 +13,7 @@ class Reference
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("reference", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID[0-9]+"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID([1-9][0-9]*|0)"));
     }
 
 

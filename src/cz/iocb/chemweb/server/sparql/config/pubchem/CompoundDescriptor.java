@@ -13,7 +13,7 @@ class CompoundDescriptor
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/CID[0-9]+_";
+        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/CID[1-9][0-9]*_";
 
         config.addIriClass(new UserIriClass("hydrogen_bond_acceptor_count", Arrays.asList("integer"),
                 prefix + "Hydrogen_Bond_Acceptor_Count"));

@@ -12,9 +12,9 @@ class Biosystem
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("biosystem", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID[0-9]+"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID[1-9][0-9]*"));
         config.addIriClass(new UserIriClass("wikipathway", Arrays.asList("integer"),
-                "http://identifiers.org/wikipathways/WP[0-9]+"));
+                "http://identifiers.org/wikipathways/WP[1-9][0-9]*"));
     }
 
 

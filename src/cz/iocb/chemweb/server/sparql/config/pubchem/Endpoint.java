@@ -13,7 +13,7 @@ class Endpoint
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("endpoint", Arrays.asList("integer", "integer", "integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/SID[0-9]+_AID[0-9]+(_(PMID[0-9]*|[0-9]+))?"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/SID[1-9][0-9]*_AID[1-9][0-9]*(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?"));
     }
 
 

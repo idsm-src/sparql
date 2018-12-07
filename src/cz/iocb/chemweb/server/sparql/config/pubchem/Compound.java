@@ -11,7 +11,7 @@ class Compound
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID[0-9]+";
+        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID[1-9][0-9]*";
 
         config.addIriClass(new UserIriClass("compound", Arrays.asList("integer"), prefix));
         config.addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), prefix + "_Molfile"));

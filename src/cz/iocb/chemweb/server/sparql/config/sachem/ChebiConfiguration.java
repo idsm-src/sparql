@@ -9,6 +9,6 @@ public class ChebiConfiguration extends SachemConfiguration
 {
     public ChebiConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(connectionPool, "http://purl.obolibrary.org/obo/CHEBI_", "[0-9]+");
+        super(connectionPool, "http://purl.obolibrary.org/obo/CHEBI_", "[1-9][0-9]*");
     }
 }

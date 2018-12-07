@@ -12,7 +12,7 @@ class ConservedDomain
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("conserveddomain", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/PSSMID[0-9]+"));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/PSSMID[1-9][0-9]*"));
     }
 
 
