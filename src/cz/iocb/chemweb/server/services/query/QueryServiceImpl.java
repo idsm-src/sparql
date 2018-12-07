@@ -5,7 +5,10 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 import javax.naming.Context;
@@ -55,16 +58,19 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         Throwable exception;
     }
 
+
     private static final long serialVersionUID = 1L;
     private static final int timeout = 20 * 60 * 1000; // 20 minutes
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
+    private static final int cacheSize = 1000000;
+    private static final Map<String, Map<RdfNode, String>> nodeHashMaps = new HashMap<String, Map<RdfNode, String>>();
 
+    private Map<RdfNode, String> nodeHashMap;
     private SparqlDatabaseConfiguration dbConfig;
     private Parser parser;
     private PostgresDatabase database;
     private VelocityEngine ve;
-    private LinkedHashMap<RdfNode, String> nodeHashMap = new LinkedHashMap<RdfNode, String>(10000, 0.75f);
 
 
     @Override
@@ -86,6 +92,29 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         {
             throw new ServletException(e);
         }
+
+
+        synchronized(QueryServiceImpl.class)
+        {
+            nodeHashMap = nodeHashMaps.get(resourceName);
+
+            if(nodeHashMap == null)
+            {
+                nodeHashMap = Collections.synchronizedMap(new LinkedHashMap<RdfNode, String>(cacheSize, 0.75f, true)
+                {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected boolean removeEldestEntry(Map.Entry<RdfNode, String> eldest)
+                    {
+                        return size() > cacheSize;
+                    }
+                });
+
+                nodeHashMaps.put(resourceName, nodeHashMap);
+            }
+        }
+
 
         Properties properties = new Properties();
         properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
