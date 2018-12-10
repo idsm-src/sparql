@@ -1,16 +1,13 @@
 #parse("common/utils.vm")
+#parse("common/label.vm")
 
 
 <style scoped>
 #include("css/owl.css")
 </style>
 
-#parse("common/label.vm")
-
-
 
 <div class="VET-Page">
-  <!-- ------------------------------------------------------------------------------------------- -->
 
   <div class="VET-BoxedSection">
     <div class="VET-Header">Class</div>
@@ -18,191 +15,189 @@
       <b>#label($entity)</b>
       <br/>
       <small>#escapeIRI($entity)</small>
-      <br/>
     </div>
   </div>
 
-
   <!-- ------------------------------------------------------------------------------------------- -->
-  
-  #macro( superlevel $class )
-    #sparql($super)
-      SELECT ?CLASS FROM pubchem:ontology WHERE
+
+  #macro(superlevelClasses $class $label $depth $count)
+    #sparql($superclasses)
+      SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
       {
         $class rdfs:subClassOf ?CLASS.
-        ##FILTER NOT EXISTS { ?CLASS owl:unionOf ?X }
-        ##FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
+        ?CLASS rdfs:label ?LABEL.
         FILTER (?CLASS != $class) #avoid simple type cycle
       }
     #end
 
-    <ul class="hierarchy">
-      <li>
-        #url($class)#escapeIRI($class)#end
-        (#label($class))
-      <li>
-      #foreach($s in $super)
-      <li>#superlevel($s.CLASS)<li>
-      #end
-    </ul>
+    #if($superclasses.count == 0)
+      &#9632;
+    #elseif($count < 128 && $depth < 8)
+      &#9662;
+    #else
+      &#9656;
+    #end
+
+    #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+    #if($count < 128 && $depth < 8)
+      #set($count = $count + $superclasses.count)
+      #set($depth = $depth + 1)
+      <ul class="hierarchy">
+        #foreach($superclass in $superclasses)
+          <li>#superlevelClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
+        #end
+      </ul>
+      #set($depth = $depth - 1)
+    #end
   #end
-  
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Superclass Hierarchy</div>
-    <div>
-    #superlevel($entity)
+
+
+  #sparql($superclasses)
+    SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+    {
+      $entity rdfs:subClassOf ?CLASS.
+      ?CLASS rdfs:label ?LABEL.
+      FILTER (?CLASS != $entity) #avoid simple type cycle
+    }
+  #end
+
+  #if($superclasses.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Superclass Hierarchy</div>
+      <div>
+        <ul class="hierarchy">
+          <li>
+            &#9662;
+            #url($entity)#escapeIRI($entity)#end (#label($entity))
+            #set($count = $superclasses.count)
+            <ul class="hierarchy">
+              #foreach($superclass in $superclasses)
+                <li>#superlevelClasses($superclass.CLASS $superclass.LABEL 1 $count)</li>
+              #end
+            </ul>
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
-  
-  
+  #end
+
   <!-- ------------------------------------------------------------------------------------------- -->
-  
-  #macro( sublevel $class )
-    #sparql($super)
-      SELECT ?CLASS FROM pubchem:ontology WHERE
+
+  #macro(sublevelClasses $class $label $depth $count)
+    #sparql($subclasses)
+      SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
       {
         ?CLASS rdfs:subClassOf $class.
-        
-        ##FILTER NOT EXISTS { ?CLASS owl:unionOf ?X }
-        ##FILTER NOT EXISTS { ?CLASS rdf:type owl:Restriction }
-        FILTER ( ?CLASS != owl:Nothing )
+        ?CLASS rdfs:label ?LABEL.
+        FILTER (?CLASS != owl:Nothing)
         FILTER (?CLASS != $class) #avoid simple type cycle
       }
     #end
 
-    <ul class="hierarchy">
-      <li>
-        #url($class)#escapeIRI($class)#end
-        (#label($class))
-      <li>
-      #foreach($s in $super)
-      <li>#sublevel($s.CLASS)<li>
-      #end
-    </ul>
+    #if($subclasses.count == 0)
+      &#9632;
+    #elseif($count < 128 && $depth < 8)
+      &#9662;
+    #else
+      &#9656;
+    #end
+
+    #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+    #if($count < 128 && $depth < 8)
+      #set($count = $count + $subclasses.count)
+      #set($depth = $depth + 1)
+      <ul class="hierarchy">
+        #foreach($subclass in $subclasses)
+          <li>#sublevelClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
+        #end
+      </ul>
+      #set($depth = $depth - 1)
+    #end
   #end
-  
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Subclass Hierarchy</div>
-    <div>  
-    #sublevel($entity)
+
+
+  #sparql($subclasses)
+    SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+    {
+      ?CLASS rdfs:subClassOf $entity.
+      ?CLASS rdfs:label ?LABEL.
+      FILTER (?CLASS != owl:Nothing)
+      FILTER (?CLASS != $entity) #avoid simple type cycle
+    }
+  #end
+
+  #if($subclasses.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Subclass Hierarchy</div>
+      <div>
+        <ul class="hierarchy">
+          <li>
+            &#9662;
+            #url($entity)#escapeIRI($entity)#end (#label($entity))
+            #set($count = $subclasses.count)
+            <ul class="hierarchy">
+              #foreach($subclass in $subclasses)
+                <li>#sublevelClasses($subclass.CLASS $subclass.LABEL 1 $count)</li>
+              #end
+            </ul>
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
-  
-
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-    #sparql($properties)
-      SELECT ?PROPERTY FROM pubchem:ontology WHERE
-      {
-        $entity rdfs:subClassOf ?DOMAIN .
-        filter( ?DOMAIN != rdfs:Resource )
-        ?PROPERTY rdfs:domain ?DOMAIN .
-      }
-    #end
-
-
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Properties</div>
-    <div>
-    #foreach($property in $properties)
-      #if($velocityCount > 1)<br/>#end
-	  #url($property.PROPERTY)#escapeIRI($property.PROPERTY)#end (#label($property.PROPERTY))
-	  
-	  <table style="margin-left: 10px">
-        #sparql($domains)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
-          {
-            $property.PROPERTY rdfs:domain ?CLASS .
-          }
-        #end
-		#foreach($domain in $domains)
-	    <tr>
-	      <td>domain:</td>
-	      <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
-	    </tr>
-        #end
-
-        #sparql($ranges)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
-          {
-            $property.PROPERTY rdfs:range ?CLASS .
-          }
-        #end
-		#foreach($range in $ranges)
-	    <tr>
-	      <td>range:</td>
-	      <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
-	    </tr>
-	    #end
-	    
-	    #sparql($cardinalities)
-          SELECT ?COUNT FROM pubchem:ontology WHERE
-          {
-            $entity rdfs:subClassOf ?R.
-            ?R rdf:type owl:Restriction.
-            ?R owl:onProperty $property.PROPERTY.
-            ?R owl:cardinality ?COUNT.
-		  }
-		#end
-		#foreach($cardinality in $cardinalities)
-	    <tr>
-	      <td>cardinality:</td>
-	      <td>#escapeHTML($cardinality.COUNT)</td>
-	    </tr>
-	    #end
-	  </table>
-    #end
-    </div>
-  </div>
-
+  #end
 
   <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($properties)
-    SELECT ?PROPERTY FROM pubchem:ontology WHERE
+    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
     {
-      ##?RANGE rdfs:subClassOf* $entity.
-      ##?PROPERTY rdfs:range ?RANGE.
-      ?PROPERTY rdfs:range $entity.
+      ?PROPERTY rdfs:domain $entity.
+      ?PROPERTY rdfs:label ?LABEL.
     }
   #end
 
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">In Range of Properties</div>
-    <div>
-    #foreach($property in $properties)
-      #if($velocityCount > 1)<br/>#end
-	  #url($property.PROPERTY)#escapeIRI($property.PROPERTY)#end (#label($property.PROPERTY))
-	  
-	  <table style="margin-left: 10px">
-        #sparql($domains)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
-          {
-            $property.PROPERTY rdfs:domain ?CLASS .
-          }
-        #end
-		#foreach($domain in $domains)
-	    <tr>
-	      <td>domain:</td>
-	      <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
-	    </tr>
-        #end
+  #if($properties.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Properties</div>
+      <div>
+        #foreach($property in $properties)
+          #if($velocityCount > 1)<br/>#end
+          #url($property.PROPERTY)#escapeIRI($property.PROPERTY)#end (#escapeHTML($property.LABEL))
 
-        #sparql($ranges)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
-          {
-            $property.PROPERTY rdfs:range ?CLASS .
-          }
+          <table style="margin-left: 10px">
+            #sparql($domains)
+              SELECT ?CLASS FROM pubchem:ontology WHERE
+              {
+                $property.PROPERTY rdfs:domain ?CLASS .
+              }
+            #end
+
+            #foreach($domain in $domains)
+              <tr>
+                <td>domain:</td>
+                <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
+              </tr>
+            #end
+
+            #sparql($ranges)
+              SELECT ?CLASS FROM pubchem:ontology WHERE
+              {
+                $property.PROPERTY rdfs:range ?CLASS.
+              }
+            #end
+
+            #foreach($range in $ranges)
+              <tr>
+                <td>range:</td>
+                <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
+              </tr>
+            #end
+          </table>
         #end
-		#foreach($range in $ranges)
-	    <tr>
-	      <td>range:</td>
-	      <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
-	    </tr>
-	    #end
-	  </table>
-    #end
+      </div>
     </div>
-  </div>
+  #end
 
 </div>

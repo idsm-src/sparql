@@ -45,8 +45,56 @@
   SELECT ?PROPERTY ?TYPE ?VALUE FROM pubchem:ontology WHERE
   {
     $class owl:onProperty ?PROPERTY.
-    $class ?TYPE ?VALUE.
-    filter (?TYPE in (owl:allValuesFrom, owl:hasValue, owl:someValuesFrom, owl:cardinality, owl:hasSelf, owl:minCardinality, owl:maxCardinality, owl:qualifiedCardinality, owl:maxQualifiedCardinality, owl:minQualifiedCardinality))
+
+    {
+      VALUES ?TYPE { owl:someValuesFrom }
+      $class owl:someValuesFrom ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:allValuesFrom }
+      $class owl:allValuesFrom ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:hasValue }
+      $class owl:hasValue ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:hasSelf }
+      $class owl:hasSelf ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:cardinality }
+      $class owl:cardinality ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:minCardinality }
+      $class owl:minCardinality ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:maxCardinality }
+      $class owl:maxCardinality ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:qualifiedCardinality }
+      $class owl:qualifiedCardinality ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:minQualifiedCardinality }
+      $class owl:minQualifiedCardinality ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TYPE { owl:maxQualifiedCardinality }
+      $class owl:maxQualifiedCardinality ?VALUE.
+    }
   }
 #end
 #if( $restriction.count == 1 )

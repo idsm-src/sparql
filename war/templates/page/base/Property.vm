@@ -1,16 +1,13 @@
 #parse("common/utils.vm")
+#parse("common/label.vm")
 
 
 <style scoped>
 #include("css/owl.css")
 </style>
 
-#parse("common/label.vm")
-
-
 
 <div class="VET-Page">
-  <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($info)
     SELECT ?LABEL FROM pubchem:ontology WHERE
@@ -23,13 +20,12 @@
     <div class="VET-Header">Property</div>
     <div>
       #if($info.LABEL)
-      <b>#escapeHTML($info.LABEL)</b>
-      <br/>
-      <small>#escapeIRI($entity)</small>
+        <b>#escapeHTML($info.LABEL)</b>
+        <br/>
+        <small>#escapeIRI($entity)</small>
       #else
-      <b>#escapeIRI($entity)</b>
+        <b>#escapeIRI($entity)</b>
       #end
-
 
       #sparql($domains)
         SELECT ?CLASS FROM pubchem:ontology WHERE
@@ -46,99 +42,150 @@
       #end
 
       #if( $domains.count > 0 || $ranges.count > 0 )
-      <hr/>
-      
-      <table>
-		#foreach($domain in $domains)
-	    <tr>
-	      <td>domain:</td>
-	      <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
-	    </tr>
-        #end
+        <hr/>
+        <table>
+          #foreach($domain in $domains)
+            <tr>
+              <td>domain:</td>
+              <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
+            </tr>
+          #end
 
-		#foreach($range in $ranges)
-	    <tr>
-	      <td>range:</td>
-	      <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
-	    </tr>
-	    #end
-      </table>
+          #foreach($range in $ranges)
+            <tr>
+              <td>range:</td>
+              <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
+            </tr>
+          #end
+        </table>
       #end
     </div>
   </div>
 
-
   <!-- ------------------------------------------------------------------------------------------- -->
 
-  #macro( superlevel $property )
-    #sparql($info)
-      SELECT ?LABEL FROM pubchem:ontology WHERE
-      {
-        $property rdfs:label ?LABEL.
-      }
-    #end
-    #sparql($super)
-      SELECT ?PROPERTY FROM pubchem:ontology WHERE
+  #macro(superlevelProperties $property $label $depth $count)
+    #sparql($superproperties)
+      SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
       {
         $property rdfs:subPropertyOf ?PROPERTY.
+        ?PROPERTY rdfs:label ?LABEL.
       }
     #end
 
-    <ul class="hierarchy">
-      <li>
-        #url($property)#escapeIRI($property)#end
-        #if($info.LABEL)
-        (#escapeHTML($info.LABEL))
-        #end
-      <li>
-      #foreach($s in $super)
-      <li>#superlevel($s.PROPERTY)<li>
-      #end
-    </ul>
-  #end
-  
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Superproperty Hierarchy</div>
-    <div>
-    #superlevel($entity)
-    </div>
-  </div>
+    #if($superproperties.count == 0)
+      &#9632;
+    #elseif($count < 128 && $depth < 8)
+      &#9662;
+    #else
+      &#9656;
+    #end
 
+    #url($property)#escapeIRI($property)#end (#escapeHTML($label))
+
+    #if($count < 128 && $depth < 8)
+      #set($count = $count + $superproperties.count)
+      #set($depth = $depth + 1)
+      <ul class="hierarchy">
+        #foreach($superproperty in $superproperties)
+          <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL $depth $count)</li>
+        #end
+      </ul>
+      #set($depth = $depth - 1)
+    #end
+  #end
+
+
+  #sparql($superproperties)
+    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+    {
+      $entity rdfs:subPropertyOf ?PROPERTY.
+      ?PROPERTY rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($superproperties.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Superproperty Hierarchy</div>
+      <div>
+        <ul class="hierarchy">
+          <li>
+            &#9662;
+            #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+            #set($count = $superproperties.count)
+            <ul class="hierarchy">
+              #foreach($superproperty in $superproperties)
+                <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL 1 $count)</li>
+              #end
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  #end
 
   <!-- ------------------------------------------------------------------------------------------- -->
 
-  #macro( sublevel $property )
-    #sparql($info)
-      SELECT ?LABEL FROM pubchem:ontology WHERE
-      {
-        $property rdfs:label ?LABEL.
-      }
-    #end
-    #sparql($super)
-      SELECT ?PROPERTY FROM pubchem:ontology WHERE
+  #macro(sublevelProperties $property $label $depth $count)
+    #sparql($subproperties)
+      SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
       {
         ?PROPERTY rdfs:subPropertyOf $property.
+        ?PROPERTY rdfs:label ?LABEL.
       }
     #end
 
-    <ul class="hierarchy">
-      <li>
-        #url($property)#escapeIRI($property)#end
-        #if($info.LABEL)
-        (#escapeHTML($info.LABEL))
+    #if($subproperties.count == 0)
+      &#9632;
+    #elseif($count < 128 && $depth < 8)
+      &#9662;
+    #else
+      &#9656;
+    #end
+
+    #url($property)#escapeIRI($property)#end (#escapeHTML($label))
+
+    #if($count < 128 && $depth < 8)
+      #set($count = $count + $subproperties.count)
+      #set($depth = $depth + 1)
+      <ul class="hierarchy">
+        #foreach($subproperty in $subproperties)
+          <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL $depth $count)</li>
         #end
-      <li>
-      #foreach($s in $super)
-      <li>#sublevel($s.PROPERTY)<li>
-      #end
-    </ul>
+      </ul>
+      #set($depth = $depth - 1)
+    #end
   #end
-  
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Subproperty Hierarchy</div>
-    <div>  
-    #sublevel($entity)
+
+
+  #sparql($subproperties)
+    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+    {
+      ?PROPERTY rdfs:subPropertyOf $entity.
+      ?PROPERTY rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($subproperties.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Subproperty Hierarchy</div>
+      <div>
+        <ul class="hierarchy">
+          <li>
+            &#9662;
+            #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+            #set($count = $subproperties.count)
+            <ul class="hierarchy">
+              #foreach($subproperty in $subproperties)
+                <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL 1 $count)</li>
+              #end
+            </ul>
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
+  #end
+
+  <!-- ------------------------------------------------------------------------------------------- -->
 
 </div>
