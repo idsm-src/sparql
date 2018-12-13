@@ -16,15 +16,12 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 public class SqlIri extends SqlNodeValue
 {
     private final IRI iri;
-    private final Set<ResourceClass> patternResourceClasses;
 
 
-    protected SqlIri(IRI iri, IriClass iriClass, Set<ResourceClass> resourceClasses)
+    protected SqlIri(IRI iri, Set<ResourceClass> resourceClasses)
     {
         super(resourceClasses, false, false);
         this.iri = iri;
-        this.patternResourceClasses = new HashSet<ResourceClass>();
-        this.patternResourceClasses.add(iriClass);
     }
 
 
@@ -39,7 +36,7 @@ public class SqlIri extends SqlNodeValue
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.add(iriClass);
 
-        return new SqlIri(iri, iriClass, resourceClasses);
+        return new SqlIri(iri, resourceClasses);
     }
 
 
