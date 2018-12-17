@@ -57,6 +57,6 @@ public class UnsupportedLiteralClass extends LiteralClass
     @Override
     public String getResultCode(String variable, int part)
     {
-        return getSqlColumn(variable, 0);
+        return getSqlColumn(variable, part);
     }
 }
