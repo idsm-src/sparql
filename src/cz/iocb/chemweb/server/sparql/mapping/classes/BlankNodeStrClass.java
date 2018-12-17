@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.BLANKNODEINT;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.BLANKNODESTR;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
@@ -9,7 +9,7 @@ public class BlankNodeStrClass extends BlankNodeClass
 {
     BlankNodeStrClass()
     {
-        super("str_blanknode", "varchar", BLANKNODEINT);
+        super("str_blanknode", "varchar", BLANKNODESTR);
     }
 
 
