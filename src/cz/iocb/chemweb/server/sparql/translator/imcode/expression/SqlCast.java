@@ -21,7 +21,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
@@ -104,7 +103,7 @@ public class SqlCast extends SqlUnary
                 builder.append(((DateConstantZoneClass) operandClass).getZone());
                 builder.append("'::int4)");
             }
-            else if(operandClass instanceof DateConstantZoneClass)
+            else if(operandClass == iri)
             {
                 builder.append(getOperand().translate());
             }
@@ -216,6 +215,22 @@ public class SqlCast extends SqlUnary
             }
 
             /* special to-string casts */
+            else if(resClass == xsdDate && castClass == xsdString)
+            {
+                builder.append("sparql.cast_as_string_from_date(");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(", ");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(")");
+            }
+            else if(resClass == xsdDateTime && castClass == xsdString)
+            {
+                builder.append("sparql.cast_as_string_from_datetime(");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(", ");
+                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(")");
+            }
             else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdString)
             {
                 builder.append("sparql.cast_as_string_from_datetime(");
@@ -232,11 +247,11 @@ public class SqlCast extends SqlUnary
                 builder.append(((DateConstantZoneClass) resClass).getZone());
                 builder.append("'::int4)");
             }
-            else if(resClass instanceof LangStringConstantTagClass || resClass instanceof IriClass)
+            else if(resClass instanceof IriClass)
             {
                 builder.append(variable.getExpressionValue(resClass, false));
             }
-            else if(resClass == rdfLangString || resClass == unsupportedLiteral)
+            else if(resClass == unsupportedLiteral)
             {
                 builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
             }
@@ -269,7 +284,10 @@ public class SqlCast extends SqlUnary
     {
         assert BuiltinClasses.getLiteralClasses().contains(to);
 
-        if((from == rdfLangString || from == unsupportedLiteral || isIri(from)) && to == xsdString)
+        if(from == rdfLangString)
+            return null;
+
+        if((from == unsupportedLiteral || isIri(from)) && to == xsdString)
             return xsdString;
 
         if(!BuiltinClasses.getLiteralClasses().contains(from) && !isDateTime(from) && !isDate(from))
@@ -323,8 +341,10 @@ public class SqlCast extends SqlUnary
     {
         // https://www.w3.org/TR/xpath-functions/#casting-from-primitive-to-primitive
 
+        if(from == rdfLangString)
+            return true;
 
-        if((isLangString(from) || from == unsupportedLiteral || from == iri) && to == xsdString)
+        if((from == unsupportedLiteral || from == iri) && to == xsdString)
             return false;
 
         if(!BuiltinClasses.getLiteralClasses().contains(from))
