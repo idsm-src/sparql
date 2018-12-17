@@ -98,15 +98,9 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public NodeMapping createLiteralMapping(LiteralClass literalClass, String column)
+    public NodeMapping createLiteralMapping(LiteralClass literalClass, String... column)
     {
         return new ParametrisedLiteralMapping(literalClass, Arrays.asList(column));
-    }
-
-
-    public NodeMapping createLiteralMapping(LiteralClass literalClass, List<String> columns)
-    {
-        return new ParametrisedLiteralMapping(literalClass, columns);
     }
 
 
