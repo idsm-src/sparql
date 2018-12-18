@@ -284,10 +284,10 @@ public class SqlCast extends SqlUnary
     {
         assert BuiltinClasses.getLiteralClasses().contains(to);
 
-        if(from == rdfLangString)
+        if(from == rdfLangString || from == unsupportedLiteral)
             return null;
 
-        if((from == unsupportedLiteral || isIri(from)) && to == xsdString)
+        if(isIri(from) && to == xsdString)
             return xsdString;
 
         if(!BuiltinClasses.getLiteralClasses().contains(from) && !isDateTime(from) && !isDate(from))
@@ -341,10 +341,10 @@ public class SqlCast extends SqlUnary
     {
         // https://www.w3.org/TR/xpath-functions/#casting-from-primitive-to-primitive
 
-        if(from == rdfLangString)
+        if(from == rdfLangString || from == unsupportedLiteral)
             return true;
 
-        if((from == unsupportedLiteral || from == iri) && to == xsdString)
+        if(from == iri && to == xsdString)
             return false;
 
         if(!BuiltinClasses.getLiteralClasses().contains(from))
