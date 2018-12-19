@@ -18,10 +18,12 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
@@ -121,6 +123,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static boolean isIri(ResourceClass resClass)
     {
         return resClass instanceof IriClass;
+    }
+
+
+    protected static boolean isBlankNode(ResourceClass resClass)
+    {
+        return resClass instanceof BlankNodeClass;
+    }
+
+
+    protected static boolean isLiteral(ResourceClass resClass)
+    {
+        return resClass instanceof LiteralClass;
     }
 
 
