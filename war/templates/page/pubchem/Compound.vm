@@ -27,13 +27,26 @@
     </div>
   #end
 
-  <div class="VET-BoxedSection">
-    <table style="width:100%;">
-      <tr>
-        <td align="center" style="text-align: center;"><img src="compound/image?w=800&id=$CID" alt="CID$CID" height="400" width="400"></td>
-      </tr>
-    </table>
-  </div>
+
+  #sparql($structure)
+    SELECT (true as ?R) WHERE
+    {
+      ?S rdf:typ sio:SIO_011120.
+      ?S sio:is-attribute-of compound:CID132859899.
+      ?S sio:has-value ?V.
+  }
+  #end
+
+  #if($structure.count > 0)
+    <div class="VET-BoxedSection">
+      <table style="width:100%;">
+        <tr>
+          <td align="center" style="text-align: center;"><img src="compound/image?w=800&id=$CID" alt="CID$CID" height="400" width="400"></td>
+        </tr>
+      </table>
+    </div>
+  #end
+
 
   #set( $descriptors = [
     ["Molecular_Formula",            "molecular formula"],

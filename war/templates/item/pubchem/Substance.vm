@@ -16,17 +16,25 @@
 
 <table style="width:100%">
   <tr>
-  
     #if($CID)
-    <td style="width:90px">
-      <table style="width:80px">
-        <tr>
-          <td>
-            <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
-          </td>
-        </tr>
-      </table>
-    </td>
+      #sparql($structure)
+        SELECT (true as ?R) WHERE
+        {
+          ?S rdf:typ sio:SIO_011120.
+          ?S sio:is-attribute-of compound:CID132859899.
+          ?S sio:has-value ?V.
+        }
+      #end
+
+      <td style="width:90px">
+        <table style="width:80px">
+          <tr>
+            <td>
+              <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
+            </td>
+          </tr>
+        </table>
+      </td>
     #end
 
     <td>
