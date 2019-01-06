@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.mapping;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -13,7 +13,7 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     private final List<String> columns;
 
 
-    public ParametrisedIriMapping(UserIriClass iriClass, List<String> columns)
+    public ParametrisedIriMapping(IriClass iriClass, List<String> columns)
     {
         super(iriClass);
         this.columns = columns;

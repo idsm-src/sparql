@@ -16,6 +16,7 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -50,7 +51,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public NodeMapping createIriMapping(UserIriClass iriClass, String... columns)
+    public NodeMapping createIriMapping(IriClass iriClass, String... columns)
     {
         return new ParametrisedIriMapping(iriClass, Arrays.asList(columns));
     }
@@ -76,7 +77,7 @@ public abstract class SparqlDatabaseConfiguration
             iri = prefixes.get(parts[0]) + (parts.length > 1 ? parts[1] : "");
         }
 
-        UserIriClass iriClass = null;
+        IriClass iriClass = null;
 
         for(ResourceClass c : iriClasses.values())
         {
@@ -92,7 +93,7 @@ public abstract class SparqlDatabaseConfiguration
         assert iriClass != null;
 
         if(iriClass == null)
-            throw new RuntimeException("no iri class for " + value);
+            iriClass = BuiltinClasses.unsupportedIri;
 
         return new ConstantIriMapping(iriClass, new IRI(iri));
     }

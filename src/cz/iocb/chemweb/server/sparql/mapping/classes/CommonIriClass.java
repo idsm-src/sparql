@@ -60,6 +60,9 @@ public class CommonIriClass extends IriClass
     @Override
     public boolean match(Node node)
     {
+        if(node instanceof VariableOrBlankNode || node instanceof IRI)
+            return true;
+
         return false;
     }
 }
