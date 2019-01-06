@@ -42,28 +42,37 @@ public class SqlValues extends SqlIntercode
                 Pair<String, ArrayList<ResourceClass>> typedVariable = typedVariables.get(j);
                 Pair<Node, ResourceClass> value = valueList.get(j);
 
-                for(ResourceClass resClass : typedVariable.getValue())
+                if(!typedVariable.getValue().isEmpty())
                 {
-                    if(resClass == value.getValue())
+                    for(ResourceClass resClass : typedVariable.getValue())
                     {
-                        for(int k = 0; k < resClass.getPatternPartsCount(); k++)
+                        if(resClass == value.getValue())
                         {
-                            appendComma(builder, hasValue);
-                            hasValue = true;
+                            for(int k = 0; k < resClass.getPatternPartsCount(); k++)
+                            {
+                                appendComma(builder, hasValue);
+                                hasValue = true;
 
-                            builder.append(resClass.getPatternCode(value.getKey(), k));
+                                builder.append(resClass.getPatternCode(value.getKey(), k));
+                            }
+                        }
+                        else
+                        {
+                            for(int k = 0; k < resClass.getPatternPartsCount(); k++)
+                            {
+                                appendComma(builder, hasValue);
+                                hasValue = true;
+
+                                builder.append("null");
+                            }
                         }
                     }
-                    else
-                    {
-                        for(int k = 0; k < resClass.getPatternPartsCount(); k++)
-                        {
-                            appendComma(builder, hasValue);
-                            hasValue = true;
-
-                            builder.append("null");
-                        }
-                    }
+                }
+                else
+                {
+                    appendComma(builder, hasValue);
+                    hasValue = true;
+                    builder.append("null");
                 }
             }
 
@@ -77,15 +86,24 @@ public class SqlValues extends SqlIntercode
 
         for(Pair<String, ArrayList<ResourceClass>> typedVariable : typedVariables)
         {
-            for(ResourceClass resClass : typedVariable.getValue())
+            if(!typedVariable.getValue().isEmpty())
             {
-                for(int k = 0; k < resClass.getPatternPartsCount(); k++)
+                for(ResourceClass resClass : typedVariable.getValue())
                 {
-                    appendComma(builder, hasValue);
-                    hasValue = true;
+                    for(int k = 0; k < resClass.getPatternPartsCount(); k++)
+                    {
+                        appendComma(builder, hasValue);
+                        hasValue = true;
 
-                    builder.append(resClass.getSqlColumn(typedVariable.getKey(), k));
+                        builder.append(resClass.getSqlColumn(typedVariable.getKey(), k));
+                    }
                 }
+            }
+            else
+            {
+                appendComma(builder, hasValue);
+                hasValue = true;
+                builder.append("\"null\"");
             }
         }
 
