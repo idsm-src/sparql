@@ -36,8 +36,8 @@ public class SqlVariable extends SqlNodeValue
         Set<ResourceClass> classes = usedVariable.getClasses();
 
         boolean isBoxed = classes.size() > 1 && !classes.stream().allMatch(r -> isDateTime(r))
-                && !classes.stream().allMatch(r -> isDate(r)) || classes.contains(rdfLangString)
-                || classes.contains(unsupportedLiteral);
+                && !classes.stream().allMatch(r -> isDate(r)) && !classes.stream().allMatch(r -> isIri(r))
+                || classes.contains(rdfLangString) || classes.contains(unsupportedLiteral);
 
         return new SqlVariable(usedVariable, variableAccessor, classes, isBoxed, usedVariable.canBeNull());
     }
