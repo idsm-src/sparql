@@ -327,7 +327,7 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append("'" + ((DateTimeConstantZoneClass) leftClass).getZone() + "'::int4");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(leftClass, 0));
+                builder.append(rightNode.getNodeAccess(rightClass, 0));
                 builder.append(", ");
 
                 if(rightClass instanceof DateTimeClass)
@@ -349,7 +349,7 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append("'" + ((DateConstantZoneClass) leftClass).getZone() + "'::int4");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(leftClass, 0));
+                builder.append(rightNode.getNodeAccess(rightClass, 0));
                 builder.append(", ");
 
                 if(rightClass instanceof DateClass)
@@ -371,7 +371,7 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append("'" + ((LangStringConstantTagClass) leftClass).getTag() + "'::varchar");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(leftClass, 0));
+                builder.append(rightNode.getNodeAccess(rightClass, 0));
                 builder.append(", ");
 
                 if(rightClass instanceof LangStringClass)
@@ -413,14 +413,14 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    String left = getLeft() instanceof SqlIri
-                            ? leftClass.getPatternCode(((SqlIri) getLeft()).getIri(), 0)
-                            : leftClass.getExpressionCode(((SqlVariable) getLeft()).getName(),
+                    String left = getLeft() instanceof SqlIri ?
+                            leftClass.getPatternCode(((SqlIri) getLeft()).getIri(), 0) :
+                            leftClass.getExpressionCode(((SqlVariable) getLeft()).getName(),
                                     ((SqlVariable) getLeft()).getVariableAccessor(), false);
 
-                    String right = getRight() instanceof SqlIri
-                            ? rightClass.getPatternCode(((SqlIri) getRight()).getIri(), 0)
-                            : rightClass.getExpressionCode(((SqlVariable) getRight()).getName(),
+                    String right = getRight() instanceof SqlIri ?
+                            rightClass.getPatternCode(((SqlIri) getRight()).getIri(), 0) :
+                            rightClass.getExpressionCode(((SqlVariable) getRight()).getName(),
                                     ((SqlVariable) getRight()).getVariableAccessor(), false);
 
                     builder.append("sparql." + operator.getName() + "_iri");
@@ -434,9 +434,9 @@ public class SqlBinaryComparison extends SqlBinary
                 builder.append(", ");
                 builder.append(leftNode.getNodeAccess(leftClass, 1));
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(leftClass, 0));
+                builder.append(rightNode.getNodeAccess(rightClass, 0));
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(leftClass, 1));
+                builder.append(rightNode.getNodeAccess(rightClass, 1));
                 builder.append(")");
             }
             else
@@ -715,9 +715,9 @@ public class SqlBinaryComparison extends SqlBinary
             {
                 builder.append("sparql.cast_as_rdfbox_from_lang_string(");
                 builder.append(operand.translate());
-                builder.append(", ");
-                ((LangStringConstantTagClass) resourceClass).getTag();
-                builder.append("::varchar)");
+                builder.append(", '");
+                builder.append(((LangStringConstantTagClass) resourceClass).getTag());
+                builder.append("'::varchar)");
             }
             else
             {
