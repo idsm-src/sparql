@@ -118,9 +118,9 @@ public class UserIriClass extends IriClass
     public String getPatternCode(String column, int part, boolean isBoxed)
     {
         if(isBoxed)
-            return inverseFunction.get(part) + "(sparql.rdfbox_extract_iri(\"" + column + "\"))";
+            return inverseFunction.get(part) + "(sparql.rdfbox_extract_iri(" + column + "))";
 
-        return inverseFunction.get(part) + "(\"" + column + "\")";
+        return inverseFunction.get(part) + "(" + column + ")";
     }
 
 
