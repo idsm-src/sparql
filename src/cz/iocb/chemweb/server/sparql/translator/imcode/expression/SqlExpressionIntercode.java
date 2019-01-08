@@ -89,9 +89,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(resourceClasses.stream().allMatch(r -> isDate(r)))
             return xsdDate;
 
-        if(resourceClasses.stream().allMatch(r -> isLangString(r)))
-            return rdfLangString;
-
         if(resourceClasses.stream().allMatch(r -> isIri(r)))
             return iri;
 
