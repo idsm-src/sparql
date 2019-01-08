@@ -746,6 +746,8 @@ public class SqlBinaryComparison extends SqlBinary
         if(leftClass instanceof IriClass && rightClass instanceof IriClass)
             return iri;
 
+        if(leftClass == rightClass)
+            return leftClass;
 
         if(isNumeric(leftClass) && isNumeric(rightClass))
         {
