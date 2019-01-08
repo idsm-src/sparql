@@ -501,60 +501,6 @@ public class SqlBinaryComparison extends SqlBinary
     }
 
 
-    private static void buildNullCheck(StringBuilder builder, SqlExpressionIntercode operand, boolean not)
-    {
-        if(operand instanceof SqlVariable)
-        {
-            SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
-
-            boolean hasOuterVariants = false;
-
-            if(variable.getResourceClasses().size() > 1)
-                builder.append("(");
-
-            for(ResourceClass resourceClass : variable.getResourceClasses())
-            {
-                if(not)
-                    appendOr(builder, hasOuterVariants);
-                else
-                    appendAnd(builder, hasOuterVariants);
-
-                hasOuterVariants = true;
-                boolean hasInnerVariants = false;
-
-                if(resourceClass.getPatternPartsCount() > 1)
-                    builder.append("(");
-
-                for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
-                {
-                    String access = variable.getVariableAccessor().getSqlVariableAccess(name, resourceClass, i);
-
-                    if(not)
-                        appendAnd(builder, hasInnerVariants);
-                    else
-                        appendOr(builder, hasInnerVariants);
-
-                    hasInnerVariants = true;
-                    builder.append(access);
-                    builder.append(not ? " IS NOT NULL" : " IS NULL");
-                }
-
-                if(resourceClass.getPatternPartsCount() > 1)
-                    builder.append(")");
-            }
-
-            if(variable.getResourceClasses().size() > 1)
-                builder.append(")");
-        }
-        else
-        {
-            builder.append(operand.translate());
-            builder.append(not ? " IS NOT NULL" : " IS NULL");
-        }
-    }
-
-
     private static void buildUnboxedOperand(StringBuilder builder, SqlExpressionIntercode operand,
             ResourceClass resourceClass)
     {
@@ -658,75 +604,6 @@ public class SqlBinaryComparison extends SqlBinary
             else
             {
                 builder.append(operand.translate());
-            }
-        }
-    }
-
-
-    private static void buildBoxedOperand(StringBuilder builder, SqlExpressionIntercode operand,
-            Set<ResourceClass> requestedClasses)
-    {
-        if(operand instanceof SqlVariable)
-        {
-            SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
-
-            boolean hasAlternative = false;
-
-            if(requestedClasses.size() > 1)
-                builder.append("COALESCE(");
-
-            for(ResourceClass patternClass : requestedClasses)
-            {
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                builder.append(patternClass.getExpressionCode(name, variable.getVariableAccessor(), true));
-            }
-
-            if(requestedClasses.size() > 1)
-                builder.append(")");
-        }
-        else if(operand.isBoxed())
-        {
-            builder.append(operand.translate());
-        }
-        else
-        {
-            ResourceClass resourceClass = operand.getExpressionResourceClass();
-
-            if(resourceClass instanceof DateTimeConstantZoneClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_datetime(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) resourceClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass instanceof DateConstantZoneClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_date(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateConstantZoneClass) resourceClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass instanceof LangStringConstantTagClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_lang_string(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((LangStringConstantTagClass) resourceClass).getTag());
-                builder.append("'::varchar)");
-            }
-            else
-            {
-                builder.append("sparql.cast_as_rdfbox");
-                builder.append("_from_");
-                builder.append(operand.getResourceName());
-                builder.append("(");
-                builder.append(operand.translate());
-                builder.append(")");
             }
         }
     }

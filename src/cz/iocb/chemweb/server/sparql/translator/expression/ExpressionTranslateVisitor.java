@@ -30,6 +30,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogic
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlCast;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlInExpression;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
@@ -99,23 +100,12 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(InExpression inExpression)
     {
         SqlExpressionIntercode left = visitElement(inExpression.getLeft());
-        SqlExpressionIntercode result = null;
-
-        Operator compareOperator = inExpression.isNegated() ? Operator.NotEquals : Operator.Equals;
-        Operator logicalOperator = inExpression.isNegated() ? Operator.And : Operator.Or;
+        List<SqlExpressionIntercode> right = new LinkedList<SqlExpressionIntercode>();
 
         for(Expression expression : inExpression.getRight())
-        {
-            SqlExpressionIntercode right = visitElement(expression);
-            SqlExpressionIntercode compare = SqlBinaryComparison.create(compareOperator, left, right);
+            right.add(visitElement(expression));
 
-            if(result == null)
-                result = compare;
-            else
-                result = SqlBinaryLogical.create(logicalOperator, result, compare);
-        }
-
-        return result;
+        return SqlInExpression.create(inExpression.isNegated(), left, right);
     }
 
 

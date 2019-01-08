@@ -54,6 +54,87 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     {
         switch(function)
         {
+            // functional forms
+            case "bound":
+            {
+                if(!arguments.get(0).canBeNull())
+                    return SqlEffectiveBooleanValue.trueValue;
+
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false, false);
+            }
+
+            case "if":
+            {
+                SqlExpressionIntercode condition = SqlEffectiveBooleanValue.create(arguments.get(0));
+                SqlExpressionIntercode left = arguments.get(1);
+                SqlExpressionIntercode right = arguments.get(2);
+
+                if(condition == SqlNull.get() || left == SqlNull.get() && right == SqlNull.get())
+                    return SqlNull.get();
+
+                if(condition == SqlEffectiveBooleanValue.trueValue)
+                    return left;
+
+                if(condition == SqlEffectiveBooleanValue.falseValue)
+                    return right;
+
+                Set<ResourceClass> resourceClasses = joinResourceClasses(left.getResourceClasses(),
+                        right.getResourceClasses());
+
+                ResourceClass expressionResourceClass = getExpressionResourceClass(resourceClasses);
+
+                return new SqlBuiltinCall(function, arguments, resourceClasses, expressionResourceClass == null,
+                        condition.canBeNull() || left.canBeNull() || right.canBeNull());
+            }
+
+            case "coalesce":
+            {
+                boolean canBeNull = true;
+                Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
+                List<SqlExpressionIntercode> realArguments = new LinkedList<SqlExpressionIntercode>();
+
+                for(SqlExpressionIntercode argument : arguments)
+                {
+                    if(argument == SqlNull.get())
+                        continue;
+
+                    canBeNull &= argument.canBeNull();
+                    resourceClasses = joinResourceClasses(resourceClasses, argument.getResourceClasses());
+                    realArguments.add(argument);
+
+                    if(!argument.canBeNull())
+                        break;
+                }
+
+                if(realArguments.isEmpty())
+                    return SqlNull.get();
+
+                if(realArguments.size() == 1 || !realArguments.get(0).canBeNull())
+                    return realArguments.get(0);
+
+                ResourceClass expressionResourceClass = getExpressionResourceClass(resourceClasses);
+
+                return new SqlBuiltinCall(function, realArguments, resourceClasses, expressionResourceClass == null,
+                        canBeNull);
+            }
+
+            case "sameterm":
+            {
+                SqlExpressionIntercode left = arguments.get(0);
+                SqlExpressionIntercode right = arguments.get(1);
+
+                if(left == SqlNull.get() || right == SqlNull.get())
+                    return SqlNull.get();
+
+                if(intersectResourceClasses(left.getResourceClasses(), right.getResourceClasses()).isEmpty()
+                        && !left.canBeNull() && !right.canBeNull())
+                    return SqlEffectiveBooleanValue.falseValue;
+
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false,
+                        left.canBeNull() || right.canBeNull());
+            }
+
+
             // functions on RDF terms
             case "isiri":
             case "isuri":
@@ -349,6 +430,345 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     {
         switch(function)
         {
+            // functional forms
+            case "bound":
+            {
+                SqlVariable variable = (SqlVariable) arguments.get(0);
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("(");
+                boolean hasVariants = false;
+
+                for(ResourceClass resourceClass : variable.getResourceClasses())
+                {
+                    appendOr(builder, hasVariants);
+                    hasVariants = true;
+
+                    for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
+                    {
+                        appendAnd(builder, i > 0);
+                        builder.append(variable.getNodeAccess(resourceClass, i));
+                        builder.append(" IS NOT NULL");
+                    }
+                }
+
+                builder.append(")");
+
+                return builder.toString();
+            }
+
+            case "if":
+            {
+                SqlExpressionIntercode condition = SqlEffectiveBooleanValue.create(arguments.get(0));
+                SqlExpressionIntercode left = arguments.get(1);
+                SqlExpressionIntercode right = arguments.get(2);
+
+                ResourceClass expressionResourceClass = getExpressionResourceClass();
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("CASE ");
+                builder.append(condition.translate());
+                builder.append(" WHEN true THEN ");
+                builder.append(translateAsResourceClass(left, expressionResourceClass));
+                builder.append(" WHEN false THEN ");
+                builder.append(translateAsResourceClass(right, expressionResourceClass));
+                builder.append(" END");
+
+                return builder.toString();
+            }
+
+            case "coalesce":
+            {
+                ResourceClass expressionResourceClass = getExpressionResourceClass();
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("COALESCE(");
+                boolean hasVariants = false;
+
+                for(SqlExpressionIntercode argument : arguments)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(translateAsResourceClass(argument, expressionResourceClass));
+                }
+
+                builder.append(")");
+
+                return builder.toString();
+            }
+
+            case "sameterm":
+            {
+                SqlExpressionIntercode left = arguments.get(0);
+                SqlExpressionIntercode right = arguments.get(1);
+
+                ResourceClass leftExpressionResourceClass = left.getExpressionResourceClass();
+                ResourceClass rightExpressionResourceClass = right.getExpressionResourceClass();
+
+                StringBuilder builder = new StringBuilder();
+
+                if(left instanceof SqlNodeValue && right instanceof SqlNodeValue)
+                {
+                    boolean incomparable = false;
+                    int variants = 0;
+
+                    SqlNodeValue leftNode = (SqlNodeValue) left;
+                    SqlNodeValue rightNode = (SqlNodeValue) right;
+
+                    for(ResourceClass leftClass : leftNode.resourceClasses)
+                    {
+                        for(ResourceClass rightClass : rightNode.resourceClasses)
+                        {
+                            if(leftClass == rightClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                for(int i = 0; i < leftClass.getPatternPartsCount(); i++)
+                                {
+                                    appendAnd(builder, i > 0);
+                                    builder.append(leftNode.getNodeAccess(leftClass, i));
+                                    builder.append(" = ");
+                                    builder.append(rightNode.getNodeAccess(rightClass, i));
+                                }
+                            }
+                            else if(leftClass == xsdDateTime && rightClass instanceof DateTimeConstantZoneClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 1));
+                                builder.append(" = CASE WHEN ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((DateTimeConstantZoneClass) rightClass).getZone());
+                                builder.append("'::int4 END");
+                            }
+                            else if(leftClass instanceof DateTimeConstantZoneClass && rightClass == xsdDateTime)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND CASE WHEN ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((DateTimeConstantZoneClass) leftClass).getZone());
+                                builder.append("'::int4 END = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 1));
+                            }
+                            else if(leftClass == xsdDate && rightClass instanceof DateConstantZoneClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 1));
+                                builder.append(" = CASE WHEN ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((DateConstantZoneClass) rightClass).getZone());
+                                builder.append("'::int4 END");
+                            }
+                            else if(leftClass instanceof DateConstantZoneClass && rightClass == xsdDate)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND CASE WHEN ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((DateConstantZoneClass) leftClass).getZone());
+                                builder.append("'::int4 END = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 1));
+                            }
+                            else if(leftClass == rdfLangString && rightClass instanceof LangStringConstantTagClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 1));
+                                builder.append(" = CASE WHEN ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((LangStringConstantTagClass) rightClass).getTag());
+                                builder.append("'::varchar END");
+                            }
+                            else if(leftClass instanceof LangStringConstantTagClass && rightClass == rdfLangString)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                builder.append(" AND CASE WHEN ");
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" IS NOT NULL THEN '");
+                                builder.append(((LangStringConstantTagClass) leftClass).getTag());
+                                builder.append("'::varchar END = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 1));
+                            }
+                            else if(leftClass == iri && rightClass instanceof IriClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                                builder.append(" = ");
+
+                                if(right instanceof SqlVariable)
+                                    builder.append(((SqlVariable) right).getExpressionValue(leftClass, false));
+                                else
+                                    builder.append("'" + ((SqlIri) right).getIri().getUri() + "'");
+                            }
+                            else if(leftClass instanceof IriClass && rightClass == iri)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                if(left instanceof SqlVariable)
+                                    builder.append(((SqlVariable) left).getExpressionValue(leftClass, false));
+                                else
+                                    builder.append("'" + ((SqlIri) left).getIri().getUri() + "'");
+
+                                builder.append(" = ");
+                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                            }
+                            else
+                            {
+                                incomparable = true;
+                            }
+                        }
+                    }
+
+                    if(incomparable)
+                    {
+                        appendComma(builder, variants++ > 0);
+
+                        if(left.canBeNull() || right.canBeNull())
+                        {
+                            builder.append("NULLIF(");
+
+                            if(left.canBeNull())
+                                buildNullCheck(builder, left, false);
+
+                            if(left.canBeNull() && right.canBeNull())
+                                builder.append(" OR ");
+
+                            if(right.canBeNull())
+                                buildNullCheck(builder, right, false);
+
+                            builder.append(", true)");
+                        }
+                        else
+                        {
+                            builder.append("false");
+                        }
+                    }
+
+                    if(variants > 1)
+                    {
+                        builder.insert(0, "COALESCE(");
+                        builder.append(")");
+                    }
+                }
+                else
+                {
+                    if(intersectResourceClasses(left.getResourceClasses(), right.getResourceClasses()).isEmpty())
+                    {
+                        if(left.canBeNull() || right.canBeNull())
+                        {
+                            builder.append("NULLIF(");
+
+                            if(left.canBeNull())
+                                buildNullCheck(builder, left, false);
+
+                            if(left.canBeNull() && right.canBeNull())
+                                builder.append(" OR ");
+
+                            if(right.canBeNull())
+                                buildNullCheck(builder, right, false);
+
+                            builder.append(", true)");
+                        }
+                        else
+                        {
+                            builder.append("false");
+                        }
+                    }
+                    else if(left.isBoxed() || right.isBoxed())
+                    {
+                        builder.append("sparql.same_term_rdfbox(");
+                        buildBoxedOperand(builder, left, left.getResourceClasses());
+                        builder.append(", ");
+                        buildBoxedOperand(builder, right, right.getResourceClasses());
+                        builder.append(")");
+                    }
+                    else if(leftExpressionResourceClass == rightExpressionResourceClass
+                            || isIri(leftExpressionResourceClass) && isIri(rightExpressionResourceClass))
+                    {
+                        builder.append("(");
+                        builder.append(left.translate());
+                        builder.append(" = ");
+                        builder.append(right.translate());
+                        builder.append(")");
+                    }
+                    else if(leftExpressionResourceClass == xsdDateTime)
+                    {
+                        builder.append("sparql.zoneddatetime_same(");
+                        builder.append(left.translate());
+                        builder.append(", sparql.zoneddatetime_create(");
+                        builder.append(right.translate());
+                        builder.append(", '");
+                        builder.append(((DateTimeConstantZoneClass) rightExpressionResourceClass).getZone());
+                        builder.append("'::int4))");
+                    }
+                    else if(rightExpressionResourceClass == xsdDateTime)
+                    {
+                        builder.append("sparql.zoneddatetime_same(sparql.zoneddatetime_create(");
+                        builder.append(left.translate());
+                        builder.append(", '");
+                        builder.append(((DateTimeConstantZoneClass) leftExpressionResourceClass).getZone());
+                        builder.append("'::int4), ");
+                        builder.append(right.translate());
+                        builder.append(")");
+                    }
+                    else if(leftExpressionResourceClass == xsdDate)
+                    {
+                        builder.append("sparql.zoneddate_same(");
+                        builder.append(left.translate());
+                        builder.append(", sparql.zoneddate_create(");
+                        builder.append(right.translate());
+                        builder.append(", '");
+                        builder.append(((DateConstantZoneClass) rightExpressionResourceClass).getZone());
+                        builder.append("'::int4))");
+
+                    }
+                    else if(rightExpressionResourceClass == xsdDate)
+                    {
+                        builder.append("sparql.zoneddate_same(sparql.zoneddate_create(");
+                        builder.append(left.translate());
+                        builder.append(", '");
+                        builder.append(((DateConstantZoneClass) leftExpressionResourceClass).getZone());
+                        builder.append("'::int4), ");
+                        builder.append(right.translate());
+                        builder.append(")");
+                    }
+                }
+
+                return builder.toString();
+            }
+
+
             // functions on RDF terms
             case "isiri":
             case "isuri":
@@ -970,6 +1390,58 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         }
 
         return null;
+    }
+
+
+    private String translateAsResourceClass(SqlExpressionIntercode operand, ResourceClass expressionResourceClass)
+    {
+        ResourceClass operandExpressionResourceClass = operand.getExpressionResourceClass();
+
+        if(expressionResourceClass == operandExpressionResourceClass)
+        {
+            return operand.translate();
+        }
+        else if(expressionResourceClass == xsdDateTime)
+        {
+            int zone = ((DateTimeConstantZoneClass) operandExpressionResourceClass).getZone();
+            return "sparql.zoneddatetime_create(" + operand.translate() + ", '" + zone + "'::int4)";
+        }
+        else if(expressionResourceClass == xsdDate)
+        {
+            int zone = ((DateConstantZoneClass) operandExpressionResourceClass).getZone();
+            return "sparql.zoneddate_create(" + operand.translate() + ", '" + zone + "'::int4)";
+        }
+        else if(expressionResourceClass == iri)
+        {
+            return operand.translate();
+        }
+        else if(operandExpressionResourceClass instanceof DateTimeConstantZoneClass)
+        {
+            int zone = ((DateTimeConstantZoneClass) operandExpressionResourceClass).getZone();
+            return "sparql.cast_as_rdfbox_from_datetime(" + operand.translate() + ", '" + zone + "'::int4)";
+        }
+        else if(operandExpressionResourceClass instanceof DateConstantZoneClass)
+        {
+            int zone = ((DateConstantZoneClass) operandExpressionResourceClass).getZone();
+            return "sparql.cast_as_rdfbox_from_date(" + operand.translate() + ", '" + zone + "'::int4)";
+        }
+        else if(operandExpressionResourceClass instanceof LangStringConstantTagClass)
+        {
+            String tag = ((LangStringConstantTagClass) operandExpressionResourceClass).getTag();
+            return "sparql.cast_as_rdfbox_from_lang_string(" + operand.translate() + ", '" + tag + "'::varchar)";
+        }
+        else if(operandExpressionResourceClass instanceof IriClass)
+        {
+            return "sparql.cast_as_rdfbox_from_iri(" + operand.translate() + ")";
+        }
+        else if(operand.isBoxed())
+        {
+            return operand.translate();
+        }
+        else
+        {
+            return "sparql.cast_as_rdfbox_from_" + operand.getResourceName() + "(" + operand.translate() + ")";
+        }
     }
 
 
