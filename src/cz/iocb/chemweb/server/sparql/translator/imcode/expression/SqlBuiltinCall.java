@@ -1179,18 +1179,18 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             }
 
             case "bnode":
-                return arguments.size() == 0 ? "sparql.bnode()" : translate_as_xsd_string(arguments.get(0));
+                return arguments.size() == 0 ? "sparql.bnode()" : translateAsXsdString(arguments.get(0));
 
             case "strdt":
-                return "sparql.cast_as_rdfbox_from_typed_literal(" + translate_as_xsd_string(arguments.get(0)) + ", "
-                        + translate_as_iri(arguments.get(1)) + ")";
+                return "sparql.cast_as_rdfbox_from_typed_literal(" + translateAsXsdString(arguments.get(0)) + ", "
+                        + translateAsIri(arguments.get(1)) + ")";
 
             case "strlang":
                 if(this.getExpressionResourceClass() instanceof LangStringConstantTagClass)
-                    return translate_as_xsd_string(arguments.get(0));
+                    return translateAsXsdString(arguments.get(0));
                 else
-                    return "sparql.cast_as_rdfbox_from_lang_string(" + translate_as_xsd_string(arguments.get(0)) + ", "
-                            + translate_as_xsd_string(arguments.get(1)) + ")";
+                    return "sparql.cast_as_rdfbox_from_lang_string(" + translateAsXsdString(arguments.get(0)) + ", "
+                            + translateAsXsdString(arguments.get(1)) + ")";
 
             case "uuid":
                 return "sparql.uuid()";
@@ -1445,7 +1445,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
-    private String translate_as_iri(SqlExpressionIntercode operand)
+    private String translateAsIri(SqlExpressionIntercode operand)
     {
         if(!(operand instanceof SqlVariable))
         {
@@ -1484,7 +1484,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
-    private String translate_as_xsd_string(SqlExpressionIntercode operand)
+    private String translateAsXsdString(SqlExpressionIntercode operand)
     {
         if(operand instanceof SqlVariable)
             return ((SqlVariable) operand).getExpressionValue(xsdString, false);
