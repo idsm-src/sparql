@@ -8,8 +8,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -41,27 +41,15 @@ public class SqlBinaryArithmetic extends SqlBinary
         if(resultClasses.isEmpty())
             return SqlNull.get();
 
-
-        ResourceClass requestedClass = null;
-
-        if(resultClasses.size() == 1)
-            requestedClass = resultClasses.iterator().next();
-
-        left = SqlNumeric.create(left, requestedClass);
-        right = SqlNumeric.create(right, requestedClass);
-
-        boolean canBeNull = left.canBeNull() || right.canBeNull()
-                || operator == Operator.Divide && resultClasses.contains(xsdDecimal) && canBeDecimalZero(right);
-
-        return new SqlBinaryArithmetic(operator, left, right, resultClasses, canBeNull);
+        return new SqlBinaryArithmetic(operator, left, right, resultClasses, left.canBeNull() || right.canBeNull()
+                || left.getResourceClasses().stream().anyMatch(r -> !isNumeric(r))
+                || right.getResourceClasses().stream().anyMatch(r -> !isNumeric(r))
+                || operator == Operator.Divide && resultClasses.contains(xsdDecimal) && canBeDecimalZero(right));
     }
 
 
     private static boolean canBeDecimalZero(SqlExpressionIntercode operand)
     {
-        if(operand instanceof SqlNumeric)
-            operand = ((SqlNumeric) operand).getOperand();
-
         if(!(operand instanceof SqlLiteral))
             return true;
 
@@ -109,8 +97,8 @@ public class SqlBinaryArithmetic extends SqlBinary
     @Override
     public String translate()
     {
-        String leftCode = getLeft().translate();
-        String rightCode = getRight().translate();
+        String leftCode = translateAsNumeric(getLeft(), getExpressionResourceClass());
+        String rightCode = translateAsNumeric(getRight(), getExpressionResourceClass());
 
         return "sparql." + operator.getName() + "_" + getResourceName() + "(" + leftCode + ", " + rightCode + ")";
     }

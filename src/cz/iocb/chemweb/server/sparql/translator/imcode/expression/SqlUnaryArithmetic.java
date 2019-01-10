@@ -35,17 +35,8 @@ public class SqlUnaryArithmetic extends SqlUnary
         if(resultClasses.isEmpty())
             return SqlNull.get();
 
-
-        ResourceClass requestedClass = null;
-
-        if(resultClasses.size() == 1)
-            requestedClass = resultClasses.iterator().next();
-
-        operand = SqlNumeric.create(operand, requestedClass);
-
-        boolean canBeNull = operand.canBeNull();
-
-        return new SqlUnaryArithmetic(isMinus, operand, resultClasses, canBeNull);
+        return new SqlUnaryArithmetic(isMinus, operand, resultClasses,
+                operand.canBeNull() || operand.getResourceClasses().stream().anyMatch(r -> !isNumeric(r)));
     }
 
 
@@ -69,9 +60,11 @@ public class SqlUnaryArithmetic extends SqlUnary
     @Override
     public String translate()
     {
-        if(!isMinus)
-            getOperand().translate();
+        String operandCode = translateAsNumeric(getOperand(), getExpressionResourceClass());
 
-        return "sparql.uminus_" + getResourceName() + "(" + getOperand().translate() + ")";
+        if(!isMinus)
+            return operandCode;
+
+        return "sparql.uminus_" + getResourceName() + "(" + operandCode + ")";
     }
 }

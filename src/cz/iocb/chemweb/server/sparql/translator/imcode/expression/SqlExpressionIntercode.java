@@ -391,4 +391,64 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             }
         }
     }
+
+
+    public static String translateAsNumeric(SqlExpressionIntercode operand, ResourceClass requestedClass)
+    {
+        if(operand instanceof SqlVariable)
+        {
+            SqlVariable variable = (SqlVariable) operand;
+
+            Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
+                    .filter(r -> isNumericCompatibleWith(r, requestedClass)).collect(Collectors.toSet());
+
+
+            StringBuilder builder = new StringBuilder();
+            boolean hasAlternative = false;
+
+            if(compatibleClasses.size() > 1)
+                builder.append("COALESCE(");
+
+            for(ResourceClass resourceClass : compatibleClasses)
+            {
+                appendComma(builder, hasAlternative);
+                hasAlternative = true;
+
+                String code = variable.getExpressionValue(resourceClass, requestedClass == null);
+
+                if(requestedClass != null && resourceClass != requestedClass)
+                {
+                    builder.append("sparql.cast_as_");
+                    builder.append(requestedClass.getName());
+                    builder.append("_from_");
+                    builder.append(resourceClass.getName());
+                    builder.append("(");
+                    builder.append(code);
+                    builder.append(")");
+                }
+                else
+                {
+                    builder.append(code);
+                }
+            }
+
+            if(compatibleClasses.size() > 1)
+                builder.append(")");
+
+            return builder.toString();
+        }
+        else
+        {
+            String resourceName = requestedClass != null ? requestedClass.getName() : "rdfbox";
+
+            String code = "(" + operand.translate() + ")";
+
+            if(!operand.isBoxed())
+                return "sparql.cast_as_" + resourceName + "_from_" + operand.getResourceName() + "(" + code + ")";
+            else if(requestedClass != null)
+                return "sparql.rdfbox_extract_derivated_from_" + resourceName + "(" + code + ")";
+            else
+                return code;
+        }
+    }
 }

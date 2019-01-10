@@ -320,26 +320,25 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "substr":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
-                SqlExpressionIntercode location = SqlNumeric.create(arguments.get(1), xsdInteger);
-                SqlExpressionIntercode length = arguments.size() > 2 ? SqlNumeric.create(arguments.get(2), xsdInteger) :
-                        null;
+                SqlExpressionIntercode location = arguments.get(1);
+                SqlExpressionIntercode length = arguments.size() > 2 ? arguments.get(2) : null;
 
                 Set<ResourceClass> resourceClasses = operand.getResourceClasses().stream()
                         .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
 
-                if(resourceClasses.size() == 0 || location == SqlNull.get() || length == SqlNull.get())
+                if(resourceClasses.size() == 0
+                        || location.getResourceClasses().stream().noneMatch(r -> isNumericCompatibleWith(r, xsdInteger))
+                        || (length != null && length.getResourceClasses().stream()
+                                .noneMatch(r -> isNumericCompatibleWith(r, xsdInteger))))
                     return SqlNull.get();
 
-                LinkedList<SqlExpressionIntercode> realArguments = new LinkedList<SqlExpressionIntercode>();
-                realArguments.add(operand);
-                realArguments.add(location);
-
-                if(length != null)
-                    realArguments.add(length);
-
-                return new SqlBuiltinCall(function, realArguments, resourceClasses,
+                return new SqlBuiltinCall(function, arguments, resourceClasses,
                         getExpressionResourceClass(resourceClasses) == null,
-                        operand.canBeNull() || location.canBeNull() || (length != null && length.canBeNull())
+                        operand.canBeNull() || location.canBeNull()
+                                || location.getResourceClasses().stream()
+                                        .anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))
+                                || (length != null && (length.canBeNull() || length.getResourceClasses().stream()
+                                        .anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))))
                                 || operand.getResourceClasses().size() > resourceClasses.size());
             }
 
@@ -1494,12 +1493,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 }
 
                 builder.append(", ");
-                builder.append(location.translate());
+                builder.append(translateAsNumeric(location, xsdInteger));
 
                 if(length != null)
                 {
                     builder.append(", ");
-                    builder.append(length.translate());
+                    builder.append(translateAsNumeric(length, xsdInteger));
                 }
 
                 builder.append(")");
