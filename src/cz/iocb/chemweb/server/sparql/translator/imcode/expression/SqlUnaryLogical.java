@@ -11,7 +11,7 @@ public class SqlUnaryLogical extends SqlUnary
 {
     protected SqlUnaryLogical(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(operand, resourceClasses, false, canBeNull);
+        super(operand, resourceClasses, canBeNull);
     }
 
 

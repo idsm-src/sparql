@@ -13,7 +13,7 @@ public class SqlNull extends SqlExpressionIntercode
 
     private SqlNull()
     {
-        super(new HashSet<ResourceClass>(), false, true);
+        super(new HashSet<ResourceClass>(), true);
     }
 
 

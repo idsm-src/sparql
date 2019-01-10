@@ -10,10 +10,9 @@ public abstract class SqlUnary extends SqlExpressionIntercode
     private final SqlExpressionIntercode operand;
 
 
-    protected SqlUnary(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean isBoxed,
-            boolean canBeNull)
+    protected SqlUnary(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, isBoxed, canBeNull);
+        super(resourceClasses, canBeNull);
         this.operand = operand;
     }
 

@@ -16,7 +16,7 @@ public class SqlInExpression extends SqlExpressionIntercode
 
         protected OperandWrapper(SqlExpressionIntercode operand)
         {
-            super(operand.resourceClasses, operand.isBoxed, operand.canBeNull);
+            super(operand.resourceClasses, operand.canBeNull);
             this.operand = operand;
         }
 
@@ -51,7 +51,7 @@ public class SqlInExpression extends SqlExpressionIntercode
     public SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
             SqlExpressionIntercode expression)
     {
-        super(asSet(xsdBoolean), false, expression.canBeNull());
+        super(asSet(xsdBoolean), expression.canBeNull());
 
         this.negated = negated;
         this.left = left;

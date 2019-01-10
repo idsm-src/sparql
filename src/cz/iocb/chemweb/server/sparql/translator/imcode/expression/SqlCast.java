@@ -35,7 +35,7 @@ public class SqlCast extends SqlUnary
     protected SqlCast(SqlExpressionIntercode operand, ResourceClass resourceClass, Set<ResourceClass> resourceClasses,
             boolean canBeNull)
     {
-        super(operand, resourceClasses, false, canBeNull);
+        super(operand, resourceClasses, canBeNull);
         this.resourceClass = resourceClass;
     }
 

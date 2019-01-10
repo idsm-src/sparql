@@ -42,9 +42,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments, Set<ResourceClass> resourceClasses,
-            boolean isBoxed, boolean canBeNull)
+            boolean canBeNull)
     {
-        super(resourceClasses, isBoxed, canBeNull);
+        super(resourceClasses, canBeNull);
         this.function = function;
         this.arguments = arguments;
     }
@@ -60,7 +60,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!arguments.get(0).canBeNull())
                     return SqlEffectiveBooleanValue.trueValue;
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false, false);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false);
             }
 
             case "if":
@@ -81,9 +81,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 Set<ResourceClass> resourceClasses = joinResourceClasses(left.getResourceClasses(),
                         right.getResourceClasses());
 
-                ResourceClass expressionResourceClass = getExpressionResourceClass(resourceClasses);
-
-                return new SqlBuiltinCall(function, arguments, resourceClasses, expressionResourceClass == null,
+                return new SqlBuiltinCall(function, arguments, resourceClasses,
                         condition.canBeNull() || left.canBeNull() || right.canBeNull());
             }
 
@@ -112,10 +110,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(realArguments.size() == 1 || !realArguments.get(0).canBeNull())
                     return realArguments.get(0);
 
-                ResourceClass expressionResourceClass = getExpressionResourceClass(resourceClasses);
-
-                return new SqlBuiltinCall(function, realArguments, resourceClasses, expressionResourceClass == null,
-                        canBeNull);
+                return new SqlBuiltinCall(function, realArguments, resourceClasses, canBeNull);
             }
 
             case "sameterm":
@@ -130,7 +125,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         && !left.canBeNull() && !right.canBeNull())
                     return SqlEffectiveBooleanValue.falseValue;
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false,
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean),
                         left.canBeNull() || right.canBeNull());
             }
 
@@ -154,7 +149,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!operand.canBeNull() && operand.getResourceClasses().stream().noneMatch(r -> is.apply(r)))
                     return falseValue;
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false, operand.canBeNull());
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), operand.canBeNull());
             }
 
             case "str":
@@ -167,7 +162,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand.getResourceClasses().contains(xsdString) && operand.getResourceClasses().size() == 1)
                     return operand;
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false, operand.canBeNull()
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString), operand.canBeNull()
                         || operand.getResourceClasses().stream().anyMatch(r -> !isIri(r) && !isLiteral(r)));
             }
 
@@ -178,7 +173,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand.getResourceClasses().stream().noneMatch(r -> isLiteral(r)))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false,
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString),
                         operand.canBeNull() || operand.getResourceClasses().stream().anyMatch(r -> !isLiteral(r)));
             }
 
@@ -190,7 +185,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 //NEXT: determine resource classes more precisely
-                return new SqlBuiltinCall(function, arguments, asSet(iri), false,
+                return new SqlBuiltinCall(function, arguments, asSet(iri),
                         operand.canBeNull() || operand.getResourceClasses().stream().anyMatch(r -> !isLiteral(r)));
             }
 
@@ -207,7 +202,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 Set<ResourceClass> resourceSet = operand.getResourceClasses().contains(xsdString) ? asSet(iri) :
                         operand.getResourceClasses().stream().filter(r -> isIri(r)).collect(Collectors.toSet());
 
-                return new SqlBuiltinCall(function, arguments, resourceSet, false, operand.canBeNull()
+                return new SqlBuiltinCall(function, arguments, resourceSet, operand.canBeNull()
                         || operand.getResourceClasses().stream().anyMatch(r -> !isIri(r) && r != xsdString));
             }
 
@@ -215,7 +210,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 if(arguments.size() == 0)
                 {
-                    return new SqlBuiltinCall(function, arguments, asSet(intBlankNode), false, false);
+                    return new SqlBuiltinCall(function, arguments, asSet(intBlankNode), false);
                 }
                 else
                 {
@@ -224,7 +219,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     if(!operand.getResourceClasses().contains(xsdString))
                         return SqlNull.get();
 
-                    return new SqlBuiltinCall(function, arguments, asSet(strBlankNode), false,
+                    return new SqlBuiltinCall(function, arguments, asSet(strBlankNode),
                             operand.canBeNull() || operand.getResourceClasses().size() > 1);
                 }
             }
@@ -251,11 +246,11 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     boolean canBeNull = operand.canBeNull() || operand.getResourceClasses().size() > 1;
 
                     if(resourceClass == xsdString)
-                        return new SqlBuiltinCall(function, arguments, asSet(xsdString), false, canBeNull);
+                        return new SqlBuiltinCall(function, arguments, asSet(xsdString), canBeNull);
                     else if(resourceClass == null)
-                        return new SqlBuiltinCall(function, arguments, asSet(unsupportedLiteral), true, canBeNull);
+                        return new SqlBuiltinCall(function, arguments, asSet(unsupportedLiteral), canBeNull);
                     else
-                        return new SqlBuiltinCall(function, arguments, asSet(resourceClass, unsupportedLiteral), true,
+                        return new SqlBuiltinCall(function, arguments, asSet(resourceClass, unsupportedLiteral),
                                 canBeNull);
                 }
                 else
@@ -263,7 +258,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     Set<ResourceClass> resourceClasses = asSet(unsupportedLiteral);
                     resourceClasses.addAll(BuiltinClasses.getLiteralClasses());
 
-                    return new SqlBuiltinCall(function, arguments, resourceClasses, true,
+                    return new SqlBuiltinCall(function, arguments, resourceClasses,
                             operand.canBeNull() || operand.getResourceClasses().size() > 1 || type.canBeNull()
                                     || type.getResourceClasses().stream().anyMatch(r -> !isIri(r)));
                 }
@@ -291,18 +286,18 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                             + "|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE"))
                         return SqlNull.get();
 
-                    return new SqlBuiltinCall(function, arguments, asSet(LangStringConstantTagClass.get(tag)), false,
+                    return new SqlBuiltinCall(function, arguments, asSet(LangStringConstantTagClass.get(tag)),
                             operand.canBeNull() || operand.getResourceClasses().size() > 1);
                 }
 
-                return new SqlBuiltinCall(function, arguments, asSet(rdfLangString), true, true);
+                return new SqlBuiltinCall(function, arguments, asSet(rdfLangString), true);
             }
 
             case "uuid":
-                return new SqlBuiltinCall(function, arguments, asSet(iri), false, false);
+                return new SqlBuiltinCall(function, arguments, asSet(iri), false);
 
             case "struuid":
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false, false);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false);
 
 
             // functions on strings
@@ -313,7 +308,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand.getResourceClasses().stream().noneMatch(r -> isStringLiteral(r)))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdInteger), false, operand.canBeNull()
+                return new SqlBuiltinCall(function, arguments, asSet(xsdInteger), operand.canBeNull()
                         || operand.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r)));
             }
 
@@ -332,14 +327,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                 .noneMatch(r -> isNumericCompatibleWith(r, xsdInteger))))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, resourceClasses,
-                        getExpressionResourceClass(resourceClasses) == null,
-                        operand.canBeNull() || location.canBeNull()
-                                || location.getResourceClasses().stream()
-                                        .anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))
-                                || (length != null && (length.canBeNull() || length.getResourceClasses().stream()
-                                        .anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))))
-                                || operand.getResourceClasses().size() > resourceClasses.size());
+                return new SqlBuiltinCall(function, arguments, resourceClasses, operand.canBeNull()
+                        || location.canBeNull()
+                        || location.getResourceClasses().stream().anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))
+                        || (length != null && (length.canBeNull() || length.getResourceClasses().stream()
+                                .anyMatch(r -> !isNumericCompatibleWith(r, xsdInteger))))
+                        || operand.getResourceClasses().size() > resourceClasses.size());
             }
 
             case "ucase":
@@ -354,7 +347,6 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 return new SqlBuiltinCall(function, arguments, resourceClasses,
-                        getExpressionResourceClass(resourceClasses) == null,
                         operand.canBeNull() || operand.getResourceClasses().size() > resourceClasses.size());
             }
 
@@ -391,7 +383,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!isValid)
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false, canBeNull);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), canBeNull);
             }
 
             case "strbefore":
@@ -426,8 +418,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(resourceClasses.size() == 0)
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, resourceClasses,
-                        getExpressionResourceClass(resourceClasses) == null, canBeNull);
+                return new SqlBuiltinCall(function, arguments, resourceClasses, canBeNull);
             }
 
             case "encode_for_uri":
@@ -437,7 +428,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand.getResourceClasses().stream().noneMatch(r -> isStringLiteral(r)))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false, operand.canBeNull()
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString), operand.canBeNull()
                         || operand.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r)));
             }
 
@@ -484,8 +475,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     resultClasses = nextResourceClasses;
                 }
 
-                return new SqlBuiltinCall(function, arguments, resultClasses,
-                        getExpressionResourceClass(resultClasses) == null, canBeNull);
+                return new SqlBuiltinCall(function, arguments, resultClasses, canBeNull);
             }
 
             case "langmatches":
@@ -496,7 +486,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!lang.getResourceClasses().contains(xsdString) || !pattern.getResourceClasses().contains(xsdString))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false,
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean),
                         lang.canBeNull() || pattern.canBeNull() || lang.getResourceClasses().size() > 1
                                 || pattern.getResourceClasses().size() > 1);
             }
@@ -512,7 +502,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         || (flags != null && !flags.getResourceClasses().contains(xsdString)))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false, true);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), true);
             }
 
             case "replace":
@@ -530,14 +520,13 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         || (flags != null && !flags.getResourceClasses().contains(xsdString)))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, resourceClasses,
-                        getExpressionResourceClass(resourceClasses) == null, true);
+                return new SqlBuiltinCall(function, arguments, resourceClasses, true);
             }
 
 
             // functions on numerics
             case "rand":
-                return new SqlBuiltinCall(function, arguments, asSet(xsdDouble), false, false);
+                return new SqlBuiltinCall(function, arguments, asSet(xsdDouble), false);
 
             case "abs":
             case "round":
@@ -553,14 +542,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 Set<ResourceClass> resultClasses = resourceClasses.stream().filter(r -> isNumeric(r))
                         .map(r -> determineNumericResultClass(r)).collect(Collectors.toSet());
 
-                return new SqlBuiltinCall(function, arguments, resultClasses, resultClasses.size() > 1,
+                return new SqlBuiltinCall(function, arguments, resultClasses,
                         operand.canBeNull() || resourceClasses.stream().anyMatch(r -> !isNumeric(r)));
             }
 
 
             // functions on dates and times:
             case "now":
-                return new SqlBuiltinCall(function, arguments, asSet(DateTimeConstantZoneClass.get(0)), false, false);
+                return new SqlBuiltinCall(function, arguments, asSet(DateTimeConstantZoneClass.get(0)), false);
 
             case "year":
             case "month":
@@ -603,7 +592,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                     || r instanceof DateConstantZoneClass
                                             && ((DateConstantZoneClass) r).getZone() == Integer.MIN_VALUE);
 
-                return new SqlBuiltinCall(function, arguments, resultClasses, false, operand.canBeNull() || canBeNull);
+                return new SqlBuiltinCall(function, arguments, resultClasses, operand.canBeNull() || canBeNull);
             }
 
             case "hours":
@@ -617,7 +606,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 return new SqlBuiltinCall(function, arguments,
-                        asSet(function.equals("seconds") ? xsdDecimal : xsdInteger), false,
+                        asSet(function.equals("seconds") ? xsdDecimal : xsdInteger),
                         operand.canBeNull() || resourceClasses.stream().anyMatch(r -> !isDateTime(r)));
             }
 
@@ -634,7 +623,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!operand.getResourceClasses().contains(xsdString))
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, arguments, asSet(xsdString), false,
+                return new SqlBuiltinCall(function, arguments, asSet(xsdString),
                         operand.canBeNull() || operand.getResourceClasses().size() > 1);
             }
         }

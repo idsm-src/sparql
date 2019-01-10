@@ -1,7 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -18,9 +16,9 @@ public class SqlVariable extends SqlNodeValue
 
 
     protected SqlVariable(UsedVariable usedVariable, VariableAccessor variableAccessor,
-            Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+            Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, isBoxed, canBeNull);
+        super(resourceClasses, canBeNull);
         this.usedVariable = usedVariable;
         this.variableAccessor = variableAccessor;
     }
@@ -33,13 +31,7 @@ public class SqlVariable extends SqlNodeValue
         if(usedVariable == null)
             return SqlNull.get();
 
-        Set<ResourceClass> classes = usedVariable.getClasses();
-
-        boolean isBoxed = classes.size() > 1 && !classes.stream().allMatch(r -> isDateTime(r))
-                && !classes.stream().allMatch(r -> isDate(r)) && !classes.stream().allMatch(r -> isIri(r))
-                || classes.contains(rdfLangString) || classes.contains(unsupportedLiteral);
-
-        return new SqlVariable(usedVariable, variableAccessor, classes, isBoxed, usedVariable.canBeNull());
+        return new SqlVariable(usedVariable, variableAccessor, usedVariable.getClasses(), usedVariable.canBeNull());
     }
 
 

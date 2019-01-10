@@ -7,9 +7,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 public abstract class SqlNodeValue extends SqlExpressionIntercode
 {
-    protected SqlNodeValue(Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+    protected SqlNodeValue(Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, isBoxed, canBeNull);
+        super(resourceClasses, canBeNull);
     }
 
 

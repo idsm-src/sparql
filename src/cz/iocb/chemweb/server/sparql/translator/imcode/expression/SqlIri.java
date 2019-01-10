@@ -20,7 +20,7 @@ public class SqlIri extends SqlNodeValue
 
     protected SqlIri(IRI iri, Set<ResourceClass> resourceClasses)
     {
-        super(resourceClasses, false, false);
+        super(resourceClasses, false);
         this.iri = iri;
     }
 

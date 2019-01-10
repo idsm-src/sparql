@@ -20,9 +20,9 @@ public class SqlLiteral extends SqlNodeValue
     private final Literal literal;
 
 
-    protected SqlLiteral(Literal literal, Set<ResourceClass> resourceClasses, boolean isBoxed)
+    protected SqlLiteral(Literal literal, Set<ResourceClass> resourceClasses)
     {
-        super(resourceClasses, isBoxed, false);
+        super(resourceClasses, false);
         this.literal = literal;
     }
 
@@ -47,7 +47,7 @@ public class SqlLiteral extends SqlNodeValue
                 resourceClass = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
         }
 
-        return new SqlLiteral(literal, asSet(resourceClass), resourceClass == unsupportedLiteral);
+        return new SqlLiteral(literal, asSet(resourceClass));
     }
 
 

@@ -58,7 +58,7 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
     protected SqlEffectiveBooleanValue(SqlExpressionIntercode operand, boolean canBeNull)
     {
-        super(operand, booleanClassSet, false, canBeNull);
+        super(operand, booleanClassSet, canBeNull);
     }
 
 

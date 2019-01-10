@@ -12,9 +12,9 @@ public abstract class SqlBinary extends SqlExpressionIntercode
 
 
     protected SqlBinary(SqlExpressionIntercode left, SqlExpressionIntercode right, Set<ResourceClass> resourceClasses,
-            boolean isBoxed, boolean canBeNull)
+            boolean canBeNull)
     {
-        super(resourceClasses, isBoxed, canBeNull);
+        super(resourceClasses, canBeNull);
         this.left = left;
         this.right = right;
     }

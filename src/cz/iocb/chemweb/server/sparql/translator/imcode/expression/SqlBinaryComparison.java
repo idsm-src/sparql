@@ -53,7 +53,7 @@ public class SqlBinaryComparison extends SqlBinary
             boolean canBeNull, boolean isAlwaysDifferentIfNotNull, List<Pair<ResourceClass, ResourceClass>> comparable,
             List<Pair<ResourceClass, ResourceClass>> different)
     {
-        super(left, right, booleanClassSet, false, canBeNull);
+        super(left, right, booleanClassSet, canBeNull);
         this.operator = operator;
         this.isAlwaysDifferentIfNotNull = isAlwaysDifferentIfNotNull;
         this.comparable = comparable;

@@ -23,7 +23,7 @@ public class SqlBinaryArithmetic extends SqlBinary
     public SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(left, right, resourceClasses, resourceClasses.size() > 1, canBeNull);
+        super(left, right, resourceClasses, canBeNull);
         this.operator = operator;
     }
 

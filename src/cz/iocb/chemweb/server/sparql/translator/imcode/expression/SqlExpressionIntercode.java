@@ -43,10 +43,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected final Set<ResourceClass> resourceClasses;
 
 
-    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean isBoxed, boolean canBeNull)
+    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         this.canBeNull = canBeNull;
-        this.isBoxed = isBoxed;
+        this.isBoxed = getExpressionResourceClass(resourceClasses) == null;
         this.resourceClasses = resourceClasses;
     }
 
@@ -77,23 +77,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public ResourceClass getExpressionResourceClass()
     {
-        if(isBoxed)
-            return null;
-
-        if(resourceClasses.size() == 1)
-            return resourceClasses.iterator().next();
-
-        if(resourceClasses.stream().allMatch(r -> isDateTime(r)))
-            return xsdDateTime;
-
-        if(resourceClasses.stream().allMatch(r -> isDate(r)))
-            return xsdDate;
-
-        if(resourceClasses.stream().allMatch(r -> isIri(r)))
-            return iri;
-
-        assert false;
-        return null;
+        return getExpressionResourceClass(resourceClasses);
     }
 
 

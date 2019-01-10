@@ -18,7 +18,7 @@ public class SqlBinaryLogical extends SqlBinary
     public SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(left, right, resourceClasses, false, canBeNull);
+        super(left, right, resourceClasses, canBeNull);
         this.operator = operator;
     }
 

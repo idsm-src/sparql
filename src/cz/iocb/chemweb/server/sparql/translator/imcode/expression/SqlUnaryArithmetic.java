@@ -19,7 +19,7 @@ public class SqlUnaryArithmetic extends SqlUnary
     protected SqlUnaryArithmetic(boolean isMinus, SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses,
             boolean canBeNull)
     {
-        super(operand, resourceClasses, resourceClasses.size() > 1, canBeNull);
+        super(operand, resourceClasses, canBeNull);
         this.isMinus = isMinus;
     }
 
