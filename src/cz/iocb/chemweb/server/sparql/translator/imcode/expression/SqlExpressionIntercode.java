@@ -156,6 +156,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    protected static boolean isStringLiteral(ResourceClass resClass)
+    {
+        return resClass == xsdString || resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
+    }
+
+
     protected static boolean isNumeric(ResourceClass resClass)
     {
         return numericOrder.contains(resClass);
