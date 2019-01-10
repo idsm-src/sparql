@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.booleanClassSet;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
 import java.util.Set;
@@ -65,7 +65,7 @@ public class SqlBinaryLogical extends SqlBinary
             }
         }
 
-        return new SqlBinaryLogical(operator, left, right, booleanClassSet, left.canBeNull() || right.canBeNull());
+        return new SqlBinaryLogical(operator, left, right, asSet(xsdBoolean), left.canBeNull() || right.canBeNull());
     }
 
 

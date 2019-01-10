@@ -22,7 +22,6 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,27 +37,15 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     private static final List<IRI> ebvTypes = Arrays.asList(xsdBooleanIri, xsdShortIri, xsdIntIri, xsdLongIri,
             xsdIntegerIri, xsdDecimalIri, xsdFloatIri, xsdDoubleIri, xsdStringIri);
 
-    public static final SqlEffectiveBooleanValue trueValue;
-    public static final SqlEffectiveBooleanValue falseValue;
-    public static final Set<ResourceClass> booleanClassSet;
-
-
-    static
-    {
-        booleanClassSet = new HashSet<ResourceClass>();
-        booleanClassSet.add(xsdBoolean);
-
-        SqlExpressionIntercode trueOperand = SqlLiteral.create(new Literal("true", xsdBooleanIri));
-        SqlExpressionIntercode falseOperand = SqlLiteral.create(new Literal("false", xsdBooleanIri));
-
-        trueValue = new SqlEffectiveBooleanValue(trueOperand, false);
-        falseValue = new SqlEffectiveBooleanValue(falseOperand, false);
-    }
+    public static final SqlEffectiveBooleanValue trueValue = new SqlEffectiveBooleanValue(
+            SqlLiteral.create(new Literal("true", xsdBooleanIri)), false);
+    public static final SqlEffectiveBooleanValue falseValue = new SqlEffectiveBooleanValue(
+            SqlLiteral.create(new Literal("false", xsdBooleanIri)), false);
 
 
     protected SqlEffectiveBooleanValue(SqlExpressionIntercode operand, boolean canBeNull)
     {
-        super(operand, booleanClassSet, canBeNull);
+        super(operand, asSet(xsdBoolean), canBeNull);
     }
 
 

@@ -16,7 +16,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.booleanClassSet;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
 import java.util.HashSet;
@@ -53,7 +52,7 @@ public class SqlBinaryComparison extends SqlBinary
             boolean canBeNull, boolean isAlwaysDifferentIfNotNull, List<Pair<ResourceClass, ResourceClass>> comparable,
             List<Pair<ResourceClass, ResourceClass>> different)
     {
-        super(left, right, booleanClassSet, canBeNull);
+        super(left, right, asSet(xsdBoolean), canBeNull);
         this.operator = operator;
         this.isAlwaysDifferentIfNotNull = isAlwaysDifferentIfNotNull;
         this.comparable = comparable;
