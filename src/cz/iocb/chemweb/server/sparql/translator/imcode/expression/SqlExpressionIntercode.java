@@ -38,9 +38,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     private static final List<ResourceClass> numericOrder = Arrays.asList(xsdShort, xsdInt, xsdLong, xsdInteger,
             xsdDecimal, xsdFloat, xsdDouble);
 
-    protected final boolean canBeNull;
-    protected final boolean isBoxed;
-    protected final Set<ResourceClass> resourceClasses;
+    private final boolean canBeNull;
+    private final boolean isBoxed;
+    private final Set<ResourceClass> resourceClasses;
 
 
     protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull)

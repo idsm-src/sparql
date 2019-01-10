@@ -735,9 +735,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlNodeValue leftNode = (SqlNodeValue) left;
                     SqlNodeValue rightNode = (SqlNodeValue) right;
 
-                    for(ResourceClass leftClass : leftNode.resourceClasses)
+                    for(ResourceClass leftClass : leftNode.getResourceClasses())
                     {
-                        for(ResourceClass rightClass : rightNode.resourceClasses)
+                        for(ResourceClass rightClass : rightNode.getResourceClasses())
                         {
                             if(leftClass == rightClass)
                             {
@@ -1428,8 +1428,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlVariable variable = (SqlVariable) operand;
                     String varName = variable.getName();
 
-                    Set<ResourceClass> applicable = operand.resourceClasses.stream().filter(r -> isStringLiteral(r))
-                            .collect(Collectors.toSet());
+                    Set<ResourceClass> applicable = operand.getResourceClasses().stream()
+                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
 
                     StringBuilder builder = new StringBuilder();
 
@@ -1830,8 +1830,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlVariable variable = (SqlVariable) operand;
                     String varName = variable.getName();
 
-                    Set<ResourceClass> applicable = operand.resourceClasses.stream().filter(r -> isStringLiteral(r))
-                            .collect(Collectors.toSet());
+                    Set<ResourceClass> applicable = operand.getResourceClasses().stream()
+                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
 
                     StringBuilder builder = new StringBuilder();
 
@@ -1878,8 +1878,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     appendComma(builder, i > 0);
 
                     SqlExpressionIntercode argument = arguments.get(i);
-                    Set<ResourceClass> applicable = argument.resourceClasses.stream().filter(r -> isStringLiteral(r))
-                            .collect(Collectors.toSet());
+                    Set<ResourceClass> applicable = argument.getResourceClasses().stream()
+                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
 
                     if(isBoxed())
                     {

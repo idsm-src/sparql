@@ -16,7 +16,7 @@ public class SqlInExpression extends SqlExpressionIntercode
 
         protected OperandWrapper(SqlExpressionIntercode operand)
         {
-            super(operand.resourceClasses, operand.canBeNull);
+            super(operand.getResourceClasses(), operand.canBeNull());
             this.operand = operand;
         }
 
