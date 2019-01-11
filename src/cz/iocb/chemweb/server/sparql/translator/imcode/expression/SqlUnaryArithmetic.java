@@ -6,6 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFl
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -60,7 +61,11 @@ public class SqlUnaryArithmetic extends SqlUnary
     @Override
     public String translate()
     {
-        String operandCode = translateAsNumeric(getOperand(), getExpressionResourceClass());
+        ResourceClass expressionResourceClass = getExpressionResourceClass();
+        String operandCode = expressionResourceClass != null ?
+                translateAsUnboxedOperand(getOperand(), getExpressionResourceClass()) :
+                translateAsBoxedOperand(getOperand(), getOperand().getResourceClasses().stream()
+                        .filter(r -> isNumeric(r)).collect(Collectors.toSet()));
 
         if(!isMinus)
             return operandCode;

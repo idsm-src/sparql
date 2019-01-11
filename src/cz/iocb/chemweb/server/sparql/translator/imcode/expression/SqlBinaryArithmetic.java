@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -97,9 +98,23 @@ public class SqlBinaryArithmetic extends SqlBinary
     @Override
     public String translate()
     {
-        String leftCode = translateAsNumeric(getLeft(), getExpressionResourceClass());
-        String rightCode = translateAsNumeric(getRight(), getExpressionResourceClass());
+        ResourceClass expressionResourceClass = getExpressionResourceClass();
 
-        return "sparql." + operator.getName() + "_" + getResourceName() + "(" + leftCode + ", " + rightCode + ")";
+        if(expressionResourceClass == null)
+        {
+            String leftCode = translateAsBoxedOperand(getLeft(),
+                    getLeft().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(Collectors.toSet()));
+            String rightCode = translateAsBoxedOperand(getRight(),
+                    getRight().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(Collectors.toSet()));
+
+            return "sparql." + operator.getName() + "_rdfbox(" + leftCode + ", " + rightCode + ")";
+        }
+        else
+        {
+            String leftCode = translateAsUnboxedOperand(getLeft(), getExpressionResourceClass());
+            String rightCode = translateAsUnboxedOperand(getRight(), getExpressionResourceClass());
+
+            return "sparql." + operator.getName() + "_" + getResourceName() + "(" + leftCode + ", " + rightCode + ")";
+        }
     }
 }

@@ -214,13 +214,13 @@ public class SqlBinaryComparison extends SqlBinary
             builder.append("NULLIF(");
 
             if(getLeft().canBeNull())
-                buildNullCheck(builder, getLeft(), operator == Operator.NotEquals);
+                builder.append(translateAsNullCheck(getLeft(), operator == Operator.NotEquals));
 
             if(getLeft().canBeNull() && getRight().canBeNull())
                 builder.append(operator == Operator.Equals ? " OR " : " AND ");
 
             if(getRight().canBeNull())
-                buildNullCheck(builder, getRight(), operator == Operator.NotEquals);
+                builder.append(translateAsNullCheck(getRight(), operator == Operator.NotEquals));
 
             builder.append(operator == Operator.Equals ? ", true)" : ", false)");
 
@@ -244,9 +244,9 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append("_");
                     builder.append(cmpClass.getName());
                     builder.append("(");
-                    buildUnboxedOperand(builder, getLeft(), cmpClass);
+                    builder.append(translateAsUnboxedOperand(getLeft(), cmpClass));
                     builder.append(", ");
-                    buildUnboxedOperand(builder, getRight(), cmpClass);
+                    builder.append(translateAsUnboxedOperand(getRight(), cmpClass));
                     builder.append(")");
 
                     return builder.toString();
@@ -267,9 +267,9 @@ public class SqlBinaryComparison extends SqlBinary
         builder.append(operator.getName());
         builder.append("_rdfbox");
         builder.append("(");
-        buildBoxedOperand(builder, getLeft(), leftSet);
+        builder.append(translateAsBoxedOperand(getLeft(), leftSet));
         builder.append(", ");
-        buildBoxedOperand(builder, getRight(), rightSet);
+        builder.append(translateAsBoxedOperand(getRight(), rightSet));
         builder.append(")");
 
         return builder.toString();
@@ -497,114 +497,6 @@ public class SqlBinaryComparison extends SqlBinary
             builder.append(")");
 
         return builder.toString();
-    }
-
-
-    private static void buildUnboxedOperand(StringBuilder builder, SqlExpressionIntercode operand,
-            ResourceClass resourceClass)
-    {
-        if(operand instanceof SqlVariable)
-        {
-            SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
-
-            List<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
-                    .filter(r -> r == resourceClass || isNumeric(r) && isNumeric(resourceClass)
-                            || isDateTime(r) && isDateTime(resourceClass) || isDate(r) && isDate(resourceClass)
-                            || isIri(r) && isIri(resourceClass))
-                    .collect(Collectors.toList());
-
-
-            boolean hasAlternative = false;
-
-            if(compatibleClasses.size() > 1)
-                builder.append("COALESCE(");
-
-            for(ResourceClass compatibleClass : compatibleClasses)
-            {
-                String code = compatibleClass.getExpressionCode(name, variable.getVariableAccessor(), false);
-
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                if(compatibleClass instanceof DateTimeConstantZoneClass)
-                {
-                    builder.append("sparql.zoneddatetime_create(");
-                    builder.append(code);
-                    builder.append(", ");
-                    builder.append(((DateTimeConstantZoneClass) compatibleClass).getZone());
-                    builder.append("::int4)");
-                }
-                else if(compatibleClass instanceof DateConstantZoneClass)
-                {
-                    builder.append("sparql.zoneddate_create(");
-                    builder.append(code);
-                    builder.append(", ");
-                    builder.append(((DateConstantZoneClass) compatibleClass).getZone());
-                    builder.append("::int4)");
-                }
-                else if(compatibleClass instanceof UserIriClass)
-                {
-                    builder.append(code);
-                }
-                else if(compatibleClass != resourceClass)
-                {
-                    builder.append("sparql.cast_as_");
-                    builder.append(resourceClass.getName());
-                    builder.append("_from_");
-                    builder.append(compatibleClass.getName());
-                    builder.append("(");
-                    builder.append(code);
-                    builder.append(")");
-                }
-                else
-                {
-                    builder.append(code);
-                }
-            }
-
-            if(compatibleClasses.size() > 1)
-                builder.append(")");
-        }
-        else
-        {
-            ResourceClass expressionClass = operand.getExpressionResourceClass();
-
-            if(resourceClass == xsdDateTime && expressionClass instanceof DateTimeConstantZoneClass)
-            {
-                builder.append("sparql.zoneddatetime_create(");
-                builder.append(operand.translate());
-                builder.append(", ");
-                builder.append(((DateTimeConstantZoneClass) expressionClass).getZone());
-                builder.append("::int4)");
-            }
-            else if(resourceClass == xsdDate && expressionClass instanceof DateConstantZoneClass)
-            {
-                builder.append("sparql.zoneddate_create(");
-                builder.append(operand.translate());
-                builder.append(", ");
-                builder.append(((DateConstantZoneClass) expressionClass).getZone());
-                builder.append("::int4)");
-            }
-            else if(resourceClass == iri)
-            {
-                builder.append(operand.translate());
-            }
-            else if(operand.getResourceClasses().size() > 1 || !operand.getResourceClasses().contains(resourceClass))
-            {
-                builder.append("sparql.cast_as_");
-                builder.append(resourceClass.getName());
-                builder.append("_from_");
-                builder.append(operand.getResourceName());
-                builder.append("(");
-                builder.append(operand.translate());
-                builder.append(")");
-            }
-            else
-            {
-                builder.append(operand.translate());
-            }
-        }
     }
 
 
