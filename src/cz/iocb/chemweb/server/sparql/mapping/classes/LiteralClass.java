@@ -60,15 +60,24 @@ public abstract class LiteralClass extends ResourceClass
             return false;
 
         Literal literal = (Literal) node;
+        IRI literalTypeIri = literal.getTypeIri();
 
-        if(!typeIri.equals(literal.getTypeIri()))
-            return false;
+        if(typeIri == null)
+        {
+            if(literal.isTypeSupported() && literal.getValue() != null)
+                return false;
+        }
+        else
+        {
+            if(literal.getValue() == null)
+                return false;
 
-        if(literal.getValue() == null)
-            return false;
+            if(!typeIri.equals(literalTypeIri))
+                return false;
 
-        if(typeIri.equals(BuiltinTypes.rdfLangStringIri) && literal.getLanguageTag() == null)
-            return false;
+            if(typeIri.equals(BuiltinTypes.rdfLangStringIri) && literal.getLanguageTag() == null)
+                return false;
+        }
 
         return true;
     }
