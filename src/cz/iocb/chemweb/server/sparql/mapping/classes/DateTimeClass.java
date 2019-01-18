@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATETIME;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateTimeIri;
 import java.util.Arrays;
@@ -17,12 +18,33 @@ public class DateTimeClass extends LiteralClass
 
 
     @Override
+    public ResourceClass getGeneralClass()
+    {
+        return xsdDateTime;
+    }
+
+
+    @Override
     public String getLiteralPatternCode(Literal literal, int part)
     {
         if(part == 0)
             return "sparql.zoneddatetime_datetime('" + literal.getStringValue().trim() + "'::sparql.zoneddatetime)";
         else
             return "sparql.zoneddatetime_zone('" + literal.getStringValue().trim() + "'::sparql.zoneddatetime)";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 

@@ -88,20 +88,36 @@ public class UsedPairedVariable
             }
             else
             {
-                LinkedHashSet<ResourceClass> classes = new LinkedHashSet<ResourceClass>();
-
-                for(ResourceClass resClass : leftVar.getClasses())
-                    classes.add(resClass);
-
-                for(ResourceClass resClass : rightVar.getClasses())
-                    classes.add(resClass);
-
-                for(ResourceClass resClass : classes)
+                for(ResourceClass leftClass : leftVar.getClasses())
                 {
-                    ResourceClass l = leftVar.containsClass(resClass) ? resClass : null;
-                    ResourceClass r = rightVar.containsClass(resClass) ? resClass : null;
+                    if(rightVar.getClasses().contains(leftClass))
+                    {
+                        paired.addClasses(leftClass, leftClass);
+                    }
+                    else if(rightVar.getClasses().contains(leftClass.getGeneralClass()))
+                    {
+                        paired.addClasses(leftClass, leftClass.getGeneralClass());
+                    }
+                    else if(rightVar.getClasses().stream().noneMatch(r -> r.getGeneralClass() == leftClass))
+                    {
+                        paired.addClasses(leftClass, null);
+                    }
+                }
 
-                    paired.addClasses(l, r);
+                for(ResourceClass rightClass : rightVar.getClasses())
+                {
+                    if(leftVar.getClasses().contains(rightClass))
+                    {
+
+                    }
+                    else if(leftVar.getClasses().contains(rightClass.getGeneralClass()))
+                    {
+                        paired.addClasses(rightClass.getGeneralClass(), rightClass);
+                    }
+                    else if(leftVar.getClasses().stream().noneMatch(r -> r.getGeneralClass() == rightClass))
+                    {
+                        paired.addClasses(null, rightClass);
+                    }
                 }
             }
 

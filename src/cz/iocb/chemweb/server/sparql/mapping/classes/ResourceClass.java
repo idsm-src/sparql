@@ -43,6 +43,14 @@ public abstract class ResourceClass
 
 
     /**
+     * Gets the general resource class corresponding to this resource class.
+     *
+     * @return corresponding general resource class
+     */
+    public abstract ResourceClass getGeneralClass();
+
+
+    /**
      * Gets the number of parts of the pattern representation.
      *
      * @return number of parts
@@ -112,6 +120,31 @@ public abstract class ResourceClass
      * @return SQL code
      */
     public abstract String getPatternCode(Node node, int part);
+
+
+    /**
+     * Gets SQL code to obtain the given part of the pattern representation of corresponding general resource class for
+     * the given SPARQL variable in the given table.
+     *
+     * @param table table name
+     * @param var variable name
+     * @param part part index
+     * @param check generate case checks
+     * @return SQL code
+     */
+    public abstract String getGeneralisedPatternCode(String table, String var, int part, boolean check);
+
+
+    /**
+     * Gets SQL code to obtain the given part of the pattern representation for the given general resource SPARQL
+     * variable in the given table.
+     *
+     * @param table table name
+     * @param var variable name
+     * @param part part index
+     * @return SQL code
+     */
+    public abstract String getSpecialisedPatternCode(String table, String var, int part);
 
 
     /**

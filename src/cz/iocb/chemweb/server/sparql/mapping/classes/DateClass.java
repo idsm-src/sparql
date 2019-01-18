@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATE;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
 import java.util.Arrays;
@@ -17,12 +18,33 @@ public class DateClass extends LiteralClass
 
 
     @Override
+    public ResourceClass getGeneralClass()
+    {
+        return xsdDate;
+    }
+
+
+    @Override
     public String getLiteralPatternCode(Literal literal, int part)
     {
         if(part == 0)
             return "sparql.zoneddate_date('" + (String) literal.getValue() + "'::sparql.zoneddate)";
         else
             return "sparql.zoneddate_zone('" + (String) literal.getValue() + "'::sparql.zoneddate)";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 

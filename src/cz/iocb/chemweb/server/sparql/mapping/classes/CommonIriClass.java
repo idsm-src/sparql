@@ -29,6 +29,20 @@ public class CommonIriClass extends IriClass
 
 
     @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
     public String getPatternCode(String column, int part, boolean isBoxed)
     {
         if(isBoxed == false)

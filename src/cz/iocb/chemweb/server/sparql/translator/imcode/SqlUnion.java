@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -40,8 +42,8 @@ public class SqlUnion extends SqlIntercode
         for(UsedPairedVariable pair : pairs)
         {
             String varName = pair.getName();
-            boolean canBeNull = pair.getLeftVariable() != null && pair.getLeftVariable().canBeNull()
-                    || pair.getRightVariable() != null && pair.getRightVariable().canBeNull();
+            boolean canBeNull = pair.getLeftVariable() == null || pair.getLeftVariable().canBeNull()
+                    || pair.getRightVariable() == null || pair.getRightVariable().canBeNull();
 
             UsedVariable newVar = new UsedVariable(varName, canBeNull);
 
@@ -49,8 +51,10 @@ public class SqlUnion extends SqlIntercode
             {
                 if(pairedClass.getLeftClass() == null)
                     newVar.addClass(pairedClass.getRightClass());
-                else
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                     newVar.addClass(pairedClass.getLeftClass());
+                else
+                    newVar.addClass(pairedClass.getLeftClass().getGeneralClass());
             }
 
             variables.add(newVar);
@@ -102,17 +106,41 @@ public class SqlUnion extends SqlIntercode
 
                 for(ResourceClass resClass : variable.getClasses())
                 {
-                    boolean defined = child.getVariables().contains(varName, resClass);
+                    UsedVariable childVariable = child.getVariables().get(varName);
+
+                    Set<ResourceClass> childResClasses = childVariable != null ? childVariable.getCompatible(resClass) :
+                            new HashSet<ResourceClass>();
 
                     for(int j = 0; j < resClass.getPatternPartsCount(); j++)
                     {
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        if(!defined)
+                        if(childResClasses.size() == 0)
                         {
                             builder.append("NULL::");
                             builder.append(resClass.getSqlType(j));
+                            builder.append(" AS ");
+                        }
+                        else if(!childResClasses.contains(resClass))
+                        {
+                            if(childResClasses.size() > 1)
+                                builder.append("COALESCE(");
+
+                            boolean hasAlternative = false;
+
+                            for(ResourceClass childResClass : childResClasses)
+                            {
+                                appendComma(builder, hasAlternative);
+                                hasAlternative = true;
+
+                                //TODO: do not use CASE check if it is not needed
+                                builder.append(childResClass.getGeneralisedPatternCode(null, varName, j, true));
+                            }
+
+                            if(childResClasses.size() > 1)
+                                builder.append(")");
+
                             builder.append(" AS ");
                         }
 

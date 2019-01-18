@@ -391,16 +391,18 @@ public class SqlTableAccess extends SqlIntercode
             {
                 for(NodeMapping rightMap : rightMappings)
                 {
-                    assert leftMap.getResourceClass() == rightMap.getResourceClass();
+                    if(leftMap.getResourceClass() == rightMap.getResourceClass())
+                    {
+                        if(leftMap instanceof ConstantMapping && rightMap instanceof ConstantMapping
+                                && !((ConstantMapping) leftMap).getValue()
+                                        .equals(((ConstantMapping) rightMap).getValue()))
+                            return false;
 
-                    if(leftMap instanceof ConstantMapping && rightMap instanceof ConstantMapping
-                            && !((ConstantMapping) leftMap).getValue().equals(((ConstantMapping) rightMap).getValue()))
-                        return false;
-
-                    if(leftMap instanceof ParametrisedMapping && rightMap instanceof ParametrisedMapping)
-                        for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
-                            columnPairs.add(new ColumnPair(((ParametrisedMapping) leftMap).getSqlColumn(i),
-                                    ((ParametrisedMapping) rightMap).getSqlColumn(i)));
+                        if(leftMap instanceof ParametrisedMapping && rightMap instanceof ParametrisedMapping)
+                            for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
+                                columnPairs.add(new ColumnPair(((ParametrisedMapping) leftMap).getSqlColumn(i),
+                                        ((ParametrisedMapping) rightMap).getSqlColumn(i)));
+                    }
                 }
             }
         }

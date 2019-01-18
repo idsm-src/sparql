@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -63,9 +65,19 @@ public class LeftJoinVariableAccessor extends SimpleVariableAccessor
 
                     variable.addClass(pairedClass.getLeftClass());
                 }
-                else
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                 {
-                    assert pairedClass.getLeftClass() == pairedClass.getRightClass();
+                    variable.addClass(pairedClass.getLeftClass());
+                }
+                else if(pairedClass.getLeftClass().getGeneralClass() == pairedClass.getRightClass())
+                {
+                    if(leftVariable.canBeNull())
+                        variable.addClass(pairedClass.getRightClass());
+                    else
+                        variable.addClass(pairedClass.getLeftClass());
+                }
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass())
+                {
                     variable.addClass(pairedClass.getLeftClass());
                 }
             }
@@ -79,24 +91,60 @@ public class LeftJoinVariableAccessor extends SimpleVariableAccessor
     @Override
     public String getSqlVariableAccess(String variable, ResourceClass resourceClass, int part)
     {
-        UsedVariable leftVariable = left.get(variable);
-        UsedVariable rightVariable = right.get(variable);
+        Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
+
+        UsedVariable leftVar = left.get(variable);
+        UsedVariable rightVar = right.get(variable);
+
+        boolean leftCanBeNull = leftVar == null ? true : leftVar.canBeNull();
+        boolean rightCanBeNull = rightVar == null ? true : rightVar.canBeNull();
+        Set<ResourceClass> leftClasses = leftVar != null ? leftVar.getCompatible(resourceClass) : emptySet;
+        Set<ResourceClass> rightClasses = rightVar != null ? rightVar.getCompatible(resourceClass) : emptySet;
 
 
-        if(rightVariable == null || rightVariable != null && !rightVariable.containsClass(resourceClass)
-                || leftVariable != null && !leftVariable.canBeNull())
+        if(!leftCanBeNull && rightCanBeNull)
+            rightClasses = emptySet;
+        else if(!leftCanBeNull && !rightCanBeNull && !leftClasses.isEmpty())
+            rightClasses = emptySet;
+
+
+        StringBuilder builder = new StringBuilder();
+
+        if(leftClasses.size() + rightClasses.size() > 1)
+            builder.append("COALESCE(");
+
+        boolean hasVariant = false;
+
+        for(ResourceClass leftClass : leftClasses)
         {
-            return leftTable + "." + resourceClass.getSqlColumn(variable, part);
+            if(hasVariant)
+                builder.append(", ");
+            else
+                hasVariant = true;
+
+            if(leftClass == resourceClass)
+                builder.append(leftTable).append('.').append(leftClass.getSqlColumn(variable, part));
+            else
+                builder.append(leftClass.getGeneralisedPatternCode(leftTable, variable, part, true));
         }
-        else if(leftVariable == null || leftVariable != null && !leftVariable.containsClass(resourceClass)
-                || rightVariable != null && !rightVariable.canBeNull())
+
+        for(ResourceClass rightClass : rightClasses)
         {
-            return rightTable + "." + resourceClass.getSqlColumn(variable, part);
+            if(hasVariant)
+                builder.append(", ");
+            else
+                hasVariant = true;
+
+            if(rightClass == resourceClass)
+                builder.append(rightTable).append('.').append(rightClass.getSqlColumn(variable, part));
+            else
+                builder.append(rightClass.getGeneralisedPatternCode(rightTable, variable, part, true));
         }
-        else
-        {
-            return "COALESCE(" + leftTable + "." + resourceClass.getSqlColumn(variable, part) + ", " + rightTable + "."
-                    + resourceClass.getSqlColumn(variable, part) + ")";
-        }
+
+        if(leftClasses.size() + rightClasses.size() > 1)
+            builder.append(")");
+
+
+        return builder.toString();
     }
 }

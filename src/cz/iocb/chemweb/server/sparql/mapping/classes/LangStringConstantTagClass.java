@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
@@ -22,6 +23,13 @@ public class LangStringConstantTagClass extends LiteralClass
     {
         super("lang-" + lang, Arrays.asList("varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
         this.lang = lang;
+    }
+
+
+    @Override
+    public ResourceClass getGeneralClass()
+    {
+        return rdfLangString;
     }
 
 
@@ -51,6 +59,61 @@ public class LangStringConstantTagClass extends LiteralClass
     public String getLiteralPatternCode(Literal literal, int part)
     {
         return "'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        if(part == 0)
+        {
+            return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        }
+        else if(check == false)
+        {
+            return "'" + lang + "'::varchar";
+        }
+        else
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.append("CASE WHEN ");
+
+            if(table != null)
+                builder.append(table).append(".");
+
+            builder.append(getSqlColumn(var, part));
+            builder.append(" IS NOT NULL THEN '");
+            builder.append(lang);
+            builder.append("'::varchar END");
+
+            return builder.toString();
+        }
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("CASE WHEN ");
+
+        if(table != null)
+            builder.append(table).append(".");
+
+        builder.append(rdfLangString.getSqlColumn(var, 1));
+        builder.append(" = '");
+        builder.append(lang);
+        builder.append("'::varchar THEN ");
+
+        if(table != null)
+            builder.append(table).append(".");
+
+        builder.append(rdfLangString.getSqlColumn(var, 0));
+        builder.append(" END");
+
+        return builder.toString();
     }
 
 

@@ -1,13 +1,19 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 
 
@@ -55,7 +61,14 @@ public class SqlLeftJoin extends SqlIntercode
             SqlIntercode newUnion = new SqlNoSolution();
 
             for(SqlIntercode child : union.getChilds())
-                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right, condition));
+            {
+                VariableAccessor accessor = new LeftJoinVariableAccessor(child.getVariables(), right.getVariables());
+
+                List<SqlExpressionIntercode> optimizedCondition = condition.stream()
+                        .map(f -> SqlEffectiveBooleanValue.create(f.optimize(accessor))).collect(Collectors.toList());
+
+                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right, optimizedCondition));
+            }
 
             return newUnion;
         }
@@ -108,11 +121,28 @@ public class SqlLeftJoin extends SqlIntercode
 
                     produceOnCondition++;
                 }
-                else
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                 {
-                    assert pairedClass.getLeftClass() == pairedClass.getRightClass();
                     variable.addClass(pairedClass.getLeftClass());
                     produceOnCondition++;
+                }
+                else if(pairedClass.getLeftClass().getGeneralClass() == pairedClass.getRightClass())
+                {
+                    if(leftVariable.canBeNull())
+                        variable.addClass(pairedClass.getRightClass());
+                    else
+                        variable.addClass(pairedClass.getLeftClass());
+
+                    produceOnCondition++;
+                }
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass())
+                {
+                    variable.addClass(pairedClass.getLeftClass());
+                    produceOnCondition++;
+                }
+                else
+                {
+                    assert false;
                 }
             }
 
@@ -172,58 +202,40 @@ public class SqlLeftJoin extends SqlIntercode
         /* join */
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = new UsedVariables();
+        Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
+
         StringBuilder builder = new StringBuilder();
-
-
         builder.append("SELECT ");
 
         boolean hasSelect = false;
 
-        for(UsedPairedVariable pair : pairs)
+        for(UsedVariable variable : variables.getValues())
         {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
+            String var = variable.getName();
+            UsedVariable leftVar = left.getVariables().get(var);
+            UsedVariable rightVar = right.getVariables().get(var);
 
 
-            String var = pair.getName();
-            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-
-            UsedVariable variable = new UsedVariable(var, canBeLeftNull);
-            variables.add(variable);
-
-
-            for(PairedClass pairedClass : pair.getClasses())
+            for(ResourceClass resClass : variable.getClasses())
             {
-                if(pairedClass.getLeftClass() == null)
-                {
-                    if(leftVariable != null && !leftVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else if(pairedClass.getRightClass() == null)
-                {
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else
-                {
-                    assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                    variable.addClass(pairedClass.getLeftClass());
-                }
+                boolean leftCanBeNull = leftVar == null ? true : leftVar.canBeNull();
+                boolean rightCanBeNull = rightVar == null ? true : rightVar.canBeNull();
+                Set<ResourceClass> leftClasses = leftVar != null ? leftVar.getCompatible(resClass) : emptySet;
+                Set<ResourceClass> rightClasses = rightVar != null ? rightVar.getCompatible(resClass) : emptySet;
 
 
-                ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
-                        : pairedClass.getRightClass();
+                if(!leftCanBeNull && rightCanBeNull)
+                    rightClasses = emptySet;
+                else if(!leftCanBeNull && !rightCanBeNull && !leftClasses.isEmpty())
+                    rightClasses = emptySet;
+
 
                 for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
 
-                    UsedVariable leftClassVar = pairedClass.getLeftClass() != null ? leftVariable : null;
-                    UsedVariable rightClassVar = pairedClass.getRightClass() != null ? rightVariable : null;
-                    generateJoinSelectVarable(builder, leftClassVar, rightClassVar, resClass.getSqlColumn(var, i));
+                    generateJoinSelectVariable(builder, var, resClass, i, leftClasses, rightClasses);
                 }
             }
         }
@@ -311,21 +323,38 @@ public class SqlLeftJoin extends SqlIntercode
                 {
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
-                        assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        ResourceClass resClass = pairedClass.getLeftClass();
-
                         appendOr(builder, restricted);
                         restricted = true;
 
                         builder.append("(");
 
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                        if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                         {
-                            appendAnd(builder, i > 0);
+                            ResourceClass resClass = pairedClass.getLeftClass();
 
-                            builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" = ");
-                            builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                            {
+                                appendAnd(builder, i > 0);
+
+                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
+                                builder.append(" = ");
+                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                            }
+                        }
+                        else
+                        {
+                            ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
+
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                            {
+                                appendAnd(builder, i > 0);
+
+                                builder.append(
+                                        pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, var, i, false));
+                                builder.append(" = ");
+                                builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(rightTable, var, i,
+                                        false));
+                            }
                         }
 
                         builder.append(")");
@@ -354,35 +383,37 @@ public class SqlLeftJoin extends SqlIntercode
     }
 
 
-    private void generateJoinSelectVarable(StringBuilder builder, UsedVariable leftVariable, UsedVariable rightVariable,
-            String var)
+    private void generateJoinSelectVariable(StringBuilder builder, String var, ResourceClass resourceClass, int part,
+            Set<ResourceClass> leftClasses, Set<ResourceClass> rightClasses)
     {
-        if(leftVariable == null)
-        {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else if(rightVariable == null)
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!leftVariable.canBeNull())
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!rightVariable.canBeNull())
-        {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else
-        {
+        if(leftClasses.size() + rightClasses.size() > 1)
             builder.append("COALESCE(");
-            builder.append(leftTable).append('.').append(var);
-            builder.append(", ");
-            builder.append(rightTable).append('.').append(var);
-            builder.append(")");
+
+        boolean hasVariant = false;
+
+        for(ResourceClass leftClass : leftClasses)
+        {
+            appendComma(builder, hasVariant);
+            hasVariant = true;
+
+            if(leftClass == resourceClass)
+                builder.append(leftTable).append('.').append(leftClass.getSqlColumn(var, part));
+            else
+                builder.append(leftClass.getGeneralisedPatternCode(leftTable, var, part, true));
         }
 
-        builder.append(" AS ");
-        builder.append(var);
+        for(ResourceClass rightClass : rightClasses)
+        {
+            appendComma(builder, hasVariant);
+            hasVariant = true;
+
+            if(rightClass == resourceClass)
+                builder.append(rightTable).append('.').append(rightClass.getSqlColumn(var, part));
+            else
+                builder.append(rightClass.getGeneralisedPatternCode(rightTable, var, part, true));
+        }
+
+        if(leftClasses.size() + rightClasses.size() > 1)
+            builder.append(") AS ").append(resourceClass.getSqlColumn(var, part));
     }
 }

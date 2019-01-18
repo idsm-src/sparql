@@ -17,12 +17,33 @@ public class UnsupportedLiteralClass extends LiteralClass
 
 
     @Override
+    public ResourceClass getGeneralClass()
+    {
+        return this;
+    }
+
+
+    @Override
     public String getLiteralPatternCode(Literal literal, int part)
     {
         if(part == 0)
             return "'" + literal.getStringValue().replaceAll("'", "''") + "'::varchar";
         else
             return "'" + literal.getTypeIri().getUri().toString() + "'::varchar";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 

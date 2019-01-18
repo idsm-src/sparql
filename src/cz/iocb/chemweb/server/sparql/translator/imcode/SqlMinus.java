@@ -163,21 +163,38 @@ public class SqlMinus extends SqlIntercode
                 {
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
-                        assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        ResourceClass resClass = pairedClass.getLeftClass();
-
                         appendOr(builder, restricted);
                         restricted = true;
 
                         builder.append("(");
 
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                        if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                         {
-                            appendAnd(builder, i > 0);
+                            ResourceClass resClass = pairedClass.getLeftClass();
 
-                            builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" = ");
-                            builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                            {
+                                appendAnd(builder, i > 0);
+
+                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
+                                builder.append(" = ");
+                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                            }
+                        }
+                        else
+                        {
+                            ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
+
+                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                            {
+                                appendAnd(builder, i > 0);
+
+                                builder.append(
+                                        pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, var, i, false));
+                                builder.append(" = ");
+                                builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(rightTable, var, i,
+                                        false));
+                            }
                         }
 
                         builder.append(")");

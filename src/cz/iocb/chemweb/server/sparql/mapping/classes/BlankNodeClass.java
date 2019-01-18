@@ -15,9 +15,30 @@ public abstract class BlankNodeClass extends ResourceClass
 
 
     @Override
+    public ResourceClass getGeneralClass()
+    {
+        return this;
+    }
+
+
+    @Override
     public String getPatternCode(Node node, int part)
     {
         return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 

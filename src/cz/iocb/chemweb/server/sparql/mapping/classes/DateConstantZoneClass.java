@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATE;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
 import java.util.Arrays;
@@ -21,6 +22,13 @@ public class DateConstantZoneClass extends LiteralClass
     {
         super("date$" + zone, Arrays.asList("date"), Arrays.asList(DATE), xsdDateIri);
         this.zone = zone;
+    }
+
+
+    @Override
+    public ResourceClass getGeneralClass()
+    {
+        return xsdDate;
     }
 
 
@@ -50,6 +58,61 @@ public class DateConstantZoneClass extends LiteralClass
     public String getLiteralPatternCode(Literal literal, int part)
     {
         return "sparql.zoneddate_date('" + (String) literal.getValue() + "'::sparql.zoneddate)";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        if(part == 0)
+        {
+            return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        }
+        else if(check == false)
+        {
+            return "'" + zone + "'::int4";
+        }
+        else
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.append("CASE WHEN ");
+
+            if(table != null)
+                builder.append(table).append(".");
+
+            builder.append(getSqlColumn(var, part));
+            builder.append(" IS NOT NULL THEN '");
+            builder.append(zone);
+            builder.append("'::int4 END");
+
+            return builder.toString();
+        }
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("CASE WHEN ");
+
+        if(table != null)
+            builder.append(table).append(".");
+
+        builder.append(xsdDate.getSqlColumn(var, 1));
+        builder.append(" = '");
+        builder.append(zone);
+        builder.append("'::int4 THEN ");
+
+        if(table != null)
+            builder.append(table).append(".");
+
+        builder.append(xsdDate.getSqlColumn(var, 0));
+        builder.append(" END");
+
+        return builder.toString();
     }
 
 

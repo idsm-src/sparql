@@ -1,7 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
@@ -74,49 +76,10 @@ public class SqlJoin extends SqlIntercode
         /* standard join */
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = new UsedVariables();
+        UsedVariables variables = getUsedVariable(pairs);
 
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-
-            String var = pair.getName();
-            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-            boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
-
-            UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-            variables.add(variable);
-
-
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() == null)
-                {
-                    if(leftVariable != null && !leftVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else if(pairedClass.getRightClass() == null)
-                {
-                    if(rightVariable != null && !rightVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else
-                {
-                    assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-            }
-
-            if(variable.getClasses().isEmpty())
-                return new SqlNoSolution();
-        }
+        if(variables == null)
+            return new SqlNoSolution();
 
 
         ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
@@ -232,62 +195,43 @@ public class SqlJoin extends SqlIntercode
             /* join */
 
             ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(joinVariables, child.getVariables());
-            UsedVariables variables = new UsedVariables();
+            UsedVariables variables = getUsedVariable(pairs);
+            Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
+
             StringBuilder builder = new StringBuilder();
-
-
             builder.append("SELECT ");
 
             boolean hasSelect = false;
 
-            for(UsedPairedVariable pair : pairs)
+            for(UsedVariable variable : variables.getValues())
             {
-                UsedVariable leftVariable = pair.getLeftVariable();
-                UsedVariable rightVariable = pair.getRightVariable();
+                String var = variable.getName();
+                UsedVariable leftVar = joinVariables.get(var);
+                UsedVariable rightVar = child.getVariables().get(var);
 
 
-                String var = pair.getName();
-                boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-                boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
-
-                UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-                variables.add(variable);
-
-
-                for(PairedClass pairedClass : pair.getClasses())
+                for(ResourceClass resClass : variable.getClasses())
                 {
-                    if(pairedClass.getLeftClass() == null)
-                    {
-                        if(leftVariable != null && !leftVariable.canBeNull())
-                            continue;
-
-                        variable.addClass(pairedClass.getRightClass());
-                    }
-                    else if(pairedClass.getRightClass() == null)
-                    {
-                        if(rightVariable != null && !rightVariable.canBeNull())
-                            continue;
-
-                        variable.addClass(pairedClass.getLeftClass());
-                    }
-                    else
-                    {
-                        assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                        variable.addClass(pairedClass.getLeftClass());
-                    }
+                    boolean leftCanBeNull = leftVar == null ? true : leftVar.canBeNull();
+                    boolean rightCanBeNull = rightVar == null ? true : rightVar.canBeNull();
+                    Set<ResourceClass> leftClasses = leftVar != null ? leftVar.getCompatible(resClass) : emptySet;
+                    Set<ResourceClass> rightClasses = rightVar != null ? rightVar.getCompatible(resClass) : emptySet;
 
 
-                    ResourceClass resClass = pairedClass.getLeftClass() != null ? pairedClass.getLeftClass()
-                            : pairedClass.getRightClass();
+                    if(leftCanBeNull && !rightCanBeNull)
+                        leftClasses = emptySet;
+                    else if(!leftCanBeNull && rightCanBeNull)
+                        rightClasses = emptySet;
+                    else if(!leftCanBeNull && !rightCanBeNull && !leftClasses.isEmpty())
+                        rightClasses = emptySet;
+
 
                     for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                     {
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        UsedVariable leftClassVar = pairedClass.getLeftClass() != null ? leftVariable : null;
-                        UsedVariable rightClassVar = pairedClass.getRightClass() != null ? rightVariable : null;
-                        generateJoinSelectVarable(builder, leftClassVar, rightClassVar, resClass.getSqlColumn(var, i));
+                        generateJoinSelectVariable(builder, var, resClass, i, leftClasses, rightClasses);
                     }
                 }
             }
@@ -375,21 +319,38 @@ public class SqlJoin extends SqlIntercode
                     {
                         if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                         {
-                            assert pairedClass.getLeftClass() == pairedClass.getRightClass();
-                            ResourceClass resClass = pairedClass.getLeftClass();
-
                             appendOr(builder, restricted);
                             restricted = true;
 
                             builder.append("(");
 
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                            if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                             {
-                                appendAnd(builder, i > 0);
+                                ResourceClass resClass = pairedClass.getLeftClass();
 
-                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" = ");
-                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                                {
+                                    appendAnd(builder, i > 0);
+
+                                    builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
+                                    builder.append(" = ");
+                                    builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
+                                }
+                            }
+                            else
+                            {
+                                ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
+
+                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                                {
+                                    appendAnd(builder, i > 0);
+
+                                    builder.append(pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, var,
+                                            i, false));
+                                    builder.append(" = ");
+                                    builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(rightTable,
+                                            var, i, false));
+                                }
                             }
 
                             builder.append(")");
@@ -416,35 +377,103 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private void generateJoinSelectVarable(StringBuilder builder, UsedVariable leftVariable, UsedVariable rightVariable,
-            String var)
+    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs)
     {
-        if(leftVariable == null)
+        UsedVariables variables = new UsedVariables();
+
+        for(UsedPairedVariable pair : pairs)
         {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else if(rightVariable == null)
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!leftVariable.canBeNull())
-        {
-            builder.append(leftTable).append('.').append(var);
-        }
-        else if(!rightVariable.canBeNull())
-        {
-            builder.append(rightTable).append('.').append(var);
-        }
-        else
-        {
-            builder.append("COALESCE(");
-            builder.append(leftTable).append('.').append(var);
-            builder.append(", ");
-            builder.append(rightTable).append('.').append(var);
-            builder.append(")");
+            UsedVariable leftVariable = pair.getLeftVariable();
+            UsedVariable rightVariable = pair.getRightVariable();
+
+
+            String var = pair.getName();
+            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
+            boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
+
+            UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
+            variables.add(variable);
+
+
+            for(PairedClass pairedClass : pair.getClasses())
+            {
+                if(pairedClass.getLeftClass() == null)
+                {
+                    if(leftVariable != null && !leftVariable.canBeNull())
+                        continue;
+
+                    variable.addClass(pairedClass.getRightClass());
+                }
+                else if(pairedClass.getRightClass() == null)
+                {
+                    if(rightVariable != null && !rightVariable.canBeNull())
+                        continue;
+
+                    variable.addClass(pairedClass.getLeftClass());
+                }
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
+                {
+                    variable.addClass(pairedClass.getLeftClass());
+                }
+                else if(pairedClass.getLeftClass().getGeneralClass() == pairedClass.getRightClass())
+                {
+                    if(leftVariable.canBeNull())
+                        variable.addClass(pairedClass.getRightClass());
+                    else
+                        variable.addClass(pairedClass.getLeftClass());
+                }
+                else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass())
+                {
+                    if(rightVariable.canBeNull())
+                        variable.addClass(pairedClass.getLeftClass());
+                    else
+                        variable.addClass(pairedClass.getRightClass());
+                }
+                else
+                {
+                    assert false;
+                }
+            }
+
+            if(variable.getClasses().isEmpty())
+                return null;
         }
 
-        builder.append(" AS ");
-        builder.append(var);
+        return variables;
+    }
+
+
+    private void generateJoinSelectVariable(StringBuilder builder, String var, ResourceClass resourceClass, int part,
+            Set<ResourceClass> leftClasses, Set<ResourceClass> rightClasses)
+    {
+        if(leftClasses.size() + rightClasses.size() > 1)
+            builder.append("COALESCE(");
+
+        boolean hasVariant = false;
+
+        for(ResourceClass leftClass : leftClasses)
+        {
+            appendComma(builder, hasVariant);
+            hasVariant = true;
+
+            if(leftClass == resourceClass)
+                builder.append(leftTable).append('.').append(leftClass.getSqlColumn(var, part));
+            else
+                builder.append(leftClass.getGeneralisedPatternCode(leftTable, var, part, true));
+        }
+
+        for(ResourceClass rightClass : rightClasses)
+        {
+            appendComma(builder, hasVariant);
+            hasVariant = true;
+
+            if(rightClass == resourceClass)
+                builder.append(rightTable).append('.').append(rightClass.getSqlColumn(var, part));
+            else
+                builder.append(rightClass.getGeneralisedPatternCode(rightTable, var, part, true));
+        }
+
+        if(leftClasses.size() + rightClasses.size() > 1)
+            builder.append(") AS ").append(resourceClass.getSqlColumn(var, part));
     }
 }

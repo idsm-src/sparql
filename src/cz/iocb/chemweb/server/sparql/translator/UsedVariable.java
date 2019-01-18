@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -74,5 +75,12 @@ public class UsedVariable
     public final Set<ResourceClass> getClasses()
     {
         return classes;
+    }
+
+
+    public final Set<ResourceClass> getCompatible(ResourceClass resClass)
+    {
+        return classes.stream().filter(r -> r == resClass || r.getGeneralClass() == resClass)
+                .collect(Collectors.toSet());
     }
 }

@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
@@ -14,6 +15,13 @@ public class LangStringClass extends LiteralClass
     LangStringClass()
     {
         super("lang", Arrays.asList("varchar", "varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
+    }
+
+
+    @Override
+    public ResourceClass getGeneralClass()
+    {
+        return rdfLangString;
     }
 
 
@@ -34,6 +42,20 @@ public class LangStringClass extends LiteralClass
             throw new IllegalArgumentException();
 
         return "sparql.rdfbox_extract_lang_string_" + (part == 0 ? "string" : "lang") + "(" + column + ")";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 

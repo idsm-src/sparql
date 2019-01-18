@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -111,6 +112,49 @@ public class UserIriClass extends IriClass
         IRI iri = (IRI) node;
 
         return inverseFunction.get(part) + "('" + iri.getUri().toString() + "'::varchar)";
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        StringBuffer strBuf = new StringBuffer();
+
+        strBuf.append(function);
+        strBuf.append("(");
+
+        for(int i = 0; i < getPatternPartsCount(); i++)
+        {
+            if(i > 0)
+                strBuf.append(", ");
+
+            if(table != null)
+                strBuf.append(table).append(".");
+
+            strBuf.append(getSqlColumn(var, i));
+        }
+
+        strBuf.append(")");
+
+        return strBuf.toString();
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(inverseFunction.get(part));
+        builder.append("(");
+
+        if(table != null)
+            builder.append(table).append(".");
+
+        builder.append(iri.getSqlColumn(var, 0));
+        builder.append(")");
+
+        return builder.toString();
     }
 
 

@@ -16,6 +16,13 @@ public class SimpleLiteralClass extends LiteralClass
 
 
     @Override
+    public ResourceClass getGeneralClass()
+    {
+        return this;
+    }
+
+
+    @Override
     public String getLiteralPatternCode(Literal literal, int part)
     {
         Object value = literal.getValue();
@@ -24,6 +31,20 @@ public class SimpleLiteralClass extends LiteralClass
             return "'" + ((String) value).replace("'", "''") + "'::varchar";
         else
             return "'" + value.toString() + "'::" + sqlTypes.get(part);
+    }
+
+
+    @Override
+    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+    }
+
+
+    @Override
+    public String getSpecialisedPatternCode(String table, String var, int part)
+    {
+        return (table != null ? table + "." : "") + getSqlColumn(var, part);
     }
 
 
