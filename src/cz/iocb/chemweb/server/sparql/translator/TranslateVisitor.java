@@ -894,8 +894,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(Filter filter : optionalFilters)
         {
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, configuration,
-                    prologue, exceptions, warnings);
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, this);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
             expression = SqlEffectiveBooleanValue.create(expression);
@@ -934,8 +933,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     variableName));
 
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), configuration,
-                prologue, exceptions, warnings);
+                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), this);
 
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
@@ -1007,8 +1005,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         for(Filter filter : filters)
         {
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), configuration, prologue,
-                    exceptions, warnings);
+                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), this);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
             expression = SqlEffectiveBooleanValue.create(expression);
@@ -1207,5 +1204,29 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     public final LinkedHashMap<String, UserIriClass> getIriClasses()
     {
         return iriClasses;
+    }
+
+
+    public SparqlDatabaseConfiguration getConfiguration()
+    {
+        return configuration;
+    }
+
+
+    public Prologue getPrologue()
+    {
+        return prologue;
+    }
+
+
+    public List<TranslateException> getExceptions()
+    {
+        return exceptions;
+    }
+
+
+    public List<TranslateException> getWarnings()
+    {
+        return warnings;
     }
 }

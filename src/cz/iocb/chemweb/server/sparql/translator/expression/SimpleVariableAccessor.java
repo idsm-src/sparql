@@ -18,6 +18,13 @@ public class SimpleVariableAccessor extends VariableAccessor
 
 
     @Override
+    public UsedVariables getUsedVariables()
+    {
+        return usedVariables;
+    }
+
+
+    @Override
     public UsedVariable getUsedVariable(String variable)
     {
         return usedVariables.get(variable);
