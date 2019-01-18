@@ -3,8 +3,8 @@
 #sparql($structure)
   SELECT (true as ?R) WHERE
   {
-    ?S rdf:typ sio:SIO_011120.
-    ?S sio:is-attribute-of compound:CID132859899.
+    ?S rdf:type sio:SIO_011120.
+    ?S sio:is-attribute-of compound:CID$CID.
     ?S sio:has-value ?V.
   }
 #end
