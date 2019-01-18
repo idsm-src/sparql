@@ -105,9 +105,50 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public NodeMapping createLiteralMapping(LiteralClass literalClass, Literal literal)
+    {
+        return new ConstantLiteralMapping(literalClass, literal);
+    }
+
+
     public NodeMapping createLiteralMapping(String value)
     {
         return new ConstantLiteralMapping(BuiltinClasses.xsdString, new Literal(value, BuiltinTypes.xsdStringIri));
+    }
+
+
+    public NodeMapping createLiteralMapping(short value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdShort,
+                new Literal(Short.toString(value), BuiltinTypes.xsdShortIri));
+    }
+
+
+    public NodeMapping createLiteralMapping(int value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdInt,
+                new Literal(Integer.toString(value), BuiltinTypes.xsdIntIri));
+    }
+
+
+    public NodeMapping createLiteralMapping(long value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdLong,
+                new Literal(Long.toString(value), BuiltinTypes.xsdLongIri));
+    }
+
+
+    public NodeMapping createLiteralMapping(float value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdFloat,
+                new Literal(Float.toString(value), BuiltinTypes.xsdFloatIri));
+    }
+
+
+    public NodeMapping createLiteralMapping(double value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdDouble,
+                new Literal(Double.toString(value), BuiltinTypes.xsdDoubleIri));
     }
 
 
