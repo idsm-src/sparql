@@ -51,6 +51,8 @@ public class SqlUnion extends SqlIntercode
             {
                 if(pairedClass.getLeftClass() == null)
                     newVar.addClass(pairedClass.getRightClass());
+                else if(pairedClass.getRightClass() == null)
+                    newVar.addClass(pairedClass.getLeftClass());
                 else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
                     newVar.addClass(pairedClass.getLeftClass());
                 else
