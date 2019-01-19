@@ -10,6 +10,8 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNodeValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
@@ -40,6 +42,20 @@ public class SqlBind extends SqlIntercode
 
         if(expression == SqlNull.get())
             return context;
+
+        if(context instanceof SqlUnion)
+        {
+            SqlIntercode union = new SqlNoSolution();
+
+            for(SqlIntercode child : ((SqlUnion) context).getChilds())
+            {
+                VariableAccessor variableAccessor = new SimpleVariableAccessor(child.getVariables());
+                union = SqlUnion.union(union, bind(variable, expression.optimize(variableAccessor), child));
+            }
+
+            return union;
+        }
+
 
         UsedVariables variables = new UsedVariables();
 
