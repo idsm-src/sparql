@@ -8,7 +8,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Stack;
 import java.util.stream.Collectors;
@@ -32,6 +31,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
+import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
@@ -68,10 +68,12 @@ import cz.iocb.chemweb.server.sparql.translator.GraphOrServiceRestriction.Restri
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionAggregationRewriteVisitor;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlAggregation;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
@@ -150,18 +152,173 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         // translate the WHERE clause
         TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
 
-        if(!select.getGroupByConditions().isEmpty())
-            translatedWhereClause = translateBindInGroupBy(select.getGroupByConditions(), translatedWhereClause);
 
+        // translate the GROUP BY clause
+        List<Variable> groupByVariables = new LinkedList<Variable>();
+
+        for(GroupCondition groupBy : select.getGroupByConditions())
+        {
+            if(groupBy.getExpression() instanceof Variable && groupBy.getVariable() == null)
+            {
+                groupByVariables.add((Variable) groupBy.getExpression());
+            }
+            else
+            {
+                Variable variable = groupBy.getVariable();
+
+                if(variable == null)
+                    variable = Variable.getNewVariable();
+
+                groupByVariables.add(variable);
+                String name = variable.getName();
+
+                if(translatedWhereClause.getVariablesInScope().contains(name))
+                    exceptions.add(new TranslateException(ErrorType.variableUsedBeforeBind,
+                            groupBy.getVariable().getRange(), name));
+
+
+                checkExpressionForUnGroupedSolutions(groupBy.getExpression());
+
+                ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
+                        new SimpleVariableAccessor(translatedWhereClause.getIntercode().getVariables()), this);
+
+                SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
+                expression = SqlEffectiveBooleanValue.create(expression);
+
+                //TODO: optimize based on the expression value
+
+                ArrayList<String> variables = new ArrayList<String>();
+                variables.addAll(translatedWhereClause.getVariablesInScope());
+
+                if(variable instanceof Variable)
+                    variables.add(name);
+
+                SqlIntercode intercode = SqlBind.bind(name, expression, translatedWhereClause.getIntercode());
+                translatedWhereClause = new TranslatedSegment(variables, intercode);
+            }
+        }
+
+
+        List<Projection> projections = select.getProjections();
+        List<OrderCondition> orderByConditions = select.getOrderByConditions();
+
+        if(isInAggregateMode(select))
+        {
+            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor();
+
+            List<Filter> havingConditions = select.getHavingConditions().stream()
+                    .map(e -> new Filter(rewriter.visitElement(e))).collect(Collectors.toList());
+
+
+            projections = new LinkedList<Projection>();
+
+            for(Projection projection : select.getProjections())
+            {
+                if(projection.getExpression() == null)
+                {
+                    projections.add(projection);
+                }
+                else
+                {
+                    Projection rewrited = new Projection(rewriter.visitElement(projection.getExpression()),
+                            projection.getVariable());
+                    rewrited.setRange(projection.getRange());
+                    projections.add(rewrited);
+                }
+            }
+
+
+            orderByConditions = new LinkedList<OrderCondition>();
+
+            for(OrderCondition condition : select.getOrderByConditions())
+            {
+                OrderCondition rewrited = new OrderCondition(condition.getDirection(),
+                        rewriter.visitElement(condition.getExpression()));
+                rewrited.setRange(condition.getRange());
+                orderByConditions.add(rewrited);
+            }
+
+
+            for(BuiltInCallExpression expression : rewriter.getAggregations().values())
+            {
+                if(expression.getArguments().size() > 0)
+                {
+                    new ElementVisitor<Void>()
+                    {
+                        @Override
+                        public Void visit(BuiltInCallExpression call)
+                        {
+                            if(call.isAggregateFunction())
+                                exceptions.add(
+                                        new TranslateException(ErrorType.nestedAggregateFunction, call.getRange()));
+
+                            return null;
+                        }
+                    }.visitElement(expression.getArguments().get(0));
+                }
+            }
+
+
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
+                    new SimpleVariableAccessor(translatedWhereClause.getIntercode().getVariables()), this);
+
+            LinkedHashMap<Variable, SqlExpressionIntercode> aggregations = new LinkedHashMap<>();
+
+            for(Entry<Variable, BuiltInCallExpression> entry : rewriter.getAggregations().entrySet())
+                aggregations.put(entry.getKey(), visitor.visitElement(entry.getValue()));
+
+            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations,
+                    translatedWhereClause.getIntercode());
+
+            List<String> inScopeVariables = groupByVariables.stream().filter(v -> v instanceof Variable)
+                    .map(v -> v.getName()).collect(Collectors.toList());
+            translatedWhereClause = new TranslatedSegment(inScopeVariables, intercode);
+
+
+            // translate having as filters
+            translatedWhereClause = translateFilters(havingConditions, translatedWhereClause);
+        }
+
+
+        // translate projection expressions
+        for(Projection projection : projections)
+        {
+            if(projection.getExpression() != null)
+            {
+                Bind bind = new Bind(projection.getExpression(), projection.getVariable());
+                translatedWhereClause = translateBind(bind, translatedWhereClause);
+            }
+        }
+
+
+        // translate order by expressions
+        LinkedHashMap<String, Direction> orderByVariables = new LinkedHashMap<String, Direction>();
+
+        for(OrderCondition condition : orderByConditions)
+        {
+            if(condition.getExpression() instanceof Variable)
+            {
+                String varName = ((Variable) condition.getExpression()).getName();
+
+                if(translatedWhereClause.getIntercode().getVariables().get(varName) != null)
+                    orderByVariables.put(varName, condition.getDirection());
+            }
+            else
+            {
+                Variable variable = Variable.getNewVariable();
+                orderByVariables.put(variable.getName(), condition.getDirection());
+
+                Bind bind = new Bind(condition.getExpression(), variable);
+                translatedWhereClause = translateBind(bind, translatedWhereClause);
+            }
+        }
 
 
         UsedVariables variables = new UsedVariables();
-        ArrayList<String> variablesInScope = null;
+        List<String> variablesInScope = null;
 
         if(select.getProjections().isEmpty())
         {
-            //TODO: check whether star can be used
-
             for(String variableName : translatedWhereClause.getVariablesInScope())
             {
                 UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
@@ -180,24 +337,18 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 String variableName = projection.getVariable().getName();
 
-                if(projection.getExpression() != null)
-                {
-                    //TODO: expression translation is not implemented yet
-                }
-                else
-                {
-                    UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
+                UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
 
-                    if(variable != null)
-                        variables.add(variable);
+                if(variable != null)
+                    variables.add(variable);
 
-                    variablesInScope.add(variableName);
-                }
+                variablesInScope.add(variableName);
             }
         }
 
 
-        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause.getIntercode());
+        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause.getIntercode(),
+                orderByVariables);
 
 
         if(select.isDistinct())
@@ -259,7 +410,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             else
             {
                 SqlIntercode intercode = SqlUnion.union(translatedPattern.getIntercode(), translated.getIntercode());
-                ArrayList<String> variablesInScope = TranslatedSegment
+                List<String> variablesInScope = TranslatedSegment
                         .mergeVariableLists(translatedPattern.getVariablesInScope(), translated.getVariablesInScope());
 
                 translatedPattern = new TranslatedSegment(variablesInScope, intercode);
@@ -593,7 +744,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             @Override
             public Void visit(BuiltInCallExpression func)
             {
-                if(!isAggregateFunction(func.getFunctionName()) || func.getArguments().isEmpty())
+                if(!func.isAggregateFunction() || func.getArguments().isEmpty())
                     return null;
 
                 Expression arg = func.getArguments().get(0);
@@ -601,9 +752,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 if(!(arg instanceof VariableOrBlankNode))
                     return null;
 
-                if(groupByVars.contains(((VariableOrBlankNode) arg).getName()))
-                    exceptions.add(new TranslateException(ErrorType.invalidVariableInAggregate, arg.getRange(),
-                            arg.toString()));
+                String name = ((VariableOrBlankNode) arg).getName();
+
+                if(groupByVars.contains(name))
+                    exceptions.add(new TranslateException(ErrorType.invalidVariableInAggregate, arg.getRange(), name));
 
                 return null;
             }
@@ -613,7 +765,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 if(!groupByVars.contains(var.getName()))
                     exceptions.add(new TranslateException(ErrorType.invalidVariableOutsideAggregate, var.getRange(),
-                            var.toString()));
+                            var.getName()));
 
                 return null;
             }
@@ -640,7 +792,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             @Override
             public Void visit(BuiltInCallExpression call)
             {
-                if(isAggregateFunction(call.getFunctionName()))
+                if(call.isAggregateFunction())
                     exceptions.add(new TranslateException(ErrorType.invalidContextOfAggregate, call.getRange()));
 
                 return null;
@@ -671,7 +823,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             @Override
             public Boolean visit(BuiltInCallExpression call)
             {
-                return isAggregateFunction(call.getFunctionName());
+                return call.isAggregateFunction();
             }
 
             @Override
@@ -695,49 +847,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }.visitElement(expression);
 
         return ret != null && ret;
-    }
-
-
-    private boolean isAggregateFunction(String functionName)
-    {
-        functionName = functionName.toUpperCase(Locale.US);
-
-        switch(functionName)
-        {
-            // aggregate functions according to SPARQL 1.1
-            case "COUNT":
-            case "SUM":
-            case "MIN":
-            case "MAX":
-            case "AVG":
-            case "GROUP_CONCAT":
-            case "SAMPLE":
-                return true;
-        }
-
-        return false;
-    }
-
-    /**************************************************************************/
-
-    private TranslatedSegment translateBindInGroupBy(List<GroupCondition> groupByList,
-            TranslatedSegment translatedWhereClause)
-    {
-        for(GroupCondition groupBy : groupByList)
-        {
-            if(groupBy.getVariable() != null)
-            {
-                Bind bind = new Bind(groupBy.getExpression(), groupBy.getVariable());
-                bind.setRange(groupBy.getRange());
-
-                translatedWhereClause = translateBind(bind, translatedWhereClause);
-            }
-
-            if(groupBy.getExpression() != null)
-                checkExpressionForUnGroupedSolutions(groupBy.getExpression());
-        }
-
-        return translatedWhereClause;
     }
 
 
@@ -805,7 +914,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                 SqlIntercode intercode = SqlJoin.join(schema, translatedGroupPattern.getIntercode(),
                         translatedPattern.getIntercode());
-                ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
+                List<String> variablesInScope = TranslatedSegment.mergeVariableLists(
                         translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
 
                 translatedGroupPattern = new TranslatedSegment(variablesInScope, intercode);
@@ -860,7 +969,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
             TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
     {
-        ArrayList<String> variablesInScope = TranslatedSegment.mergeVariableLists(
+        List<String> variablesInScope = TranslatedSegment.mergeVariableLists(
                 translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
 
         List<SqlExpressionIntercode> conditions = null;
@@ -894,6 +1003,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(Filter filter : optionalFilters)
         {
+            checkExpressionForUnGroupedSolutions(filter.getConstraint());
+
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, this);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
@@ -931,6 +1042,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         if(translatedGroupPattern.getVariablesInScope().contains(variableName))
             exceptions.add(new TranslateException(ErrorType.variableUsedBeforeBind, bind.getVariable().getRange(),
                     variableName));
+
+        checkExpressionForUnGroupedSolutions(bind.getExpression());
 
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
                 new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), this);
@@ -994,7 +1107,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateFilters(LinkedList<Filter> filters, TranslatedSegment groupPattern)
+    private TranslatedSegment translateFilters(List<Filter> filters, TranslatedSegment groupPattern)
     {
         if(filters.size() == 0)
             return groupPattern;
@@ -1004,6 +1117,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(Filter filter : filters)
         {
+            checkExpressionForUnGroupedSolutions(filter.getConstraint());
+
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
                     new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), this);
 

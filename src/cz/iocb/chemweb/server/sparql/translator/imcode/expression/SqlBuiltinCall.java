@@ -38,22 +38,79 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 public class SqlBuiltinCall extends SqlExpressionIntercode
 {
     private final String function;
+    private final boolean distinct;
     private final List<SqlExpressionIntercode> arguments;
+
+
+    SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
+            Set<ResourceClass> resourceClasses, boolean canBeNull)
+    {
+        super(resourceClasses, canBeNull);
+        this.function = function;
+        this.distinct = distinct;
+        this.arguments = arguments;
+    }
 
 
     SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments, Set<ResourceClass> resourceClasses,
             boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
-        this.function = function;
-        this.arguments = arguments;
+        this(function, false, arguments, resourceClasses, canBeNull);
     }
 
 
-    public static SqlExpressionIntercode create(String function, List<SqlExpressionIntercode> arguments)
+    public static SqlExpressionIntercode create(String function, boolean distinct,
+            List<SqlExpressionIntercode> arguments)
     {
         switch(function)
         {
+            // aggregate functions
+            case "count":
+                return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdInteger), false);
+
+            case "sum":
+            case "avg":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                Set<ResourceClass> numerics = argument.getResourceClasses().stream().filter(r -> isNumeric(r))
+                        .collect(Collectors.toSet());
+                ResourceClass baseType = function.equals("avg") ? xsdDecimal : xsdInteger;
+                Set<ResourceClass> resourceClass = numerics.stream()
+                        .map(r -> isNumericCompatibleWith(r, baseType) ? baseType : r).collect(Collectors.toSet());
+                boolean canBeNull = argument.canBeNull() || argument.getResourceClasses().size() > numerics.size();
+
+                if(resourceClass.size() == 0)
+                    return SqlNull.get();
+
+                return new SqlBuiltinCall(function, distinct, arguments, resourceClass, canBeNull);
+            }
+
+            case "min":
+            case "max":
+            case "sample":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                return new SqlBuiltinCall(function, distinct, arguments, argument.getResourceClasses(),
+                        argument.canBeNull());
+            }
+
+            case "group_concat":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                Set<ResourceClass> resourceClass = argument.getResourceClasses().stream()
+                        .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                boolean canBeNull = argument.canBeNull() || argument.getResourceClasses().size() > resourceClass.size();
+
+                if(resourceClass.size() == 0)
+                    return SqlNull.get();
+
+                return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdString), canBeNull);
+            }
+
+
             // functional forms
             case "bound":
             {
@@ -640,7 +697,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         for(SqlExpressionIntercode argument : arguments)
             optimized.add(argument.optimize(variableAccessor));
 
-        return create(function, optimized);
+        return create(function, distinct, optimized);
     }
 
 
@@ -649,6 +706,129 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     {
         switch(function)
         {
+            // aggregate functions
+            case "count":
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("count(");
+
+                if(distinct)
+                    builder.append("DISTINCT ");
+
+                if(arguments.size() == 0)
+                    builder.append("*");
+                else
+                    builder.append(arguments.get(0).translate());
+
+                builder.append(")::decimal");
+
+                return builder.toString();
+            }
+
+            case "sum":
+            case "avg":
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("sparql.");
+                builder.append(function);
+                builder.append("(");
+
+                if(distinct)
+                    builder.append("DISTINCT ");
+
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(!isBoxed())
+                    builder.append(translateAsUnboxedOperand(argument, getExpressionResourceClass()));
+                else
+                    builder.append(translateAsBoxedOperand(argument, argument.getResourceClasses().stream()
+                            .filter(r -> isNumeric(r)).collect(Collectors.toSet())));
+
+                builder.append(")");
+
+                return builder.toString();
+            }
+
+            case "min":
+            case "max":
+            case "sample":
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("sparql.");
+                builder.append(function);
+                builder.append("(");
+
+                if(distinct)
+                    builder.append("DISTINCT ");
+
+                SqlExpressionIntercode argument = arguments.get(0);
+                builder.append(argument.translate());
+                builder.append(")");
+
+                return builder.toString();
+            }
+
+            case "group_concat":
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("sparql.group_concat(");
+
+                if(distinct)
+                    builder.append("DISTINCT ");
+
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(argument instanceof SqlVariable)
+                {
+                    SqlVariable variable = (SqlVariable) argument;
+
+                    Set<ResourceClass> compatible = argument.getResourceClasses().stream()
+                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+
+                    if(compatible.size() > 1)
+                        builder.append("COALESCE(");
+
+                    boolean hasVariant = false;
+
+                    for(ResourceClass resClass : compatible)
+                    {
+                        appendComma(builder, hasVariant);
+                        hasVariant = true;
+
+                        builder.append(variable.getNodeAccess(resClass, 0));
+                    }
+
+                    if(compatible.size() > 1)
+                        builder.append(")");
+                }
+                else if(argument.isBoxed())
+                {
+                    builder.append("rdfbox_extract_string_literal(");
+                    builder.append(argument.translate());
+                    builder.append(")");
+                }
+                else
+                {
+                    builder.append(argument.translate());
+                }
+
+                builder.append(", ");
+
+                if(arguments.size() == 1)
+                    builder.append("' '::varchar");
+                else
+                    builder.append(arguments.get(1).translate());
+
+                builder.append(")");
+
+                return builder.toString();
+            }
+
+
             // functional forms
             case "bound":
             {

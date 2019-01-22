@@ -55,7 +55,9 @@ public enum ErrorType
 
     unnecessaryMinus("The MINUS clause has no effect."),
 
-    repeatOfValuesVariable("Variable '%s' cannot be used twice in a VALUES clause.");
+    repeatOfValuesVariable("Variable '%s' cannot be used twice in a VALUES clause."),
+
+    nestedAggregateFunction("Aggregate functions cannot be nested.");
 
     /**
      * Error message template.

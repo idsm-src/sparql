@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -596,8 +595,6 @@ class TripleExpander extends ComplexElementVisitor<Node>
         this.context = context;
     }
 
-    private static AtomicInteger variableId = new AtomicInteger();
-
     private final List<BasicPattern> results = new ArrayList<>();
 
     public List<BasicPattern> getResults()
@@ -746,16 +743,10 @@ class TripleExpander extends ComplexElementVisitor<Node>
         return new ProcedureCall.Parameter(parameterName, parameterValue);
     }
 
-    private static BlankNode getNewBlankNode()
-    {
-        int id = variableId.incrementAndGet();
-        return new BlankNode(BlankNode.prefix + id);
-    }
-
     @Override
     public Node visit(BlankNodePropertyList blankNodePropertyList)
     {
-        BlankNode blankNode = getNewBlankNode();
+        BlankNode blankNode = BlankNode.getNewBlankNode();
         blankNode.setRange(blankNodePropertyList.getRange());
 
         // take advantage of triple processing
@@ -772,7 +763,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         if(rdfCollection.getNodes().isEmpty())
             return new IRI(Rdf.NIL);
 
-        BlankNode firstNode = getNewBlankNode();
+        BlankNode firstNode = BlankNode.getNewBlankNode();
         firstNode.setRange(rdfCollection.getRange());
 
         BlankNode currentNode = firstNode;
@@ -793,7 +784,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
             }
             else
             {
-                nextNode = getNewBlankNode();
+                nextNode = BlankNode.getNewBlankNode();
                 nextNode.setRange(rdfCollection.getRange());
 
                 restObject = nextNode;

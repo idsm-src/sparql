@@ -1,24 +1,25 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.ArrayList;
+import java.util.List;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 
 
 
 public class TranslatedSegment
 {
-    private final ArrayList<String> scope;
+    private final List<String> scope;
     private final SqlIntercode intercode;
 
 
-    public TranslatedSegment(ArrayList<String> scope, SqlIntercode intercode)
+    public TranslatedSegment(List<String> scope, SqlIntercode intercode)
     {
         this.scope = scope;
         this.intercode = intercode;
     }
 
 
-    public static ArrayList<String> mergeVariableLists(ArrayList<String> left, ArrayList<String> right)
+    public static List<String> mergeVariableLists(List<String> left, List<String> right)
     {
         ArrayList<String> merged = new ArrayList<String>(left.size() + right.size());
 
@@ -32,7 +33,7 @@ public class TranslatedSegment
     }
 
 
-    public final ArrayList<String> getVariablesInScope()
+    public final List<String> getVariablesInScope()
     {
         return scope;
     }

@@ -14,11 +14,11 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlQuery extends SqlIntercode
 {
-    private final ArrayList<String> selectedVariables;
+    private final List<String> selectedVariables;
     private final SqlIntercode child;
 
 
-    public SqlQuery(ArrayList<String> selectedVariables, SqlIntercode child)
+    public SqlQuery(List<String> selectedVariables, SqlIntercode child)
     {
         super(child.variables);
         this.selectedVariables = selectedVariables;

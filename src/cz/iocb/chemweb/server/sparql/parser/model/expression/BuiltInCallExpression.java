@@ -50,4 +50,22 @@ public class BuiltInCallExpression extends CallExpression
     {
         return visitor.visit(this);
     }
+
+    public boolean isAggregateFunction()
+    {
+        switch(functionName.toLowerCase())
+        {
+            // aggregate functions according to SPARQL 1.1
+            case "count":
+            case "sum":
+            case "min":
+            case "max":
+            case "avg":
+            case "group_concat":
+            case "sample":
+                return true;
+        }
+
+        return false;
+    }
 }

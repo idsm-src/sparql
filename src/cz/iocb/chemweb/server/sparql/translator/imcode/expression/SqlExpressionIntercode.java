@@ -104,55 +104,55 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static boolean isIri(ResourceClass resClass)
+    public static boolean isIri(ResourceClass resClass)
     {
         return resClass instanceof IriClass;
     }
 
 
-    protected static boolean isBlankNode(ResourceClass resClass)
+    public static boolean isBlankNode(ResourceClass resClass)
     {
         return resClass instanceof BlankNodeClass;
     }
 
 
-    protected static boolean isLiteral(ResourceClass resClass)
+    public static boolean isLiteral(ResourceClass resClass)
     {
         return resClass instanceof LiteralClass;
     }
 
 
-    protected static boolean isDateTime(ResourceClass resClass)
+    public static boolean isDateTime(ResourceClass resClass)
     {
         return resClass == xsdDateTime || resClass instanceof DateTimeConstantZoneClass;
     }
 
 
-    protected static boolean isDate(ResourceClass resClass)
+    public static boolean isDate(ResourceClass resClass)
     {
         return resClass == xsdDate || resClass instanceof DateConstantZoneClass;
     }
 
 
-    protected static boolean isLangString(ResourceClass resClass)
+    public static boolean isLangString(ResourceClass resClass)
     {
         return resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
     }
 
 
-    protected static boolean isStringLiteral(ResourceClass resClass)
+    public static boolean isStringLiteral(ResourceClass resClass)
     {
         return resClass == xsdString || resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
     }
 
 
-    protected static boolean isNumeric(ResourceClass resClass)
+    public static boolean isNumeric(ResourceClass resClass)
     {
         return numericOrder.contains(resClass);
     }
 
 
-    protected static boolean isNumericCompatibleWith(ResourceClass resClass, ResourceClass requestClass)
+    public static boolean isNumericCompatibleWith(ResourceClass resClass, ResourceClass requestClass)
     {
         if(!isNumeric(resClass))
             return false;
@@ -164,7 +164,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static boolean isEffectiveBooleanClass(ResourceClass resClass)
+    public static boolean isEffectiveBooleanClass(ResourceClass resClass)
     {
         return isNumeric(resClass) || resClass == xsdBoolean || resClass == xsdString || resClass == unsupportedLiteral;
     }

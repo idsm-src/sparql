@@ -264,7 +264,6 @@ WHERE
     ]]></code>
   </example>
 
-  <!--
   <example>
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChem Case 10:</div>
@@ -289,8 +288,8 @@ WHERE
     sio:has-value ?value.
 }
 GROUP BY ?protein
-ORDER BY count(?sub)
+ORDER BY DESC(count(?sub))
     ]]></code>
   </example>
-   -->
+
 </examples>
