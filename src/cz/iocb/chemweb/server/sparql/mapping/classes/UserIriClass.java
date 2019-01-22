@@ -278,4 +278,26 @@ public class UserIriClass extends IriClass
             throw new SQLRuntimeException(e);
         }
     }
+
+
+    @Override
+    public String getIriValueCode(List<String> columns)
+    {
+        StringBuffer strBuf = new StringBuffer();
+
+        strBuf.append(function);
+        strBuf.append("(");
+
+        for(int i = 0; i < getPatternPartsCount(); i++)
+        {
+            if(i > 0)
+                strBuf.append(", ");
+
+            strBuf.append(columns.get(i));
+        }
+
+        strBuf.append(")");
+
+        return strBuf.toString();
+    }
 }

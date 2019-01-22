@@ -18,4 +18,7 @@ public abstract class IriClass extends ResourceClass
     {
         return iri;
     }
+
+
+    public abstract String getIriValueCode(List<String> columns);
 }

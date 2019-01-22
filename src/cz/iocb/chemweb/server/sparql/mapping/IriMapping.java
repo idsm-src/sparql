@@ -16,4 +16,7 @@ public abstract class IriMapping extends NodeMapping
     {
         return (IriClass) resourceClass;
     }
+
+
+    public abstract String getSqlIriValueAccess();
 }

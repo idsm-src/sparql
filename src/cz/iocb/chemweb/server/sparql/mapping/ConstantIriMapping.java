@@ -68,4 +68,11 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
     {
         return value;
     }
+
+
+    @Override
+    public String getSqlIriValueAccess()
+    {
+        return "'" + value.getUri() + "'::varchar";
+    }
 }

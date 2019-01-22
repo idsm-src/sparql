@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -9,8 +10,10 @@ import java.util.Map.Entry;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
+import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
@@ -60,13 +63,23 @@ public class SqlTableAccess extends SqlIntercode
     {
         UsedVariable other = variables.get(variable);
 
-        if(other != null && other.containsClass(resourceClass))
-            return;
-
-        if(other != null)
-            other.addClass(resourceClass);
-        else
+        if(other == null)
+        {
             variables.add(new UsedVariable(variable, resourceClass, false));
+        }
+        else
+        {
+            if(other.containsClass(resourceClass))
+                return;
+
+            if(resourceClass == iri && other.getClasses().stream().anyMatch(r -> r instanceof IriClass))
+                return;
+
+            if(resourceClass instanceof IriClass)
+                other.getClasses().remove(iri);
+
+            other.addClass(resourceClass);
+        }
     }
 
 
@@ -601,8 +614,9 @@ public class SqlTableAccess extends SqlIntercode
             appendComma(builder, hasSelect);
             hasSelect = true;
 
+            String varName = entry.getKey();
             ArrayList<NodeMapping> mappings = entry.getValue();
-            ResourceClass resourceClass = mappings.get(0).getResourceClass(); // all mappings have the same class
+            ResourceClass resourceClass = variables.get(varName).getClasses().iterator().next();
 
             for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
             {
@@ -613,17 +627,24 @@ public class SqlTableAccess extends SqlIntercode
                 if(mappings.size() > 1)
                     builder.append("COALESCE(");
 
-                for(int j = 0; j < mappings.size(); j++)
+                boolean hasVariant = false;
+
+                for(NodeMapping mapping : mappings)
                 {
-                    appendComma(builder, j > 0);
-                    builder.append(mappings.get(j).getSqlValueAccess(i));
+                    if(mapping.getResourceClass() == resourceClass)
+                    {
+                        appendComma(builder, hasVariant);
+                        hasVariant = true;
+
+                        builder.append(mapping.getSqlValueAccess(i));
+                    }
                 }
 
                 if(mappings.size() > 1)
                     builder.append(")");
 
                 builder.append(" AS ");
-                builder.append(resourceClass.getSqlColumn(entry.getKey(), i));
+                builder.append(resourceClass.getSqlColumn(varName, i));
             }
         }
 
@@ -695,34 +716,48 @@ public class SqlTableAccess extends SqlIntercode
             {
                 for(int m = 0; m < entry.getValue().size() - 1; m++)
                 {
+                    //TODO: sort entry.getValue() according to .getResourceClass()
                     NodeMapping map1 = entry.getValue().get(m);
                     NodeMapping map2 = entry.getValue().get(m + 1);
 
                     appendAnd(builder, hasWhere);
                     hasWhere = true;
 
-                    assert map1.getResourceClass() == map2.getResourceClass();
+                    builder.append("(");
+
+                    if(map1.getResourceClass() == map2.getResourceClass())
+                    {
+                        for(int i = 0; i < map1.getResourceClass().getPatternPartsCount(); i++)
+                        {
+                            appendAnd(builder, i > 0);
+
+                            builder.append(map1.getSqlValueAccess(i));
+                            builder.append(" = ");
+                            builder.append(map2.getSqlValueAccess(i));
+                        }
+                    }
+                    else
+                    {
+                        builder.append(((IriMapping) map1).getSqlIriValueAccess());
+                        builder.append(" = ");
+                        builder.append(((IriMapping) map2).getSqlIriValueAccess());
+                    }
 
                     for(int i = 0; i < map1.getResourceClass().getPatternPartsCount(); i++)
                     {
-                        appendAnd(builder, i > 0);
-
-                        builder.append("(");
-                        builder.append(map1.getSqlValueAccess(i));
-                        builder.append(" = ");
-                        builder.append(map2.getSqlValueAccess(i));
-
-                        //TODO: remove IS NULL if it is possible
-
                         builder.append(" OR ");
                         builder.append(map1.getSqlValueAccess(i));
                         builder.append(" IS NULL");
-
-                        builder.append(" OR ");
-                        builder.append(map2.getSqlValueAccess(i));
-                        builder.append(" IS NULL");
-                        builder.append(")");
                     }
+
+                    for(int i = 0; i < map2.getResourceClass().getPatternPartsCount(); i++)
+                    {
+                        builder.append(" OR ");
+                        builder.append(map2.getSqlValueAccess(i));
+                        builder.append(" IS NULL");
+                    }
+
+                    builder.append(")");
                 }
             }
         }

@@ -73,4 +73,10 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
 
         return columns.equals(other.columns);
     }
+
+
+    public String getSqlIriValueAccess()
+    {
+        return getIriClass().getIriValueCode(columns);
+    }
 }

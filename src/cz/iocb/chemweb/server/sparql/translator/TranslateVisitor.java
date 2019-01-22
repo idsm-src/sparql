@@ -557,6 +557,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         SqlIntercode translatedPattern = null;
 
+        matching:
         for(QuadMapping mapping : mappings)
         {
             if(!datasets.isEmpty())
@@ -586,7 +587,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                 for(UsedVariable usedVariable : translated.getVariables().getValues())
                     if(usedVariable.getClasses().size() > 1)
-                        continue;
+                        continue matching;
 
                 processNodeCondition(translated, graph, mapping.getGraph());
                 processNodeCondition(translated, subject, mapping.getSubject());
