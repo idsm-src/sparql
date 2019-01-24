@@ -21,16 +21,24 @@ public class SqlJoin extends SqlIntercode
     private static final String rightTable = "tab1";
 
     private final ArrayList<SqlIntercode> childs;
+    private final boolean strip;
 
 
-    protected SqlJoin(UsedVariables variables, ArrayList<SqlIntercode> childs)
+    protected SqlJoin(UsedVariables variables, ArrayList<SqlIntercode> childs, boolean strip)
     {
         super(variables);
         this.childs = childs;
+        this.strip = strip;
     }
 
 
     public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right)
+    {
+        return join(schema, left, right, false);
+    }
+
+
+    public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right, boolean strip)
     {
         /* special cases */
 
@@ -67,7 +75,7 @@ public class SqlJoin extends SqlIntercode
 
             for(SqlIntercode leftChild : leftChilds)
                 for(SqlIntercode rightChild : rightChilds)
-                    union = SqlUnion.union(union, join(schema, leftChild, rightChild));
+                    union = SqlUnion.union(union, join(schema, leftChild, rightChild, strip));
 
             return union;
         }
@@ -76,7 +84,7 @@ public class SqlJoin extends SqlIntercode
         /* standard join */
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = getUsedVariable(pairs);
+        UsedVariables variables = getUsedVariable(pairs, strip);
 
         if(variables == null)
             return new SqlNoSolution();
@@ -94,14 +102,14 @@ public class SqlJoin extends SqlIntercode
         else
             childs.add(right);
 
-        SqlJoin join = new SqlJoin(variables, childs);
+        SqlJoin join = new SqlJoin(variables, childs, strip);
 
 
-        return optimize(join, schema);
+        return optimize(join, schema, strip);
     }
 
 
-    private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema)
+    private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema, boolean strip)
     {
         if(schema == null)
             return join;
@@ -135,7 +143,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantA != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, strip);
                         join.childs.set(j, merge);
                         join.childs.remove(i);
                         continue loop;
@@ -146,7 +154,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantB != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB);
+                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, strip);
                         join.childs.set(i, merge);
                         join.childs.remove(j);
                         continue loop;
@@ -155,7 +163,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(SqlTableAccess.canBeMerged(schema, left, right))
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, strip);
 
                         join.childs.set(i, merge);
                         join.childs.remove(j);
@@ -195,7 +203,7 @@ public class SqlJoin extends SqlIntercode
             /* join */
 
             ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(joinVariables, child.getVariables());
-            UsedVariables variables = getUsedVariable(pairs);
+            UsedVariables variables = getUsedVariable(pairs, strip);
             Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
 
             StringBuilder builder = new StringBuilder();
@@ -235,6 +243,9 @@ public class SqlJoin extends SqlIntercode
                     }
                 }
             }
+
+            if(!hasSelect)
+                builder.append(" 1 ");
 
 
             builder.append(" FROM ");
@@ -377,7 +388,7 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs)
+    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, boolean strip)
     {
         UsedVariables variables = new UsedVariables();
 
@@ -392,8 +403,9 @@ public class SqlJoin extends SqlIntercode
             boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
 
             UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-            variables.add(variable);
 
+            if(strip == false || leftVariable == null || rightVariable == null)
+                variables.add(variable);
 
             for(PairedClass pairedClass : pair.getClasses())
             {

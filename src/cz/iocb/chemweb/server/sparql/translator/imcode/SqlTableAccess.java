@@ -427,7 +427,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right)
+    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right, boolean strip)
     {
         String condition = null;
 
@@ -449,7 +449,7 @@ public class SqlTableAccess extends SqlIntercode
             {
                 merged.getVariables().add(var);
             }
-            else
+            else if(!strip)
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
@@ -524,7 +524,8 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<ColumnPair> columnMap)
+    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<ColumnPair> columnMap,
+            boolean strip)
     {
         String condition = null;
 
@@ -546,7 +547,7 @@ public class SqlTableAccess extends SqlIntercode
             {
                 merged.getVariables().add(var);
             }
-            else
+            else if(!strip)
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
@@ -609,13 +610,13 @@ public class SqlTableAccess extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
+        for(UsedVariable var : getVariables().getValues())
         {
             appendComma(builder, hasSelect);
             hasSelect = true;
 
-            String varName = entry.getKey();
-            ArrayList<NodeMapping> mappings = entry.getValue();
+            String varName = var.getName();
+            ArrayList<NodeMapping> nodeMappings = mappings.get(varName);
             ResourceClass resourceClass = variables.get(varName).getClasses().iterator().next();
 
             for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
@@ -624,12 +625,12 @@ public class SqlTableAccess extends SqlIntercode
 
                 //TODO: remove COALESCE if it is possible
 
-                if(mappings.size() > 1)
+                if(nodeMappings.size() > 1)
                     builder.append("COALESCE(");
 
                 boolean hasVariant = false;
 
-                for(NodeMapping mapping : mappings)
+                for(NodeMapping mapping : nodeMappings)
                 {
                     if(mapping.getResourceClass() == resourceClass)
                     {
@@ -640,7 +641,7 @@ public class SqlTableAccess extends SqlIntercode
                     }
                 }
 
-                if(mappings.size() > 1)
+                if(nodeMappings.size() > 1)
                     builder.append(")");
 
                 builder.append(" AS ");

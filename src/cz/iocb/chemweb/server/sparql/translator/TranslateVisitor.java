@@ -13,11 +13,6 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.SQLRuntimeException;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
-import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
-import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -61,6 +56,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values.ValuesList;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
@@ -85,7 +81,6 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
@@ -104,7 +99,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     private final SparqlDatabaseConfiguration configuration;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
-    private final List<QuadMapping> mappings;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
 
@@ -116,7 +110,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     {
         this.configuration = configuration;
         this.iriClasses = configuration.getIriClasses();
-        this.mappings = configuration.getMappings();
         this.schema = configuration.getSchema();
         this.procedures = configuration.getProcedures();
     }
@@ -534,13 +527,9 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Triple triple)
     {
-        if(!(triple.getPredicate() instanceof Node))
-            return null; //TODO: paths are not yet implemented
-
-
         Node graph = null;
         Node subject = triple.getSubject();
-        Node predicate = (Node) triple.getPredicate();
+        Verb predicate = triple.getPredicate();
         Node object = triple.getObject();
 
 
@@ -555,67 +544,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
 
-        SqlIntercode translatedPattern = null;
-
-        matching:
-        for(QuadMapping mapping : mappings)
-        {
-            if(!datasets.isEmpty())
-            {
-                ConstantIriMapping graphMapping = (ConstantIriMapping) mapping.getGraph();
-
-                if(graphMapping == null)
-                    continue;
-
-                IRI graphIri = ((IRI) graphMapping.getValue());
-                boolean useDefaultDataset = graph == null;
-
-                if(datasets.stream().filter(d -> d.isDefault() == useDefaultDataset)
-                        .noneMatch(d -> d.getSourceSelector().equals(graphIri)))
-                    continue;
-            }
-
-
-            if(mapping.match(graph, subject, predicate, object))
-            {
-                SqlTableAccess translated = new SqlTableAccess(mapping.getTable(), mapping.getCondition());
-
-                processNodeMapping(translated, graph, mapping.getGraph());
-                processNodeMapping(translated, subject, mapping.getSubject());
-                processNodeMapping(translated, predicate, mapping.getPredicate());
-                processNodeMapping(translated, object, mapping.getObject());
-
-                for(UsedVariable usedVariable : translated.getVariables().getValues())
-                    if(usedVariable.getClasses().size() > 1)
-                        continue matching;
-
-                processNodeCondition(translated, graph, mapping.getGraph());
-                processNodeCondition(translated, subject, mapping.getSubject());
-                processNodeCondition(translated, predicate, mapping.getPredicate());
-                processNodeCondition(translated, object, mapping.getObject());
-
-                if(processNodesCondition(translated, graph, subject, mapping.getGraph(), mapping.getSubject()))
-                    continue;
-
-                if(processNodesCondition(translated, graph, predicate, mapping.getGraph(), mapping.getPredicate()))
-                    continue;
-
-                if(processNodesCondition(translated, graph, object, mapping.getGraph(), mapping.getObject()))
-                    continue;
-
-                if(processNodesCondition(translated, subject, predicate, mapping.getSubject(), mapping.getPredicate()))
-                    continue;
-
-                if(processNodesCondition(translated, subject, object, mapping.getSubject(), mapping.getObject()))
-                    continue;
-
-
-                if(translatedPattern == null)
-                    translatedPattern = translated;
-                else
-                    translatedPattern = SqlUnion.union(translatedPattern, translated);
-            }
-        }
+        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(this, datasets);
+        SqlIntercode translatedPattern = pathVisitor.visitElement(predicate, graph, subject, object);
 
 
         ArrayList<String> variablesInScope = new ArrayList<String>();
@@ -631,10 +561,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         if(object instanceof Variable)
             variablesInScope.add(((Variable) object).getName());
-
-
-        if(translatedPattern == null)
-            return new TranslatedSegment(variablesInScope, new SqlNoSolution());
 
 
         return new TranslatedSegment(variablesInScope, translatedPattern);
@@ -923,47 +849,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
         return translateFilters(filters, translatedGroupPattern);
-    }
-
-
-    private void processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
-    {
-        if(!(node instanceof VariableOrBlankNode))
-            return;
-
-        translated.addVariableClass(((VariableOrBlankNode) node).getName(), mapping.getResourceClass());
-        translated.addMapping(((VariableOrBlankNode) node).getName(), mapping);
-    }
-
-
-    private void processNodeCondition(SqlTableAccess translated, Node node, NodeMapping mapping)
-    {
-        if(node instanceof VariableOrBlankNode && mapping instanceof ParametrisedMapping)
-            translated.addNotNullCondition((ParametrisedMapping) mapping);
-
-        if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
-            translated.addValueCondition(node, (ParametrisedMapping) mapping);
-    }
-
-
-    private boolean processNodesCondition(SqlTableAccess translated, Node node1, Node node2, NodeMapping map1,
-            NodeMapping map2)
-    {
-        if(!(node1 instanceof VariableOrBlankNode) || !(node2 instanceof VariableOrBlankNode))
-            return false;
-
-        if(!node1.equals(node2))
-            return false;
-
-        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
-        {
-            if(map1.equals(map2))
-                return false;
-            else
-                return true;
-        }
-
-        return false;
     }
 
 

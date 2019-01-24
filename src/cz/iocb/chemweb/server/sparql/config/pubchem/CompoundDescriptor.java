@@ -4,6 +4,7 @@ import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -59,10 +60,10 @@ class CompoundDescriptor
     static void addQuadMapping(PubChemConfiguration config)
     {
         NodeMapping graph = config.createIriMapping("descriptor:compound");
-        NodeMapping type = config.createIriMapping("rdf:type");
-        NodeMapping template = config.createIriMapping("template:itemTemplate");
-        NodeMapping value = config.createIriMapping("sio:has-value");
-        NodeMapping unit = config.createIriMapping("sio:has-unit");
+        ConstantIriMapping type = config.createIriMapping("rdf:type");
+        ConstantIriMapping template = config.createIriMapping("template:itemTemplate");
+        ConstantIriMapping value = config.createIriMapping("sio:has-value");
+        ConstantIriMapping unit = config.createIriMapping("sio:has-unit");
         String directory = "pubchem/descriptor/";
 
 

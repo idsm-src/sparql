@@ -10,18 +10,19 @@ public class QuadMapping
     private final String condition;
     private final NodeMapping graph;
     private final NodeMapping subject;
-    private final NodeMapping predicate;
+    private final ConstantIriMapping predicate;
     private final NodeMapping object;
 
 
-    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object)
+    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
     {
         this(table, graph, subject, predicate, object, null);
     }
 
 
-    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object,
-            String condition)
+    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object, String condition)
     {
         //TODO: add support for ParametrisedIriMapping graphs
         if(graph != null && !(graph instanceof ConstantIriMapping))
@@ -90,7 +91,7 @@ public class QuadMapping
     }
 
 
-    public final NodeMapping getPredicate()
+    public final ConstantIriMapping getPredicate()
     {
         return predicate;
     }

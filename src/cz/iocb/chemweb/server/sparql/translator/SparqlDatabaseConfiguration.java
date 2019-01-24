@@ -152,7 +152,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate,
+    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
         QuadMapping map = new QuadMapping(table, graph, subject, predicate, object);
@@ -160,7 +160,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, NodeMapping predicate,
+    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String condition)
     {
         QuadMapping map = new QuadMapping(table, graph, subject, predicate, object, condition);
