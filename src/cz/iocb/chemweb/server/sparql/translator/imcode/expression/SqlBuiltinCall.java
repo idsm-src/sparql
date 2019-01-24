@@ -717,9 +717,51 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append("DISTINCT ");
 
                 if(arguments.size() == 0)
+                {
                     builder.append("*");
-                else
+                }
+                else if(arguments.size() == 1 && !(arguments.get(0) instanceof SqlVariable))
+                {
                     builder.append(arguments.get(0).translate());
+                }
+                else
+                {
+                    int columns = 0;
+
+                    for(int i = 0; i < arguments.size(); i++)
+                        for(ResourceClass resClass : arguments.get(i).getResourceClasses())
+                            columns += resClass.getPatternPartsCount();
+
+                    if(columns > 1)
+                        builder.append("row(");
+
+                    boolean hasColumn = false;
+
+                    for(int i = 0; i < arguments.size(); i++)
+                    {
+                        if(arguments.get(i) == SqlNull.get())
+                            continue;
+
+                        SqlVariable variable = (SqlVariable) arguments.get(i);
+
+                        for(ResourceClass resClass : variable.getResourceClasses())
+                        {
+                            for(int j = 0; j < resClass.getPatternPartsCount(); j++)
+                            {
+                                appendComma(builder, hasColumn);
+                                hasColumn = true;
+
+                                builder.append(resClass.getSqlColumn(variable.getName(), j));
+                            }
+                        }
+                    }
+
+                    if(!hasColumn)
+                        builder.append("NULL");
+
+                    if(columns > 1)
+                        builder.append(")");
+                }
 
                 builder.append(")::decimal");
 
