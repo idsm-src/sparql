@@ -176,7 +176,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         new SimpleVariableAccessor(translatedWhereClause.getIntercode().getVariables()), this);
 
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
-                expression = SqlEffectiveBooleanValue.create(expression);
 
                 //TODO: optimize based on the expression value
 
