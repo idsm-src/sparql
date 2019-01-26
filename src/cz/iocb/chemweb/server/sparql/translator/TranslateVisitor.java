@@ -60,7 +60,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.GraphOrServiceRestriction.RestrictionType;
 import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
@@ -92,7 +91,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 {
-    private final Stack<GraphOrServiceRestriction> graphOrServiceRestrictions = new Stack<>();
+    private final Stack<VarOrIri> graphRestrictions = new Stack<>();
 
     private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
     private final List<TranslateException> warnings = new LinkedList<TranslateException>();
@@ -369,12 +368,11 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     @Override
     public TranslatedSegment visit(Graph graph)
     {
-        VarOrIri varOrIri = graph.getName();
-        graphOrServiceRestrictions.push(new GraphOrServiceRestriction(RestrictionType.GRAPH_RESTRICTION, varOrIri));
+        graphRestrictions.push(graph.getName());
 
         TranslatedSegment translatedPattern = visitElement(graph.getPattern());
 
-        graphOrServiceRestrictions.pop();
+        graphRestrictions.pop();
         return translatedPattern;
     }
 
@@ -532,15 +530,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         Node object = triple.getObject();
 
 
-        if(!graphOrServiceRestrictions.isEmpty())
-        {
-            GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-
-            if(restriction.isRestrictionType(RestrictionType.GRAPH_RESTRICTION))
-                graph = restriction.getVarOrIri();
-            else
-                assert false; //TODO: services are not supported
-        }
+        if(!graphRestrictions.isEmpty())
+            graph = graphRestrictions.peek();
 
 
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(this, datasets);
@@ -1027,15 +1018,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         /* check graph */
 
-        if(!graphOrServiceRestrictions.isEmpty())
+        if(!graphRestrictions.isEmpty())
         {
-            GraphOrServiceRestriction restriction = graphOrServiceRestrictions.peek();
-
-            if(restriction.isRestrictionType(RestrictionType.GRAPH_RESTRICTION))
-            {
-                exceptions.add(new TranslateException(ErrorType.procedureCallInsideGraph,
-                        procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
-            }
+            exceptions.add(new TranslateException(ErrorType.procedureCallInsideGraph,
+                    procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
         }
 
 

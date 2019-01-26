@@ -70,6 +70,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.Query;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
+import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BracketedExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
@@ -460,6 +461,9 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
      */
     private Stream<Pattern> repairExpandedProcedureCalls(Stream<Pattern> stream)
     {
+        if(!context.getServiceRestrictions().empty())
+            return stream;
+
         List<Pattern> patterns = stream.collect(Collectors.toList());
         LinkedList<Pattern> removed = new LinkedList<Pattern>();
 
@@ -618,16 +622,17 @@ class TripleExpander extends ComplexElementVisitor<Node>
     {
         Node subject = null;
 
-        // NOTE: added by galgonek
         if(triple.getProperties().isEmpty())
             subject = visitElement(triple.getNode());
+
+
+        boolean outsideService = context.getServiceRestrictions().empty();
 
         for(Property property : triple.getProperties())
         {
             Verb verb = property.getVerb();
-            ProcedureDefinition callDefinition = verb instanceof IRI
-                    ? context.getProcedures().get(((IRI) verb).getUri().toString())
-                    : null;
+            ProcedureDefinition callDefinition = outsideService && verb instanceof IRI ?
+                    context.getProcedures().get(((IRI) verb).getUri().toString()) : null;
 
             if(callDefinition != null)
             {
@@ -687,7 +692,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        if(context.getProcedures().get(iri.getUri().toString()) != null)
+                        if(outsideService && context.getProcedures().get(iri.getUri().toString()) != null)
                             throw new UncheckedParseException(ErrorType.invalidProcedureCallPropertyPathCombinaion,
                                     iri.getRange());
 
@@ -940,8 +945,13 @@ class PatternVisitor extends BaseVisitor<Pattern>
     @Override
     public Service visitServiceGraphPattern(ServiceGraphPatternContext ctx)
     {
-        return new Service(new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI()),
-                graphPatternVisitor.visit(ctx.groupGraphPattern()), ctx.SILENT() != null);
+        VarOrIri name = new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI());
+
+        context.getServiceRestrictions().add(name);
+        GraphPattern pattern = graphPatternVisitor.visit(ctx.groupGraphPattern());
+        context.getServiceRestrictions().pop();
+
+        return new Service(name, pattern, ctx.SILENT() != null);
     }
 
     @Override

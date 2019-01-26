@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
+import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 
@@ -11,8 +12,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
  * <p>
  * Corresponds to the rule [59] ServiceGraphPattern in the SPARQL grammar.
  */
-public class Service extends Graph
+public class Service extends BaseElement implements Pattern
 {
+    private VarOrIri name;
+    private GraphPattern pattern;
     private boolean silent;
 
     public Service()
@@ -22,8 +25,29 @@ public class Service extends Graph
 
     public Service(VarOrIri name, GraphPattern pattern, boolean silent)
     {
-        super(name, pattern);
+        this.name = name;
+        this.pattern = pattern;
         this.silent = silent;
+    }
+
+    public VarOrIri getName()
+    {
+        return name;
+    }
+
+    public void setName(VarOrIri name)
+    {
+        this.name = name;
+    }
+
+    public GraphPattern getPattern()
+    {
+        return pattern;
+    }
+
+    public void setPattern(GraphPattern pattern)
+    {
+        this.pattern = pattern;
     }
 
     public boolean isSilent()

@@ -2,10 +2,12 @@ package cz.iocb.chemweb.server.sparql.parser.visitor;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Stack;
 import java.util.function.Consumer;
 import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
+import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
@@ -16,6 +18,7 @@ public class QueryVisitorContext
     private LinkedHashMap<String, ProcedureDefinition> procedures;
     private List<Prefix> predefinedPrefixes;
     private Consumer<ParseException> exceptionConsumer;
+    private final Stack<VarOrIri> serviceRestrictions = new Stack<>();
 
     public final Prologue getPrologue()
     {
@@ -55,5 +58,10 @@ public class QueryVisitorContext
     public final void setExceptionConsumer(Consumer<ParseException> exceptionConsumer)
     {
         this.exceptionConsumer = exceptionConsumer;
+    }
+
+    public Stack<VarOrIri> getServiceRestrictions()
+    {
+        return serviceRestrictions;
     }
 }
