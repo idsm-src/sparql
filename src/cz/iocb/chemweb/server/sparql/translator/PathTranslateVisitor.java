@@ -315,8 +315,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!(node instanceof VariableOrBlankNode))
             return;
 
-        translated.addVariableClass(((VariableOrBlankNode) node).getName(), mapping.getResourceClass());
-        translated.addMapping(((VariableOrBlankNode) node).getName(), mapping);
+        String name = node instanceof Variable ? ((Variable) node).getName() : '@' + ((BlankNode) node).getName();
+
+        translated.addVariableClass(name, mapping.getResourceClass());
+        translated.addMapping(name, mapping);
     }
 
 

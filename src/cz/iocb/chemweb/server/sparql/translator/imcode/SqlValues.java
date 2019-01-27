@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
@@ -10,11 +11,11 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlValues extends SqlIntercode
 {
-    private final ArrayList<Pair<String, ArrayList<ResourceClass>>> typedVariables;
+    private final ArrayList<Pair<String, Set<ResourceClass>>> typedVariables;
     private final ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList;
 
 
-    public SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, ArrayList<ResourceClass>>> typedVariables,
+    public SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
             ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
     {
         super(usedVariables);
@@ -37,9 +38,10 @@ public class SqlValues extends SqlIntercode
             ArrayList<Pair<Node, ResourceClass>> valueList = typedValuesList.get(i);
 
             boolean hasValue = false;
+
             for(int j = 0; j < typedVariables.size(); j++)
             {
-                Pair<String, ArrayList<ResourceClass>> typedVariable = typedVariables.get(j);
+                Pair<String, Set<ResourceClass>> typedVariable = typedVariables.get(j);
                 Pair<Node, ResourceClass> value = valueList.get(j);
 
                 if(!typedVariable.getValue().isEmpty())
@@ -76,6 +78,9 @@ public class SqlValues extends SqlIntercode
                 }
             }
 
+            if(!hasValue)
+                builder.append("null");
+
             builder.append(") ");
         }
 
@@ -84,7 +89,7 @@ public class SqlValues extends SqlIntercode
 
         boolean hasValue = false;
 
-        for(Pair<String, ArrayList<ResourceClass>> typedVariable : typedVariables)
+        for(Pair<String, Set<ResourceClass>> typedVariable : typedVariables)
         {
             if(!typedVariable.getValue().isEmpty())
             {
@@ -106,6 +111,9 @@ public class SqlValues extends SqlIntercode
                 builder.append("\"null\"");
             }
         }
+
+        if(!hasValue)
+            builder.append("\"#null\"");
 
         builder.append(")");
 

@@ -57,7 +57,13 @@ public enum ErrorType
 
     repeatOfValuesVariable("Variable '%s' cannot be used twice in a VALUES clause."),
 
-    nestedAggregateFunction("Aggregate functions cannot be nested.");
+    nestedAggregateFunction("Aggregate functions cannot be nested."),
+
+    serviceContextLimitExceeded("The limit of service calls has been exceeded."),
+
+    serviceResultLimitExceeded("The limit of service results has been exceeded."),
+
+    badServiceEndpoint("The SERVICE pattern cannot be evaluated by endpoint '%s'.");
 
     /**
      * Error message template.

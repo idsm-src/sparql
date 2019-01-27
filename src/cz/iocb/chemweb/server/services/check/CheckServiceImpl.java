@@ -71,7 +71,8 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
         /* translator */
         try
         {
-            TranslateResult translateResult = new TranslateVisitor(dbConfig).tryTranslate(parseResult.getResult());
+            TranslateResult translateResult = new TranslateVisitor(dbConfig, true)
+                    .tryTranslate(parseResult.getResult());
 
             for(TranslateException err : translateResult.getExceptions())
                 addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));

@@ -53,9 +53,19 @@ public class BuiltinClasses
     private static final List<LiteralClass> literalClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong,
             xsdFloat, xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
 
+    private static final List<ResourceClass> classes = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
+            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString, rdfLangString,
+            unsupportedLiteral, intBlankNode, strBlankNode, iri);
+
 
     public static List<LiteralClass> getLiteralClasses()
     {
         return literalClasses;
+    }
+
+
+    public static List<ResourceClass> getClasses()
+    {
+        return classes;
     }
 }
