@@ -1,9 +1,15 @@
 package cz.iocb.chemweb.server.services.query;
 
+import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,6 +20,10 @@ import java.util.Vector;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpSession;
@@ -71,6 +81,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private Parser parser;
     private PostgresDatabase database;
     private VelocityEngine ve;
+    private SSLContext sslContext;
 
 
     @Override
@@ -90,6 +101,34 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
         catch(NamingException e)
         {
+            throw new ServletException(e);
+        }
+
+
+        try
+        {
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            keyStore.load(config.getServletContext().getResourceAsStream("cacerts"), "changeit".toCharArray());
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(keyStore);
+
+            X509TrustManager trustManager = null;
+
+            for(TrustManager tm : tmf.getTrustManagers())
+                if(tm instanceof X509TrustManager)
+                    trustManager = (X509TrustManager) tm;
+
+            if(trustManager == null)
+                throw new NoSuchAlgorithmException("No X509TrustManager in TrustManagerFactory");
+
+            sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, new TrustManager[] { trustManager }, null);
+        }
+        catch(KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
+                | KeyManagementException e)
+        {
+            e.printStackTrace();
             throw new ServletException(e);
         }
 
@@ -166,7 +205,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             }
 
 
-            final String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
+            final String translatedQuery = new TranslateVisitor(dbConfig, sslContext, false).translate(syntaxTree);
 
             queryState.thread = new Thread()
             {

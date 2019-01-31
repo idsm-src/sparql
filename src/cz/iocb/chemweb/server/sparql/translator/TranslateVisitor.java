@@ -19,6 +19,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -126,25 +128,33 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
+    private final SSLContext sslContext;
     private final boolean checkOnly;
 
     private List<DataSet> datasets;
     private Prologue prologue;
 
 
-    public TranslateVisitor(SparqlDatabaseConfiguration configuration, boolean checkOnly)
+    public TranslateVisitor(SparqlDatabaseConfiguration configuration, SSLContext sslContext, boolean checkOnly)
     {
         this.configuration = configuration;
         this.iriClasses = configuration.getIriClasses();
         this.schema = configuration.getSchema();
         this.procedures = configuration.getProcedures();
+        this.sslContext = sslContext;
         this.checkOnly = checkOnly;
+    }
+
+
+    public TranslateVisitor(SparqlDatabaseConfiguration configuration, boolean checkOnly)
+    {
+        this(configuration, null, checkOnly);
     }
 
 
     public TranslateVisitor(SparqlDatabaseConfiguration configuration)
     {
-        this(configuration, false);
+        this(configuration, null, false);
     }
 
 
@@ -1347,6 +1357,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 /* process service query */
                 HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+
+                if(connection instanceof HttpsURLConnection && sslContext != null)
+                    ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
+
                 connection.setRequestMethod("POST");
                 connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
                 connection.setRequestProperty("accept", "application/sparql-results+xml");
