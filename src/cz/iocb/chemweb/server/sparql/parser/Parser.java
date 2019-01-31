@@ -3,7 +3,6 @@ package cz.iocb.chemweb.server.sparql.parser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -25,7 +24,6 @@ import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
 import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.parser.visitor.BaseVisitor;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitorContext;
 import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
@@ -151,23 +149,6 @@ public class Parser
 
             QueryVisitor visitor = new QueryVisitor(context);
             result = (SelectQuery) visitor.visit(t);
-
-
-            // NOTE: added by galgonek
-            HashSet<String> usedVariables = new HashSet<>();
-            new BaseVisitor<Void>()
-            {
-                @Override
-                public Void visitVar(SparqlParser.VarContext ctx)
-                {
-                    usedVariables.add(ctx.getText().substring(1));
-                    return null;
-                }
-
-            }.visit(t);
-
-            if(result != null)
-                result.setQueryVariables(usedVariables);
         }
         catch(UncheckedParseException e)
         {

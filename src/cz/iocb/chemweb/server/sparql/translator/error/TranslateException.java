@@ -22,24 +22,6 @@ public class TranslateException extends Exception
         this.message = String.format(erType.getText(), o);
     }
 
-
-
-    /**
-     * Constructs an exception object.
-     *
-     * @param message Error message.
-     * @param range Error context.
-     */
-    /*
-     * public TranslateException(String message, Range range) {
-     * super(String.format("Line %d: %s", range.getStart().getLineNumber(),
-     * message));
-     *
-     * this.range = range; this.message = message; }
-     */
-
-
-
     /**
      * Get the context where the error occured.
      *

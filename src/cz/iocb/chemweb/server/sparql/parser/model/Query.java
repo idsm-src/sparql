@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser.model;
 
-import java.util.HashSet;
 import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 
 
@@ -28,22 +27,5 @@ public abstract class Query extends BaseElement
             throw new IllegalArgumentException();
 
         this.prologue = prologue;
-    }
-
-
-    // NOTE: added by galgonek
-    HashSet<String> queryVariables;
-
-    public HashSet<String> getQueryVariables()
-    {
-        return queryVariables;
-    }
-
-    public void setQueryVariables(HashSet<String> usedVariables)
-    {
-        if(usedVariables == null)
-            throw new IllegalArgumentException();
-
-        this.queryVariables = usedVariables;
     }
 }

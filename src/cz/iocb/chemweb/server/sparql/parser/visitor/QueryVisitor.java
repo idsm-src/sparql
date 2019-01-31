@@ -399,18 +399,6 @@ class PrologueVisitor extends BaseVisitor<Void>
         IRI iri = new IRI(IriVisitor.parseUri(ctx.IRIREF().getText(), prologue));
 
         PrefixDefinition result = withRange(new PrefixDefinition(name, iri), ctx);
-
-        /*
-        java.util.Optional<PrefixDefinition> existingPrefix = prologue.getPrefixes().stream()
-                .filter(p -> p.getName().equals(result.getName())).findFirst();
-        
-        if(existingPrefix.isPresent())
-        {
-            // this should probably be a warning
-            prologue.getPrefixes().remove(existingPrefix.get());
-        }
-        */
-
         prologue.addPrefixDefinition(result);
 
         return null;
