@@ -29,7 +29,7 @@ public class UnsupportedLiteralClass extends LiteralClass
         if(part == 0)
             return "'" + literal.getStringValue().replaceAll("'", "''") + "'::varchar";
         else
-            return "'" + literal.getTypeIri().getUri().toString() + "'::varchar";
+            return "'" + literal.getTypeIri().getValue() + "'::varchar";
     }
 
 
@@ -62,8 +62,7 @@ public class UnsupportedLiteralClass extends LiteralClass
     {
         String value = literal.getStringValue().replaceAll("'", "''");
 
-        return "sparql.cast_as_rdfbox_from_typed_literal('" + value + "', '" + literal.getTypeIri().getUri().toString()
-                + "')";
+        return "sparql.cast_as_rdfbox_from_typed_literal('" + value + "', '" + literal.getTypeIri().getValue() + "')";
     }
 
 

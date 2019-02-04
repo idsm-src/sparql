@@ -452,7 +452,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
     public List<String> visit(IRI iri)
     {
         builder.append('<');
-        builder.append(iri.getUri().toString());
+        builder.append(iri.getValue());
         builder.append('>');
 
         return empty;

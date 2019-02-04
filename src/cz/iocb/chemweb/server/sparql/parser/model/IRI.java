@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.parser.model;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -17,72 +18,32 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
  */
 public final class IRI extends BaseComplexNode implements VarOrIri, Path
 {
-    private URI uri;
+    private final String value;
 
-    public IRI(String uri)
+
+    public IRI(String value)
     {
-        if(hasBrackets(uri))
-            uri = removeBrackets(uri);
-
-        setUri(URI.create(uri));
+        this.value = value;
     }
 
-    public IRI(URI uri)
+
+    public String getValue()
     {
-        setUri(uri);
-    }
-
-    public URI getUri()
-    {
-        return uri;
-    }
-
-    public void setUri(URI uri)
-    {
-        if(uri == null)
-            throw new IllegalArgumentException();
-
-        this.uri = uri;
-    }
-
-    public URI getAbsoluteURI(Prologue prologue)
-    {
-        return prologue.getBase().getUri().resolve(uri);
-    }
-
-    public static boolean hasBrackets(String s)
-    {
-        return s.startsWith("<") && s.endsWith(">");
-    }
-
-    public static String removeBrackets(String s)
-    {
-        if(!hasBrackets(s))
-            throw new IllegalArgumentException();
-
-        return s.substring(1, s.length() - 1);
-    }
-
-    public static URI parseURI(String s)
-    {
-        if(s == null)
-            return null;
-
-        return URI.create(removeBrackets(s));
+        return value;
     }
 
 
     @Override
     public String toString()
     {
-        return "<" + uri + ">";
+        return '<' + value + '>';
     }
 
 
     public String toString(Prologue prologue)
     {
         if(prologue == null)
-            return "<" + uri + ">";
+            return '<' + value + '>';
 
         Collection<Prefix> prefixes = prologue.getAllPrefixes();
 
@@ -90,7 +51,7 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
         {
             List<String> options = new ArrayList<>();
 
-            String thisString = uri.toString();
+            String thisString = value.toString();
 
             for(Prefix prefix : prefixes)
             {
@@ -109,20 +70,20 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
         }
 
 
-        URI result;
-
         if(prologue.getBase() != null)
-            result = prologue.getBase().getUri().relativize(uri);
-        else
-            result = uri;
+        {
+            try
+            {
+                return '<' + new URI(prologue.getBase().getValue()).relativize(new URI(value)).toString() + '>';
+            }
+            catch(URISyntaxException e)
+            {
+            }
+        }
 
-        return "<" + result + ">";
+        return '<' + value + '>';
     }
 
-    /*
-     * public String toString(Prologue prologue) { return toString(prologue,
-     * false, true); }
-     */
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)
@@ -130,22 +91,25 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
         return visitor.visit(this);
     }
 
+
     @Override
     public boolean equals(Object o)
     {
         if(this == o)
             return true;
+
         if(o == null || getClass() != o.getClass())
             return false;
 
         IRI iri = (IRI) o;
 
-        return uri.equals(iri.uri);
+        return value.equals(iri.value);
     }
+
 
     @Override
     public int hashCode()
     {
-        return uri.hashCode();
+        return value.hashCode();
     }
 }

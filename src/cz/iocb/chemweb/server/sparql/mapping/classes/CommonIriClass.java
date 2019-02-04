@@ -25,7 +25,7 @@ public class CommonIriClass extends IriClass
 
         IRI iri = (IRI) node;
 
-        return "'" + iri.getUri().toString().replaceAll("'", "''") + "'::varchar";
+        return "'" + iri.getValue().replaceAll("'", "''") + "'::varchar";
     }
 
 

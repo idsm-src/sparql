@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.parser.visitor;
 import static cz.iocb.chemweb.server.sparql.parser.StreamUtils.mapList;
 import java.math.BigInteger;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -11,10 +12,9 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.CollectionContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.CollectionPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DatasetClauseContext;
@@ -33,7 +33,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.IriContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.LimitClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.LimitOffsetClausesContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.MinusGraphPatternContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NilContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OffsetClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OptionalGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OrderClauseContext;
@@ -63,6 +62,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
+import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixedName;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
@@ -112,39 +112,6 @@ public class QueryVisitor extends BaseVisitor<Query>
         this.context = context;
     }
 
-    class ContainsCollectionVisitor extends BaseVisitor<Boolean>
-    {
-        @Override
-        protected Boolean defaultResult()
-        {
-            return false;
-        }
-
-        @Override
-        protected Boolean aggregateResult(Boolean aggregate, Boolean nextResult)
-        {
-            return aggregate || nextResult;
-        }
-
-        @Override
-        public Boolean visitCollection(CollectionContext ctx)
-        {
-            return true;
-        }
-
-        @Override
-        public Boolean visitCollectionPath(CollectionPathContext ctx)
-        {
-            return true;
-        }
-
-        @Override
-        public Boolean visitNil(NilContext ctx)
-        {
-            return true;
-        }
-    }
-
     @Override
     public Query visitQuery(QueryContext ctx)
     {
@@ -166,21 +133,6 @@ public class QueryVisitor extends BaseVisitor<Query>
             SelectQuery result = visitSelectQuery(ctx.selectQuery());
 
             result.setPrologue(prologue);
-
-            if(new ContainsCollectionVisitor().visit(ctx.selectQuery()))
-            {
-                IRI rdfIri = new IRI(Rdf.NS);
-
-                // if we find PREFIX with the rdf IRI, we don't need to add a new one
-                // if we find PREFIX with the rdf: prefix, adding a new one would cause a conflict this means that if
-                // the existing rdf: PREFIX is wrong, expanded RDF collection triplets will use the full IRI
-                if(!result.getPrologue().getAllPrefixes().stream()
-                        .filter(prefix -> prefix.getName().equals("rdf") || prefix.getIri().equals(Rdf.NS)).findAny()
-                        .isPresent())
-                {
-                    result.getPrologue().addPrefixDefinition(new PrefixDefinition("rdf", rdfIri));
-                }
-            }
 
             result.getSelect().setValues(parseValues(ctx.valuesClause()));
 
@@ -333,8 +285,8 @@ public class QueryVisitor extends BaseVisitor<Query>
     {
         if(ctx.ASC() != null || ctx.DESC() != null)
         {
-            OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending
-                    : OrderCondition.Direction.Descending;
+            OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending :
+                    OrderCondition.Direction.Descending;
 
             return new OrderCondition(direction, new ExpressionVisitor(context).visit(ctx.expression()));
         }
@@ -371,10 +323,12 @@ public class QueryVisitor extends BaseVisitor<Query>
 class PrologueVisitor extends BaseVisitor<Void>
 {
     private final Prologue prologue;
+    private final QueryVisitorContext context;
 
     public PrologueVisitor(QueryVisitorContext context)
     {
-        prologue = new Prologue(context.getPredefinedPrefixes());
+        this.prologue = new Prologue(context.getPredefinedPrefixes());
+        this.context = context;
     }
 
     public Prologue getPrologue()
@@ -386,6 +340,18 @@ class PrologueVisitor extends BaseVisitor<Void>
     public Void visitBaseDecl(BaseDeclContext ctx)
     {
         String uri = ctx.IRIREF().getText();
+        uri = uri.substring(1, uri.length() - 1);
+
+        try
+        {
+            if(!(new URI(uri)).isAbsolute())
+                throw new UncheckedParseException(ErrorType.invalidBaseIri, Range.compute(ctx));
+        }
+        catch(URISyntaxException e)
+        {
+            Range range = Range.compute(ctx.IRIREF().getSymbol(), ctx.IRIREF().getSymbol());
+            throw new UncheckedParseException(ErrorType.malformedIri, range);
+        }
 
         prologue.setBase(new IRI(uri));
 
@@ -396,7 +362,7 @@ class PrologueVisitor extends BaseVisitor<Void>
     public Void visitPrefixDecl(PrefixDeclContext ctx)
     {
         String name = ctx.PNAME_NS().getText();
-        IRI iri = new IRI(IriVisitor.parseUri(ctx.IRIREF().getText(), prologue));
+        IRI iri = new IRI(new IriVisitor(context).parseUri(ctx.IRIREF(), prologue));
 
         PrefixDefinition result = withRange(new PrefixDefinition(name, iri), ctx);
         prologue.addPrefixDefinition(result);
@@ -477,7 +443,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             if(!(verb instanceof IRI))
                 continue;
 
-            ProcedureDefinition callDefinition = context.getProcedures().get(((IRI) verb).getUri().toString());
+            ProcedureDefinition callDefinition = context.getProcedures().get(((IRI) verb).getValue());
 
             if(callDefinition == null)
                 continue;
@@ -620,7 +586,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         {
             Verb verb = property.getVerb();
             ProcedureDefinition callDefinition = outsideService && verb instanceof IRI ?
-                    context.getProcedures().get(((IRI) verb).getUri().toString()) : null;
+                    context.getProcedures().get(((IRI) verb).getValue()) : null;
 
             if(callDefinition != null)
             {
@@ -680,7 +646,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        if(outsideService && context.getProcedures().get(iri.getUri().toString()) != null)
+                        if(outsideService && context.getProcedures().get(iri.getValue()) != null)
                             throw new UncheckedParseException(ErrorType.invalidProcedureCallPropertyPathCombinaion,
                                     iri.getRange());
 
@@ -1018,24 +984,25 @@ class IriVisitor extends BaseVisitor<IRI>
     public IRI visitIri(IriContext ctx)
     {
         if(ctx.IRIREF() != null)
-        {
-            URI uri = parseUri(ctx.IRIREF().getText(), context.getPrologue());
-
-            return new IRI(uri);
-        }
+            return new IRI(parseUri(ctx.IRIREF(), context.getPrologue()));
 
         return visit(ctx.prefixedName());
     }
 
-    public static URI parseUri(String uriString, Prologue prologue)
+    public String parseUri(TerminalNode iriRef, Prologue prologue)
     {
-        uriString = cz.iocb.chemweb.server.sparql.parser.model.IRI.removeBrackets(uriString);
+        String uri = iriRef.getText();
+        uri = uri.substring(1, uri.length() - 1);
 
-        URI uri = java.net.URI.create(uriString);
-
-        if(!uri.isAbsolute())
+        try
         {
-            uri = java.net.URI.create(prologue.getBase().getUri().toString() + uriString);
+            if(!(new URI(uri)).isAbsolute())
+                uri = (new URI(prologue.getBase().getValue())).resolve(uri).toString();
+        }
+        catch(URISyntaxException e)
+        {
+            Range range = Range.compute(iriRef.getSymbol(), iriRef.getSymbol());
+            throw new UncheckedParseException(ErrorType.malformedIri, range);
         }
 
         return uri;
@@ -1044,7 +1011,16 @@ class IriVisitor extends BaseVisitor<IRI>
     @Override
     public IRI visitPrefixedName(PrefixedNameContext ctx)
     {
-        return new IRI(parsePrefixedName(ctx).getAbsoluteURI(context.getPrologue()));
+        PrefixedName prefixedName = parsePrefixedName(ctx);
+
+        java.util.Optional<Prefix> prefix = context.getPrologue().getAllPrefixes().stream()
+                .filter(p -> p.getName().equals(prefixedName.getPrefix())).findFirst();
+
+        if(!prefix.isPresent())
+            throw new UncheckedParseException(ErrorType.unknownPrefix, prefixedName.getRange(),
+                    prefixedName.getPrefix());
+
+        return new IRI(prefix.get().getIri() + prefixedName.getLocalName());
     }
 
     public static PrefixedName parsePrefixedName(PrefixedNameContext ctx)

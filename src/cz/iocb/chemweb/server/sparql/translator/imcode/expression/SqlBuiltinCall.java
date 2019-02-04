@@ -1083,7 +1083,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                 if(right instanceof SqlVariable)
                                     builder.append(((SqlVariable) right).getExpressionValue(leftClass, false));
                                 else
-                                    builder.append("'" + ((SqlIri) right).getIri().getUri() + "'");
+                                    builder.append("'" + ((SqlIri) right).getIri().getValue() + "'");
                             }
                             else if(leftClass instanceof IriClass && rightClass == iri)
                             {
@@ -1092,7 +1092,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                 if(left instanceof SqlVariable)
                                     builder.append(((SqlVariable) left).getExpressionValue(leftClass, false));
                                 else
-                                    builder.append("'" + ((SqlIri) left).getIri().getUri() + "'");
+                                    builder.append("'" + ((SqlIri) left).getIri().getValue() + "'");
 
                                 builder.append(" = ");
                                 builder.append(rightNode.getNodeAccess(rightClass, 0));
@@ -1491,7 +1491,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else
                     {
-                        String datatype = ((LiteralClass) operandClass).getTypeIri().getUri().toString();
+                        String datatype = ((LiteralClass) operandClass).getTypeIri().getValue();
 
                         if(operand.canBeNull())
                             return "CASE WHEN " + operand.translate() + " IS NOT NULL THEN '" + datatype + "' END";
@@ -1525,7 +1525,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else
                         {
-                            String datatype = ((LiteralClass) resClass).getTypeIri().getUri().toString();
+                            String datatype = ((LiteralClass) resClass).getTypeIri().getValue();
 
                             if(operand.canBeNull() || variable.getResourceClasses().size() > 1)
                             {

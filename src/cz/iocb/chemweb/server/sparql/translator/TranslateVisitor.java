@@ -1060,7 +1060,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private TranslatedSegment translateProcedureCall(ProcedureCallBase procedureCallBase, TranslatedSegment context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
-        ProcedureDefinition procedureDefinition = procedures.get(procedureName.getUri().toString());
+        ProcedureDefinition procedureDefinition = procedures.get(procedureName.getValue());
         UsedVariables contextVariables = context.getIntercode().getVariables();
 
 
@@ -1085,7 +1085,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(ProcedureCall.Parameter parameter : procedureCallBase.getParameters())
         {
-            String parameterName = parameter.getName().getUri().toString();
+            String parameterName = parameter.getName().getValue();
             ParameterDefinition parameterDefinition = procedureDefinition.getParameter(parameterName);
 
             if(parameterDefinition == null)
@@ -1171,7 +1171,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
             for(Parameter result : multiProcedureCall.getResults())
             {
-                String parameterName = result.getName().getUri().toString();
+                String parameterName = result.getName().getValue();
                 ResultDefinition resultDefinition = procedureDefinition.getResult(parameterName);
 
                 if(resultDefinition == null)
@@ -1281,7 +1281,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             String endpoint = null;
 
             if(name instanceof IRI)
-                endpoint = ((IRI) name).getUri().toString();
+                endpoint = ((IRI) name).getValue();
             else if(row.get(((Variable) name).getName()) instanceof IriNode)
                 endpoint = row.get(((Variable) name).getName()).getValue();
 

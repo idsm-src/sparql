@@ -29,7 +29,11 @@ public enum ErrorType
 
     invalidProcedureResultValue("Procedure return value name has to be an IRI."),
 
-    invalidProcedureResultValueNumber("Procedure return value can have only one value.");
+    invalidProcedureResultValueNumber("Procedure return value can have only one value."),
+
+    invalidBaseIri("Base IRI must be absolute."),
+
+    malformedIri("IRI is malformed.");
 
 
 

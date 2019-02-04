@@ -19,7 +19,7 @@ public class TypedLiteral extends Literal
     public TypedLiteral(String value, IRI datatype)
     {
         super(value);
-        this.datatype = datatype.getUri().toString();
+        this.datatype = datatype.getValue();
     }
 
 

@@ -111,7 +111,7 @@ public class UserIriClass extends IriClass
 
         IRI iri = (IRI) node;
 
-        return inverseFunction.get(part) + "('" + iri.getUri().toString() + "'::varchar)";
+        return inverseFunction.get(part) + "('" + iri.getValue() + "'::varchar)";
     }
 
 
@@ -227,7 +227,7 @@ public class UserIriClass extends IriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match(((IRI) node).getUri().toString());
+        return match(((IRI) node).getValue());
     }
 
 

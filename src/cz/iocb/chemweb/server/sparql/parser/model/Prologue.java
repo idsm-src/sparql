@@ -57,7 +57,7 @@ public class Prologue extends BaseElement
     {
         prefixDefinitions.add(definition);
 
-        Prefix prefix = new Prefix(definition.getName(), definition.getIri().getAbsoluteURI(this).toString());
+        Prefix prefix = new Prefix(definition.getName(), definition.getIri().getValue());
 
         if(userPrefixes.containsKey(definition.getName()))
             userPrefixes.remove(definition.getName());
@@ -68,6 +68,7 @@ public class Prologue extends BaseElement
         userPrefixes.put(definition.getName(), prefix);
         allPrefixes.put(definition.getName(), prefix);
     }
+
 
     public List<PrefixDefinition> getPrefixes()
     {
