@@ -5,27 +5,31 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BooleanLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralNegativeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralPositiveContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.RdfLiteralContext;
-import cz.iocb.chemweb.server.sparql.parser.Range;
-import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 
 
 public class LiteralVisitor extends BaseVisitor<Literal>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public LiteralVisitor(QueryVisitorContext context)
+
+    public LiteralVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
@@ -36,30 +40,21 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         if(ctx.iri() == null)
             return new Literal(unquote(ctx.string().getText()), xsdStringIri);
 
-        try
-        {
-            Literal literal = new Literal(unquote(ctx.string().getText()), new IriVisitor(context).visit(ctx.iri()));
+        Literal literal = new Literal(unquote(ctx.string().getText()),
+                new IriVisitor(prologue, messages).visit(ctx.iri()));
 
-            if(!literal.isTypeSupported())
-            {
-                //TODO: warning: type is not supported
-            }
-            else if(literal.getValue() == null)
-            {
-                //TODO: warning: lexical value is not supported
-            }
+        if(!literal.isTypeSupported())
+        {
+            //TODO: warning: type is not supported
+        }
+        else if(literal.getValue() == null)
+        {
+            //TODO: warning: lexical value is not supported
+        }
 
-            return literal;
-        }
-        catch(UncheckedParseException ex)
-        {
-            throw ex;
-        }
-        catch(Throwable ex) //TODO: is it needed?
-        {
-            throw new UncheckedParseException(ErrorType.parsingException, ex, Range.compute(ctx), ex.getMessage());
-        }
+        return literal;
     }
+
 
     private static String unescape(String text)
     {
@@ -67,6 +62,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         return text.replace("\\t", "\t").replace("\\b", "\b").replace("\\n", "\n").replace("\\r", "\r")
                 .replace("\\\"", "\"").replace("\\'", "'");
     }
+
 
     public static String unquote(String text)
     {
@@ -79,6 +75,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
 
         return unescape(text);
     }
+
 
     private static Literal createNumericLiteral(String text)
     {
@@ -94,11 +91,13 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         return new Literal(text, type);
     }
 
+
     @Override
     public Literal visitNumericLiteral(NumericLiteralContext ctx)
     {
         return createNumericLiteral(ctx.getText());
     }
+
 
     @Override
     public Literal visitNumericLiteralPositive(NumericLiteralPositiveContext ctx)
@@ -106,11 +105,13 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         return createNumericLiteral(ctx.getText());
     }
 
+
     @Override
     public Literal visitNumericLiteralNegative(NumericLiteralNegativeContext ctx)
     {
         return createNumericLiteral(ctx.getText());
     }
+
 
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)

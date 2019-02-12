@@ -12,15 +12,15 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import javax.sql.DataSource;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
@@ -170,9 +170,10 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                "sachem_substructure_search");
-        subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        ProcedureDefinition subsearch = new cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition(
+                sachem + "substructureSearch", "sachem_substructure_search");
+        subsearch.addParameter(new cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition(sachem + "query",
+                xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
         subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));

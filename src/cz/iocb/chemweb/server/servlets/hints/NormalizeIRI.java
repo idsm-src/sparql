@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.servlets.hints;
 
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 
 
 

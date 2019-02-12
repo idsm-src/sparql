@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import cz.iocb.chemweb.server.sparql.error.MessageType;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -23,8 +25,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
-import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogical;
@@ -48,8 +48,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     private final TranslateVisitor parentTranslator;
     private final Prologue prologue;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
-    private final List<TranslateException> exceptions;
-    //private final List<TranslateException> warnings;
+    private final List<TranslateMessage> messages;
 
 
     public ExpressionTranslateVisitor(VariableAccessor variableAccessor, TranslateVisitor parentTranslator)
@@ -58,8 +57,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         this.parentTranslator = parentTranslator;
         this.prologue = parentTranslator.getPrologue();
         this.iriClasses = parentTranslator.getConfiguration().getIriClasses();
-        this.exceptions = parentTranslator.getExceptions();
-        //this.warnings = parentTranslator.getWarnings();
+        this.messages = parentTranslator.getMessages();
     }
 
 
@@ -178,7 +176,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 
         if(!resourceClass.isPresent())
         {
-            exceptions.add(new TranslateException(ErrorType.unimplementedFunction, function.getRange(),
+            messages.add(new TranslateMessage(MessageType.unimplementedFunction, function.getRange(),
                     function.toString(prologue)));
 
             return SqlNull.get();
@@ -186,7 +184,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 
         if(arguemnts.size() != 1)
         {
-            exceptions.add(new TranslateException(ErrorType.wrongCountOfParameters, function.getRange(),
+            messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, function.getRange(),
                     function.toString(prologue), 1));
 
             return SqlNull.get();

@@ -45,7 +45,7 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
         if(prologue == null)
             return '<' + value + '>';
 
-        Collection<Prefix> prefixes = prologue.getAllPrefixes();
+        Collection<Prefix> prefixes = prologue.getPrefixes();
 
         if(!prefixes.isEmpty())
         {

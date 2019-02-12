@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator;
+package cz.iocb.chemweb.server.sparql.config;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;

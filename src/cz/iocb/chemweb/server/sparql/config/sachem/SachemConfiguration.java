@@ -8,14 +8,14 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.sql.SQLException;
 import java.util.Arrays;
 import javax.sql.DataSource;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
 
 
 
@@ -99,8 +99,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                "sachem_substructure_search");
+        ProcedureDefinition subsearch = new cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition(
+                sachem + "substructureSearch", "sachem_substructure_search");
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));

@@ -2,12 +2,21 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -22,15 +31,11 @@ import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.TypedLiteral;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.sparql.parser.Parser;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
+import cz.iocb.chemweb.server.sparql.SparqlEngine;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
-import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 
 
 
@@ -43,9 +48,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private SparqlDatabaseConfiguration dbConfig;
-    private Parser parser;
-    private PostgresDatabase db;
+    private SparqlEngine engine;
 
 
     @Override
@@ -59,12 +62,32 @@ public class EndpointServlet extends HttpServlet
 
         try
         {
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            keyStore.load(config.getServletContext().getResourceAsStream("cacerts"), "changeit".toCharArray());
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(keyStore);
+
+            X509TrustManager trustManager = null;
+
+            for(TrustManager tm : tmf.getTrustManagers())
+                if(tm instanceof X509TrustManager)
+                    trustManager = (X509TrustManager) tm;
+
+            if(trustManager == null)
+                throw new NoSuchAlgorithmException("No X509TrustManager in TrustManagerFactory");
+
+            SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, new TrustManager[] { trustManager }, null);
+
+
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
-            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-            db = new PostgresDatabase(dbConfig.getConnectionPool());
+            SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+
+            engine = new SparqlEngine(sparqlConfig, sslContext);
         }
-        catch(NamingException e)
+        catch(NamingException | KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
+                | KeyManagementException e)
         {
             throw new ServletException(e);
         }
@@ -152,16 +175,9 @@ public class EndpointServlet extends HttpServlet
 
         try
         {
-            SelectQuery syntaxTree = parser.parse(query);
-
-            if(!dataSets.isEmpty())
-                syntaxTree.getSelect().setDataSets(dataSets);
-
-            String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
-
-            Result result = db.query(code);
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
+            Result result = engine.execute(query, dataSets);
 
             switch(detectOutputType(req))
             {
@@ -181,7 +197,7 @@ public class EndpointServlet extends HttpServlet
                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
             }
         }
-        catch(ParseExceptions | TranslateExceptions e)
+        catch(TranslateExceptions e)
         {
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             return;

@@ -49,8 +49,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public PathTranslateVisitor(TranslateVisitor translateVisitor, List<DataSet> datasets)
     {
-        this.schema = translateVisitor.getConfiguration().schema;
-        this.mappings = translateVisitor.getConfiguration().mappings;
+        this.schema = translateVisitor.getConfiguration().getSchema();
+        this.mappings = translateVisitor.getConfiguration().getMappings();
         this.datasets = datasets;
     }
 

@@ -1,19 +1,16 @@
 package cz.iocb.chemweb.server.services.check;
 
 import java.sql.SQLException;
+import java.util.List;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import cz.iocb.chemweb.server.sparql.parser.ParseResult;
-import cz.iocb.chemweb.server.sparql.parser.Parser;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateResult;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
+import cz.iocb.chemweb.server.sparql.SparqlEngine;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
 import cz.iocb.chemweb.shared.services.check.CheckService;
@@ -25,8 +22,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 {
     private static final long serialVersionUID = 1L;
 
-    private SparqlDatabaseConfiguration dbConfig;
-    private Parser parser;
+    private SparqlEngine engine;
 
 
     @Override
@@ -40,8 +36,8 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
         try
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
-            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
+            SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+            engine = new SparqlEngine(sparqlConfig, null);
         }
         catch(NamingException e)
         {
@@ -55,37 +51,22 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
     @Override
     public CheckResult check(String code) throws DatabaseException
     {
-        CheckResult result = new CheckResult();
-
-        /* parser */
-        ParseResult parseResult = parser.tryParse(code);
-
-        if(parseResult.getExceptions() != null)
-            for(ParseException err : parseResult.getExceptions())
-                addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getMessage()));
-
-        if(parseResult.getResult() == null)
-            return result;
-
-
-        /* translator */
         try
         {
-            TranslateResult translateResult = new TranslateVisitor(dbConfig, true)
-                    .tryTranslate(parseResult.getResult());
+            CheckResult result = new CheckResult();
 
-            for(TranslateException err : translateResult.getExceptions())
-                addWarning(result, CheckerWarningFactory.create(err.getRange(), "error", err.getErrorMessage()));
+            List<TranslateMessage> messages = engine.check(code);
 
-            for(TranslateException err : translateResult.getWarnings())
-                addWarning(result, CheckerWarningFactory.create(err.getRange(), "warning", err.getErrorMessage()));
+            for(TranslateMessage message : messages)
+                addWarning(result, CheckerWarningFactory.create(message.getRange(), message.getCategory().getText(),
+                        message.getMessage()));
+
+            return result;
         }
         catch(SQLException e)
         {
             throw new DatabaseException(e);
         }
-
-        return result;
     }
 
 

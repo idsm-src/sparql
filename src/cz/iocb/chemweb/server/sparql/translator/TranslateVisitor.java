@@ -37,6 +37,9 @@ import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.db.SQLRuntimeException;
 import cz.iocb.chemweb.server.db.TypedLiteral;
 import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.MessageType;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -45,6 +48,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -82,12 +88,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
-import cz.iocb.chemweb.server.sparql.procedure.ParameterDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.procedure.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.translator.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionAggregationRewriteVisitor;
 import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
@@ -120,41 +120,29 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private static final int serviceResultLimit = 10000;
 
     private final Stack<VarOrIri> graphRestrictions = new Stack<>();
-
-    private final List<TranslateException> exceptions = new LinkedList<TranslateException>();
-    private final List<TranslateException> warnings = new LinkedList<TranslateException>();
+    private final List<TranslateMessage> messages;
 
     private final SparqlDatabaseConfiguration configuration;
     private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
     private final SSLContext sslContext;
-    private final boolean checkOnly;
+    private final boolean evalSeriveces;
 
     private List<DataSet> datasets;
     private Prologue prologue;
 
 
-    public TranslateVisitor(SparqlDatabaseConfiguration configuration, SSLContext sslContext, boolean checkOnly)
+    public TranslateVisitor(SparqlDatabaseConfiguration configuration, SSLContext sslContext,
+            List<TranslateMessage> messages, boolean evalSeriveces)
     {
         this.configuration = configuration;
         this.iriClasses = configuration.getIriClasses();
         this.schema = configuration.getSchema();
         this.procedures = configuration.getProcedures();
         this.sslContext = sslContext;
-        this.checkOnly = checkOnly;
-    }
-
-
-    public TranslateVisitor(SparqlDatabaseConfiguration configuration, boolean checkOnly)
-    {
-        this(configuration, null, checkOnly);
-    }
-
-
-    public TranslateVisitor(SparqlDatabaseConfiguration configuration)
-    {
-        this(configuration, null, false);
+        this.evalSeriveces = evalSeriveces;
+        this.messages = messages;
     }
 
 
@@ -209,7 +197,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 String name = variable.getName();
 
                 if(translatedWhereClause.getVariablesInScope().contains(name))
-                    exceptions.add(new TranslateException(ErrorType.variableUsedBeforeBind,
+                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
                             groupBy.getVariable().getRange(), name));
 
 
@@ -284,8 +272,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                         public Void visit(BuiltInCallExpression call)
                         {
                             if(call.isAggregateFunction())
-                                exceptions.add(
-                                        new TranslateException(ErrorType.nestedAggregateFunction, call.getRange()));
+                                messages.add(
+                                        new TranslateMessage(MessageType.nestedAggregateFunction, call.getRange()));
 
                             return null;
                         }
@@ -481,7 +469,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             if(!variablesInScope.contains(variable))
                 variablesInScope.add(variable);
             else
-                exceptions.add(new TranslateException(ErrorType.repeatOfValuesVariable,
+                messages.add(new TranslateMessage(MessageType.repeatOfValuesVariable,
                         values.getVariables().get(i).getRange(), variable));
 
 
@@ -641,7 +629,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     private void checkProjectionVariables(Select select)
     {
         if(!select.getGroupByConditions().isEmpty() && select.getProjections().isEmpty())
-            exceptions.add(new TranslateException(ErrorType.invalidProjection, select.getRange()));
+            messages.add(new TranslateMessage(MessageType.invalidProjection, select.getRange()));
 
         if(!isInAggregateMode(select))
             return;
@@ -663,7 +651,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         for(Projection projection : select.getProjections())
         {
             if(vars.contains(projection.getVariable().getName()))
-                exceptions.add(new TranslateException(ErrorType.repeatOfProjectionVariable,
+                messages.add(new TranslateMessage(MessageType.repeatOfProjectionVariable,
                         projection.getVariable().getRange(), projection.getVariable().toString()));
 
             vars.add(projection.getVariable().getName());
@@ -716,7 +704,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 String name = ((VariableOrBlankNode) arg).getName();
 
                 if(groupByVars.contains(name))
-                    exceptions.add(new TranslateException(ErrorType.invalidVariableInAggregate, arg.getRange(), name));
+                    messages.add(new TranslateMessage(MessageType.invalidVariableInAggregate, arg.getRange(), name));
 
                 return null;
             }
@@ -725,7 +713,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             public Void visit(Variable var)
             {
                 if(!groupByVars.contains(var.getName()))
-                    exceptions.add(new TranslateException(ErrorType.invalidVariableOutsideAggregate, var.getRange(),
+                    messages.add(new TranslateMessage(MessageType.invalidVariableOutsideAggregate, var.getRange(),
                             var.getName()));
 
                 return null;
@@ -754,7 +742,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             public Void visit(BuiltInCallExpression call)
             {
                 if(call.isAggregateFunction())
-                    exceptions.add(new TranslateException(ErrorType.invalidContextOfAggregate, call.getRange()));
+                    messages.add(new TranslateMessage(MessageType.invalidContextOfAggregate, call.getRange()));
 
                 return null;
             }
@@ -964,7 +952,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         String variableName = bind.getVariable().getName();
 
         if(translatedGroupPattern.getVariablesInScope().contains(variableName))
-            exceptions.add(new TranslateException(ErrorType.variableUsedBeforeBind, bind.getVariable().getRange(),
+            messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind, bind.getVariable().getRange(),
                     variableName));
 
         checkExpressionForUnGroupedSolutions(bind.getExpression());
@@ -1068,7 +1056,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         if(!graphRestrictions.isEmpty())
         {
-            exceptions.add(new TranslateException(ErrorType.procedureCallInsideGraph,
+            messages.add(new TranslateMessage(MessageType.procedureCallInsideGraph,
                     procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
         }
 
@@ -1090,13 +1078,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
             if(parameterDefinition == null)
             {
-                exceptions.add(new TranslateException(ErrorType.invalidParameterPredicate,
-                        parameter.getName().getRange(), parameter.getName().toString(prologue),
-                        procedureCallBase.getProcedure().toString(prologue)));
+                messages.add(new TranslateMessage(MessageType.invalidParameterPredicate, parameter.getName().getRange(),
+                        parameter.getName().toString(prologue), procedureCallBase.getProcedure().toString(prologue)));
             }
             else if(parameterNodes.get(parameterDefinition) != null)
             {
-                exceptions.add(new TranslateException(ErrorType.repeatOfParameterPredicate,
+                messages.add(new TranslateMessage(MessageType.repeatOfParameterPredicate,
                         parameter.getName().getRange(), parameter.getName().toString(prologue)));
             }
             else
@@ -1111,10 +1098,10 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     if(variable == null)
                     {
                         if(value instanceof Variable)
-                            exceptions.add(new TranslateException(ErrorType.unboundedVariableParameterValue,
+                            messages.add(new TranslateMessage(MessageType.unboundedVariableParameterValue,
                                     value.getRange(), parameter.getName().toString(prologue), variableName));
                         else if(value instanceof BlankNode)
-                            exceptions.add(new TranslateException(ErrorType.unboundedBlankNodeParameterValue,
+                            messages.add(new TranslateMessage(MessageType.unboundedBlankNodeParameterValue,
                                     value.getRange(), parameter.getName().toString(prologue)));
                     }
                 }
@@ -1139,7 +1126,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 if(parameterDefinition.getDefaultValue() != null)
                     entry.setValue(parameterDefinition.getDefaultValue());
                 else
-                    exceptions.add(new TranslateException(ErrorType.missingParameterPredicate,
+                    messages.add(new TranslateMessage(MessageType.missingParameterPredicate,
                             procedureCallBase.getProcedure().getRange(),
                             new IRI(parameterDefinition.getParamName()).toString(prologue),
                             procedureCallBase.getProcedure().toString(prologue)));
@@ -1176,14 +1163,14 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
                 if(resultDefinition == null)
                 {
-                    exceptions.add(new TranslateException(ErrorType.invalidResultPredicate, result.getName().getRange(),
+                    messages.add(new TranslateMessage(MessageType.invalidResultPredicate, result.getName().getRange(),
                             result.getName().toString(prologue), procedureCallBase.getProcedure().toString(prologue)));
 
                 }
                 else if(resultNodes.get(resultDefinition) != null)
                 {
-                    exceptions.add(new TranslateException(ErrorType.repeatOfResultPredicate,
-                            result.getName().getRange(), result.getName().toString(prologue)));
+                    messages.add(new TranslateMessage(MessageType.repeatOfResultPredicate, result.getName().getRange(),
+                            result.getName().toString(prologue)));
                 }
                 else
                 {
@@ -1238,7 +1225,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 .collect(Collectors.toList());
 
 
-        if(checkOnly)
+        if(!evalSeriveces)
             return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
 
 
@@ -1251,7 +1238,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                     new LinkedHashMap<String, Direction>());
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
 
-            PostgresDatabase db = new PostgresDatabase(configuration.connectionPool);
+            PostgresDatabase db = new PostgresDatabase(configuration.getConnectionPool());
             result = db.query(sqlSelect.translate());
         }
         catch(SQLException e)
@@ -1261,7 +1248,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         if(result.size() > serviceContextLimit)
         {
-            exceptions.add(new TranslateException(ErrorType.serviceContextLimitExceeded, service.getRange()));
+            messages.add(new TranslateMessage(MessageType.serviceContextLimitExceeded, service.getRange()));
             return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
         }
 
@@ -1471,7 +1458,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 if(limitExceeded[0])
                 {
-                    exceptions.add(new TranslateException(ErrorType.serviceResultLimitExceeded, service.getRange()));
+                    messages.add(new TranslateMessage(MessageType.serviceResultLimitExceeded, service.getRange()));
                     return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
                 }
 
@@ -1483,7 +1470,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 }
                 else
                 {
-                    exceptions.add(new TranslateException(ErrorType.badServiceEndpoint, service.getRange(), endpoint));
+                    messages.add(new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
                     return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
                 }
             }
@@ -1586,30 +1573,13 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public String translate(SelectQuery sparqlQuery) throws TranslateExceptions, SQLException
+    public String translate(SelectQuery sparqlQuery) throws SQLException
     {
         try
         {
             TranslatedSegment segment = visitElement(sparqlQuery);
 
-            if(!exceptions.isEmpty())
-                throw new TranslateExceptions(exceptions);
-
             return segment.getIntercode().translate();
-        }
-        catch(SQLRuntimeException e)
-        {
-            throw(SQLException) e.getCause();
-        }
-    }
-
-
-    public TranslateResult tryTranslate(SelectQuery sparqlQuery) throws SQLException
-    {
-        try
-        {
-            visitElement(sparqlQuery);
-            return new TranslateResult(null, exceptions, warnings);
         }
         catch(SQLRuntimeException e)
         {
@@ -1636,14 +1606,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    public List<TranslateException> getExceptions()
+    public List<TranslateMessage> getMessages()
     {
-        return exceptions;
-    }
-
-
-    public List<TranslateException> getWarnings()
-    {
-        return warnings;
+        return messages;
     }
 }

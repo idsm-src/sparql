@@ -7,8 +7,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
+import java.util.Set;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -20,14 +22,13 @@ import javax.servlet.http.HttpServletResponse;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
-import cz.iocb.chemweb.server.sparql.parser.Parser;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
-import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.SparqlEngine;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
 
 
@@ -70,7 +71,7 @@ public class GenerateHints extends HttpServlet
                     hintsJS = generateHints(dbConfig);
                     hintsMap.put(resourceName, hintsJS);
                 }
-                catch(NamingException | ParseExceptions | TranslateExceptions | SQLException e)
+                catch(NamingException | TranslateExceptions | SQLException e)
                 {
                     throw new ServletException(e);
                 }
@@ -101,42 +102,52 @@ public class GenerateHints extends HttpServlet
     }
 
 
-    private static String generateHints(SparqlDatabaseConfiguration dbConfig)
-            throws ParseExceptions, TranslateExceptions, SQLException
+    private static String generateHints(SparqlDatabaseConfiguration sparqlConfig)
+            throws TranslateExceptions, SQLException
     {
+        Set<String> iris = new HashSet<String>();
+
+        for(QuadMapping mapping : sparqlConfig.getMappings())
+        {
+            if(mapping.getGraph() instanceof ConstantIriMapping)
+                iris.add(((IRI) (((ConstantIriMapping) mapping.getGraph()).getValue())).getValue());
+
+            if(mapping.getSubject() instanceof ConstantIriMapping)
+                iris.add(((IRI) (((ConstantIriMapping) mapping.getSubject()).getValue())).getValue());
+
+            if(mapping.getPredicate() instanceof ConstantIriMapping)
+                iris.add(((IRI) (mapping.getPredicate().getValue())).getValue());
+
+            if(mapping.getObject() instanceof ConstantIriMapping)
+                iris.add(((IRI) (((ConstantIriMapping) mapping.getObject()).getValue())).getValue());
+        }
+
+
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("select ?H ?T ?L where");
+        builder.append("{");
+        builder.append("?H rdf:type ?T.");
+        builder.append("optional {?H rdfs:label ?L}");
+        builder.append("filter (?T in (owl:Class, owl:NamedIndividual, rdf:Property))");
+        builder.append("}");
+        builder.append("values ?H {");
+
+        for(String iri : iris)
+        {
+            builder.append("<");
+            builder.append(iri);
+            builder.append(">");
+        }
+
+        builder.append("}");
+
+
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);
 
-        String query = "select ?H ?T ?L where                                 "
-                + "{                                                          "
-                + "  graph pubchem:ontology                                   "
-                + "  {                                                        "
-                + "    {                                                      "
-                + "      ?H rdf:type rdf:Property.                            "
-                + "    }                                                      "
-                + "    union                                                  "
-                + "    {                                                      "
-                + "      ?H rdf:type owl:Class.                               "
-                + "    }                                                      "
-                + "                                                           "
-                + "    ?H rdf:type ?T.                                        "
-                + "                                                           "
-                + "    optional                                               "
-                + "    {                                                      "
-                + "      ?H rdfs:label ?L.                                    "
-                + "    }                                                      "
-                + "  }                                                        "
-                + "}                                                          ";
-
-
-        Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-        SelectQuery syntaxTree = parser.parse(query);
-
-        String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
-
-
-        PostgresDatabase database = new PostgresDatabase(dbConfig.getConnectionPool());
-        Result result = database.query(translatedQuery);
+        SparqlEngine engine = new SparqlEngine(sparqlConfig, null);
+        Result result = engine.execute(builder.toString());
 
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
 
@@ -146,7 +157,7 @@ public class GenerateHints extends HttpServlet
             RdfNode type = row.get("T");
             RdfNode label = row.get("L");
 
-            PrefixedName iri = NormalizeIRI.decompose(dbConfig, text.getValue());
+            PrefixedName iri = NormalizeIRI.decompose(sparqlConfig, text.getValue());
 
             if(iri == null)
                 continue;
@@ -166,6 +177,10 @@ public class GenerateHints extends HttpServlet
             {
                 case "http://www.w3.org/2002/07/owl#Class":
                     typeCode = "C";
+                    break;
+
+                case "http://www.w3.org/2002/07/owl#NamedIndividual":
+                    typeCode = "I";
                     break;
 
                 case "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property":

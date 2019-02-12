@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.IriContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PathAlternativeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PathEltContext;
@@ -14,6 +15,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PathPrimaryContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PathSequenceContext;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.AlternativePath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BracketedPath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.InversePath;
@@ -26,17 +28,22 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.SequencePath;
 
 public class PathVisitor extends BaseVisitor<Path>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public PathVisitor(QueryVisitorContext context)
+
+    public PathVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     private List<Path> visitPathList(List<? extends ParserRuleContext> pathSequenceContexts)
     {
         return pathSequenceContexts.stream().map(this::visit).collect(Collectors.toList());
     }
+
 
     @Override
     public Path visitPathAlternative(PathAlternativeContext ctx)
@@ -49,6 +56,7 @@ public class PathVisitor extends BaseVisitor<Path>
         return new AlternativePath(paths);
     }
 
+
     @Override
     public Path visitPathSequence(PathSequenceContext ctx)
     {
@@ -60,6 +68,7 @@ public class PathVisitor extends BaseVisitor<Path>
         return new SequencePath(paths);
     }
 
+
     @Override
     public Path visitPathEltOrInverse(PathEltOrInverseContext ctx)
     {
@@ -70,6 +79,7 @@ public class PathVisitor extends BaseVisitor<Path>
 
         return new InversePath(path);
     }
+
 
     @Override
     public Path visitPathElt(PathEltContext ctx)
@@ -97,6 +107,7 @@ public class PathVisitor extends BaseVisitor<Path>
         return new RepeatedPath(repeatKind, path);
     }
 
+
     @Override
     public Path visitPathPrimary(PathPrimaryContext ctx)
     {
@@ -118,11 +129,13 @@ public class PathVisitor extends BaseVisitor<Path>
         return new BracketedPath(visit(ctx.path()));
     }
 
+
     @Override
     public IRI visitIri(IriContext ctx)
     {
-        return new IriVisitor(context).visit(ctx);
+        return new IriVisitor(prologue, messages).visit(ctx);
     }
+
 
     @Override
     public Path visitPathNegatedPropertySet(PathNegatedPropertySetContext ctx)
@@ -142,6 +155,7 @@ public class PathVisitor extends BaseVisitor<Path>
 
         return new BracketedPath(new AlternativePath(visitPathList(ctx.pathOneInPropertySet())));
     }
+
 
     @Override
     public Path visitPathOneInPropertySet(PathOneInPropertySetContext ctx)

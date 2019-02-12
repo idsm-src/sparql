@@ -2,11 +2,12 @@ package cz.iocb.chemweb.server.sparql.parser.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map.Entry;
 import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
-import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 
 
 
@@ -19,36 +20,30 @@ import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 public class Prologue extends BaseElement
 {
     private IRI base;
+    private final LinkedHashMap<String, Prefix> prefixes;
     private final List<PrefixDefinition> prefixDefinitions;
-    private final LinkedHashMap<String, Prefix> userPrefixes;
-    private final LinkedHashMap<String, Prefix> allPrefixes;
+    //private final LinkedHashMap<String, String> prefixMap;
 
 
-    public Prologue(List<Prefix> predefinedPrefixes)
+    public Prologue(HashMap<String, String> predefinedPrefixes)
     {
         setBase(new IRI(""));
+        prefixDefinitions = new ArrayList<PrefixDefinition>();
+        prefixes = new LinkedHashMap<String, Prefix>();
 
-        prefixDefinitions = new ArrayList<>();
-        userPrefixes = new LinkedHashMap<>();
-        allPrefixes = new LinkedHashMap<>();
-
-        for(Prefix prefix : predefinedPrefixes)
-            allPrefixes.put(prefix.getName(), prefix);
+        for(Entry<String, String> entry : predefinedPrefixes.entrySet())
+            prefixes.put(entry.getKey(), new Prefix(entry.getKey(), entry.getValue()));
     }
 
-    /**
-     * The spec allows multiple BASEs, but we and Virtuoso don't.
-     */
+
     public IRI getBase()
     {
         return base;
     }
 
+
     public void setBase(IRI base)
     {
-        if(base == null)
-            throw new IllegalArgumentException();
-
         this.base = base;
     }
 
@@ -57,38 +52,21 @@ public class Prologue extends BaseElement
     {
         prefixDefinitions.add(definition);
 
-        Prefix prefix = new Prefix(definition.getName(), definition.getIri().getValue());
-
-        if(userPrefixes.containsKey(definition.getName()))
-            userPrefixes.remove(definition.getName());
-
-        if(allPrefixes.containsKey(definition.getName()))
-            allPrefixes.remove(definition.getName());
-
-        userPrefixes.put(definition.getName(), prefix);
-        allPrefixes.put(definition.getName(), prefix);
+        prefixes.remove(definition.getName());
+        prefixes.put(definition.getName(), new Prefix(definition.getName(), definition.getIri().getValue()));
     }
 
-
-    public List<PrefixDefinition> getPrefixes()
+    public List<PrefixDefinition> getPrefixeDefinitions()
     {
         return prefixDefinitions;
     }
 
-    /**
-     * Returns all prefixes, including those from {@link QueryVisitor#getPredefinedPrefixes()}.
-     *
-     * Prefixes from this prologue go first.
-     */
-    public Collection<Prefix> getAllPrefixes()
+
+    public Collection<Prefix> getPrefixes()
     {
-        return allPrefixes.values();
+        return prefixes.values();
     }
 
-    public Collection<Prefix> getUserPrefixes()
-    {
-        return userPrefixes.values();
-    }
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

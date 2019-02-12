@@ -5,8 +5,6 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParserBaseVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.Range;
-import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 
 
 
@@ -23,30 +21,14 @@ public class BaseVisitor<T> extends SparqlParserBaseVisitor<T>
         return element;
     }
 
+
     @Override
     public T visit(ParseTree tree)
     {
-        T result;
-        try
-        {
-            result = super.visit(tree);
-        }
-        catch(UncheckedParseException e)
-        {
-            throw e;
-        }
-        catch(Exception e)
-        {
-            throw new UncheckedParseException(ErrorType.parsingException, e, Range.compute((ParserRuleContext) tree),
-                    e.getMessage());
-        }
+        T result = super.visit(tree);
 
         if(result instanceof Element)
-        {
-            Element element = (Element) result;
-
-            withRange(element, (ParserRuleContext) tree);
-        }
+            withRange((Element) result, (ParserRuleContext) tree);
 
         return result;
     }

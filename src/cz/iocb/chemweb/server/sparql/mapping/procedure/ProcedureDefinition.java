@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.procedure;
+package cz.iocb.chemweb.server.sparql.mapping.procedure;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;

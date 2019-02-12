@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.translator;
+package cz.iocb.chemweb.server.sparql.config;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -20,10 +20,10 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
 

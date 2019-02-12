@@ -5,8 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
-import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 
@@ -47,8 +45,10 @@ public class Values extends BaseElement implements Pattern
         }
     }
 
+
     private final List<Variable> variables;
     private final List<ValuesList> valuesLists;
+
 
     public Values()
     {
@@ -56,32 +56,25 @@ public class Values extends BaseElement implements Pattern
         valuesLists = new ArrayList<>();
     }
 
+
     public Values(Collection<Variable> variables, Collection<ValuesList> valuesLists)
     {
         this.variables = new ArrayList<>(variables);
         this.valuesLists = new ArrayList<>(valuesLists);
     }
 
+
     public List<Variable> getVariables()
     {
         return variables;
     }
+
 
     public List<ValuesList> getValuesLists()
     {
         return valuesLists;
     }
 
-    /**
-     * Checks whether counts of variables and values match. If not, throws an {@link UncheckedParseException}.
-     */
-    public void checkCounts()
-    {
-        if(valuesLists.stream().anyMatch(list -> list.getValues().size() != variables.size()))
-        {
-            throw new UncheckedParseException(ErrorType.wrongNumberOfValues, this.getRange());
-        }
-    }
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

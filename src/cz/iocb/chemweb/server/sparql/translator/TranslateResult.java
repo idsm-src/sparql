@@ -1,17 +1,17 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateException;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 
 
 
 public class TranslateResult
 {
     final String result;
-    final List<TranslateException> exceptions;
-    final List<TranslateException> warnings;
+    final List<TranslateMessage> exceptions;
+    final List<TranslateMessage> warnings;
 
-    public TranslateResult(String result, List<TranslateException> exceptions, List<TranslateException> warnings)
+    public TranslateResult(String result, List<TranslateMessage> exceptions, List<TranslateMessage> warnings)
     {
         this.result = result;
         this.exceptions = exceptions;
@@ -23,12 +23,12 @@ public class TranslateResult
         return result;
     }
 
-    public List<TranslateException> getExceptions()
+    public List<TranslateMessage> getExceptions()
     {
         return exceptions;
     }
 
-    public List<TranslateException> getWarnings()
+    public List<TranslateMessage> getWarnings()
     {
         return warnings;
     }

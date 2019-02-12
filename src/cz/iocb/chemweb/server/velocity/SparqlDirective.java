@@ -16,13 +16,9 @@ import org.apache.velocity.runtime.parser.node.ASTReference;
 import org.apache.velocity.runtime.parser.node.Node;
 import org.apache.velocity.runtime.parser.node.SimpleNode;
 import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.sparql.parser.Parser;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
-import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.SparqlEngine;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 
 
 
@@ -30,9 +26,7 @@ public class SparqlDirective extends Directive
 {
     public static final String SPARQL_CONFIG = "SPARQL_CONFIG";
 
-    private SparqlDatabaseConfiguration dbConfig;
-    private Parser parser;
-    private PostgresDatabase db;
+    private SparqlEngine engine;
     private Log log;
 
 
@@ -56,9 +50,8 @@ public class SparqlDirective extends Directive
         super.init(rs, context, node);
         log = rs.getLog();
 
-        dbConfig = (SparqlDatabaseConfiguration) rs.getApplicationAttribute(SPARQL_CONFIG);
-        parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-        db = new PostgresDatabase(dbConfig.getConnectionPool());
+        SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) rs.getApplicationAttribute(SPARQL_CONFIG);
+        engine = new SparqlEngine(dbConfig, null);
     }
 
 
@@ -82,15 +75,14 @@ public class SparqlDirective extends Directive
 
         try
         {
-            SelectQuery syntaxTree = parser.parse(query);
-            String code = new TranslateVisitor(dbConfig).translate(syntaxTree);
+            Result result = engine.execute(query);
 
-            Result result = db.query(code);
+            //TODO: print errors and warnings into log
 
             context.put(varName, result);
             return true;
         }
-        catch(ParseExceptions | TranslateExceptions | SQLException e)
+        catch(TranslateExceptions | SQLException e)
         {
             log.error("sparql directive: " + e.getMessage());
 

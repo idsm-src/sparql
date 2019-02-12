@@ -102,7 +102,7 @@ public abstract class ElementVisitor<T>
 
     public T visit(Prologue prologue)
     {
-        return aggregateResult(visitElements(prologue.getPrefixes()));
+        return aggregateResult(visitElements(prologue.getPrefixeDefinitions()));
     }
 
     public T visit(PrefixedName prefixedName)

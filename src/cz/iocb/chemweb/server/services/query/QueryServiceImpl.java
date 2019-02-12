@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.services.query;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
@@ -36,16 +35,11 @@ import cz.iocb.chemweb.server.db.Literal;
 import cz.iocb.chemweb.server.db.RdfNode;
 import cz.iocb.chemweb.server.db.Result;
 import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
 import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
 import cz.iocb.chemweb.server.services.SessionData;
-import cz.iocb.chemweb.server.sparql.parser.Parser;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseExceptions;
-import cz.iocb.chemweb.server.sparql.parser.model.Select;
-import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
-import cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.SparqlEngine;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
 import cz.iocb.chemweb.server.velocity.SparqlDirective;
 import cz.iocb.chemweb.server.velocity.UrlDirective;
@@ -77,11 +71,9 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static final Map<String, Map<RdfNode, String>> nodeHashMaps = new HashMap<String, Map<RdfNode, String>>();
 
     private Map<RdfNode, String> nodeHashMap;
-    private SparqlDatabaseConfiguration dbConfig;
-    private Parser parser;
-    private PostgresDatabase database;
+    private SparqlDatabaseConfiguration sparqlConfig;
+    private SparqlEngine engine;
     private VelocityEngine ve;
-    private SSLContext sslContext;
 
 
     @Override
@@ -91,18 +83,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
         if(resourceName == null || resourceName.isEmpty())
             throw new ServletException("Resource name is not set");
-
-        try
-        {
-            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
-            dbConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-            database = new PostgresDatabase(dbConfig.getConnectionPool());
-            parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-        }
-        catch(NamingException e)
-        {
-            throw new ServletException(e);
-        }
 
 
         try
@@ -122,13 +102,27 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             if(trustManager == null)
                 throw new NoSuchAlgorithmException("No X509TrustManager in TrustManagerFactory");
 
-            sslContext = SSLContext.getInstance("SSL");
+            SSLContext sslContext = SSLContext.getInstance("SSL");
             sslContext.init(null, new TrustManager[] { trustManager }, null);
+
+            Context context = (Context) (new InitialContext()).lookup("java:comp/env");
+            sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
+
+            engine = new SparqlEngine(sparqlConfig, sslContext);
+
+
+            Properties properties = new Properties();
+            properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
+            properties.put("file.resource.loader.path", config.getServletContext().getRealPath("/templates"));
+            properties.put("userdirective",
+                    "cz.iocb.chemweb.server.velocity.SparqlDirective,cz.iocb.chemweb.server.velocity.UrlDirective");
+
+            ve = new VelocityEngine(properties);
+            ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, sparqlConfig);
         }
-        catch(KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
+        catch(NamingException | KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
                 | KeyManagementException e)
         {
-            e.printStackTrace();
             throw new ServletException(e);
         }
 
@@ -155,15 +149,6 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
 
 
-        Properties properties = new Properties();
-        properties.put("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
-        properties.put("file.resource.loader.path", config.getServletContext().getRealPath("/templates"));
-        properties.put("userdirective",
-                "cz.iocb.chemweb.server.velocity.SparqlDirective,cz.iocb.chemweb.server.velocity.UrlDirective");
-
-        ve = new VelocityEngine(properties);
-        ve.setApplicationAttribute(SparqlDirective.SPARQL_CONFIG, dbConfig);
-
         super.init(config);
     }
 
@@ -184,105 +169,78 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
         logger.info(query.replaceAll("\n", "\\\\n"));
 
-        queryState.handler = database.getHandler();
+        queryState.handler = engine.getHandler();
 
 
         final long id = sessionData.insert(httpSession, queryState);
 
-        try
+        queryState.thread = new Thread()
         {
-            final SelectQuery syntaxTree = parser.parse(query);
-
-            if(limit >= 0)
+            @Override
+            public void run()
             {
-                Select originalSelect = syntaxTree.getSelect();
-                Select limitedSelect = new Select();
-                limitedSelect.getDataSets().addAll(originalSelect.getDataSets());
-                limitedSelect.setPattern(originalSelect);
-                limitedSelect.setOffset(BigInteger.valueOf(offset));
-                limitedSelect.setLimit(BigInteger.valueOf(limit + 1));
-                syntaxTree.setSelect(limitedSelect);
-            }
-
-
-            final String translatedQuery = new TranslateVisitor(dbConfig, sslContext, false).translate(syntaxTree);
-
-            queryState.thread = new Thread()
-            {
-                @Override
-                public void run()
+                try
                 {
-                    try
+                    Template template = ve.getTemplate("node.vm");
+
+                    Result result = engine.execute(query, offset, limit, timeout, queryState.handler);
+
+                    Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
+
+                    for(Row row : result)
                     {
-                        Template template = ve.getTemplate("node.vm");
+                        DataGridNode[] stringRow = new DataGridNode[row.getRdfNodes().length];
 
-                        Result result = database.query(translatedQuery, timeout, queryState.handler);
-
-                        Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
-
-                        for(Row row : result)
+                        for(int i = 0; i < row.getRdfNodes().length; i++)
                         {
-                            DataGridNode[] stringRow = new DataGridNode[row.getRdfNodes().length];
+                            stringRow[i] = new DataGridNode();
 
-                            for(int i = 0; i < row.getRdfNodes().length; i++)
+                            if(row.getRdfNodes()[i] != null && !row.getRdfNodes()[i].isLiteral())
+                                stringRow[i].ref = row.getRdfNodes()[i].getValue();
+
+
+                            String html = nodeHashMap.get(row.getRdfNodes()[i]);
+
+                            if(html != null)
                             {
-                                stringRow[i] = new DataGridNode();
-
-                                if(row.getRdfNodes()[i] != null && !row.getRdfNodes()[i].isLiteral())
-                                    stringRow[i].ref = row.getRdfNodes()[i].getValue();
-
-
-                                String html = nodeHashMap.get(row.getRdfNodes()[i]);
-
-                                if(html != null)
-                                {
-                                    stringRow[i].html = html;
-                                }
-                                else
-                                {
-                                    VelocityContext context = new VelocityContext();
-                                    context.put("urlContext", UrlDirective.Context.NODE);
-                                    context.put("utils", new NodeUtils(dbConfig.getPrefixes()));
-                                    context.put("entity", row.getRdfNodes()[i]);
-
-                                    StringWriter writer = new StringWriter();
-                                    template.merge(context, writer);
-
-                                    stringRow[i].html = writer.toString();
-                                    nodeHashMap.put(row.getRdfNodes()[i], stringRow[i].html);
-                                }
+                                stringRow[i].html = html;
                             }
+                            else
+                            {
+                                VelocityContext context = new VelocityContext();
+                                context.put("urlContext", UrlDirective.Context.NODE);
+                                context.put("utils", new NodeUtils(sparqlConfig.getPrefixes()));
+                                context.put("entity", row.getRdfNodes()[i]);
 
-                            items.add(stringRow);
+                                StringWriter writer = new StringWriter();
+                                template.merge(context, writer);
+
+                                stringRow[i].html = writer.toString();
+                                nodeHashMap.put(row.getRdfNodes()[i], stringRow[i].html);
+                            }
                         }
 
-
-                        boolean truncated = false;
-
-                        if(limit >= 0 && items.size() > limit)
-                        {
-                            truncated = true;
-                            items.remove(limit);
-                        }
-
-
-                        queryState.result = new QueryResult(result.getHeads(), items, truncated);
+                        items.add(stringRow);
                     }
-                    catch(Throwable e)
+
+
+                    boolean truncated = false;
+
+                    if(limit >= 0 && items.size() > limit)
                     {
-                        queryState.exception = e;
+                        truncated = true;
+                        items.remove(limit);
                     }
+
+
+                    queryState.result = new QueryResult(result.getHeads(), items, truncated);
                 }
-            };
-        }
-        catch(ParseExceptions | TranslateExceptions e)
-        {
-            throw new QueryException();
-        }
-        catch(SQLException e)
-        {
-            throw new DatabaseException(e);
-        }
+                catch(Throwable e)
+                {
+                    queryState.exception = e;
+                }
+            }
+        };
 
 
         synchronized(queryState.handler)
@@ -295,7 +253,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             }
             catch(InterruptedException e)
             {
-                new DatabaseException(e);
+                new DatabaseException(e); //FIXME: use different exception
             }
         }
 
@@ -369,21 +327,10 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     @Override
     public int countOfProperties(String iri) throws DatabaseException
     {
-        Result result;
         try
         {
-            Parser parser = new Parser(dbConfig.getProcedures(), dbConfig.getPrefixes());
-
-            final SelectQuery syntaxTree = parser
-                    .parse("SELECT * WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
-
-            final String translatedQuery = new TranslateVisitor(dbConfig).translate(syntaxTree);
-
-            //result = database.query("sparql define input:storage virtrdf:PubchemQuadStorage "
-            //        + "SELECT (count(*) as ?count) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
-
-            result = database.query("select count(*) as \"C#int\" from (" + translatedQuery + ") as tab");
-
+            Result result = engine
+                    .execute("SELECT (count(*) as ?C) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
 
             if(result.size() != 1)
                 throw new DatabaseException();
@@ -395,7 +342,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
             return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
         }
-        catch(URISyntaxException | ParseExceptions | TranslateExceptions | SQLException e)
+        catch(URISyntaxException | TranslateExceptions | SQLException e)
         {
             throw new DatabaseException(e);
         }

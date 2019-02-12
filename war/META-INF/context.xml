@@ -87,32 +87,32 @@
 
   <Resource name="sparql:pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:pubchem" singleton="true" />
 
   <Resource name="sparql:empty" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:empty" singleton="true" />
 
   <Resource name="sparql:sachem-chebi" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chebi" singleton="true" />
 
   <Resource name="sparql:sachem-chembl" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chembl" singleton="true" />
 
   <Resource name="sparql:sachem-drugbank" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-drugbank" singleton="true" />
 
   <Resource name="sparql:sachem-pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.translator.SparqlDatabaseConfigurationFactory"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-pubchem" singleton="true" />
 
 </Context>

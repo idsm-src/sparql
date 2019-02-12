@@ -9,14 +9,19 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.error.MessageType;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValuesContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DatasetClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.FilterContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GraphGraphPatternContext;
@@ -50,14 +55,12 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
+import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
-import cz.iocb.chemweb.server.sparql.parser.error.ErrorType;
-import cz.iocb.chemweb.server.sparql.parser.error.ParseException;
-import cz.iocb.chemweb.server.sparql.parser.error.UncheckedParseException;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -87,9 +90,11 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.Optional;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCall;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase.Parameter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values.ValuesList;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNodePropertyList;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.ComplexNode;
@@ -99,52 +104,63 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Property;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RdfCollection;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
-import cz.iocb.chemweb.server.sparql.procedure.ProcedureDefinition;
 
 
 
 public class QueryVisitor extends BaseVisitor<Query>
 {
-    private final QueryVisitorContext context;
+    private final SparqlDatabaseConfiguration config;
+    private final Stack<VarOrIri> services;
+    private final List<TranslateMessage> messages;
+    private Prologue prologue;
 
-    public QueryVisitor(QueryVisitorContext context)
+
+    public QueryVisitor(SparqlDatabaseConfiguration config, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.config = config;
+        this.services = new Stack<VarOrIri>();
+        this.messages = messages;
     }
+
+
+    public QueryVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            List<TranslateMessage> messages)
+    {
+        this.config = config;
+        this.prologue = prologue;
+        this.services = services;
+        this.messages = messages;
+    }
+
 
     @Override
     public Query visitQuery(QueryContext ctx)
     {
-        Prologue prologue;
-
         if(ctx.prologue() != null)
         {
-            PrologueVisitor visitor = new PrologueVisitor(context);
+            PrologueVisitor visitor = new PrologueVisitor(config, messages);
             visitor.visit(ctx.prologue());
             prologue = visitor.getPrologue();
         }
         else
-            prologue = new Prologue(context.getPredefinedPrefixes());
-
-        context.setPrologue(prologue);
+        {
+            prologue = new Prologue(config.getPrefixes());
+        }
 
         if(ctx.selectQuery() != null)
         {
             SelectQuery result = visitSelectQuery(ctx.selectQuery());
-
             result.setPrologue(prologue);
-
             result.getSelect().setValues(parseValues(ctx.valuesClause()));
 
-            context.setPrologue(null);
-
+            prologue = null;
             return result;
         }
 
-        context.setPrologue(null);
-
+        prologue = null;
         return null;
     }
+
 
     /**
      * @param ctx Can be null.
@@ -158,16 +174,18 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(dataBlockCtx == null)
             return null;
 
-        return (Values) new PatternVisitor(context).visit(dataBlockCtx);
+        return (Values) new PatternVisitor(config, prologue, services, messages).visit(dataBlockCtx);
     }
+
 
     @Override
     public SelectQuery visitSelectQuery(SelectQueryContext ctx)
     {
         Select select = parseSelect(ctx.selectClause(), ctx.datasetClause(), ctx.whereClause(), ctx.solutionModifier());
 
-        return new SelectQuery(context.getPrologue(), select);
+        return new SelectQuery(prologue, select);
     }
+
 
     public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
             WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx)
@@ -189,7 +207,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             result.getDataSets().addAll(mapList(dataSetClauseCtxs, this::parseDataSet));
         }
 
-        GraphPattern pattern = new GraphPatternVisitor(context).visit(whereClauseCtx);
+        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
 
         result.setPattern(pattern);
 
@@ -198,13 +216,15 @@ public class QueryVisitor extends BaseVisitor<Query>
         return result;
     }
 
+
     private Projection parseProjection(SelectVariableContext variableCtx)
     {
         Variable variable = withRange(new Variable(variableCtx.var().getText()), variableCtx.var());
 
         if(variableCtx.expression() != null)
         {
-            Expression expression = new ExpressionVisitor(context).visit(variableCtx.expression());
+            Expression expression = new ExpressionVisitor(config, prologue, services, messages)
+                    .visit(variableCtx.expression());
 
             return new Projection(expression, variable);
         }
@@ -212,13 +232,15 @@ public class QueryVisitor extends BaseVisitor<Query>
         return withRange(new Projection(variable), variableCtx);
     }
 
+
     private DataSet parseDataSet(DatasetClauseContext dataSetCtx)
     {
-        IRI iri = new IriVisitor(context).visit(dataSetCtx.iri());
+        IRI iri = new IriVisitor(prologue, messages).visit(dataSetCtx.iri());
         boolean isDefault = dataSetCtx.NAMED() == null;
 
         return withRange(new DataSet(iri, isDefault), dataSetCtx);
     }
+
 
     private void parseSolutionModifier(SolutionModifierContext ctx, Select select)
     {
@@ -227,6 +249,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         parseOrderClause(ctx.orderClause(), select);
         parseLimitOffsetClauses(ctx.limitOffsetClauses(), select);
     }
+
 
     private void parseGroupClause(GroupClauseContext ctx, Select select)
     {
@@ -238,9 +261,10 @@ public class QueryVisitor extends BaseVisitor<Query>
         select.getGroupByConditions().addAll(conditions);
     }
 
+
     private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(context);
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
 
         if(ctx.expression() != null)
         {
@@ -259,17 +283,19 @@ public class QueryVisitor extends BaseVisitor<Query>
         return withRange(new GroupCondition(expressionVisitor.visit(ctx)), ctx);
     }
 
+
     private void parseHavingClause(HavingClauseContext ctx, Select select)
     {
         if(ctx == null)
             return;
 
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(context);
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
 
         List<Expression> conditions = mapList(ctx.havingCondition(), expressionVisitor::visit);
 
         select.getHavingConditions().addAll(conditions);
     }
+
 
     private void parseOrderClause(OrderClauseContext ctx, Select select)
     {
@@ -281,6 +307,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         select.getOrderByConditions().addAll(conditions);
     }
 
+
     private OrderCondition parseOrderCondition(OrderConditionContext ctx)
     {
         if(ctx.ASC() != null || ctx.DESC() != null)
@@ -288,11 +315,14 @@ public class QueryVisitor extends BaseVisitor<Query>
             OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending :
                     OrderCondition.Direction.Descending;
 
-            return new OrderCondition(direction, new ExpressionVisitor(context).visit(ctx.expression()));
+            return new OrderCondition(direction,
+                    new ExpressionVisitor(config, prologue, services, messages).visit(ctx.expression()));
         }
 
-        return withRange(new OrderCondition(new ExpressionVisitor(context).visit(ctx)), ctx);
+        return withRange(new OrderCondition(new ExpressionVisitor(config, prologue, services, messages).visit(ctx)),
+                ctx);
     }
+
 
     private static void parseLimitOffsetClauses(LimitOffsetClausesContext ctx, Select select)
     {
@@ -303,6 +333,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         parseOffsetClause(ctx.offsetClause(), select);
     }
 
+
     private static void parseLimitClause(LimitClauseContext ctx, Select select)
     {
         if(ctx == null)
@@ -310,6 +341,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         select.setLimit(new BigInteger(ctx.INTEGER().getText()));
     }
+
 
     private static void parseOffsetClause(OffsetClauseContext ctx, Select select)
     {
@@ -320,21 +352,25 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 }
 
+
 class PrologueVisitor extends BaseVisitor<Void>
 {
     private final Prologue prologue;
-    private final QueryVisitorContext context;
+    private final List<TranslateMessage> messages;
 
-    public PrologueVisitor(QueryVisitorContext context)
+
+    public PrologueVisitor(SparqlDatabaseConfiguration config, List<TranslateMessage> messages)
     {
-        this.prologue = new Prologue(context.getPredefinedPrefixes());
-        this.context = context;
+        this.messages = messages;
+        this.prologue = new Prologue(config.getPrefixes());
     }
+
 
     public Prologue getPrologue()
     {
         return prologue;
     }
+
 
     @Override
     public Void visitBaseDecl(BaseDeclContext ctx)
@@ -345,12 +381,12 @@ class PrologueVisitor extends BaseVisitor<Void>
         try
         {
             if(!(new URI(uri)).isAbsolute())
-                throw new UncheckedParseException(ErrorType.invalidBaseIri, Range.compute(ctx));
+                messages.add(new TranslateMessage(MessageType.invalidBaseIri, Range.compute(ctx)));
         }
         catch(URISyntaxException e)
         {
             Range range = Range.compute(ctx.IRIREF().getSymbol(), ctx.IRIREF().getSymbol());
-            throw new UncheckedParseException(ErrorType.malformedIri, range);
+            messages.add(new TranslateMessage(MessageType.malformedIri, range));
         }
 
         prologue.setBase(new IRI(uri));
@@ -358,11 +394,12 @@ class PrologueVisitor extends BaseVisitor<Void>
         return null;
     }
 
+
     @Override
     public Void visitPrefixDecl(PrefixDeclContext ctx)
     {
         String name = ctx.PNAME_NS().getText();
-        IRI iri = new IRI(new IriVisitor(context).parseUri(ctx.IRIREF(), prologue));
+        IRI iri = new IRI(new IriVisitor(prologue, messages).parseUri(ctx.IRIREF(), prologue));
 
         PrefixDefinition result = withRange(new PrefixDefinition(name, iri), ctx);
         prologue.addPrefixDefinition(result);
@@ -371,20 +408,29 @@ class PrologueVisitor extends BaseVisitor<Void>
     }
 }
 
+
 class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 {
-    private final QueryVisitorContext context;
+    private final SparqlDatabaseConfiguration config;
+    private final Prologue prologue;
+    private final Stack<VarOrIri> services;
+    private final List<TranslateMessage> messages;
 
-    public GraphPatternVisitor(QueryVisitorContext context)
+
+    public GraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.config = config;
+        this.prologue = prologue;
+        this.services = services;
+        this.messages = messages;
     }
+
 
     @Override
     public GraphPattern visitGroupGraphPattern(GroupGraphPatternContext ctx)
     {
-        // brackets are added to the range of group graph pattern, but not of
-        // sub select
+        // brackets are added to the range of group graph pattern, but not of sub select
 
         if(ctx.groupGraphPatternSub() == null)
             return visit(ctx.subSelect());
@@ -394,19 +440,21 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         return graphPattern;
     }
 
+
     public Stream<? extends Pattern> processPattern(Pattern pattern)
     {
         if(pattern instanceof ComplexTriple)
         {
             ComplexTriple triple = (ComplexTriple) pattern;
 
-            TripleExpander tripleExpander = new TripleExpander(context);
+            TripleExpander tripleExpander = new TripleExpander(config, prologue, services, messages);
             tripleExpander.visit(triple);
             return tripleExpander.getResults().stream();
         }
 
         return Stream.of(pattern);
     }
+
 
     /**
      * Quick (and dirty) fix to merge triplets representing a procedure call splitted by a remote endpoint.
@@ -415,7 +463,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
      */
     private Stream<Pattern> repairExpandedProcedureCalls(Stream<Pattern> stream)
     {
-        if(!context.getServiceRestrictions().empty())
+        if(!services.empty())
             return stream;
 
         List<Pattern> patterns = stream.collect(Collectors.toList());
@@ -443,7 +491,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             if(!(verb instanceof IRI))
                 continue;
 
-            ProcedureDefinition callDefinition = context.getProcedures().get(((IRI) verb).getValue());
+            ProcedureDefinition callDefinition = config.getProcedures().get(((IRI) verb).getValue());
 
             if(callDefinition == null)
                 continue;
@@ -523,42 +571,55 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         return patterns.stream();
     }
 
+
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = repairExpandedProcedureCalls(new GroupGraphPatternVisitor(context).visit(ctx))
-                .flatMap(this::processPattern).collect(Collectors.toList());
+        List<Pattern> patterns = repairExpandedProcedureCalls(
+                new GroupGraphPatternVisitor(config, prologue, services, messages).visit(ctx))
+                        .flatMap(this::processPattern).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
 
+
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        Select select = new QueryVisitor(context).parseSelect(ctx.selectClause(), null, ctx.whereClause(),
-                ctx.solutionModifier());
+        Select select = new QueryVisitor(config, prologue, services, messages).parseSelect(ctx.selectClause(), null,
+                ctx.whereClause(), ctx.solutionModifier());
 
-        select.setValues(new QueryVisitor(context).parseValues(ctx.valuesClause()));
+        select.setValues(new QueryVisitor(config, prologue, services, messages).parseValues(ctx.valuesClause()));
 
         return select;
     }
 }
 
+
 class TripleExpander extends ComplexElementVisitor<Node>
 {
-    private final QueryVisitorContext context;
+    private final List<BasicPattern> results = new ArrayList<>();
+    private final SparqlDatabaseConfiguration config;
+    private final Prologue prologue;
+    private final Stack<VarOrIri> services;
+    private final List<TranslateMessage> messages;
 
-    public TripleExpander(QueryVisitorContext context)
+
+    public TripleExpander(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.config = config;
+        this.prologue = prologue;
+        this.services = services;
+        this.messages = messages;
     }
 
-    private final List<BasicPattern> results = new ArrayList<>();
 
     public List<BasicPattern> getResults()
     {
         return results;
     }
+
 
     @Override
     public Node visitElement(Element element)
@@ -571,6 +632,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         return result;
     }
 
+
     @Override
     public Node visit(ComplexTriple triple)
     {
@@ -580,13 +642,11 @@ class TripleExpander extends ComplexElementVisitor<Node>
             subject = visitElement(triple.getNode());
 
 
-        boolean outsideService = context.getServiceRestrictions().empty();
-
         for(Property property : triple.getProperties())
         {
             Verb verb = property.getVerb();
-            ProcedureDefinition callDefinition = outsideService && verb instanceof IRI ?
-                    context.getProcedures().get(((IRI) verb).getValue()) : null;
+            ProcedureDefinition callDefinition = services.isEmpty() && verb instanceof IRI ?
+                    config.getProcedures().get(((IRI) verb).getValue()) : null;
 
             if(callDefinition != null)
             {
@@ -594,43 +654,68 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
                 for(ComplexNode objectNode : property.getObjects())
                 {
-                    if(!(objectNode instanceof BlankNodePropertyList))
-                        throw new UncheckedParseException(ErrorType.invalidProcedureCallObject, objectNode.getRange(),
-                                procedureName.toString(context.getPrologue()));
+                    List<ProcedureCall.Parameter> parameters = new LinkedList<ProcedureCall.Parameter>();
 
-                    BlankNodePropertyList blankNodePropertyList = (BlankNodePropertyList) objectNode;
+                    if(objectNode instanceof BlankNodePropertyList)
+                    {
+                        for(Property parameterProperty : ((BlankNodePropertyList) objectNode).getProperties())
+                        {
+                            Parameter parameter = parseParameter(parameterProperty);
 
-                    List<ProcedureCall.Parameter> parameters = mapList(blankNodePropertyList.getProperties(),
-                            this::parseParameter);
+                            if(parameter != null)
+                                parameters.add(parameter);
+                        }
+                    }
+                    else
+                    {
+                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject, objectNode.getRange(),
+                                procedureName.toString(prologue)));
+                    }
+
+
 
                     ComplexNode originalSubject = triple.getNode();
 
                     ProcedureCallBase result;
 
-                    if(!callDefinition.isSimple() /* originalSubject instanceof BlankNodePropertyList */)
+                    if(!callDefinition.isSimple())
                     {
-                        if(!(originalSubject instanceof BlankNodePropertyList))
-                            throw new UncheckedParseException(ErrorType.invalidMultiProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(context.getPrologue()));
-
                         if(triple.getProperties().size() > 1)
-                            throw new UncheckedParseException(ErrorType.invalidMultiProcedureCallPredicateCombinaion,
-                                    triple.getProperties().get(1).getRange());
+                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallPredicateCombinaion,
+                                    triple.getProperties().get(1).getRange()));
 
-                        BlankNodePropertyList castedSubject = (BlankNodePropertyList) originalSubject;
-                        List<ProcedureCall.Parameter> results = mapList(castedSubject.getProperties(),
-                                this::parseResultParameter);
+                        List<ProcedureCall.Parameter> results = new LinkedList<ProcedureCall.Parameter>();
+
+                        if(originalSubject instanceof BlankNodePropertyList)
+                        {
+                            for(Property resultProperty : ((BlankNodePropertyList) originalSubject).getProperties())
+                            {
+                                Parameter resultParameter = parseResultParameter(resultProperty);
+
+                                if(resultParameter != null)
+                                    results.add(resultParameter);
+                            }
+                        }
+                        else
+                        {
+                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
+                                    originalSubject.getRange(), procedureName.toString(prologue)));
+                        }
 
                         result = new MultiProcedureCall(results, procedureName, parameters);
                     }
                     else
                     {
-                        if(!(originalSubject instanceof BlankNodePropertyList) && !(originalSubject instanceof Node))
-                            throw new UncheckedParseException(ErrorType.invalidProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(context.getPrologue()));
-
-                        if(subject == null)
-                            subject = visitElement(triple.getNode());
+                        if(originalSubject instanceof BlankNodePropertyList || originalSubject instanceof Node)
+                        {
+                            if(subject == null)
+                                subject = visitElement(triple.getNode());
+                        }
+                        else
+                        {
+                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallSubject,
+                                    originalSubject.getRange(), procedureName.toString(prologue)));
+                        }
 
                         result = new ProcedureCall(subject, procedureName, parameters);
                     }
@@ -646,9 +731,9 @@ class TripleExpander extends ComplexElementVisitor<Node>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        if(outsideService && context.getProcedures().get(iri.getValue()) != null)
-                            throw new UncheckedParseException(ErrorType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange());
+                        if(services.isEmpty() && config.getProcedures().get(iri.getValue()) != null)
+                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
+                                    iri.getRange()));
 
                         return null;
                     }
@@ -672,35 +757,51 @@ class TripleExpander extends ComplexElementVisitor<Node>
         return null;
     }
 
+
     private ProcedureCall.Parameter parseParameter(Property property)
     {
         if(!(property.getVerb() instanceof IRI))
-            throw new UncheckedParseException(ErrorType.invalidProcedureParameterValue, property.getVerb().getRange());
+        {
+            messages.add(
+                    new TranslateMessage(MessageType.invalidProcedureParameterValue, property.getVerb().getRange()));
+            return null;
+        }
 
         IRI parameterName = (IRI) property.getVerb();
 
         if(property.getObjects().size() != 1)
-            throw new UncheckedParseException(ErrorType.invalidProcedureParameterValueNumber, property.getRange());
+        {
+            messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValueNumber, property.getRange()));
+            return null;
+        }
 
         Node parameterValue = visitElement(property.getObjects().get(0));
 
         return new ProcedureCall.Parameter(parameterName, parameterValue);
     }
+
 
     private ProcedureCall.Parameter parseResultParameter(Property property)
     {
         if(!(property.getVerb() instanceof IRI))
-            throw new UncheckedParseException(ErrorType.invalidProcedureResultValue, property.getVerb().getRange());
+        {
+            messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue, property.getVerb().getRange()));
+            return null;
+        }
 
         IRI parameterName = (IRI) property.getVerb();
 
         if(property.getObjects().size() != 1)
-            throw new UncheckedParseException(ErrorType.invalidProcedureResultValueNumber, property.getRange());
+        {
+            messages.add(new TranslateMessage(MessageType.invalidProcedureResultValueNumber, property.getRange()));
+            return null;
+        }
 
         Node parameterValue = visitElement(property.getObjects().get(0));
 
         return new ProcedureCall.Parameter(parameterName, parameterValue);
     }
+
 
     @Override
     public Node visit(BlankNodePropertyList blankNodePropertyList)
@@ -715,6 +816,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
         return blankNode;
     }
+
 
     @Override
     public Node visit(RdfCollection rdfCollection)
@@ -759,6 +861,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         return firstNode;
     }
 
+
     @Override
     public Node visit(Literal literal)
     {
@@ -766,29 +869,24 @@ class TripleExpander extends ComplexElementVisitor<Node>
     }
 }
 
+
 class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 {
-    private final QueryVisitorContext context;
+    private final SparqlDatabaseConfiguration config;
+    private final Prologue prologue;
+    private final Stack<VarOrIri> services;
+    private final List<TranslateMessage> messages;
 
-    public GroupGraphPatternVisitor(QueryVisitorContext context)
+
+    public GroupGraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.config = config;
+        this.prologue = prologue;
+        this.services = services;
+        this.messages = messages;
     }
 
-    @Override
-    public Stream<Pattern> visit(ParseTree tree)
-    {
-        try
-        {
-            return super.visit(tree);
-        }
-        catch(UncheckedParseException e)
-        {
-            context.getExceptionConsumer().accept(new ParseException(e));
-
-            return Stream.empty();
-        }
-    }
 
     public Stream<Pattern> visitIfNotNull(ParseTree ctx)
     {
@@ -797,6 +895,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 
         return visit(ctx);
     }
+
 
     @Override
     public Stream<Pattern> visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
@@ -808,18 +907,20 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
         return Stream.concat(triplesPatterns, groupGraphPatterns);
     }
 
+
     @Override
     public Stream<Pattern> visitTriplesBlock(TriplesBlockContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(context);
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, messages);
 
         return ctx.triplesSameSubjectPath().stream().map(patternVisitor::visit).filter(Objects::nonNull);
     }
 
+
     @Override
     public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(context);
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, messages);
 
         Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
 
@@ -829,40 +930,33 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     }
 }
 
+
 class PatternVisitor extends BaseVisitor<Pattern>
 {
+    private final Prologue prologue;
+    private final Stack<VarOrIri> services;
+    private final List<TranslateMessage> messages;
     private final GraphPatternVisitor graphPatternVisitor;
     private final ExpressionVisitor expressionVisitor;
-    private final QueryVisitorContext context;
 
-    public PatternVisitor(QueryVisitorContext context)
+
+    public PatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            List<TranslateMessage> messages)
     {
-        this.context = context;
-        this.graphPatternVisitor = new GraphPatternVisitor(context);
-        this.expressionVisitor = new ExpressionVisitor(context);
+        this.prologue = prologue;
+        this.services = services;
+        this.messages = messages;
+        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, messages);
+        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
     }
 
-
-    @Override
-    public Pattern visit(ParseTree tree)
-    {
-        try
-        {
-            return super.visit(tree);
-        }
-        catch(UncheckedParseException e)
-        {
-            context.getExceptionConsumer().accept(new ParseException(e));
-
-            return null;
-        }
-    }
 
     @Override
     public ComplexTriple visitTriplesSameSubjectPath(TriplesSameSubjectPathContext ctx)
     {
-        return new TripleVisitor(context).parseTriple(ctx);
+        return new TripleVisitor(prologue, messages).parseTriple(ctx);
     }
+
 
     @Override
     public Pattern visitGroupOrUnionGraphPattern(GroupOrUnionGraphPatternContext ctx)
@@ -877,11 +971,13 @@ class PatternVisitor extends BaseVisitor<Pattern>
         return new Union(patterns);
     }
 
+
     @Override
     public Optional visitOptionalGraphPattern(OptionalGraphPatternContext ctx)
     {
         return new Optional(graphPatternVisitor.visit(ctx.groupGraphPattern()));
     }
+
 
     @Override
     public Minus visitMinusGraphPattern(MinusGraphPatternContext ctx)
@@ -889,24 +985,27 @@ class PatternVisitor extends BaseVisitor<Pattern>
         return new Minus(graphPatternVisitor.visit(ctx.groupGraphPattern()));
     }
 
+
     @Override
     public Graph visitGraphGraphPattern(GraphGraphPatternContext ctx)
     {
-        return new Graph(new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI()),
+        return new Graph(new NodeVisitor(prologue, messages).parseVarOrIri(ctx.varOrIRI()),
                 graphPatternVisitor.visit(ctx.groupGraphPattern()));
     }
+
 
     @Override
     public Service visitServiceGraphPattern(ServiceGraphPatternContext ctx)
     {
-        VarOrIri name = new NodeVisitor(context).parseVarOrIri(ctx.varOrIRI());
+        VarOrIri name = new NodeVisitor(prologue, messages).parseVarOrIri(ctx.varOrIRI());
 
-        context.getServiceRestrictions().add(name);
+        services.add(name);
         GraphPattern pattern = graphPatternVisitor.visit(ctx.groupGraphPattern());
-        context.getServiceRestrictions().pop();
+        services.pop();
 
         return new Service(name, pattern, ctx.SILENT() != null);
     }
+
 
     @Override
     public Filter visitFilter(FilterContext ctx)
@@ -914,12 +1013,14 @@ class PatternVisitor extends BaseVisitor<Pattern>
         return new Filter(expressionVisitor.visit(ctx.constraint()));
     }
 
+
     @Override
     public Bind visitBind(BindContext ctx)
     {
         return new Bind(expressionVisitor.visit(ctx.expression()),
                 withRange(new Variable(ctx.var().getText()), ctx.var()));
     }
+
 
     @Override
     public Values visitDataBlock(DataBlockContext ctx)
@@ -932,6 +1033,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
         return visitInlineDataFull(ctx.inlineDataFull());
     }
 
+
     @Override
     public Values visitInlineDataOneVar(InlineDataOneVarContext ctx)
     {
@@ -939,55 +1041,70 @@ class PatternVisitor extends BaseVisitor<Pattern>
         List<Values.ValuesList> valuesLists = mapList(ctx.dataBlockValue(),
                 value -> new Values.ValuesList(Collections.singleton(createVal(value))));
 
-        // withRange is called here, so that the thrown exception knows about
-        // its position
-        Values result = withRange(new Values(Collections.singleton(variable), valuesLists), ctx);
-        result.checkCounts();
-        return result;
+        return withRange(new Values(Collections.singleton(variable), valuesLists), ctx);
     }
+
 
     @Override
     public Values visitInlineDataFull(InlineDataFullContext ctx)
     {
         List<Variable> variables = mapList(ctx.var(), var -> withRange(new Variable(var.getText()), var));
-        List<Values.ValuesList> valuesLists = mapList(ctx.dataBlockValues(),
-                values -> new Values.ValuesList(mapList(values.dataBlockValue(), this::createVal)));
+        List<Values.ValuesList> valuesLists = new LinkedList<Values.ValuesList>();
 
-        // withRange is called here, so that the thrown exception knows about
-        // its position
-        Values result = withRange(new Values(variables, valuesLists), ctx);
-        result.checkCounts();
-        return result;
+
+        for(DataBlockValuesContext block : ctx.dataBlockValues())
+        {
+            ValuesList valueList = withRange(new ValuesList(mapList(block.dataBlockValue(), this::createVal)), block);
+
+            if(valueList.getValues().size() != variables.size())
+            {
+                messages.add(new TranslateMessage(MessageType.wrongNumberOfValues, valueList.getRange()));
+
+                for(int i = 0; i < variables.size() - valueList.getValues().size(); i++)
+                    valueList.getValues().add(null);
+            }
+
+            valuesLists.add(valueList);
+        }
+
+        return withRange(new Values(variables, valuesLists), ctx);
     }
+
 
     Expression createVal(DataBlockValueContext value)
     {
-        Expression ret = new LiteralVisitor(context).visit(value);
+        Expression ret = new LiteralVisitor(prologue, messages).visit(value);
 
         if(ret == null)
-            ret = new IriVisitor(context).visit(value);
+            ret = new IriVisitor(prologue, messages).visit(value);
 
         return ret;
     }
 }
 
+
 class IriVisitor extends BaseVisitor<IRI>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public IriVisitor(QueryVisitorContext context)
+
+    public IriVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     @Override
     public IRI visitIri(IriContext ctx)
     {
         if(ctx.IRIREF() != null)
-            return new IRI(parseUri(ctx.IRIREF(), context.getPrologue()));
+            return new IRI(parseUri(ctx.IRIREF(), prologue));
 
         return visit(ctx.prefixedName());
     }
+
 
     public String parseUri(TerminalNode iriRef, Prologue prologue)
     {
@@ -1002,26 +1119,31 @@ class IriVisitor extends BaseVisitor<IRI>
         catch(URISyntaxException e)
         {
             Range range = Range.compute(iriRef.getSymbol(), iriRef.getSymbol());
-            throw new UncheckedParseException(ErrorType.malformedIri, range);
+            messages.add(new TranslateMessage(MessageType.malformedIri, range));
         }
 
         return uri;
     }
+
 
     @Override
     public IRI visitPrefixedName(PrefixedNameContext ctx)
     {
         PrefixedName prefixedName = parsePrefixedName(ctx);
 
-        java.util.Optional<Prefix> prefix = context.getPrologue().getAllPrefixes().stream()
+        java.util.Optional<Prefix> prefix = prologue.getPrefixes().stream()
                 .filter(p -> p.getName().equals(prefixedName.getPrefix())).findFirst();
 
         if(!prefix.isPresent())
-            throw new UncheckedParseException(ErrorType.unknownPrefix, prefixedName.getRange(),
-                    prefixedName.getPrefix());
+        {
+            messages.add(
+                    new TranslateMessage(MessageType.unknownPrefix, prefixedName.getRange(), prefixedName.getPrefix()));
+            return new IRI(prefixedName.getPrefix() + ":" + prefixedName.getLocalName());
+        }
 
         return new IRI(prefix.get().getIri() + prefixedName.getLocalName());
     }
+
 
     public static PrefixedName parsePrefixedName(PrefixedNameContext ctx)
     {

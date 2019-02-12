@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodePropertyListContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodePropertyListPathContext;
@@ -31,6 +32,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VerbSimpleContext;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -46,17 +48,21 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 
 public class TripleVisitor
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public TripleVisitor(QueryVisitorContext context)
+
+    public TripleVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     public ComplexTriple parseTriple(TriplesSameSubjectPathContext ctx)
     {
-        NodeVisitor nodeVisitor = new NodeVisitor(context);
-        PropertiesVisitor propertiesVisitor = new PropertiesVisitor(context);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
+        PropertiesVisitor propertiesVisitor = new PropertiesVisitor(prologue, messages);
 
         ComplexNode node;
         Stream<Property> properties;
@@ -76,23 +82,28 @@ public class TripleVisitor
     }
 }
 
+
 class NodeVisitor extends BaseVisitor<ComplexNode>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public NodeVisitor(QueryVisitorContext context)
+
+    public NodeVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     @Override
     public ComplexNode visitObjectPath(ObjectPathContext ctx)
     {
-        //ComplexNode node = super.visitObjectPath(ctx);
         ComplexNode node = visit(ctx.graphNodePath());
 
         return node;
     }
+
 
     @Override
     public Variable visitVar(VarContext ctx)
@@ -100,11 +111,13 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
         return new Variable(ctx.getText());
     }
 
+
     @Override
     public IRI visitIri(IriContext ctx)
     {
-        return new IriVisitor(context).visit(ctx);
+        return new IriVisitor(prologue, messages).visit(ctx);
     }
+
 
     public VarOrIri parseVarOrIri(VarOrIRIContext ctx)
     {
@@ -113,6 +126,7 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
 
         return (IRI) visit(ctx.iri());
     }
+
 
     @Override
     public ComplexNode visitBlankNode(BlankNodeContext ctx)
@@ -125,11 +139,13 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
         return new BlankNode(ctx.getText());
     }
 
+
     @Override
     public ComplexNode visitNil(NilContext ctx)
     {
         return new RdfCollection();
     }
+
 
     @Override
     public RdfCollection visitCollectionPath(CollectionPathContext ctx)
@@ -139,6 +155,7 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
         return new RdfCollection(nodes);
     }
 
+
     @Override
     public RdfCollection visitCollection(CollectionContext ctx)
     {
@@ -147,76 +164,88 @@ class NodeVisitor extends BaseVisitor<ComplexNode>
         return new RdfCollection(nodes);
     }
 
+
     @Override
     public BlankNodePropertyList visitBlankNodePropertyListPath(BlankNodePropertyListPathContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(context).visit(ctx.propertyListPathNotEmpty())
+        List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPathNotEmpty())
                 .collect(Collectors.toList());
 
         return new BlankNodePropertyList(properties);
     }
+
 
     @Override
     public BlankNodePropertyList visitBlankNodePropertyList(BlankNodePropertyListContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(context).visit(ctx.propertyListNotEmpty())
+        List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListNotEmpty())
                 .collect(Collectors.toList());
 
         return new BlankNodePropertyList(properties);
     }
 
+
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
-        return new LiteralVisitor(context).visitRdfLiteral(ctx);
+        return new LiteralVisitor(prologue, messages).visitRdfLiteral(ctx);
     }
+
 
     @Override
     public Literal visitNumericLiteral(NumericLiteralContext ctx)
     {
-        return new LiteralVisitor(context).visitNumericLiteral(ctx);
+        return new LiteralVisitor(prologue, messages).visitNumericLiteral(ctx);
     }
+
 
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new LiteralVisitor(context).visitBooleanLiteral(ctx);
+        return new LiteralVisitor(prologue, messages).visitBooleanLiteral(ctx);
     }
 }
 
 
 class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public PropertiesVisitor(QueryVisitorContext context)
+
+    public PropertiesVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     private Verb parseVerb(VerbPathContext verbPathCtx, VerbSimpleContext verbSimpleCtx)
     {
         if(verbPathCtx != null)
         {
-            return new PathVisitor(context).visit(verbPathCtx.path());
+            return new PathVisitor(prologue, messages).visit(verbPathCtx.path());
         }
 
         return withRange(new Variable(verbSimpleCtx.var().getText()), verbSimpleCtx);
     }
 
+
     private List<ComplexNode> parseNodes(ObjectListPathContext ctx)
     {
-        NodeVisitor nodeVisitor = new NodeVisitor(context);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
 
         return mapList(ctx.objectPath(), nodeVisitor::visit);
     }
 
+
     private List<ComplexNode> parseNodes(ObjectListContext ctx)
     {
-        NodeVisitor nodeVisitor = new NodeVisitor(context);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
 
         return mapList(ctx.object(), nodeVisitor::visit);
     }
+
 
     private Property parseProperty(PropertyListPathNotEmptyListContext ctx)
     {
@@ -225,6 +254,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
         return withRange(new Property(verb, nodes), ctx);
     }
+
 
     @Override
     public Stream<Property> visitPropertyListPathNotEmpty(PropertyListPathNotEmptyContext ctx)
@@ -241,10 +271,11 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         return Stream.concat(Stream.of(head), tail);
     }
 
+
     @Override
     public Stream<Property> visitPropertyListNotEmpty(PropertyListNotEmptyContext ctx)
     {
-        VerbVisitor verbVisitor = new VerbVisitor(context);
+        VerbVisitor verbVisitor = new VerbVisitor(prologue, messages);
 
         List<Property> properties = new ArrayList<>();
 
@@ -259,6 +290,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         return properties.stream();
     }
 
+
     @Override
     public Stream<Property> visitPropertyListPath(PropertyListPathContext ctx)
     {
@@ -269,14 +301,19 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     }
 }
 
+
 class VerbVisitor extends BaseVisitor<Verb>
 {
-    private final QueryVisitorContext context;
+    private final Prologue prologue;
+    private final List<TranslateMessage> messages;
 
-    public VerbVisitor(QueryVisitorContext context)
+
+    public VerbVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
-        this.context = context;
+        this.prologue = prologue;
+        this.messages = messages;
     }
+
 
     @Override
     public Verb visitVerb(VerbContext ctx)
@@ -287,15 +324,17 @@ class VerbVisitor extends BaseVisitor<Verb>
         return visit(ctx.varOrIRI());
     }
 
+
     @Override
     public Variable visitVar(VarContext ctx)
     {
         return new Variable(ctx.getText());
     }
 
+
     @Override
     public IRI visitIri(IriContext ctx)
     {
-        return new IriVisitor(context).visit(ctx);
+        return new IriVisitor(prologue, messages).visit(ctx);
     }
 }
