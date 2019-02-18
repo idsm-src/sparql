@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.error;
 
 import static cz.iocb.chemweb.server.sparql.error.MessageCategory.ERROR;
+import static cz.iocb.chemweb.server.sparql.error.MessageCategory.WARNING;
 
 
 
@@ -114,7 +115,15 @@ public enum MessageType
 
     serviceResultLimitExceeded(ERROR, "The limit of service results has been exceeded."),
 
-    badServiceEndpoint(ERROR, "The SERVICE pattern cannot be evaluated by endpoint '%s'.");
+    badServiceEndpoint(ERROR, "The SERVICE pattern cannot be evaluated by endpoint '%s'."),
+
+    unsupportedDatatype(WARNING, "datatype '%s' is not supported"),
+
+    invalidDatatype(WARNING, "datatype '%s' should not be specified explicitly"),
+
+    invalidLexicalForm(WARNING, "lexical form '%s' is not valid"),
+
+    invalidLanguageTag(WARNING, "language tag '%s' is not valid");
 
 
     private final String text;

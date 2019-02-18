@@ -1,17 +1,20 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BooleanLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralNegativeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralPositiveContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.RdfLiteralContext;
+import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -34,25 +37,46 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
+        String value = unquote(ctx.string().getText());
+
         if(ctx.LANGTAG() != null)
-            return new Literal(unquote(ctx.string().getText()), ctx.LANGTAG().getText().substring(1));
-
-        if(ctx.iri() == null)
-            return new Literal(unquote(ctx.string().getText()), xsdStringIri);
-
-        Literal literal = new Literal(unquote(ctx.string().getText()),
-                new IriVisitor(prologue, messages).visit(ctx.iri()));
-
-        if(!literal.isTypeSupported())
         {
-            //TODO: warning: type is not supported
-        }
-        else if(literal.getValue() == null)
-        {
-            //TODO: warning: lexical value is not supported
-        }
+            String tag = ctx.LANGTAG().getText().substring(1);
 
-        return literal;
+            if(!tag.matches("([A-Za-z]{2,3}(-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8})"
+                    + "(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?(-([A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*"
+                    + "(-[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+)*(-x(-[A-Za-z0-9]{1,8})+)?|x(-[A-Za-z0-9]{1,8})+"
+                    + "|i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn"
+                    + "|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE"))
+                messages.add(new TranslateMessage(MessageType.invalidLanguageTag,
+                        Range.compute(ctx.LANGTAG().getSymbol(), ctx.LANGTAG().getSymbol()), tag));
+
+            return new Literal(value, tag);
+        }
+        else if(ctx.iri() != null)
+        {
+            IRI type = new IriVisitor(prologue, messages).visit(ctx.iri());
+
+            if(type == null)
+                type = xsdStringIri;
+
+            Literal literal = new Literal(value, type);
+
+            if(type.equals(rdfLangStringIri))
+                messages.add(new TranslateMessage(MessageType.invalidDatatype, Range.compute(ctx.iri()),
+                        type.toString(prologue)));
+            else if(!literal.isTypeSupported())
+                messages.add(new TranslateMessage(MessageType.unsupportedDatatype, Range.compute(ctx.iri()),
+                        type.toString(prologue)));
+            else if(literal.getValue() == null)
+                messages.add(new TranslateMessage(MessageType.invalidLexicalForm, Range.compute(ctx.string()), value));
+
+            return literal;
+        }
+        else
+        {
+            return new Literal(value, xsdStringIri);
+        }
     }
 
 
