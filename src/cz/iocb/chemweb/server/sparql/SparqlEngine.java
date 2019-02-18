@@ -117,7 +117,7 @@ public class SparqlEngine
             QueryVisitor visitor = new QueryVisitor(config, messages);
             SelectQuery syntaxTree = (SelectQuery) visitor.visit(context);
 
-            new TranslateVisitor(config, sslContext, messages, false).translate(syntaxTree);
+            new TranslateVisitor(config, sslContext, messages, false).visitElement(syntaxTree);
         }
         catch(Throwable e)
         {

@@ -64,6 +64,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     SqlIntercode visitElement(Element element, Node subject, Node object)
     {
+        if(element == null || subject == null || object == null)
+            return new SqlNoSolution();
+
         Node prevSubject = this.subject;
         Node prevObject = this.object;
 

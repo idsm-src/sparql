@@ -38,8 +38,10 @@ public class UnaryExpression extends BaseElement implements Expression
         }
     }
 
+
     private Operator operator;
     private Expression operand;
+
 
     public UnaryExpression(Operator operator, Expression operand)
     {
@@ -47,31 +49,30 @@ public class UnaryExpression extends BaseElement implements Expression
         setOperand(operand);
     }
 
+
     public Operator getOperator()
     {
         return operator;
     }
 
+
     public void setOperator(Operator operator)
     {
-        if(operator == null)
-            throw new IllegalArgumentException();
-
         this.operator = operator;
     }
+
 
     public Expression getOperand()
     {
         return operand;
     }
 
+
     public void setOperand(Expression operand)
     {
-        if(operand == null)
-            throw new IllegalArgumentException();
-
         this.operand = operand;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

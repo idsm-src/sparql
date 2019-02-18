@@ -56,9 +56,11 @@ public class BinaryExpression extends BaseElement implements Expression
         }
     }
 
+
     private Operator operator;
     private Expression left;
     private Expression right;
+
 
     public BinaryExpression(Operator operator, Expression left, Expression right)
     {
@@ -67,10 +69,12 @@ public class BinaryExpression extends BaseElement implements Expression
         setRight(right);
     }
 
+
     public Operator getOperator()
     {
         return operator;
     }
+
 
     public void setOperator(Operator operator)
     {
@@ -80,31 +84,30 @@ public class BinaryExpression extends BaseElement implements Expression
         this.operator = operator;
     }
 
+
     public Expression getLeft()
     {
         return left;
     }
 
+
     public void setLeft(Expression left)
     {
-        if(left == null)
-            throw new IllegalArgumentException();
-
         this.left = left;
     }
+
 
     public Expression getRight()
     {
         return right;
     }
 
+
     public void setRight(Expression right)
     {
-        if(right == null)
-            throw new IllegalArgumentException();
-
         this.right = right;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

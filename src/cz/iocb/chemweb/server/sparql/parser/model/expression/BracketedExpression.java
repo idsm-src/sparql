@@ -20,18 +20,18 @@ public class BracketedExpression extends BaseElement implements Expression
         setChild(child);
     }
 
+
     public Expression getChild()
     {
         return child;
     }
 
+
     public void setChild(Expression child)
     {
-        if(child == null)
-            throw new IllegalArgumentException();
-
         this.child = child;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

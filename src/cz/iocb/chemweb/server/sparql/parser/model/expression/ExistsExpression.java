@@ -18,31 +18,37 @@ public class ExistsExpression extends BaseElement implements Expression
     private GraphPattern pattern;
     private boolean negated;
 
+
     public ExistsExpression(GraphPattern pattern, boolean negated)
     {
         this.pattern = pattern;
         this.negated = negated;
     }
 
+
     public GraphPattern getPattern()
     {
         return pattern;
     }
+
 
     public void setPattern(GraphPattern pattern)
     {
         this.pattern = pattern;
     }
 
+
     public boolean isNegated()
     {
         return negated;
     }
 
+
     public void setNegated(boolean negated)
     {
         this.negated = negated;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

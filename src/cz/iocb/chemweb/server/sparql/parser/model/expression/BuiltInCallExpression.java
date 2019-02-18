@@ -21,10 +21,12 @@ public class BuiltInCallExpression extends CallExpression
 {
     private String functionName;
 
+
     public BuiltInCallExpression(String functionName)
     {
         setFunctionName(functionName);
     }
+
 
     public BuiltInCallExpression(String functionName, Collection<Expression> arguments)
     {
@@ -32,24 +34,25 @@ public class BuiltInCallExpression extends CallExpression
         setFunctionName(functionName);
     }
 
+
     public String getFunctionName()
     {
         return functionName;
     }
 
+
     public void setFunctionName(String functionName)
     {
-        if(functionName == null || functionName.isEmpty())
-            throw new IllegalArgumentException();
-
         this.functionName = functionName;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)
     {
         return visitor.visit(this);
     }
+
 
     public boolean isAggregateFunction()
     {

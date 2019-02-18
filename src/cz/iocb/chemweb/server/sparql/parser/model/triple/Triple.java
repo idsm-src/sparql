@@ -22,9 +22,6 @@ public class Triple extends BaseElement implements BasicPattern
 
     public Triple(Node subject, Verb predicate, Node object)
     {
-        if(subject == null || predicate == null || object == null)
-            throw new IllegalArgumentException();
-
         this.subject = subject;
         this.predicate = predicate;
         this.object = object;

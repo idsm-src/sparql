@@ -430,6 +430,9 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPattern(GroupGraphPatternContext ctx)
     {
+        if(ctx.groupGraphPatternSub() == null && ctx.groupGraphPatternSub() == null)
+            return new GroupGraph();
+
         // brackets are added to the range of group graph pattern, but not of sub select
 
         if(ctx.groupGraphPatternSub() == null)
@@ -1099,6 +1102,9 @@ class IriVisitor extends BaseVisitor<IRI>
     @Override
     public IRI visitIri(IriContext ctx)
     {
+        if(ctx.IRIREF() == null && ctx.prefixedName() == null)
+            return null;
+
         if(ctx.IRIREF() != null)
             return new IRI(parseUri(ctx.IRIREF(), prologue));
 

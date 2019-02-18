@@ -9,6 +9,7 @@ import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
@@ -31,6 +32,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogic
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlCast;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionError;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlInExpression;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
@@ -58,6 +60,16 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         this.prologue = parentTranslator.getPrologue();
         this.iriClasses = parentTranslator.getConfiguration().getIriClasses();
         this.messages = parentTranslator.getMessages();
+    }
+
+
+    @Override
+    public SqlExpressionIntercode visitElement(Element element)
+    {
+        if(element == null)
+            return SqlExpressionError.create();
+
+        return super.visitElement(element);
     }
 
 

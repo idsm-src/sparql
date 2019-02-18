@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.parser.visitor;
 
 import static cz.iocb.chemweb.server.sparql.parser.StreamUtils.mapList;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,7 +30,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarOrIRIContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VerbContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VerbPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VerbSimpleContext;
-import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
@@ -222,6 +222,9 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
     private Verb parseVerb(VerbPathContext verbPathCtx, VerbSimpleContext verbSimpleCtx)
     {
+        if(verbPathCtx == null && verbSimpleCtx == null)
+            return new Variable("");
+
         if(verbPathCtx != null)
         {
             return new PathVisitor(prologue, messages).visit(verbPathCtx.path());
@@ -233,6 +236,9 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
     private List<ComplexNode> parseNodes(ObjectListPathContext ctx)
     {
+        if(ctx == null)
+            return new LinkedList<ComplexNode>();
+
         NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
 
         return mapList(ctx.objectPath(), nodeVisitor::visit);
@@ -263,8 +269,6 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         List<ComplexNode> nodes = parseNodes(ctx.objectListPath());
 
         Property head = new Property(verb, nodes);
-        head.setRange(new Range(verb.getRange().getStart(), nodes.get(nodes.size() - 1).getRange().getEnd()));
-
         Stream<Property> tail = ctx.propertyListPathNotEmptyList().stream().map(this::parseProperty);
 
         // this is likely going to be be O(n^2), hopefully that's not a problem

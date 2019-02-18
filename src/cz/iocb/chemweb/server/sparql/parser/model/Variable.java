@@ -18,9 +18,6 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
 
     public Variable(String name)
     {
-        if(name == null || name.isEmpty())
-            throw new IllegalArgumentException();
-
         if(name.startsWith("?") || name.startsWith("$"))
             name = name.substring(1);
 

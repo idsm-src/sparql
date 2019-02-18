@@ -19,15 +19,18 @@ abstract class CallExpression extends BaseElement implements Expression
     private boolean isDistinct;
     private List<Expression> arguments;
 
+
     protected CallExpression()
     {
         this.arguments = new ArrayList<>();
     }
 
+
     protected CallExpression(Collection<Expression> arguments)
     {
         this(false, arguments);
     }
+
 
     protected CallExpression(boolean isDistinct, Collection<Expression> arguments)
     {
@@ -35,15 +38,18 @@ abstract class CallExpression extends BaseElement implements Expression
         this.arguments = new ArrayList<>(arguments);
     }
 
+
     public List<Expression> getArguments()
     {
         return arguments;
     }
 
+
     public boolean isDistinct()
     {
         return isDistinct;
     }
+
 
     public void setDistinct(boolean isDistinct)
     {

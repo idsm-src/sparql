@@ -9,4 +9,5 @@ import cz.iocb.chemweb.server.sparql.parser.Element;
  */
 public interface Expression extends Element
 {
+
 }

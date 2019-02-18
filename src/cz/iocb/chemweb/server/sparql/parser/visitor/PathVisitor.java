@@ -126,7 +126,12 @@ public class PathVisitor extends BaseVisitor<Path>
             return new NegatedPath(visit(ctx.pathNegatedPropertySet()));
         }
 
-        return new BracketedPath(visit(ctx.path()));
+        if(ctx.path() != null)
+        {
+            new BracketedPath(visit(ctx.path()));
+        }
+
+        return null;
     }
 
 

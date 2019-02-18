@@ -21,6 +21,7 @@ public class InExpression extends BaseElement implements Expression
     private List<Expression> right;
     private boolean negated;
 
+
     public InExpression(Expression left, Collection<Expression> right, boolean negated)
     {
         setLeft(left);
@@ -28,33 +29,36 @@ public class InExpression extends BaseElement implements Expression
         this.negated = negated;
     }
 
+
     public Expression getLeft()
     {
         return left;
     }
 
+
     public void setLeft(Expression left)
     {
-        if(left == null)
-            throw new IllegalArgumentException();
-
         this.left = left;
     }
+
 
     public List<Expression> getRight()
     {
         return right;
     }
 
+
     public boolean isNegated()
     {
         return negated;
     }
 
+
     public void setNegated(boolean negated)
     {
         this.negated = negated;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

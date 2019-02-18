@@ -60,9 +60,6 @@ public class RepeatedPath extends BaseElement implements Path
 
     public void setChild(Path child)
     {
-        if(child == null)
-            throw new IllegalArgumentException();
-
         this.child = child;
     }
 
