@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.error;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 
@@ -10,42 +9,25 @@ public class TranslateExceptions extends Exception
 {
     private static final long serialVersionUID = 1L;
 
-    private final List<TranslateMessage> exceptions;
+    private final List<TranslateMessage> messages;
 
 
-    /**
-     * Constructs exception object.
-     *
-     * @param exceptions List of exceptions.
-     */
-    public TranslateExceptions(Collection<TranslateMessage> exceptions)
+    public TranslateExceptions(List<TranslateMessage> messages)
     {
-        super(getMessage(exceptions));
+        super(getMessage(messages));
 
-        this.exceptions = new ArrayList<>(exceptions);
+        this.messages = new ArrayList<>(messages);
     }
 
 
-    /**
-     * Gets a list of exceptions.
-     *
-     * @return List of exceptions.
-     */
-    public List<TranslateMessage> getExceptions()
+    public List<TranslateMessage> getMessages()
     {
-        return exceptions;
+        return messages;
     }
 
 
-    /**
-     * Gets a string of errors.
-     *
-     * @param exceptions List of exceptions.
-     */
-    private static String getMessage(Collection<TranslateMessage> exceptions)
+    private static String getMessage(List<TranslateMessage> messages)
     {
-        Iterable<String> exceptionMessages = exceptions.stream().map(e -> e.getMessage())::iterator;
-
-        return "Syntax error(s):" + System.lineSeparator() + String.join(System.lineSeparator(), exceptionMessages);
+        return messages.get(0).getMessage();
     }
 }
