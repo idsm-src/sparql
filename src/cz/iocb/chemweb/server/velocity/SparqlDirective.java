@@ -77,8 +77,6 @@ public class SparqlDirective extends Directive
         {
             Result result = engine.execute(query);
 
-            //TODO: print errors and warnings into log
-
             context.put(varName, result);
             return true;
         }

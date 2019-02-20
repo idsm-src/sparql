@@ -813,9 +813,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 GraphPattern optionalPattern = ((Optional) pattern).getPattern();
 
-                if(optionalPattern == null) //TODO: this possibility should be eliminated by the parser
-                    continue;
-
                 TranslatedSegment translatedPattern = null;
                 LinkedList<Filter> optionalFilters = new LinkedList<>();
 
