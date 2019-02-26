@@ -66,11 +66,55 @@ public class SqlSelect extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
+
         if(distinct)
-            builder.append("SELECT DISTINCT * FROM (");
+        {
+            builder.append("SELECT ");
+            builder.append(translateSelectVariables());
+            builder.append(" FROM (");
+        }
 
 
         builder.append("SELECT ");
+
+        builder.append(translateSelectVariables());
+
+        if(distinct)
+        {
+            builder.append(", row_number() OVER (");
+            builder.append(translateOrderBy());
+            builder.append(") AS \"#rn\"");
+        }
+
+        builder.append(" FROM (");
+        builder.append(child.translate());
+        builder.append(" ) AS tab");
+
+        if(!distinct)
+            builder.append(translateOrderBy());
+
+
+        if(distinct)
+        {
+            builder.append(") AS tab GROUP BY ");
+            builder.append(translateSelectVariables());
+            builder.append(" ORDER BY min(\"#rn\")");
+        }
+
+
+        if(limit != null)
+            builder.append(" LIMIT ").append(limit.toString());
+
+        if(offset != null)
+            builder.append(" OFFSET ").append(offset.toString());
+
+        return builder.toString();
+    }
+
+
+    private String translateSelectVariables()
+    {
+        StringBuilder builder = new StringBuilder();
 
         boolean hasSelect = false;
 
@@ -96,260 +140,245 @@ public class SqlSelect extends SqlIntercode
         if(!hasSelect)
             builder.append("1");
 
-        builder.append(" FROM (");
-        builder.append(child.translate());
-        builder.append(" ) AS tab");
+        return builder.toString();
+    }
 
 
-        if(!orderByVariables.isEmpty())
+    private String translateOrderBy()
+    {
+        if(orderByVariables.isEmpty())
+            return "";
+
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(" ORDER BY ");
+        boolean hasOrderCondition = false;
+
+        for(Entry<String, Direction> order : orderByVariables.entrySet())
         {
-            builder.append(" ORDER BY ");
-            boolean hasOrderCondition = false;
+            String varName = order.getKey();
+            UsedVariable variable = child.getVariables().get(varName);
+            Set<ResourceClass> classes = variable.getClasses();
 
-            for(Entry<String, Direction> order : orderByVariables.entrySet())
+
+            // order unbounded
+            if(variable.canBeNull())
             {
-                String varName = order.getKey();
-                UsedVariable variable = child.getVariables().get(varName);
-                Set<ResourceClass> classes = variable.getClasses();
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
 
+                boolean hasOuterVariants = false;
 
-                // order unbounded
-                if(variable.canBeNull())
+                if(classes.size() > 1)
+                    builder.append("(");
+
+                for(ResourceClass resourceClass : classes)
                 {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
+                    appendOr(builder, hasOuterVariants);
 
-                    boolean hasOuterVariants = false;
+                    hasOuterVariants = true;
+                    boolean hasInnerVariants = false;
 
-                    if(classes.size() > 1)
+                    if(resourceClass.getPatternPartsCount() > 1)
                         builder.append("(");
 
-                    for(ResourceClass resourceClass : classes)
+                    for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
                     {
-                        appendOr(builder, hasOuterVariants);
+                        appendAnd(builder, hasInnerVariants);
+                        hasInnerVariants = true;
 
-                        hasOuterVariants = true;
-                        boolean hasInnerVariants = false;
-
-                        if(resourceClass.getPatternPartsCount() > 1)
-                            builder.append("(");
-
-                        for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, hasInnerVariants);
-                            hasInnerVariants = true;
-
-                            builder.append(resourceClass.getSqlColumn(varName, i));
-                            builder.append(" IS NOT NULL");
-                        }
-
-                        if(resourceClass.getPatternPartsCount() > 1)
-                            builder.append(")");
+                        builder.append(resourceClass.getSqlColumn(varName, i));
+                        builder.append(" IS NOT NULL");
                     }
 
-                    if(classes.size() > 1)
+                    if(resourceClass.getPatternPartsCount() > 1)
                         builder.append(")");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
                 }
 
+                if(classes.size() > 1)
+                    builder.append(")");
 
-                // order blank nodes
-                if(variable.containsClass(intBlankNode))
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(intBlankNode.getSqlColumn(varName, 0));
-                    builder.append(" IS NULL");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-                if(variable.containsClass(strBlankNode))
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(strBlankNode.getSqlColumn(varName, 0));
-                    builder.append(" IS NULL");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order IRIs
-                Set<ResourceClass> iris = classes.stream().filter(r -> isIri(r)).collect(Collectors.toSet());
-
-                if(iris.size() > 0)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    if(iris.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasVariants = false;
-
-                    for(ResourceClass res : iris)
-                    {
-                        appendComma(builder, hasVariants);
-                        hasVariants = true;
-
-                        //TODO: use better approach
-                        builder.append(res.getGeneralisedPatternCode(null, varName, 0, false));
-                    }
-
-                    if(iris.size() > 1)
-                        builder.append(")");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order numerics
-                Set<ResourceClass> numerics = classes.stream().filter(r -> isNumeric(r)).collect(Collectors.toSet());
-
-                if(numerics.size() > 0)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    Set<ResourceClass> decimals = classes.stream().filter(r -> isNumericCompatibleWith(r, xsdDecimal))
-                            .collect(Collectors.toSet());
-
-                    if(numerics.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasVariants = false;
-
-                    for(ResourceClass numeric : numerics)
-                    {
-                        appendComma(builder, hasVariants);
-                        hasVariants = true;
-
-                        if(decimals.size() > 0 && decimals.size() != numerics.size())
-                            builder.append("sparql.cast_as_rdfbox_from_").append(numeric.getName()).append("(");
-
-                        builder.append(numeric.getSqlColumn(varName, 0));
-
-                        if(decimals.size() > 0 && decimals.size() != numerics.size())
-                            builder.append(")");
-                    }
-
-                    if(numerics.size() > 1)
-                        builder.append(")");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order xsd:booleans
-                if(variable.containsClass(xsdBoolean))
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(xsdBoolean.getSqlColumn(varName, 0));
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order xsd:strings
-                if(variable.containsClass(xsdString))
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    builder.append(xsdString.getSqlColumn(varName, 0));
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order xsd:dateTimes
-                Set<ResourceClass> dateTimes = classes.stream().filter(r -> isDateTime(r)).collect(Collectors.toSet());
-
-                if(dateTimes.size() > 0)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    if(dateTimes.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasVariants = false;
-
-                    for(ResourceClass dateTime : dateTimes)
-                    {
-                        appendComma(builder, hasVariants);
-                        hasVariants = true;
-
-                        builder.append(dateTime.getSqlColumn(varName, 0));
-                    }
-
-                    if(dateTimes.size() > 1)
-                        builder.append(")");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
-
-
-                // order xsd:dates
-                Set<ResourceClass> dates = classes.stream().filter(r -> isDate(r)).collect(Collectors.toSet());
-
-                if(dates.size() > 0)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
-
-                    if(dates.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasVariants = false;
-
-                    for(ResourceClass date : dates)
-                    {
-                        appendComma(builder, hasVariants);
-                        hasVariants = true;
-
-                        builder.append(date.getSqlColumn(varName, 0));
-                    }
-
-                    if(dates.size() > 1)
-                        builder.append(")");
-
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
             }
-        }
 
 
-        if(distinct)
-            builder.append(") AS tab");
+            // order blank nodes
+            if(variable.containsClass(intBlankNode))
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(intBlankNode.getSqlColumn(varName, 0));
+                builder.append(" IS NULL");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+            if(variable.containsClass(strBlankNode))
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(strBlankNode.getSqlColumn(varName, 0));
+                builder.append(" IS NULL");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
 
 
-        if(limit != null)
-        {
-            builder.append(" LIMIT ");
-            builder.append(limit.toString());
-        }
+            // order IRIs
+            Set<ResourceClass> iris = classes.stream().filter(r -> isIri(r)).collect(Collectors.toSet());
+
+            if(iris.size() > 0)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                if(iris.size() > 1)
+                    builder.append("COALESCE(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass res : iris)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    //TODO: use better approach
+                    builder.append(res.getGeneralisedPatternCode(null, varName, 0, false));
+                }
+
+                if(iris.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
 
 
-        if(offset != null)
-        {
-            builder.append(" OFFSET ");
-            builder.append(offset.toString());
+            // order numerics
+            Set<ResourceClass> numerics = classes.stream().filter(r -> isNumeric(r)).collect(Collectors.toSet());
+
+            if(numerics.size() > 0)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                Set<ResourceClass> decimals = classes.stream().filter(r -> isNumericCompatibleWith(r, xsdDecimal))
+                        .collect(Collectors.toSet());
+
+                if(numerics.size() > 1)
+                    builder.append("COALESCE(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass numeric : numerics)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    if(decimals.size() > 0 && decimals.size() != numerics.size())
+                        builder.append("sparql.cast_as_rdfbox_from_").append(numeric.getName()).append("(");
+
+                    builder.append(numeric.getSqlColumn(varName, 0));
+
+                    if(decimals.size() > 0 && decimals.size() != numerics.size())
+                        builder.append(")");
+                }
+
+                if(numerics.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // order xsd:booleans
+            if(variable.containsClass(xsdBoolean))
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(xsdBoolean.getSqlColumn(varName, 0));
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // order xsd:strings
+            if(variable.containsClass(xsdString))
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(xsdString.getSqlColumn(varName, 0));
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // order xsd:dateTimes
+            Set<ResourceClass> dateTimes = classes.stream().filter(r -> isDateTime(r)).collect(Collectors.toSet());
+
+            if(dateTimes.size() > 0)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                if(dateTimes.size() > 1)
+                    builder.append("COALESCE(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass dateTime : dateTimes)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(dateTime.getSqlColumn(varName, 0));
+                }
+
+                if(dateTimes.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // order xsd:dates
+            Set<ResourceClass> dates = classes.stream().filter(r -> isDate(r)).collect(Collectors.toSet());
+
+            if(dates.size() > 0)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                if(dates.size() > 1)
+                    builder.append("COALESCE(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass date : dates)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(date.getSqlColumn(varName, 0));
+                }
+
+                if(dates.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
         }
 
         return builder.toString();
