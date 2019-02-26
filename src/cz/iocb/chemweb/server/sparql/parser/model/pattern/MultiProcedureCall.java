@@ -2,10 +2,12 @@ package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 
 
 
@@ -20,23 +22,29 @@ import cz.iocb.chemweb.server.sparql.parser.model.IRI;
  */
 public class MultiProcedureCall extends ProcedureCallBase
 {
-    private List<Parameter> results;
+    private final List<Parameter> results;
 
-    public MultiProcedureCall()
-    {
-        results = new ArrayList<>();
-    }
 
     public MultiProcedureCall(Collection<Parameter> results, IRI procedure, Collection<Parameter> parameters)
     {
         super(procedure, parameters);
-        this.results = new ArrayList<>(results);
+        this.results = Collections.unmodifiableList(new ArrayList<>(results));
+
+        for(Parameter result : results)
+            if(result.getValue() instanceof VariableOrBlankNode)
+                variablesInScope.add(((VariableOrBlankNode) result.getValue()).getName());
+
+        for(Parameter parameter : parameters)
+            if(parameter.getValue() instanceof VariableOrBlankNode)
+                variablesInScope.add(((VariableOrBlankNode) parameter.getValue()).getName());
     }
+
 
     public List<Parameter> getResults()
     {
         return results;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

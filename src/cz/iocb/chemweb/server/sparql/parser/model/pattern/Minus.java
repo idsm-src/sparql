@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
-import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 
@@ -11,29 +10,22 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
  * <p>
  * Corresponds to the rule [66] MinusGraphPattern in the SPARQL grammar.
  */
-public class Minus extends BaseElement implements Pattern
+public class Minus extends PatternElement implements Pattern
 {
-    private GraphPattern pattern;
+    private final GraphPattern pattern;
 
-    public Minus()
-    {
-        this(null);
-    }
 
     public Minus(GraphPattern pattern)
     {
         this.pattern = pattern;
     }
 
+
     public GraphPattern getPattern()
     {
         return pattern;
     }
 
-    public void setPattern(GraphPattern pattern)
-    {
-        this.pattern = pattern;
-    }
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

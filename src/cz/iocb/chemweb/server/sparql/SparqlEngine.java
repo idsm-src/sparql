@@ -16,7 +16,6 @@ import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
-import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -58,13 +57,11 @@ public class SparqlEngine
 
         if(limit >= 0)
         {
-            Select originalSelect = syntaxTree.getSelect();
-            Select limitedSelect = new Select();
-            limitedSelect.getDataSets().addAll(originalSelect.getDataSets());
-            limitedSelect.setPattern(originalSelect);
-            limitedSelect.setOffset(BigInteger.valueOf(offset));
-            limitedSelect.setLimit(BigInteger.valueOf(limit + 1));
-            syntaxTree.setSelect(limitedSelect);
+            BigInteger oldLimit = syntaxTree.getSelect().getLimit();
+            BigInteger newLimit = BigInteger.valueOf(limit + 1);
+
+            if(oldLimit == null || oldLimit.compareTo(newLimit) == 1)
+                syntaxTree.getSelect().setLimit(newLimit);
         }
 
         TranslateVisitor translateVisitor = new TranslateVisitor(config, sslContext, messages, true);

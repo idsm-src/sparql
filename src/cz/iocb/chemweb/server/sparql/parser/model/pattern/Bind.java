@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
-import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
@@ -13,40 +12,32 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
  * <p>
  * Corresponds to the rule [60] Bind in the SPARQL grammar.
  */
-public class Bind extends BaseElement implements Pattern
+public class Bind extends PatternElement implements Pattern
 {
-    private Expression expression;
-    private Variable variable;
+    private final Expression expression;
+    private final Variable variable;
 
-    public Bind()
-    {
-    }
 
     public Bind(Expression expression, Variable variable)
     {
         this.expression = expression;
         this.variable = variable;
+
+        variablesInScope.add(variable.getName());
     }
+
 
     public Expression getExpression()
     {
         return expression;
     }
 
-    public void setExpression(Expression expression)
-    {
-        this.expression = expression;
-    }
 
     public Variable getVariable()
     {
         return variable;
     }
 
-    public void setVariable(Variable variable)
-    {
-        this.variable = variable;
-    }
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
@@ -16,7 +17,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
  * <p>
  * Corresponds to the rules [28] ValuesClause and [61] InlineData in the SPARQL grammar.
  */
-public class Values extends BaseElement implements Pattern
+public class Values extends PatternElement implements Pattern
 {
     /**
      * Single assignment of constant values ({@link #getValues}) to the variables from {@link Values}.
@@ -30,7 +31,7 @@ public class Values extends BaseElement implements Pattern
 
         public ValuesList(Collection<Expression> values)
         {
-            this.values = new ArrayList<>(values);
+            this.values = Collections.unmodifiableList(new ArrayList<>(values));
         }
 
         public List<Expression> getValues()
@@ -50,17 +51,13 @@ public class Values extends BaseElement implements Pattern
     private final List<ValuesList> valuesLists;
 
 
-    public Values()
-    {
-        variables = new ArrayList<>();
-        valuesLists = new ArrayList<>();
-    }
-
-
     public Values(Collection<Variable> variables, Collection<ValuesList> valuesLists)
     {
-        this.variables = new ArrayList<>(variables);
-        this.valuesLists = new ArrayList<>(valuesLists);
+        this.variables = Collections.unmodifiableList(new ArrayList<>(variables));
+        this.valuesLists = Collections.unmodifiableList(new ArrayList<>(valuesLists));
+
+        for(Variable variable : variables)
+            variablesInScope.add(variable.getName());
     }
 
 

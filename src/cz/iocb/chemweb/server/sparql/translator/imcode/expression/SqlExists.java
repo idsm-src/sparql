@@ -3,11 +3,11 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import java.util.ArrayList;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 
 
 
@@ -15,11 +15,11 @@ public class SqlExists extends SqlExpressionIntercode
 {
     private static final String table = "tab";
     private final boolean negated;
-    private final TranslatedSegment pattern;
+    private final SqlIntercode pattern;
     private final VariableAccessor variableAccessor;
 
 
-    protected SqlExists(boolean negated, TranslatedSegment pattern, VariableAccessor variableAccessor)
+    protected SqlExists(boolean negated, SqlIntercode pattern, VariableAccessor variableAccessor)
     {
         super(asSet(xsdBoolean), false);
         this.negated = negated;
@@ -28,10 +28,10 @@ public class SqlExists extends SqlExpressionIntercode
     }
 
 
-    public static SqlExpressionIntercode create(boolean negated, TranslatedSegment pattern,
+    public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern,
             VariableAccessor variableAccessor)
     {
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getIntercode().getVariables(),
+        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
                 variableAccessor.getUsedVariables());
 
         for(UsedPairedVariable pair : pairs)
@@ -74,7 +74,7 @@ public class SqlExists extends SqlExpressionIntercode
 
         builder.append("COALESCE((SELECT true FROM (");
 
-        builder.append(pattern.getIntercode().translate());
+        builder.append(pattern.translate());
 
         builder.append(") AS ");
         builder.append(table);
@@ -82,7 +82,7 @@ public class SqlExists extends SqlExpressionIntercode
 
         boolean hasWhere = false;
 
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getIntercode().getVariables(),
+        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
                 variableAccessor.getUsedVariables());
 
         for(UsedPairedVariable pair : pairs)

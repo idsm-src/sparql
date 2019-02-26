@@ -25,7 +25,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.InExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.TranslatedSegment;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryLogical;
@@ -169,7 +169,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
-        TranslatedSegment pattern = parentTranslator.visitElement(existsExpression.getPattern());
+        SqlIntercode pattern = parentTranslator.visitElement(existsExpression.getPattern());
         return SqlExists.create(existsExpression.isNegated(), pattern, variableAccessor);
     }
 

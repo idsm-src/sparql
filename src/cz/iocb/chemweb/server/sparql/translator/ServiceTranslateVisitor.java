@@ -68,9 +68,6 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
         for(Projection projection : select.getProjections())
             result.addAll(visitElement(projection));
 
-        if(select.getProjections().isEmpty())
-            builder.append(" * ");
-
         builder.append(" where ");
 
         List<String> variables = visitElement(select.getPattern());

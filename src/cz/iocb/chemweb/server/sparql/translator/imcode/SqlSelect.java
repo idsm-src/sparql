@@ -11,8 +11,8 @@ import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpr
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
 import java.math.BigInteger;
+import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,14 +26,14 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 public class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
-    private final List<String> selectedVariables;
+    private final Collection<String> selectedVariables;
     private final LinkedHashMap<String, Direction> orderByVariables;
     private boolean distinct = false;
     private BigInteger limit = null;
     private BigInteger offset = null;
 
 
-    public SqlSelect(List<String> selectedVariables, UsedVariables variables, SqlIntercode child,
+    public SqlSelect(Collection<String> selectedVariables, UsedVariables variables, SqlIntercode child,
             LinkedHashMap<String, Direction> orderByVariables)
     {
         super(variables);

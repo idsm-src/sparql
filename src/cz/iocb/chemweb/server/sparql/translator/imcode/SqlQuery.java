@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -14,11 +15,11 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlQuery extends SqlIntercode
 {
-    private final List<String> selectedVariables;
+    private final Collection<String> selectedVariables;
     private final SqlIntercode child;
 
 
-    public SqlQuery(List<String> selectedVariables, SqlIntercode child)
+    public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
     {
         super(child.variables);
         this.selectedVariables = selectedVariables;

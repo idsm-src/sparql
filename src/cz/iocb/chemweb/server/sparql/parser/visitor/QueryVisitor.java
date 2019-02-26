@@ -6,9 +6,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -17,12 +17,14 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValuesContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DatasetClauseContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ExistsFunctionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.FilterContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GraphGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GroupClauseContext;
@@ -35,10 +37,9 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.HavingClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.InlineDataFullContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.InlineDataOneVarContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.IriContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.LimitClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.LimitOffsetClausesContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.MinusGraphPatternContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OffsetClauseContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NotExistsFunctionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OptionalGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OrderClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.OrderConditionContext;
@@ -54,6 +55,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SubSelectContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
@@ -78,7 +80,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BracketedExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.parser.model.pattern.BasicPattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Filter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Graph;
@@ -187,31 +188,157 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    public boolean isInAggregateMode(SelectClauseContext selectClauseCtx, SolutionModifierContext solutionModifierCtx)
+    {
+        BaseVisitor<Boolean> visitor = new BaseVisitor<Boolean>()
+        {
+            @Override
+            public Boolean aggregateResult(Boolean aggregate, Boolean nextResult)
+            {
+                return (aggregate != null && aggregate) || (nextResult != null && nextResult);
+            }
+
+            @Override
+            public Boolean visit(ParseTree tree)
+            {
+                if(tree == null)
+                    return false;
+
+                return super.visit(tree);
+            }
+
+            @Override
+            public Boolean visitExistsFunction(ExistsFunctionContext ctx)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visitNotExistsFunction(NotExistsFunctionContext ctx)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visitAggregate(SparqlParser.AggregateContext ctx)
+            {
+                return true;
+            }
+        };
+
+
+        if(solutionModifierCtx.groupClause() != null)
+            return true;
+
+        for(SelectVariableContext select : selectClauseCtx.selectVariable())
+            if(visitor.visit(select))
+                return true;
+
+        if(visitor.visit(solutionModifierCtx.orderClause()))
+            return true;
+
+        if(visitor.visit(solutionModifierCtx.havingClause()))
+            return true;
+
+        return false;
+    }
+
+
     public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
             WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx)
     {
-        Select result = withRange(new Select(), selectClauseCtx);
+        LinkedList<Projection> projections = new LinkedList<Projection>();
+
+        if(!selectClauseCtx.selectVariable().isEmpty())
+        {
+            projections.addAll(mapList(selectClauseCtx.selectVariable(), this::parseProjection));
+        }
+        else if(!isInAggregateMode(selectClauseCtx, solutionModifierCtx))
+        {
+            HashSet<String> variables = new HashSet<String>();
+
+            new BaseVisitor<Void>()
+            {
+                @Override
+                public Void visitFilter(FilterContext ctx)
+                {
+                    return null;
+                }
+
+                @Override
+                public Void visitMinusGraphPattern(MinusGraphPatternContext ctx)
+                {
+                    return null;
+                }
+
+                @Override
+                public Void visitBind(BindContext ctx)
+                {
+                    visit(ctx.var());
+                    return null;
+                }
+
+                @Override
+                public Void visitSubSelect(SubSelectContext ctx)
+                {
+                    if(!ctx.selectClause().selectVariable().isEmpty())
+                    {
+                        for(SelectVariableContext var : ctx.selectClause().selectVariable())
+                            if(var.var() != null)
+                                visit(var);
+                    }
+                    else if(!isInAggregateMode(ctx.selectClause(), ctx.solutionModifier()))
+                    {
+                        visit(ctx.whereClause());
+
+                        if(ctx.solutionModifier().groupClause() != null)
+                            for(GroupConditionContext cnd : ctx.solutionModifier().groupClause().groupCondition())
+                                if(cnd.var() != null)
+                                    visit(cnd.var());
+                    }
+
+                    return null;
+                }
+
+                @Override
+                public Void visitVar(VarContext ctx)
+                {
+                    String variable = ctx.getText().substring(1);
+
+                    if(!variables.contains(variable))
+                    {
+                        variables.add(variable);
+                        projections.add(new Projection(new Variable(variable)));
+                    }
+
+                    return null;
+                }
+            }.visit(whereClauseCtx);
+        }
+        else
+        {
+            messages.add(new TranslateMessage(MessageType.invalidProjection, Range.compute(selectClauseCtx)));
+        }
+
+
+        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
+        Select result = withRange(new Select(projections, pattern), selectClauseCtx);
+
 
         if(selectClauseCtx.DISTINCT() != null)
             result.setDistinct(true);
         if(selectClauseCtx.REDUCED() != null)
             result.setReduced(true);
 
-        if(!selectClauseCtx.selectVariable().isEmpty())
-        {
-            result.getProjections().addAll(mapList(selectClauseCtx.selectVariable(), this::parseProjection));
-        }
-
         if(dataSetClauseCtxs != null)
-        {
             result.getDataSets().addAll(mapList(dataSetClauseCtxs, this::parseDataSet));
-        }
 
-        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
-
-        result.setPattern(pattern);
-
-        parseSolutionModifier(solutionModifierCtx, result);
+        result.getGroupByConditions().addAll(parseGroupClause(solutionModifierCtx.groupClause()));
+        result.getHavingConditions().addAll(parseHavingClause(solutionModifierCtx.havingClause()));
+        result.getOrderByConditions().addAll(parseOrderClause(solutionModifierCtx.orderClause()));
+        result.setLimit(parseLimitClause(solutionModifierCtx.limitOffsetClauses()));
+        result.setOffset(parseOffsetClause(solutionModifierCtx.limitOffsetClauses()));
+        result.setIsInAggregateMode(isInAggregateMode(selectClauseCtx, solutionModifierCtx));
 
         return result;
     }
@@ -242,23 +369,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
-    private void parseSolutionModifier(SolutionModifierContext ctx, Select select)
-    {
-        parseGroupClause(ctx.groupClause(), select);
-        parseHavingClause(ctx.havingClause(), select);
-        parseOrderClause(ctx.orderClause(), select);
-        parseLimitOffsetClauses(ctx.limitOffsetClauses(), select);
-    }
-
-
-    private void parseGroupClause(GroupClauseContext ctx, Select select)
+    private List<GroupCondition> parseGroupClause(GroupClauseContext ctx)
     {
         if(ctx == null)
-            return;
+            return new ArrayList<GroupCondition>();
 
-        List<GroupCondition> conditions = mapList(ctx.groupCondition(), this::parseGroupCondition);
-
-        select.getGroupByConditions().addAll(conditions);
+        return mapList(ctx.groupCondition(), this::parseGroupCondition);
     }
 
 
@@ -284,27 +400,23 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
-    private void parseHavingClause(HavingClauseContext ctx, Select select)
+    private List<Expression> parseHavingClause(HavingClauseContext ctx)
     {
         if(ctx == null)
-            return;
+            return new ArrayList<Expression>();
 
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
 
-        List<Expression> conditions = mapList(ctx.havingCondition(), expressionVisitor::visit);
-
-        select.getHavingConditions().addAll(conditions);
+        return mapList(ctx.havingCondition(), expressionVisitor::visit);
     }
 
 
-    private void parseOrderClause(OrderClauseContext ctx, Select select)
+    private List<OrderCondition> parseOrderClause(OrderClauseContext ctx)
     {
         if(ctx == null)
-            return;
+            return new ArrayList<OrderCondition>();
 
-        List<OrderCondition> conditions = mapList(ctx.orderCondition(), this::parseOrderCondition);
-
-        select.getOrderByConditions().addAll(conditions);
+        return mapList(ctx.orderCondition(), this::parseOrderCondition);
     }
 
 
@@ -324,31 +436,21 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
-    private static void parseLimitOffsetClauses(LimitOffsetClausesContext ctx, Select select)
+    private static BigInteger parseLimitClause(LimitOffsetClausesContext ctx)
     {
-        if(ctx == null)
-            return;
+        if(ctx == null || ctx.limitClause() == null)
+            return null;
 
-        parseLimitClause(ctx.limitClause(), select);
-        parseOffsetClause(ctx.offsetClause(), select);
+        return new BigInteger(ctx.limitClause().INTEGER().getText());
     }
 
 
-    private static void parseLimitClause(LimitClauseContext ctx, Select select)
+    private static BigInteger parseOffsetClause(LimitOffsetClausesContext ctx)
     {
-        if(ctx == null)
-            return;
+        if(ctx == null || ctx.offsetClause() == null)
+            return null;
 
-        select.setLimit(new BigInteger(ctx.INTEGER().getText()));
-    }
-
-
-    private static void parseOffsetClause(OffsetClauseContext ctx, Select select)
-    {
-        if(ctx == null)
-            return;
-
-        select.setOffset(new BigInteger(ctx.INTEGER().getText()));
+        return new BigInteger(ctx.offsetClause().INTEGER().getText());
     }
 }
 
@@ -430,8 +532,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPattern(GroupGraphPatternContext ctx)
     {
-        if(ctx.groupGraphPatternSub() == null && ctx.groupGraphPatternSub() == null)
-            return new GroupGraph();
+        if(ctx.subSelect() == null && ctx.groupGraphPatternSub() == null)
+            return new GroupGraph(new ArrayList<Pattern>());
 
         // brackets are added to the range of group graph pattern, but not of sub select
 
@@ -441,21 +543,6 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
         GraphPattern graphPattern = visit(ctx.groupGraphPatternSub());
         graphPattern.setRange(Range.compute(ctx));
         return graphPattern;
-    }
-
-
-    public Stream<? extends Pattern> processPattern(Pattern pattern)
-    {
-        if(pattern instanceof ComplexTriple)
-        {
-            ComplexTriple triple = (ComplexTriple) pattern;
-
-            TripleExpander tripleExpander = new TripleExpander(config, prologue, services, messages);
-            tripleExpander.visit(triple);
-            return tripleExpander.getResults().stream();
-        }
-
-        return Stream.of(pattern);
     }
 
 
@@ -580,7 +667,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     {
         List<Pattern> patterns = repairExpandedProcedureCalls(
                 new GroupGraphPatternVisitor(config, prologue, services, messages).visit(ctx))
-                        .flatMap(this::processPattern).collect(Collectors.toList());
+                        .collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
@@ -601,7 +688,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 
 class TripleExpander extends ComplexElementVisitor<Node>
 {
-    private final List<BasicPattern> results = new ArrayList<>();
+    private final List<Pattern> results = new ArrayList<>();
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
@@ -618,7 +705,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
     }
 
 
-    public List<BasicPattern> getResults()
+    public List<Pattern> getResults()
     {
         return results;
     }
@@ -914,9 +1001,32 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitTriplesBlock(TriplesBlockContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, messages);
+        return ctx.triplesSameSubjectPath().stream().flatMap(this::visit);
+    }
 
-        return ctx.triplesSameSubjectPath().stream().map(patternVisitor::visit).filter(Objects::nonNull);
+
+    @Override
+    public Stream<Pattern> visitTriplesSameSubjectPath(TriplesSameSubjectPathContext ctx)
+    {
+        ComplexNode node;
+        Stream<Property> properties;
+
+        if(ctx.varOrTerm() != null)
+        {
+            node = new NodeVisitor(prologue, messages).visit(ctx.varOrTerm());
+            properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPathNotEmpty());
+        }
+        else
+        {
+            node = new NodeVisitor(prologue, messages).visit(ctx.triplesNodePath());
+            properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPath());
+        }
+
+        ComplexTriple triple = new ComplexTriple(node, properties.collect(Collectors.toList()));
+        TripleExpander tripleExpander = new TripleExpander(config, prologue, services, messages);
+        tripleExpander.visit(triple);
+
+        return tripleExpander.getResults().stream();
     }
 
 
@@ -951,13 +1061,6 @@ class PatternVisitor extends BaseVisitor<Pattern>
         this.messages = messages;
         this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, messages);
         this.expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
-    }
-
-
-    @Override
-    public ComplexTriple visitTriplesSameSubjectPath(TriplesSameSubjectPathContext ctx)
-    {
-        return new TripleVisitor(prologue, messages).parseTriple(ctx);
     }
 
 

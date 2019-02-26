@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -114,7 +115,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 
 
-public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
+public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     private static final int serviceContextLimit = 200;
     private static final int serviceResultLimit = 10000;
@@ -147,20 +148,18 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(SelectQuery selectQuery)
+    public SqlIntercode visit(SelectQuery selectQuery)
     {
         prologue = selectQuery.getPrologue();
         datasets = selectQuery.getSelect().getDataSets();
 
-        TranslatedSegment translatedSelect = visitElement(selectQuery.getSelect());
-        SqlQuery intercode = new SqlQuery(translatedSelect.getVariablesInScope(), translatedSelect.getIntercode());
-
-        return new TranslatedSegment(translatedSelect.getVariablesInScope(), intercode);
+        SqlIntercode translatedSelect = visitElement(selectQuery.getSelect());
+        return new SqlQuery(selectQuery.getSelect().getVariablesInScope(), translatedSelect);
     }
 
 
     @Override
-    public TranslatedSegment visit(Select select)
+    public SqlIntercode visit(Select select)
     {
         /*
          * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
@@ -174,7 +173,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         checkProjectionVariables(select);
 
         // translate the WHERE clause
-        TranslatedSegment translatedWhereClause = visitElement(select.getPattern());
+        SqlIntercode translatedWhereClause = visitElement(select.getPattern());
 
 
         // translate the GROUP BY clause
@@ -196,7 +195,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 groupByVariables.add(variable);
                 String name = variable.getName();
 
-                if(translatedWhereClause.getVariablesInScope().contains(name))
+                if(select.getPattern().getVariablesInScope().contains(name))
                     messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
                             groupBy.getVariable().getRange(), name));
 
@@ -204,20 +203,13 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 checkExpressionForUnGroupedSolutions(groupBy.getExpression());
 
                 ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                        new SimpleVariableAccessor(translatedWhereClause.getIntercode().getVariables()), this);
+                        new SimpleVariableAccessor(translatedWhereClause.getVariables()), this);
 
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
 
                 //TODO: optimize based on the expression value
 
-                ArrayList<String> variables = new ArrayList<String>();
-                variables.addAll(translatedWhereClause.getVariablesInScope());
-
-                if(variable instanceof Variable)
-                    variables.add(name);
-
-                SqlIntercode intercode = SqlBind.bind(name, expression, translatedWhereClause.getIntercode());
-                translatedWhereClause = new TranslatedSegment(variables, intercode);
+                translatedWhereClause = SqlBind.bind(name, expression, translatedWhereClause);
             }
         }
 
@@ -225,7 +217,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         List<Projection> projections = select.getProjections();
         List<OrderCondition> orderByConditions = select.getOrderByConditions();
 
-        if(isInAggregateMode(select))
+        if(select.isInAggregateMode())
         {
             ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor();
 
@@ -283,19 +275,16 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(translatedWhereClause.getIntercode().getVariables()), this);
+                    new SimpleVariableAccessor(translatedWhereClause.getVariables()), this);
 
             LinkedHashMap<Variable, SqlExpressionIntercode> aggregations = new LinkedHashMap<>();
 
             for(Entry<Variable, BuiltInCallExpression> entry : rewriter.getAggregations().entrySet())
                 aggregations.put(entry.getKey(), visitor.visitElement(entry.getValue()));
 
-            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations,
-                    translatedWhereClause.getIntercode());
+            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause);
 
-            List<String> inScopeVariables = groupByVariables.stream().filter(v -> v instanceof Variable)
-                    .map(v -> v.getName()).collect(Collectors.toList());
-            translatedWhereClause = new TranslatedSegment(inScopeVariables, intercode);
+            translatedWhereClause = intercode;
 
 
             // translate having as filters
@@ -304,11 +293,22 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
         // translate projection expressions
+        List<String> inScopeVariables = new LinkedList<String>(select.getPattern().getVariablesInScope());
+
         for(Projection projection : projections)
         {
             if(projection.getExpression() != null)
             {
                 Bind bind = new Bind(projection.getExpression(), projection.getVariable());
+
+                String variableName = projection.getVariable().getName();
+
+                if(inScopeVariables.contains(variableName))
+                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind, bind.getVariable().getRange(),
+                            variableName));
+
+                inScopeVariables.add(projection.getVariable().getName());
+
                 translatedWhereClause = translateBind(bind, translatedWhereClause);
             }
         }
@@ -323,7 +323,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 String varName = ((Variable) condition.getExpression()).getName();
 
-                if(translatedWhereClause.getIntercode().getVariables().get(varName) != null)
+                if(translatedWhereClause.getVariables().get(varName) != null)
                     orderByVariables.put(varName, condition.getDirection());
             }
             else
@@ -338,40 +338,22 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
         UsedVariables variables = new UsedVariables();
-        List<String> variablesInScope = null;
+        LinkedHashSet<String> variablesInScope = new LinkedHashSet<String>();
 
-        if(select.getProjections().isEmpty())
+        for(Projection projection : select.getProjections())
         {
-            for(String variableName : translatedWhereClause.getVariablesInScope())
-            {
-                UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
+            String variableName = projection.getVariable().getName();
 
-                if(variable != null)
-                    variables.add(variable);
-            }
+            UsedVariable variable = translatedWhereClause.getVariables().get(variableName);
 
-            variablesInScope = translatedWhereClause.getVariablesInScope();
-        }
-        else
-        {
-            variablesInScope = new ArrayList<String>();
+            if(variable != null)
+                variables.add(variable);
 
-            for(Projection projection : select.getProjections())
-            {
-                String variableName = projection.getVariable().getName();
-
-                UsedVariable variable = translatedWhereClause.getIntercode().getVariables().get(variableName);
-
-                if(variable != null)
-                    variables.add(variable);
-
-                variablesInScope.add(variableName);
-            }
+            variablesInScope.add(variableName);
         }
 
 
-        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause.getIntercode(),
-                orderByVariables);
+        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause, orderByVariables);
 
 
         if(select.isDistinct())
@@ -384,25 +366,25 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             sqlSelect.setOffset(select.getOffset());
 
 
-        return new TranslatedSegment(variablesInScope, sqlSelect);
+        return sqlSelect;
     }
 
 
     @Override
-    public TranslatedSegment visit(GroupGraph groupGraph)
+    public SqlIntercode visit(GroupGraph groupGraph)
     {
-        TranslatedSegment translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
+        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
 
         return translatedGroupGraphPattern;
     }
 
 
     @Override
-    public TranslatedSegment visit(Graph graph)
+    public SqlIntercode visit(Graph graph)
     {
         graphRestrictions.push(graph.getName());
 
-        TranslatedSegment translatedPattern = visitElement(graph.getPattern());
+        SqlIntercode translatedPattern = visitElement(graph.getPattern());
 
         graphRestrictions.pop();
         return translatedPattern;
@@ -410,7 +392,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Service service)
+    public SqlIntercode visit(Service service)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -419,35 +401,22 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Union union)
+    public SqlIntercode visit(Union union)
     {
-        TranslatedSegment translatedPattern = null;
+        SqlIntercode translatedPattern = new SqlNoSolution();
 
         for(GraphPattern pattern : union.getPatterns())
         {
-            TranslatedSegment translated = visitElement(pattern);
-
-            if(translatedPattern == null)
-            {
-                translatedPattern = translated;
-            }
-            else
-            {
-                SqlIntercode intercode = SqlUnion.union(translatedPattern.getIntercode(), translated.getIntercode());
-                List<String> variablesInScope = TranslatedSegment
-                        .mergeVariableLists(translatedPattern.getVariablesInScope(), translated.getVariablesInScope());
-
-                translatedPattern = new TranslatedSegment(variablesInScope, intercode);
-            }
+            SqlIntercode translated = visitElement(pattern);
+            translatedPattern = SqlUnion.union(translatedPattern, translated);
         }
 
-        assert translatedPattern != null;
         return translatedPattern;
     }
 
 
     @Override
-    public TranslatedSegment visit(Values values)
+    public SqlIntercode visit(Values values)
     {
         final int size = values.getVariables().size();
 
@@ -549,12 +518,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             }
         }
 
-        return new TranslatedSegment(variablesInScope, new SqlValues(usedVariables, typedVariables, typedValuesList));
+        return new SqlValues(usedVariables, typedVariables, typedValuesList);
     }
 
 
     @Override
-    public TranslatedSegment visit(Triple triple)
+    public SqlIntercode visit(Triple triple)
     {
         Node graph = null;
         Node subject = triple.getSubject();
@@ -585,12 +554,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             variablesInScope.add(((Variable) object).getName());
 
 
-        return new TranslatedSegment(variablesInScope, translatedPattern);
+        return translatedPattern;
     }
 
 
     @Override
-    public TranslatedSegment visit(Minus minus)
+    public SqlIntercode visit(Minus minus)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -599,7 +568,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Optional optional)
+    public SqlIntercode visit(Optional optional)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -608,7 +577,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Bind bind)
+    public SqlIntercode visit(Bind bind)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -617,7 +586,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
 
     @Override
-    public TranslatedSegment visit(Filter filter)
+    public SqlIntercode visit(Filter filter)
     {
         // handled specially as part of GroupGraph
         assert false;
@@ -628,10 +597,18 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
     private void checkProjectionVariables(Select select)
     {
-        if(!select.getGroupByConditions().isEmpty() && select.getProjections().isEmpty())
-            messages.add(new TranslateMessage(MessageType.invalidProjection, select.getRange()));
+        HashSet<String> vars = new HashSet<>();
 
-        if(!isInAggregateMode(select))
+        for(Projection projection : select.getProjections())
+        {
+            if(vars.contains(projection.getVariable().getName()))
+                messages.add(new TranslateMessage(MessageType.repeatOfProjectionVariable,
+                        projection.getVariable().getRange(), projection.getVariable().toString()));
+
+            vars.add(projection.getVariable().getName());
+        }
+
+        if(!select.isInAggregateMode())
             return;
 
         HashSet<String> groupVars = new HashSet<>();
@@ -647,15 +624,8 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         for(Expression havingCondition : select.getHavingConditions())
             checkExpressionForGroupedSolutions(havingCondition, groupVars);
 
-        HashSet<String> vars = new HashSet<>();
         for(Projection projection : select.getProjections())
         {
-            if(vars.contains(projection.getVariable().getName()))
-                messages.add(new TranslateMessage(MessageType.repeatOfProjectionVariable,
-                        projection.getVariable().getRange(), projection.getVariable().toString()));
-
-            vars.add(projection.getVariable().getName());
-
             if(projection.getExpression() != null)
                 checkExpressionForGroupedSolutions(projection.getExpression(), groupVars);
             else
@@ -664,25 +634,6 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         for(OrderCondition orderCondition : select.getOrderByConditions())
             checkExpressionForGroupedSolutions(orderCondition.getExpression(), groupVars);
-    }
-
-
-    private boolean isInAggregateMode(Select select)
-    {
-        // check whether aggregateMode is explicit
-        if(!select.getGroupByConditions().isEmpty() || !select.getHavingConditions().isEmpty())
-            return true;
-
-        // check whether aggregateMode is implicit
-        for(Projection projection : select.getProjections())
-            if(projection.getExpression() != null && containsAggregateFunction(projection.getExpression()))
-                return true;
-
-        for(OrderCondition orderCondition : select.getOrderByConditions())
-            if(containsAggregateFunction(orderCondition.getExpression()))
-                return true;
-
-        return false;
     }
 
 
@@ -762,50 +713,12 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private boolean containsAggregateFunction(Expression expression)
+    private SqlIntercode translatePatternList(List<Pattern> patterns)
     {
-        if(expression == null)
-            return false;
-
-        Boolean ret = new ElementVisitor<Boolean>()
-        {
-            @Override
-            public Boolean visit(BuiltInCallExpression call)
-            {
-                return call.isAggregateFunction();
-            }
-
-            @Override
-            public Boolean visit(GroupGraph expr)
-            {
-                return false;
-            }
-
-            @Override
-            public Boolean visit(Select expr)
-            {
-                return false;
-            }
-
-            @Override
-            protected Boolean aggregateResult(List<Boolean> results)
-            {
-                return results.stream().anyMatch(x -> (x != null && x));
-            }
-
-        }.visitElement(expression);
-
-        return ret != null && ret;
-    }
-
-
-    private TranslatedSegment translatePatternList(List<Pattern> patterns)
-    {
-        TranslatedSegment translatedGroupPattern = new TranslatedSegment(new ArrayList<String>(),
-                new SqlEmptySolution());
+        SqlIntercode translatedGroupPattern = new SqlEmptySolution();
 
         LinkedList<Filter> filters = new LinkedList<>();
-
+        LinkedList<String> inScopeVariables = new LinkedList<String>();
 
         for(Pattern pattern : patterns)
         {
@@ -813,7 +726,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             {
                 GraphPattern optionalPattern = ((Optional) pattern).getPattern();
 
-                TranslatedSegment translatedPattern = null;
+                SqlIntercode translatedPattern = null;
                 LinkedList<Filter> optionalFilters = new LinkedList<>();
 
 
@@ -837,6 +750,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 }
 
                 translatedGroupPattern = translateLeftJoin(translatedGroupPattern, translatedPattern, optionalFilters);
+                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else if(pattern instanceof Minus)
             {
@@ -844,7 +758,14 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             }
             else if(pattern instanceof Bind)
             {
+                String variableName = ((Bind) pattern).getVariable().getName();
+
+                if(inScopeVariables.contains(variableName))
+                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
+                            ((Bind) pattern).getVariable().getRange(), variableName));
+
                 translatedGroupPattern = translateBind((Bind) pattern, translatedGroupPattern);
+                inScopeVariables.add(variableName);
             }
             else if(pattern instanceof Filter)
             {
@@ -853,21 +774,19 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             else if(pattern instanceof ProcedureCallBase)
             {
                 translatedGroupPattern = translateProcedureCall((ProcedureCallBase) pattern, translatedGroupPattern);
+                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else if(pattern instanceof Service)
             {
                 translatedGroupPattern = translateService((Service) pattern, translatedGroupPattern);
+                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else
             {
-                TranslatedSegment translatedPattern = visitElement(pattern);
+                SqlIntercode translatedPattern = visitElement(pattern);
 
-                SqlIntercode intercode = SqlJoin.join(schema, translatedGroupPattern.getIntercode(),
-                        translatedPattern.getIntercode());
-                List<String> variablesInScope = TranslatedSegment.mergeVariableLists(
-                        translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
-
-                translatedGroupPattern = new TranslatedSegment(variablesInScope, intercode);
+                translatedGroupPattern = SqlJoin.join(schema, translatedGroupPattern, translatedPattern);
+                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
         }
 
@@ -875,32 +794,27 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateLeftJoin(TranslatedSegment translatedGroupPattern,
-            TranslatedSegment translatedPattern, LinkedList<Filter> optionalFilters)
+    private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
+            LinkedList<Filter> optionalFilters)
     {
-        List<String> variablesInScope = TranslatedSegment.mergeVariableLists(
-                translatedGroupPattern.getVariablesInScope(), translatedPattern.getVariablesInScope());
-
         List<SqlExpressionIntercode> conditions = null;
 
         if(!optionalFilters.isEmpty())
         {
-            VariableAccessor variableAccessor = new LeftJoinVariableAccessor(
-                    translatedGroupPattern.getIntercode().getVariables(),
-                    translatedPattern.getIntercode().getVariables());
+            VariableAccessor variableAccessor = new LeftJoinVariableAccessor(translatedGroupPattern.getVariables(),
+                    translatedPattern.getVariables());
             conditions = translateLeftJoinFilters(optionalFilters, variableAccessor);
 
             if(conditions == null)
-                return new TranslatedSegment(variablesInScope, translatedGroupPattern.getIntercode());
+                return translatedGroupPattern;
         }
 
         if(conditions == null)
             conditions = new LinkedList<SqlExpressionIntercode>();
 
-        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern.getIntercode(),
-                translatedPattern.getIntercode(), conditions);
+        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern, translatedPattern, conditions);
 
-        return new TranslatedSegment(variablesInScope, intercode);
+        return intercode;
     }
 
 
@@ -935,40 +849,31 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateMinus(Minus pattern, TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
     {
-        TranslatedSegment minusPattern = visitElement(pattern.getPattern());
+        SqlIntercode minusPattern = visitElement(pattern.getPattern());
 
-        SqlIntercode intercode = SqlMinus.minus(translatedGroupPattern.getIntercode(), minusPattern.getIntercode());
-        return new TranslatedSegment(translatedGroupPattern.getVariablesInScope(), intercode);
+        return SqlMinus.minus(translatedGroupPattern, minusPattern);
     }
 
 
-    private TranslatedSegment translateBind(Bind bind, TranslatedSegment translatedGroupPattern)
+    private SqlIntercode translateBind(Bind bind, SqlIntercode translatedGroupPattern)
     {
         String variableName = bind.getVariable().getName();
-
-        if(translatedGroupPattern.getVariablesInScope().contains(variableName))
-            messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind, bind.getVariable().getRange(),
-                    variableName));
 
         checkExpressionForUnGroupedSolutions(bind.getExpression());
 
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                new SimpleVariableAccessor(translatedGroupPattern.getIntercode().getVariables()), this);
+                new SimpleVariableAccessor(translatedGroupPattern.getVariables()), this);
 
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
-        ArrayList<String> variables = new ArrayList<String>(translatedGroupPattern.getVariablesInScope().size() + 1);
-        variables.addAll(translatedGroupPattern.getVariablesInScope());
-        variables.add(variableName);
-
-        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern.getIntercode());
-        return new TranslatedSegment(variables, intercode);
+        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern);
+        return intercode;
     }
 
 
-    private SqlIntercode translateFilters(List<SqlExpressionIntercode> filterExpressions, SqlIntercode child)
+    private SqlIntercode translateSqlFilters(List<SqlExpressionIntercode> filterExpressions, SqlIntercode child)
     {
         if(child instanceof SqlNoSolution)
             return new SqlNoSolution();
@@ -985,7 +890,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
                 List<SqlExpressionIntercode> optimizedExpressions = filterExpressions.stream()
                         .map(f -> SqlEffectiveBooleanValue.create(f.optimize(accessor))).collect(Collectors.toList());
 
-                union = SqlUnion.union(union, translateFilters(optimizedExpressions, subChild));
+                union = SqlUnion.union(union, translateSqlFilters(optimizedExpressions, subChild));
             }
 
             return union;
@@ -1016,7 +921,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     }
 
 
-    private TranslatedSegment translateFilters(List<Filter> filters, TranslatedSegment groupPattern)
+    private SqlIntercode translateFilters(List<Filter> filters, SqlIntercode groupPattern)
     {
         if(filters.size() == 0)
             return groupPattern;
@@ -1029,7 +934,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             checkExpressionForUnGroupedSolutions(filter.getConstraint());
 
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(groupPattern.getIntercode().getVariables()), this);
+                    new SimpleVariableAccessor(groupPattern.getVariables()), this);
 
             SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
             expression = SqlEffectiveBooleanValue.create(expression);
@@ -1037,16 +942,15 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             filterExpressions.add(expression);
         }
 
-        return new TranslatedSegment(groupPattern.getVariablesInScope(),
-                translateFilters(filterExpressions, groupPattern.getIntercode()));
+        return translateSqlFilters(filterExpressions, groupPattern);
     }
 
 
-    private TranslatedSegment translateProcedureCall(ProcedureCallBase procedureCallBase, TranslatedSegment context)
+    private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
         ProcedureDefinition procedureDefinition = procedures.get(procedureName.getValue());
-        UsedVariables contextVariables = context.getIntercode().getVariables();
+        UsedVariables contextVariables = context.getVariables();
 
 
         /* check graph */
@@ -1180,38 +1084,27 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
             }
         }
 
-        SqlIntercode intercode = SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes,
-                context.getIntercode());
-
-        return new TranslatedSegment(variablesInScope, intercode);
+        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
     }
 
 
-    private TranslatedSegment translateService(Service service, TranslatedSegment context)
+    private SqlIntercode translateService(Service service, SqlIntercode context)
     {
-        List<String> contextInScopeVars = context.getVariablesInScope();
-        SqlIntercode contextIntercode = context.getIntercode();
-
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
         List<String> serviceInScopeVars = visitor.visitElement(service.getPattern());
         String serviceCode = visitor.getResultCode();
 
-        List<String> inScopeVars = new LinkedList<String>();
-        inScopeVars.addAll(contextInScopeVars);
-        serviceInScopeVars.stream().filter(v -> !contextInScopeVars.contains(v)).forEach(v -> inScopeVars.add(v));
-
-
         VarOrIri name = service.getName();
 
-        if(contextIntercode instanceof SqlNoSolution)
-            return new TranslatedSegment(inScopeVars, new SqlNoSolution());
+        if(context instanceof SqlNoSolution)
+            return new SqlNoSolution();
 
-        if(name instanceof Variable && contextIntercode.getVariables().get(((Variable) name).getName()) == null)
-            return new TranslatedSegment(inScopeVars, new SqlNoSolution());
+        if(name instanceof Variable && context.getVariables().get(((Variable) name).getName()) == null)
+            return new SqlNoSolution();
 
 
         /* create variable lists */
-        List<String> contextVariables = contextIntercode.getVariables().getValues().stream().map(v -> v.getName())
+        List<String> contextVariables = context.getVariables().getValues().stream().map(v -> v.getName())
                 .collect(Collectors.toList());
 
         List<String> mergedVariables = new LinkedList<String>();
@@ -1231,7 +1124,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         try
         {
             /* evaluate context pattern */
-            SqlSelect sqlSelect = new SqlSelect(contextVariables, contextIntercode.getVariables(), contextIntercode,
+            SqlSelect sqlSelect = new SqlSelect(contextVariables, context.getVariables(), context,
                     new LinkedHashMap<String, Direction>());
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
 
@@ -1485,22 +1378,15 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         }
 
         if(results.isEmpty())
-            return new TranslatedSegment(inScopeVars, new SqlNoSolution());
+            return new SqlNoSolution();
 
-        return new TranslatedSegment(inScopeVars, new SqlValues(usedVariables, typedVariables, results));
+        return new SqlValues(usedVariables, typedVariables, results);
     }
 
 
-    private TranslatedSegment createEmptyServiceTranslatedSegment(List<String> serviceInScopeVars,
-            TranslatedSegment context)
+    private SqlIntercode createEmptyServiceTranslatedSegment(List<String> serviceInScopeVars, SqlIntercode context)
     {
-        List<String> contextInScopeVars = context.getVariablesInScope();
-
-        List<String> inScopeVars = new LinkedList<String>();
-        inScopeVars.addAll(contextInScopeVars);
-        serviceInScopeVars.stream().filter(v -> !contextInScopeVars.contains(v)).forEach(v -> inScopeVars.add(v));
-
-        List<String> mergedVariables = context.getIntercode().getVariables().getValues().stream().map(v -> v.getName())
+        List<String> mergedVariables = context.getVariables().getValues().stream().map(v -> v.getName())
                 .collect(Collectors.toList());
         serviceInScopeVars.stream().filter(v -> !mergedVariables.contains(v)).forEach(v -> mergedVariables.add(v));
 
@@ -1510,8 +1396,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
 
         UsedVariables usedVariables = new UsedVariables();
 
-        context.getIntercode().getVariables().getValues().stream().filter(v -> !v.canBeNull())
-                .forEach(v -> usedVariables.add(v));
+        context.getVariables().getValues().stream().filter(v -> !v.canBeNull()).forEach(v -> usedVariables.add(v));
 
         for(String var : mergedVariables)
             if(usedVariables.get(var) == null)
@@ -1523,7 +1408,7 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
         for(String var : mergedVariables)
             typedVariables.add(new Pair<String, Set<ResourceClass>>(var, usedVariables.get(var).getClasses()));
 
-        return new TranslatedSegment(inScopeVars, new SqlValues(usedVariables, typedVariables, new ArrayList<>()));
+        return new SqlValues(usedVariables, typedVariables, new ArrayList<>());
     }
 
 
@@ -1574,9 +1459,9 @@ public class TranslateVisitor extends ElementVisitor<TranslatedSegment>
     {
         try
         {
-            TranslatedSegment segment = visitElement(sparqlQuery);
+            SqlIntercode imcode = visitElement(sparqlQuery);
 
-            return segment.getIntercode().translate();
+            return imcode.translate();
         }
         catch(SQLRuntimeException e)
         {

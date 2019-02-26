@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
-import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 
@@ -11,29 +10,24 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
  * <p>
  * Corresponds to the rule [57] OptionalGraphPattern in the SPARQL grammar.
  */
-public class Optional extends BaseElement implements Pattern
+public class Optional extends PatternElement implements Pattern
 {
-    private GraphPattern pattern;
+    private final GraphPattern pattern;
 
-    public Optional()
-    {
-        this(null);
-    }
 
     public Optional(GraphPattern pattern)
     {
         this.pattern = pattern;
+
+        variablesInScope.addAll(pattern.getVariablesInScope());
     }
+
 
     public GraphPattern getPattern()
     {
         return pattern;
     }
 
-    public void setPattern(GraphPattern pattern)
-    {
-        this.pattern = pattern;
-    }
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

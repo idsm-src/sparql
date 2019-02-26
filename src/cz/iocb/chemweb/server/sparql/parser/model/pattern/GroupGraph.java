@@ -2,8 +2,8 @@ package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 
@@ -14,24 +14,25 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
  * <p>
  * Corresponds to the rule [54] GroupGraphPatternSub in the SPARQL grammar.
  */
-public class GroupGraph extends BaseElement implements GraphPattern
+public class GroupGraph extends PatternElement implements GraphPattern
 {
-    private List<Pattern> patterns;
+    private final List<Pattern> patterns;
 
-    public GroupGraph()
-    {
-        patterns = new ArrayList<>();
-    }
 
     public GroupGraph(Collection<Pattern> patterns)
     {
-        this.patterns = new ArrayList<>(patterns);
+        this.patterns = Collections.unmodifiableList(new ArrayList<>(patterns));
+
+        for(Pattern pattern : patterns)
+            variablesInScope.addAll(pattern.getVariablesInScope());
     }
+
 
     public List<Pattern> getPatterns()
     {
         return patterns;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

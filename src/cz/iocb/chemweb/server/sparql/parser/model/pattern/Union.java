@@ -2,8 +2,8 @@ package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 
@@ -14,24 +14,25 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
  * <p>
  * Corresponds to the rule [67] GroupOrUnionGraphPattern in the SPARQL grammar, with at least one {@code UNION}.
  */
-public class Union extends BaseElement implements Pattern
+public class Union extends PatternElement implements Pattern
 {
-    private List<GraphPattern> patterns;
+    private final List<GraphPattern> patterns;
 
-    public Union()
-    {
-        patterns = new ArrayList<>();
-    }
 
     public Union(Collection<GraphPattern> patterns)
     {
-        this.patterns = new ArrayList<>(patterns);
+        this.patterns = Collections.unmodifiableList(new ArrayList<>(patterns));
+
+        for(Pattern pattern : patterns)
+            variablesInScope.addAll(pattern.getVariablesInScope());
     }
+
 
     public List<GraphPattern> getPatterns()
     {
         return patterns;
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)
