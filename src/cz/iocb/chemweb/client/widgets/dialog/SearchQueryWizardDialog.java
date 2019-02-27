@@ -410,7 +410,7 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(method == Methods.EXACTSEARCH)
             {
-                query.append(";\n      sachem:graphMode sachem:exactSearch");
+                query.append(";\n      sachem:searchMode sachem:exactSearch");
             }
 
             if(method == Methods.SUBSEARCH || method == Methods.EXACTSEARCH)

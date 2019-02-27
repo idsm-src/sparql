@@ -52,8 +52,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
         addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatPattern));
 
-        String graphModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass("graphMode", Arrays.asList("integer"), graphModePattern));
+        String searchModePattern = sachem + "(substructureSearch|exactSearch)";
+        addIriClass(new UserIriClass("searchMode", Arrays.asList("integer"), searchModePattern));
 
         String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
         addIriClass(new UserIriClass("chargeMode", Arrays.asList("integer"), chargeModePattern));
@@ -105,7 +105,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
                 new IRI(sachem + "UnspecifiedFormat")));
         subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
-        subsearch.addParameter(new ParameterDefinition(sachem + "graphMode", getIriClass("graphMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("searchMode"),
                 new IRI(sachem + "substructureSearch")));
         subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("chargeMode"),
                 new IRI(sachem + "defaultChargeAsAny")));
