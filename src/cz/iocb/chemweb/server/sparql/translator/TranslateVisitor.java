@@ -161,19 +161,32 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Select select)
     {
-        /*
-         * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
-         *
-         * FIXME: This is not valid in general!
-         */
-        if(select.getValues() != null)
-            ((GroupGraph) select.getPattern()).getPatterns().add(0, select.getValues());
-
-
         checkProjectionVariables(select);
 
+
         // translate the WHERE clause
-        SqlIntercode translatedWhereClause = visitElement(select.getPattern());
+        GraphPattern pattern = select.getPattern();
+
+        if(select.getValues() != null)
+        {
+            /*
+             * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
+             *
+             * FIXME: This is not valid in general!
+             */
+
+            List<Pattern> patterns = new LinkedList<Pattern>();
+            patterns.add(select.getValues());
+
+            if(pattern instanceof GroupGraph)
+                patterns.addAll(((GroupGraph) pattern).getPatterns());
+            else
+                patterns.add(pattern);
+
+            pattern = new GroupGraph(patterns);
+        }
+
+        SqlIntercode translatedWhereClause = visitElement(pattern);
 
 
         // translate the GROUP BY clause

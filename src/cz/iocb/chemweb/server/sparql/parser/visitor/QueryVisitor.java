@@ -322,7 +322,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
         GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
-        Select result = withRange(new Select(projections, pattern), selectClauseCtx);
+        Select result = withRange(new Select(projections, pattern), selectClauseCtx.getParent());
 
 
         if(selectClauseCtx.DISTINCT() != null)
