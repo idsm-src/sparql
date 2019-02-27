@@ -546,128 +546,11 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     }
 
 
-    /**
-     * Quick (and dirty) fix to merge triplets representing a procedure call splitted by a remote endpoint.
-     *
-     * TODO: need to be addressed more generally
-     */
-    private Stream<Pattern> repairExpandedProcedureCalls(Stream<Pattern> stream)
-    {
-        if(!services.empty())
-            return stream;
-
-        List<Pattern> patterns = stream.collect(Collectors.toList());
-        LinkedList<Pattern> removed = new LinkedList<Pattern>();
-
-
-        for(Pattern pattern : patterns)
-        {
-            if(removed.contains(pattern))
-                continue;
-
-            if(!(pattern instanceof ComplexTriple))
-                continue;
-
-            ComplexTriple triple = (ComplexTriple) pattern;
-
-            List<Property> properties = triple.getProperties();
-
-            if(properties.size() != 1)
-                continue;
-
-            Property property = properties.get(0);
-            Verb verb = property.getVerb();
-
-            if(!(verb instanceof IRI))
-                continue;
-
-            ProcedureDefinition callDefinition = config.getProcedures().get(((IRI) verb).getValue());
-
-            if(callDefinition == null)
-                continue;
-
-            List<ComplexNode> objects = property.getObjects();
-
-            if(objects.size() != 1)
-                continue;
-
-            ComplexNode object = objects.get(0);
-
-            if(!(object instanceof Variable) && !(object instanceof BlankNode))
-                continue;
-
-
-            /* procedure call object needs to be fixed */
-            BlankNodePropertyList objectBlanknode = new BlankNodePropertyList();
-            objectBlanknode.setRange(object.getRange());
-            property.getObjects().set(0, objectBlanknode);
-
-            for(Pattern subPattern : patterns)
-            {
-                if(subPattern == pattern)
-                    continue;
-
-                if(!(subPattern instanceof ComplexTriple))
-                    continue;
-
-                ComplexTriple subTriple = (ComplexTriple) subPattern;
-
-                ComplexNode subSubject = subTriple.getNode();
-
-                if(subSubject.equals(object))
-                {
-                    objectBlanknode.getProperties().addAll(subTriple.getProperties());
-                    removed.add(subPattern);
-                }
-            }
-
-
-            if(callDefinition.isSimple())
-                continue;
-
-            ComplexNode subject = triple.getNode();
-
-            if(!(subject instanceof Variable) && !(subject instanceof BlankNode))
-                continue;
-
-
-            /* procedure call subject needs to be fixed */
-            BlankNodePropertyList subjectBlanknode = new BlankNodePropertyList();
-            subjectBlanknode.setRange(subject.getRange());
-            triple.setNode(subjectBlanknode);
-
-            for(Pattern subPattern : patterns)
-            {
-                if(subPattern == pattern)
-                    continue;
-
-                if(!(subPattern instanceof ComplexTriple))
-                    continue;
-
-                ComplexTriple subTriple = (ComplexTriple) subPattern;
-
-                ComplexNode subSubject = subTriple.getNode();
-
-                if(subSubject.equals(subject))
-                {
-                    subjectBlanknode.getProperties().addAll(subTriple.getProperties());
-                    removed.add(subPattern);
-                }
-            }
-        }
-
-        patterns.removeAll(removed);
-
-        return patterns.stream();
-    }
-
-
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = repairExpandedProcedureCalls(
-                new GroupGraphPatternVisitor(config, prologue, services, messages).visit(ctx))
-                        .collect(Collectors.toList());
+        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, messages).visit(ctx)
+                .collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
@@ -1001,30 +884,30 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitTriplesBlock(TriplesBlockContext ctx)
     {
-        return ctx.triplesSameSubjectPath().stream().flatMap(this::visit);
-    }
+        PropertiesVisitor propertiesVisitor = new PropertiesVisitor(prologue, messages);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
+        List<ComplexTriple> triples = new LinkedList<ComplexTriple>();
 
-
-    @Override
-    public Stream<Pattern> visitTriplesSameSubjectPath(TriplesSameSubjectPathContext ctx)
-    {
-        ComplexNode node;
-        Stream<Property> properties;
-
-        if(ctx.varOrTerm() != null)
+        for(TriplesSameSubjectPathContext triplesCtx : ctx.triplesSameSubjectPath())
         {
-            node = new NodeVisitor(prologue, messages).visit(ctx.varOrTerm());
-            properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPathNotEmpty());
-        }
-        else
-        {
-            node = new NodeVisitor(prologue, messages).visit(ctx.triplesNodePath());
-            properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPath());
+            if(triplesCtx.varOrTerm() != null)
+            {
+                ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
+                Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPathNotEmpty());
+                triples.add(new ComplexTriple(node, properties.collect(Collectors.toList())));
+            }
+            else
+            {
+                ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNodePath());
+                Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPath());
+                triples.add(new ComplexTriple(node, properties.collect(Collectors.toList())));
+            }
         }
 
-        ComplexTriple triple = new ComplexTriple(node, properties.collect(Collectors.toList()));
         TripleExpander tripleExpander = new TripleExpander(config, prologue, services, messages);
-        tripleExpander.visit(triple);
+
+        for(ComplexTriple triple : repairExpandedProcedureCalls(triples))
+            tripleExpander.visit(triple);
 
         return tripleExpander.getResults().stream();
     }
@@ -1040,6 +923,118 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
         Stream<Pattern> triplesPatterns = visitIfNotNull(ctx.triplesBlock());
 
         return Stream.concat(Stream.of(graphPattern), triplesPatterns);
+    }
+
+
+    /**
+     * Quick (and dirty) fix to merge triplets representing a procedure call splitted by a remote endpoint.
+     *
+     * TODO: need to be addressed more generally
+     */
+    private List<ComplexTriple> repairExpandedProcedureCalls(List<ComplexTriple> patterns)
+    {
+        if(!services.empty())
+            return patterns;
+
+        LinkedList<ComplexTriple> removed = new LinkedList<ComplexTriple>();
+
+
+        for(ComplexTriple triple : patterns)
+        {
+            if(removed.contains(triple))
+                continue;
+
+            List<Property> properties = triple.getProperties();
+
+            if(properties.size() != 1)
+                continue;
+
+            Property property = properties.get(0);
+            Verb verb = property.getVerb();
+
+            if(!(verb instanceof IRI))
+                continue;
+
+            ProcedureDefinition callDefinition = config.getProcedures().get(((IRI) verb).getValue());
+
+            if(callDefinition == null)
+                continue;
+
+            List<ComplexNode> objects = property.getObjects();
+
+            if(objects.size() != 1)
+                continue;
+
+            ComplexNode object = objects.get(0);
+
+            if(!(object instanceof Variable) && !(object instanceof BlankNode))
+                continue;
+
+
+            /* procedure call object needs to be fixed */
+            BlankNodePropertyList objectBlanknode = new BlankNodePropertyList();
+            objectBlanknode.setRange(object.getRange());
+            property.getObjects().set(0, objectBlanknode);
+
+            for(ComplexTriple subPattern : patterns)
+            {
+                if(subPattern == triple)
+                    continue;
+
+                if(!(subPattern instanceof ComplexTriple))
+                    continue;
+
+                ComplexTriple subTriple = subPattern;
+
+                ComplexNode subSubject = subTriple.getNode();
+
+                if(subSubject.equals(object))
+                {
+                    objectBlanknode.getProperties().addAll(subTriple.getProperties());
+                    removed.add(subPattern);
+                }
+            }
+
+
+            if(callDefinition.isSimple())
+                continue;
+
+            ComplexNode subject = triple.getNode();
+
+            if(!(subject instanceof Variable) && !(subject instanceof BlankNode))
+                continue;
+
+
+            /* procedure call subject needs to be fixed */
+            BlankNodePropertyList subjectBlanknode = new BlankNodePropertyList();
+            subjectBlanknode.setRange(subject.getRange());
+            triple.setNode(subjectBlanknode);
+
+            for(ComplexTriple subPattern : patterns)
+            {
+                if(subPattern == triple)
+                    continue;
+
+                if(!(subPattern instanceof ComplexTriple))
+                    continue;
+
+                ComplexTriple subTriple = subPattern;
+
+                ComplexNode subSubject = subTriple.getNode();
+
+                if(subSubject.equals(subject))
+                {
+                    subjectBlanknode.getProperties().addAll(subTriple.getProperties());
+                    removed.add(subPattern);
+                }
+            }
+        }
+
+
+        patterns = new LinkedList<ComplexTriple>(patterns);
+        patterns.removeAll(removed);
+
+        return patterns;
     }
 }
 
