@@ -30,12 +30,9 @@
           </td>
         </tr>
           #sparql($value)
-            SELECT ?VALUE WHERE
+            SELECT ?VALUE FROM descriptor:compound WHERE
             {
-              GRAPH descriptor:compound
-              {
-                descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
-              }
+              descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
             }
           #end
 

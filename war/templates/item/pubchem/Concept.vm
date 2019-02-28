@@ -1,10 +1,7 @@
 #sparql($concept)
-  SELECT ?LABEL WHERE
+  SELECT ?LABEL FROM pubchem:concept WHERE
   {
-    GRAPH pubchem:concept
-    {
-      $entity skos:prefLabel ?LABEL
-    }
+    $entity skos:prefLabel ?LABEL
   }
 #end
 

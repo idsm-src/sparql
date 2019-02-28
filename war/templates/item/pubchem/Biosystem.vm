@@ -1,12 +1,9 @@
 #set($BSID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
 
 #sparql($title)
-  SELECT ?TITLE  WHERE
+  SELECT ?TITLE FROM pubchem:biosystem WHERE
   {
-    GRAPH pubchem:biosystem
-    {
-      $entity dcterms:title ?TITLE
-    }
+    $entity dcterms:title ?TITLE
   }
 #end
 

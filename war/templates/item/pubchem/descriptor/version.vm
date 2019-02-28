@@ -1,12 +1,9 @@
 #parse("common/utils.vm")
 
 #sparql($data)
-  SELECT ?VALUE WHERE
+  SELECT ?VALUE FROM descriptor:substance WHERE
   {
-    GRAPH descriptor:substance
-    {
-      $entity sio:has-value ?VALUE.
-    }
+    $entity sio:has-value ?VALUE.
   }
 #end
 

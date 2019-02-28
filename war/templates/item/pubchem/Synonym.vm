@@ -1,10 +1,7 @@
 #sparql($synonym)
-  SELECT ?VALUE WHERE
+  SELECT ?VALUE FROM pubchem:synonym WHERE
   {
-    GRAPH pubchem:synonym
-    {
-      $entity sio:has-value ?VALUE
-    }
+    $entity sio:has-value ?VALUE
   }
 #end
 

@@ -1,12 +1,9 @@
 #set($PMID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
 
 #sparql($title)
-  SELECT ?TITLE  WHERE
+  SELECT ?TITLE FROM pubchem:reference WHERE
   {
-    GRAPH pubchem:reference
-    {
-      $entity dcterms:title ?TITLE
-    }
+    $entity dcterms:title ?TITLE
   }
 #end
 

@@ -1,12 +1,9 @@
 #set($ID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
 
 #sparql($title)
-  SELECT ?TITLE  WHERE
+  SELECT ?TITLE FROM pubchem:source WHERE
   {
-    GRAPH pubchem:source
-    {
-      $entity dcterms:title ?TITLE
-    }
+    $entity dcterms:title ?TITLE
   }
 #end
 

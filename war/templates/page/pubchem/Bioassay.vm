@@ -2,43 +2,31 @@
 #set($AID = $uri.replaceAll(".*AID",""))
 
 #sparql($title)
-  SELECT ?TITLE  WHERE
+  SELECT ?TITLE FROM pubchem:bioassay WHERE
   {
-    GRAPH pubchem:bioassay
-    {
-      $entity dcterms:title ?TITLE
-    }
+    $entity dcterms:title ?TITLE
   }
 #end
 
 #sparql($description)
-SELECT ?VALUE WHERE
-{
-  graph pubchem:bioassay
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
   {
     <${uri}_Description> sio:has-value ?VALUE
   }
-}
 #end
 
 #sparql($protocol)
-SELECT ?VALUE WHERE
-{
-  graph pubchem:bioassay
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
   {
     <${uri}_Protocol> sio:has-value ?VALUE
   }
-}
 #end
 
 #sparql($comment)
-SELECT ?VALUE WHERE
-{
-  graph pubchem:bioassay
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
   {
     <${uri}_Comment> sio:has-value ?VALUE
   }
-}
 #end
 
 
