@@ -19,6 +19,7 @@ public class Select extends PatternElement implements GraphPattern
 {
     private final List<Projection> projections;
     private final GraphPattern pattern;
+    private final boolean isSubSelect;
     private boolean isDistinct;
     private boolean isReduced;
     private boolean isInAggregateMode;
@@ -31,13 +32,20 @@ public class Select extends PatternElement implements GraphPattern
     private Values values;
 
 
-    public Select(List<Projection> projections, GraphPattern pattern)
+    public Select(List<Projection> projections, GraphPattern pattern, boolean isSubSelect)
     {
         this.projections = Collections.unmodifiableList(projections);
         this.pattern = pattern;
+        this.isSubSelect = isSubSelect;
 
         for(Projection projection : projections)
             variablesInScope.add(projection.getVariable().getName());
+    }
+
+
+    public boolean isSubSelect()
+    {
+        return isSubSelect;
     }
 
 

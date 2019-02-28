@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
@@ -40,23 +40,27 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 
 
 
-public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
+public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 {
-    private List<String> empty = new LinkedList<String>();
+    private HashSet<String> empty = new HashSet<String>();
     private StringBuilder builder = new StringBuilder();
 
 
     @Override
-    protected List<String> aggregateResult(List<List<String>> results)
+    protected HashSet<String> aggregateResult(List<HashSet<String>> results)
     {
         throw new RuntimeException();
     }
 
 
     @Override
-    public List<String> visit(Select select)
+    public HashSet<String> visit(Select select)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
+
+        if(select.isSubSelect())
+            builder.append("{");
+
         builder.append(" select ");
 
         if(select.isDistinct())
@@ -70,7 +74,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
         builder.append(" where ");
 
-        List<String> variables = visitElement(select.getPattern());
+        HashSet<String> variables = visitElement(select.getPattern());
 
         if(result.isEmpty())
             result.addAll(variables);
@@ -107,17 +111,20 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
         visitElement(select.getValues());
 
+        if(select.isSubSelect())
+            builder.append("}");
+
         return result;
     }
 
 
     @Override
-    public List<String> visit(Projection projection)
+    public HashSet<String> visit(Projection projection)
     {
         if(projection.getExpression() != null)
             builder.append("(");
 
-        List<String> result = visitElement(projection.getVariable());
+        HashSet<String> result = visitElement(projection.getVariable());
 
         if(projection.getExpression() != null)
         {
@@ -131,7 +138,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(GroupCondition groupCondition)
+    public HashSet<String> visit(GroupCondition groupCondition)
     {
         builder.append("(");
 
@@ -150,7 +157,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(OrderCondition orderCondition)
+    public HashSet<String> visit(OrderCondition orderCondition)
     {
         builder.append(orderCondition.getDirection().getText());
         builder.append("(");
@@ -162,9 +169,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(GroupGraph groupGraph)
+    public HashSet<String> visit(GroupGraph groupGraph)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
 
         builder.append("{");
 
@@ -178,9 +185,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Union union)
+    public HashSet<String> visit(Union union)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
 
         for(int i = 0; i < union.getPatterns().size(); i++)
         {
@@ -195,17 +202,17 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Optional optional)
+    public HashSet<String> visit(Optional optional)
     {
         builder.append(" optional ");
-        List<String> result = visitElement(optional.getPattern());
+        HashSet<String> result = visitElement(optional.getPattern());
 
         return result;
     }
 
 
     @Override
-    public List<String> visit(Minus minus)
+    public HashSet<String> visit(Minus minus)
     {
         builder.append(" minus ");
         visitElement(minus.getPattern());
@@ -215,7 +222,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Filter filter)
+    public HashSet<String> visit(Filter filter)
     {
         builder.append(" filter (");
         visitElement(filter.getConstraint());
@@ -226,9 +233,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Bind bind)
+    public HashSet<String> visit(Bind bind)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
         builder.append(" bind (");
 
         result.addAll(visitElement(bind.getVariable()));
@@ -242,9 +249,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Graph graph)
+    public HashSet<String> visit(Graph graph)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
         builder.append(" graph ");
 
         result.addAll(visitElement(graph.getName()));
@@ -255,9 +262,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Service service)
+    public HashSet<String> visit(Service service)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
         builder.append(" service");
 
         if(service.isSilent())
@@ -271,9 +278,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Values values)
+    public HashSet<String> visit(Values values)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
 
         builder.append(" values (");
 
@@ -297,7 +304,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Values.ValuesList valuesList)
+    public HashSet<String> visit(Values.ValuesList valuesList)
     {
         builder.append("(");
 
@@ -320,7 +327,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(BinaryExpression binaryExpression)
+    public HashSet<String> visit(BinaryExpression binaryExpression)
     {
         visitElement(binaryExpression.getLeft());
         builder.append(binaryExpression.getOperator().getText());
@@ -331,7 +338,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(InExpression inExpression)
+    public HashSet<String> visit(InExpression inExpression)
     {
         visitElement(inExpression.getLeft());
 
@@ -352,7 +359,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(UnaryExpression unaryExpression)
+    public HashSet<String> visit(UnaryExpression unaryExpression)
     {
         builder.append(unaryExpression.getOperator().getText());
         visitElement(unaryExpression.getOperand());
@@ -362,7 +369,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(BracketedExpression bracketedExpression)
+    public HashSet<String> visit(BracketedExpression bracketedExpression)
     {
         builder.append('(');
         visitElement(bracketedExpression.getChild());
@@ -373,7 +380,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(BuiltInCallExpression builtInCallExpression)
+    public HashSet<String> visit(BuiltInCallExpression builtInCallExpression)
     {
         builder.append(' ');
         builder.append(builtInCallExpression.getFunctionName());
@@ -412,7 +419,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(ExistsExpression existsExpression)
+    public HashSet<String> visit(ExistsExpression existsExpression)
     {
         if(existsExpression.isNegated())
             builder.append(" not");
@@ -425,7 +432,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(FunctionCallExpression functionCallExpression)
+    public HashSet<String> visit(FunctionCallExpression functionCallExpression)
     {
         visitElement(functionCallExpression.getFunction());
 
@@ -446,7 +453,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(IRI iri)
+    public HashSet<String> visit(IRI iri)
     {
         builder.append('<');
         builder.append(iri.getValue());
@@ -457,7 +464,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Literal literal)
+    public HashSet<String> visit(Literal literal)
     {
         builder.append('\'');
         builder.append(literal.getStringValue());
@@ -482,9 +489,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Variable variable)
+    public HashSet<String> visit(Variable variable)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
         result.add(variable.getName());
 
         builder.append(" ?");
@@ -496,9 +503,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(Triple triple)
+    public HashSet<String> visit(Triple triple)
     {
-        List<String> result = new LinkedList<String>();
+        HashSet<String> result = new HashSet<String>();
 
         result.addAll(visitElement(triple.getSubject()));
         builder.append(" ");
@@ -512,7 +519,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(BlankNode blankNode)
+    public HashSet<String> visit(BlankNode blankNode)
     {
         builder.append(" _:");
         builder.append(blankNode.getName());
@@ -523,7 +530,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(AlternativePath alternativePath)
+    public HashSet<String> visit(AlternativePath alternativePath)
     {
         for(int i = 0; i < alternativePath.getChildren().size(); i++)
         {
@@ -538,7 +545,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(SequencePath sequencePath)
+    public HashSet<String> visit(SequencePath sequencePath)
     {
         for(int i = 0; i < sequencePath.getChildren().size(); i++)
         {
@@ -553,7 +560,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(InversePath inversePath)
+    public HashSet<String> visit(InversePath inversePath)
     {
         builder.append("^");
         visitElement(inversePath.getChild());
@@ -563,7 +570,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(RepeatedPath repeatedPath)
+    public HashSet<String> visit(RepeatedPath repeatedPath)
     {
         visitElement(repeatedPath.getChild());
         builder.append(repeatedPath.getKind().getText());
@@ -573,7 +580,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(NegatedPath negatedPath)
+    public HashSet<String> visit(NegatedPath negatedPath)
     {
         builder.append("!");
         visitElement(negatedPath.getChild());
@@ -583,7 +590,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<List<String>>
 
 
     @Override
-    public List<String> visit(BracketedPath bracketedPath)
+    public HashSet<String> visit(BracketedPath bracketedPath)
     {
         builder.append("(");
         visitElement(bracketedPath.getChild());

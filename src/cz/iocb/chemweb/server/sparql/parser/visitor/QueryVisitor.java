@@ -182,7 +182,8 @@ public class QueryVisitor extends BaseVisitor<Query>
     @Override
     public SelectQuery visitSelectQuery(SelectQueryContext ctx)
     {
-        Select select = parseSelect(ctx.selectClause(), ctx.datasetClause(), ctx.whereClause(), ctx.solutionModifier());
+        Select select = parseSelect(ctx.selectClause(), ctx.datasetClause(), ctx.whereClause(), ctx.solutionModifier(),
+                false);
 
         return new SelectQuery(prologue, select);
     }
@@ -245,7 +246,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
     public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
-            WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx)
+            WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx, boolean isSubSelect)
     {
         LinkedList<Projection> projections = new LinkedList<Projection>();
 
@@ -322,7 +323,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
         GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
-        Select result = withRange(new Select(projections, pattern), selectClauseCtx.getParent());
+        Select result = withRange(new Select(projections, pattern, isSubSelect), selectClauseCtx.getParent());
 
 
         if(selectClauseCtx.DISTINCT() != null)
@@ -560,7 +561,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
         Select select = new QueryVisitor(config, prologue, services, messages).parseSelect(ctx.selectClause(), null,
-                ctx.whereClause(), ctx.solutionModifier());
+                ctx.whereClause(), ctx.solutionModifier(), true);
 
         select.setValues(new QueryVisitor(config, prologue, services, messages).parseValues(ctx.valuesClause()));
 

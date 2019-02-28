@@ -1104,7 +1104,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateService(Service service, SqlIntercode context)
     {
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
-        List<String> serviceInScopeVars = visitor.visitElement(service.getPattern());
+        HashSet<String> serviceInScopeVars = visitor.visitElement(service.getPattern());
         String serviceCode = visitor.getResultCode();
 
         VarOrIri name = service.getName();
@@ -1397,7 +1397,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode createEmptyServiceTranslatedSegment(List<String> serviceInScopeVars, SqlIntercode context)
+    private SqlIntercode createEmptyServiceTranslatedSegment(HashSet<String> serviceInScopeVars, SqlIntercode context)
     {
         List<String> mergedVariables = context.getVariables().getValues().stream().map(v -> v.getName())
                 .collect(Collectors.toList());
