@@ -5,7 +5,6 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
@@ -58,7 +57,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
             IRI type = new IriVisitor(prologue, messages).visit(ctx.iri());
 
             if(type == null)
-                type = xsdStringIri;
+                return new Literal(value);
 
             Literal literal = new Literal(value, type);
 
@@ -75,7 +74,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
         }
         else
         {
-            return new Literal(value, xsdStringIri);
+            return new Literal(value);
         }
     }
 

@@ -476,7 +476,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             builder.append(literal.getLanguageTag());
         }
 
-        else if(literal.getTypeIri() != null)
+        else if(literal.getTypeIri() != null && !literal.isSimple())
         {
             builder.append("^^");
             visitElement(literal.getTypeIri());

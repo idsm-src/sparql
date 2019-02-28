@@ -58,6 +58,18 @@ public class Literal extends BaseComplexNode implements Expression, Node
     private final String languageTag;
     private final IRI type;
     private final boolean isTypeSupported;
+    private final boolean isSimple;
+
+
+    public Literal(String value)
+    {
+        this.stringValue = value;
+        this.value = value;
+        this.languageTag = null;
+        this.type = xsdStringIri;
+        this.isTypeSupported = true;
+        this.isSimple = true;
+    }
 
 
     public Literal(String value, String languageTag)
@@ -67,6 +79,7 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.languageTag = languageTag.toLowerCase();
         this.type = BuiltinTypes.rdfLangStringIri;
         this.isTypeSupported = true;
+        this.isSimple = false;
     }
 
 
@@ -75,6 +88,7 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.stringValue = value;
         this.languageTag = null;
         this.type = typeIri;
+        this.isSimple = false;
 
         Type<?> typeClass = Type.getType(typeIri);
 
@@ -118,6 +132,12 @@ public class Literal extends BaseComplexNode implements Expression, Node
     public boolean isTypeSupported()
     {
         return isTypeSupported;
+    }
+
+
+    public boolean isSimple()
+    {
+        return isSimple;
     }
 
 
