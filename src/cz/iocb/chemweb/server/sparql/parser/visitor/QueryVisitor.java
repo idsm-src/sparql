@@ -47,7 +47,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PrefixDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.PrefixedNameContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.QueryContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SelectClauseContext;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SelectQueryContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SelectVariableContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ServiceGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SolutionModifierContext;
@@ -150,9 +149,12 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(ctx.selectQuery() != null)
         {
-            SelectQuery result = visitSelectQuery(ctx.selectQuery());
+            Select select = withRange(parseSelect(ctx.selectQuery().selectClause(), ctx.selectQuery().datasetClause(),
+                    ctx.selectQuery().whereClause(), ctx.selectQuery().solutionModifier(), ctx.valuesClause(), false),
+                    ctx);
+
+            SelectQuery result = new SelectQuery(prologue, select);
             result.setPrologue(prologue);
-            result.getSelect().setValues(parseValues(ctx.valuesClause()));
 
             prologue = null;
             return result;
@@ -176,16 +178,6 @@ public class QueryVisitor extends BaseVisitor<Query>
             return null;
 
         return (Values) new PatternVisitor(config, prologue, services, messages).visit(dataBlockCtx);
-    }
-
-
-    @Override
-    public SelectQuery visitSelectQuery(SelectQueryContext ctx)
-    {
-        Select select = parseSelect(ctx.selectClause(), ctx.datasetClause(), ctx.whereClause(), ctx.solutionModifier(),
-                false);
-
-        return new SelectQuery(prologue, select);
     }
 
 
@@ -246,7 +238,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
     public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
-            WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx, boolean isSubSelect)
+            WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx,
+            ValuesClauseContext valuesClauseContext, boolean isSubSelect)
     {
         LinkedList<Projection> projections = new LinkedList<Projection>();
 
@@ -258,7 +251,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         {
             HashSet<String> variables = new HashSet<String>();
 
-            new BaseVisitor<Void>()
+            BaseVisitor<Void> variableVisitor = new BaseVisitor<Void>()
             {
                 @Override
                 public Void visitFilter(FilterContext ctx)
@@ -286,7 +279,7 @@ public class QueryVisitor extends BaseVisitor<Query>
                     {
                         for(SelectVariableContext var : ctx.selectClause().selectVariable())
                             if(var.var() != null)
-                                visit(var);
+                                visit(var.var());
                     }
                     else if(!isInAggregateMode(ctx.selectClause(), ctx.solutionModifier()))
                     {
@@ -297,6 +290,9 @@ public class QueryVisitor extends BaseVisitor<Query>
                                 if(cnd.var() != null)
                                     visit(cnd.var());
                     }
+
+                    if(ctx.valuesClause() != null)
+                        visit(ctx.valuesClause());
 
                     return null;
                 }
@@ -314,7 +310,12 @@ public class QueryVisitor extends BaseVisitor<Query>
 
                     return null;
                 }
-            }.visit(whereClauseCtx);
+            };
+
+            variableVisitor.visit(whereClauseCtx);
+
+            if(valuesClauseContext != null)
+                variableVisitor.visit(valuesClauseContext);
         }
         else
         {
@@ -323,7 +324,9 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
         GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
-        Select result = withRange(new Select(projections, pattern, isSubSelect), selectClauseCtx.getParent());
+        Values values = parseValues(valuesClauseContext);
+
+        Select result = new Select(projections, pattern, values, isSubSelect);
 
 
         if(selectClauseCtx.DISTINCT() != null)
@@ -560,12 +563,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        Select select = new QueryVisitor(config, prologue, services, messages).parseSelect(ctx.selectClause(), null,
-                ctx.whereClause(), ctx.solutionModifier(), true);
-
-        select.setValues(new QueryVisitor(config, prologue, services, messages).parseValues(ctx.valuesClause()));
-
-        return select;
+        return withRange(new QueryVisitor(config, prologue, services, messages).parseSelect(ctx.selectClause(), null,
+                ctx.whereClause(), ctx.solutionModifier(), ctx.valuesClause(), true), ctx);
     }
 }
 
