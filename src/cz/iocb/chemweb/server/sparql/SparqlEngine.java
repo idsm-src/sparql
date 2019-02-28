@@ -55,14 +55,35 @@ public class SparqlEngine
         if(dataSets != null && !dataSets.isEmpty())
             syntaxTree.getSelect().setDataSets(dataSets);
 
+
+        if(offset > 0)
+        {
+            BigInteger oldOffset = syntaxTree.getSelect().getOffset();
+            BigInteger newOffset = BigInteger.valueOf(offset);
+
+            if(oldOffset != null)
+                newOffset = newOffset.add(oldOffset);
+
+            syntaxTree.getSelect().setOffset(newOffset);
+        }
+
         if(limit >= 0)
         {
             BigInteger oldLimit = syntaxTree.getSelect().getLimit();
             BigInteger newLimit = BigInteger.valueOf(limit + 1);
 
+            if(oldLimit != null && offset > 0)
+                oldLimit = oldLimit.subtract(BigInteger.valueOf(offset));
+
+            if(oldLimit != null && oldLimit.signum() == -1)
+                oldLimit = BigInteger.ZERO;
+
             if(oldLimit == null || oldLimit.compareTo(newLimit) == 1)
                 syntaxTree.getSelect().setLimit(newLimit);
+            else
+                syntaxTree.getSelect().setLimit(oldLimit);
         }
+
 
         TranslateVisitor translateVisitor = new TranslateVisitor(config, sslContext, messages, true);
         String code = translateVisitor.translate(syntaxTree);
