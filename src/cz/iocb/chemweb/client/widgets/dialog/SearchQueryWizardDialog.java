@@ -545,11 +545,11 @@ public class SearchQueryWizardDialog extends DialogBox
         switch(orderByListBox.getSelectedValue())
         {
             case "COMPOUND":
-                query.append("ORDER BY xsd:integer(substr(str(str(?COMPOUND)), 49))\n");
+                query.append("ORDER BY xsd:integer(substr(str(?COMPOUND), 49))\n");
                 break;
 
             case "BIOASSAY":
-                query.append("ORDER BY xsd:integer(substr(str(str(?BIOASSAY)), 49))\n");
+                query.append("ORDER BY xsd:integer(substr(str(?BIOASSAY), 49))\n");
                 break;
 
             case "SCORE":
