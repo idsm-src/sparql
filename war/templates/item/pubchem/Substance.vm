@@ -1,12 +1,9 @@
 #set($SID = $entity.toString().replaceAll(".*/SID", "").replaceAll(">",""))
 
 #sparql($compound)
-  SELECT ?COMPOUND WHERE
+  SELECT ?COMPOUND FROM pubchem:substance WHERE
   {
-    GRAPH pubchem:substance
-    {
-      $entity sio:CHEMINF_000477 ?COMPOUND
-    }
+    $entity sio:CHEMINF_000477 ?COMPOUND
   }
 #end
 
@@ -26,6 +23,7 @@
         }
       #end
 
+      #if($structure.count > 0)
       <td style="width:90px">
         <table style="width:80px">
           <tr>
@@ -35,6 +33,7 @@
           </tr>
         </table>
       </td>
+      #end
     #end
 
     <td>
@@ -46,12 +45,9 @@
         </tr>
         #if($CID)
           #sparql($value)
-            SELECT ?VALUE WHERE
+            SELECT ?VALUE FROM descriptor:compound WHERE
             {
-              GRAPH descriptor:compound
-              {
-                descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
-              }
+              descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
             }
           #end
 
