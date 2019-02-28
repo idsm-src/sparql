@@ -31,6 +31,8 @@ class Substance
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Substance.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/Substance.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
                     config.createLiteralMapping(xsdDateM4, "available"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
