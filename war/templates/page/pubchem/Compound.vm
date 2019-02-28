@@ -12,12 +12,9 @@
   </div>
 
   #sparql($iupac)
-    SELECT ?NAME WHERE
+    SELECT ?NAME FROM descriptor:compound WHERE
     {
-      GRAPH descriptor:compound
-      {
-        descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?NAME
-      }
+      descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?NAME
     }
   #end
 
@@ -48,77 +45,65 @@
   #end
 
 
-  #set( $descriptors = [
-    ["Molecular_Formula",            "molecular formula"],
-    ["Isomeric_SMILES",              "isomeric SMILES"],
-    ["Canonical_SMILES",             "canonical SMILES"],
-    ["IUPAC_InChI",                  "IUPAC InChI"],
+  #sparql($descriptors)
+    SELECT ?TITLE ?VALUE FROM descriptor:compound WHERE
+    {
+      ?NODE sio:has-value ?VALUE
+    }
+    VALUES (?NODE ?TITLE)
+    {
+      (descriptor:CID${CID}_Molecular_Formula            "molecular formula")
+      (descriptor:CID${CID}_Isomeric_SMILES              "isomeric SMILES")
+      (descriptor:CID${CID}_Canonical_SMILES             "canonical SMILES")
+      (descriptor:CID${CID}_IUPAC_InChI                  "IUPAC InChI")
+      (descriptor:CID${CID}_Exact_Mass                   "exact mass")
+      (descriptor:CID${CID}_Molecular_Weight             "molecular weight")
+      (descriptor:CID${CID}_Mono_Isotopic_Weight         "mono isotopic weight")
+      (descriptor:CID${CID}_Total_Formal_Charge          "total formal charge")
+      (descriptor:CID${CID}_XLogP3-AA                    "XLogP3-AA")
+      (descriptor:CID${CID}_TPSA                         "TPSA")
+      (descriptor:CID${CID}_Structure_Complexity         "structure complexity")
+      (descriptor:CID${CID}_Tautomer_Count               "tautomer count")
+      (descriptor:CID${CID}_Hydrogen_Bond_Acceptor_Count "hydrogen bond acceptor count")
+      (descriptor:CID${CID}_Defined_Atom_Stereo_Count    "defined atom stereo count")
+      (descriptor:CID${CID}_Defined_Bond_Stereo_Count    "defined bond stereo count")
+      (descriptor:CID${CID}_Undefined_Bond_Stereo_Count  "undefined bond stereo count")
+      (descriptor:CID${CID}_Isotope_Atom_Count           "isotope atom count")
+      (descriptor:CID${CID}_Covalent_Unit_Count          "covalent unit count")
+      (descriptor:CID${CID}_Hydrogen_Bond_Donor_Count    "hydrogen bond donor count")
+      (descriptor:CID${CID}_Non-hydrogen_Atom_Count      "non-hydrogen atom count")
+      (descriptor:CID${CID}_Rotatable_Bond_Count         "rotatable bond count")
+      (descriptor:CID${CID}_Undefined_Atom_Stereo_Count  "undefined atom stereo count")
+    }
+  #end
 
-    ["Exact_Mass",                   "exact mass"],
-    ["Molecular_Weight",             "molecular weight"],
-    ["Mono_Isotopic_Weight",         "mono isotopic weight"],
-    ["Total_Formal_Charge",          "total formal charge"],
-    ["XLogP3-AA",                    "XLogP3-AA"],
-    ["TPSA",                         "TPSA"],
+  #if($descriptors.count > 0)
+    <div class="VET-BoxedSection">
+      <div class="VET-Header">Descriptors</div>
+      <div>
+        <table class="VET-Table">
+          <colgroup>
+            <col style="width:220px"/>
+            <col/>
+          </colgroup>
 
-    ["Structure_Complexity",         "structure complexity"],
-    ["Tautomer_Count",               "tautomer count"],
-    ["Hydrogen_Bond_Acceptor_Count", "hydrogen bond acceptor count"],
-    ["Defined_Atom_Stereo_Count",    "defined atom stereo count"],
-    ["Defined_Bond_Stereo_Count",    "defined bond stereo count"],
-    ["Undefined_Bond_Stereo_Count",  "undefined bond stereo count"],
-    ["Isotope_Atom_Count",           "isotope atom count"],
-    ["Covalent_Unit_Count",          "covalent unit count"],
-    ["Hydrogen_Bond_Donor_Count",    "hydrogen bond donor count"],
-    ["Non-hydrogen_Atom_Count",      "non-hydrogen atom count"],
-    ["Rotatable_Bond_Count",         "rotatable bond count"],
-    ["Undefined_Atom_Stereo_Count",  "undefined atom stereo count"]
-
-  ])
-
-
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">Descriptors</div>
-    <div>
-      <table class="VET-Table">
-        <colgroup>
-          <col style="width:220px"/>
-          <col/>
-        </colgroup>
-
-        #foreach( $descriptor in $descriptors )
-          #sparql($value)
-          SELECT ?VALUE WHERE
-          {
-            GRAPH descriptor:compound
-            {
-              descriptor:CID${CID}_$descriptor[0] sio:has-value ?VALUE
-            }
-          }
-          #end
-
-          #if($value.count > 0)
+          #foreach($descriptor in $descriptors)
             <tr>
-              <td>$descriptor[1]</td>
-              <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($value.VALUE)</span></td>
+              <td>$descriptor.TITLE.getValue()</td>
+              <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)</span></td>
             </tr>
           #end
-        #end
-
-      </table>
+        </table>
+      </div>
     </div>
-  </div>
-
+  #end
 
 
   #sparql($synonyms)
-    SELECT ?NAME WHERE
+    SELECT ?NAME FROM pubchem:synonym WHERE
     {
-      graph <http://rdf.ncbi.nlm.nih.gov/pubchem/synonym>
-      {
-        ?ATTR sio:is-attribute-of $entity.
-        ?ATTR sio:has-value ?NAME.
-      }
+      ?ATTR sio:is-attribute-of $entity.
+      ?ATTR sio:has-value ?NAME.
     }
   #end
 
