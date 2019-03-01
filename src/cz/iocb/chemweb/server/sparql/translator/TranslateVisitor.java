@@ -1140,9 +1140,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlSelect sqlSelect = new SqlSelect(contextVariables, context.getVariables(), context,
                     new LinkedHashMap<String, Direction>());
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
+            SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
 
             PostgresDatabase db = new PostgresDatabase(configuration.getConnectionPool());
-            result = db.query(sqlSelect.translate());
+            result = db.query(query.translate());
         }
         catch(SQLException e)
         {
@@ -1196,7 +1197,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 else if(term instanceof LanguageTaggedLiteral)
                     node = new Literal(term.getValue(), ((LanguageTaggedLiteral) term).getLanguage());
                 else if(term instanceof TypedLiteral)
-                    node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().toString()));
+                    node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
                 else if(term instanceof ReferenceNode)
                     node = new BlankNode(term.getValue());
 
