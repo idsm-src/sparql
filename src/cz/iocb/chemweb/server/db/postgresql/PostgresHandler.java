@@ -7,7 +7,8 @@ import java.sql.Statement;
 
 public class PostgresHandler
 {
-    private Statement statement;
+    private Statement statement = null;
+    private boolean canceled = false;
 
 
     PostgresHandler()
@@ -15,14 +16,23 @@ public class PostgresHandler
     }
 
 
-    void setStatement(Statement statement)
+    synchronized void setStatement(Statement statement) throws SQLException
     {
+        if(canceled)
+            throw new SQLException("query was canceled");
+
         this.statement = statement;
     }
 
 
-    public void cancel() throws SQLException
+    public synchronized void cancel() throws SQLException
     {
-        statement.cancel();
+        canceled = true;
+
+        if(statement != null)
+        {
+            statement.cancel();
+            statement.close();
+        }
     }
 }

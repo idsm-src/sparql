@@ -76,14 +76,7 @@ public class PostgresDatabase
             try(Statement statement = connection.createStatement())
             {
                 if(handler != null)
-                {
-                    synchronized(handler)
-                    {
-                        handler.setStatement(statement);
-                        handler.notifyAll();
-                        handler = null;
-                    }
-                }
+                    handler.setStatement(statement);
 
                 statement.setQueryTimeout(timeout);
 

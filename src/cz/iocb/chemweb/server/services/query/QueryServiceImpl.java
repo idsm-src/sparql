@@ -243,19 +243,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         };
 
 
-        synchronized(queryState.handler)
-        {
-            queryState.thread.start();
-
-            try
-            {
-                queryState.handler.wait();
-            }
-            catch(InterruptedException e)
-            {
-                new DatabaseException(e); //FIXME: use different exception
-            }
-        }
+        queryState.thread.start();
 
         return id;
     }
