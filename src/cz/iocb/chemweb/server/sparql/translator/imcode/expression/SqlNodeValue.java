@@ -9,7 +9,7 @@ public abstract class SqlNodeValue extends SqlExpressionIntercode
 {
     protected SqlNodeValue(Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
+        super(resourceClasses, canBeNull, true);
     }
 
 

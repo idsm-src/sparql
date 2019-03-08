@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
@@ -115,8 +116,20 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode subresult = new SqlEmptySolution();
 
             for(int i = 0; i < path.size(); i++)
-                subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), nodes.get(i), nodes.get(i + 1)),
-                        true);
+            {
+                Node subject = nodes.get(i);
+                Node object = nodes.get(i + 1);
+
+                HashSet<String> restrictions = new HashSet<String>();
+
+                if(subject instanceof VariableOrBlankNode)
+                    restrictions.add(((VariableOrBlankNode) subject).getName());
+
+                if(object instanceof VariableOrBlankNode)
+                    restrictions.add(((VariableOrBlankNode) object).getName());
+
+                subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), subject, object), restrictions);
+            }
 
             result = SqlUnion.union(result, subresult);
         }
@@ -153,7 +166,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             if(SqlRecursive.getPairs(init.getVariables().get(joinName), next.getVariables().get(joinName)).isEmpty())
                 return visitElement(repeatedPath.getChild(), subject, object);
 
-            return SqlRecursive.create(init, next, object, joinNode, (VariableOrBlankNode) subject, null);
+            return SqlRecursive.create(init, next, null, joinName, ((VariableOrBlankNode) subject).getName(), null,
+                    null);
         }
 
 
@@ -185,7 +199,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        return SqlRecursive.create(init, next, subject, joinNode, (VariableOrBlankNode) endNode, cndNode);
+        return SqlRecursive.create(init, next, subjectName, joinName, ((VariableOrBlankNode) endNode).getName(),
+                cndNode, null);
     }
 
 
@@ -318,7 +333,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!(node instanceof VariableOrBlankNode))
             return;
 
-        String name = node instanceof Variable ? ((Variable) node).getName() : '@' + ((BlankNode) node).getName();
+        String name = ((VariableOrBlankNode) node).getName();
 
         translated.addVariableClass(name, mapping.getResourceClass());
         translated.addMapping(name, mapping);

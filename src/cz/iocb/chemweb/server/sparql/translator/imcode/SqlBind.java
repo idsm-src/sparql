@@ -3,6 +3,8 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import java.util.HashSet;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -28,14 +30,15 @@ public class SqlBind extends SqlIntercode
     protected SqlBind(UsedVariables variables, String variableName, SqlExpressionIntercode expression,
             SqlIntercode context)
     {
-        super(variables);
+        super(variables, context.isDeterministic() && expression.isDeterministic());
         this.variableName = variableName;
         this.expression = expression;
         this.context = context;
     }
 
 
-    public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context)
+    public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context,
+            HashSet<String> restrictions)
     {
         if(context instanceof SqlNoSolution)
             return new SqlNoSolution();
@@ -50,21 +53,32 @@ public class SqlBind extends SqlIntercode
             for(SqlIntercode child : ((SqlUnion) context).getChilds())
             {
                 VariableAccessor variableAccessor = new SimpleVariableAccessor(child.getVariables());
-                union = SqlUnion.union(union, bind(variable, expression.optimize(variableAccessor), child));
+                union = SqlUnion.union(union,
+                        bind(variable, expression.optimize(variableAccessor), child, restrictions));
             }
 
             return union;
         }
 
 
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedVariable var : context.variables.getValues())
-            variables.add(var);
-
+        UsedVariables variables = context.getVariables().restrict(restrictions);
         variables.add(new UsedVariable(variable, expression.getResourceClasses(), expression.canBeNull()));
 
         return new SqlBind(variables, variable, expression, context);
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        if(!restrictions.contains(variableName))
+            return context.optimize(schema, restrictions, reduced);
+
+        HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
+        contextRestrictions.addAll(expression.getVariables());
+
+        return bind(variableName, expression,
+                context.optimize(schema, contextRestrictions, reduced && expression.isDeterministic()), restrictions);
     }
 
 
@@ -185,8 +199,11 @@ public class SqlBind extends SqlIntercode
                     }
                 }
 
-                for(UsedVariable variable : context.variables.getValues())
+                for(UsedVariable variable : variables.getValues())
                 {
+                    if(variable.getName().equals(variableName))
+                        continue;
+
                     for(ResourceClass resClass : variable.getClasses())
                     {
                         for(int i = 0; i < resClass.getPatternPartsCount(); i++)
@@ -207,8 +224,11 @@ public class SqlBind extends SqlIntercode
         }
 
 
-        for(UsedVariable variable : context.variables.getValues())
+        for(UsedVariable variable : variables.getValues())
         {
+            if(variable.getName().equals(variableName))
+                continue;
+
             for(ResourceClass resClass : variable.getClasses())
             {
                 for(int i = 0; i < resClass.getPatternPartsCount(); i++)

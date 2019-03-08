@@ -13,7 +13,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -190,13 +189,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         // translate the GROUP BY clause
-        List<Variable> groupByVariables = new LinkedList<Variable>();
+        HashSet<String> groupByVariables = new HashSet<String>();
 
         for(GroupCondition groupBy : select.getGroupByConditions())
         {
             if(groupBy.getExpression() instanceof Variable && groupBy.getVariable() == null)
             {
-                groupByVariables.add((Variable) groupBy.getExpression());
+                groupByVariables.add(((Variable) groupBy.getExpression()).getName());
             }
             else
             {
@@ -205,7 +204,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(variable == null)
                     variable = Variable.getNewVariable();
 
-                groupByVariables.add(variable);
+                groupByVariables.add(variable.getName());
                 String name = variable.getName();
 
                 if(select.getPattern().getVariablesInScope().contains(name))
@@ -222,7 +221,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 //TODO: optimize based on the expression value
 
-                translatedWhereClause = SqlBind.bind(name, expression, translatedWhereClause);
+                translatedWhereClause = SqlBind.bind(name, expression, translatedWhereClause, null);
             }
         }
 
@@ -290,12 +289,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
                     new SimpleVariableAccessor(translatedWhereClause.getVariables()), this);
 
-            LinkedHashMap<Variable, SqlExpressionIntercode> aggregations = new LinkedHashMap<>();
+            LinkedHashMap<String, SqlExpressionIntercode> aggregations = new LinkedHashMap<>();
 
             for(Entry<Variable, BuiltInCallExpression> entry : rewriter.getAggregations().entrySet())
-                aggregations.put(entry.getKey(), visitor.visitElement(entry.getValue()));
+                aggregations.put(entry.getKey().getName(), visitor.visitElement(entry.getValue()));
 
-            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause);
+            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause,
+                    null);
 
             translatedWhereClause = intercode;
 
@@ -351,7 +351,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         UsedVariables variables = new UsedVariables();
-        LinkedHashSet<String> variablesInScope = new LinkedHashSet<String>();
 
         for(Projection projection : select.getProjections())
         {
@@ -361,12 +360,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(variable != null)
                 variables.add(variable);
-
-            variablesInScope.add(variableName);
         }
 
-
-        SqlSelect sqlSelect = new SqlSelect(variablesInScope, variables, translatedWhereClause, orderByVariables);
+        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause, orderByVariables);
 
 
         if(select.isDistinct())
@@ -825,7 +821,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(conditions == null)
             conditions = new LinkedList<SqlExpressionIntercode>();
 
-        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern, translatedPattern, conditions);
+        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern, translatedPattern, conditions,
+                null);
 
         return intercode;
     }
@@ -866,7 +863,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         SqlIntercode minusPattern = visitElement(pattern.getPattern());
 
-        return SqlMinus.minus(translatedGroupPattern, minusPattern);
+        return SqlMinus.minus(translatedGroupPattern, minusPattern, null);
     }
 
 
@@ -881,7 +878,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
-        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern);
+        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern, null);
         return intercode;
     }
 
@@ -930,7 +927,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(validExpressions.isEmpty())
             return child;
 
-        return new SqlFilter(child, validExpressions);
+        return new SqlFilter(child.getVariables(), child, validExpressions);
     }
 
 
@@ -1097,7 +1094,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
+        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context, null);
     }
 
 
@@ -1117,8 +1114,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         /* create variable lists */
-        List<String> contextVariables = context.getVariables().getValues().stream().map(v -> v.getName())
-                .collect(Collectors.toList());
+        HashSet<String> contextVariables = new HashSet<String>(context.getVariables().getNames());
 
         List<String> mergedVariables = new LinkedList<String>();
         mergedVariables.addAll(contextVariables);
@@ -1137,7 +1133,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         try
         {
             /* evaluate context pattern */
-            SqlSelect sqlSelect = new SqlSelect(contextVariables, context.getVariables(), context,
+            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context,
                     new LinkedHashMap<String, Direction>());
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
             SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
@@ -1473,9 +1469,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         try
         {
-            SqlIntercode imcode = visitElement(sparqlQuery);
-
-            return imcode.translate();
+            SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
+            return imcode.optimize(schema).translate();
         }
         catch(SQLRuntimeException e)
         {

@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -51,11 +52,21 @@ public class SqlTableAccess extends SqlIntercode
     private final ArrayList<Pair<Node, ParametrisedMapping>> valueConditions = new ArrayList<Pair<Node, ParametrisedMapping>>();
 
 
-    public SqlTableAccess(String table, String condition)
+    private final boolean reduced;
+
+
+    public SqlTableAccess(String table, String condition, boolean reduced)
     {
-        super(new UsedVariables());
+        super(new UsedVariables(), true);
         this.table = table;
         this.condition = condition;
+        this.reduced = reduced;
+    }
+
+
+    public SqlTableAccess(String table, String condition)
+    {
+        this(table, condition, false);
     }
 
 
@@ -427,7 +438,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right, boolean strip)
+    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right, HashSet<String> restrictions)
     {
         String condition = null;
 
@@ -443,13 +454,16 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : left.getVariables().getValues())
         {
+            if(restrictions != null && !restrictions.contains(var.getName()))
+                continue;
+
             UsedVariable other = right.getVariables().get(var.getName());
 
             if(other == null)
             {
                 merged.getVariables().add(var);
             }
-            else if(!strip)
+            else
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
@@ -463,6 +477,9 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : right.getVariables().getValues())
         {
+            if(restrictions != null && !restrictions.contains(var.getName()))
+                continue;
+
             if(left.getVariables().get(var.getName()) == null)
                 merged.getVariables().add(var);
         }
@@ -525,7 +542,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess foreign, List<ColumnPair> columnMap,
-            boolean strip)
+            HashSet<String> restrictions)
     {
         String condition = null;
 
@@ -541,13 +558,16 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : foreign.getVariables().getValues())
         {
+            if(restrictions != null && !restrictions.contains(var.getName()))
+                continue;
+
             UsedVariable other = parent.getVariables().get(var.getName());
 
             if(other == null)
             {
                 merged.getVariables().add(var);
             }
-            else if(!strip)
+            else
             {
                 assert var.getClasses().size() == 1;
                 assert other.getClasses().size() == 1;
@@ -561,6 +581,9 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : parent.getVariables().getValues())
         {
+            if(restrictions != null && !restrictions.contains(var.getName()))
+                continue;
+
             if(foreign.getVariables().get(var.getName()) == null)
                 merged.getVariables().add(var);
         }
@@ -602,15 +625,38 @@ public class SqlTableAccess extends SqlIntercode
 
 
     @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        SqlTableAccess result = new SqlTableAccess(table, condition, reduced);
+
+        for(String variable : restrictions)
+            if(variables.get(variable) != null)
+                result.getVariables().add(variables.get(variable));
+
+        result.mappings.putAll(mappings);
+        result.notNullConditions.addAll(notNullConditions);
+        result.valueConditions.addAll(valueConditions);
+
+        return result;
+    }
+
+
+    @Override
     public String translate()
     {
-        StringBuilder builder = new StringBuilder();
+        boolean canBeLimited = reduced;
 
+        for(UsedVariable var : variables.getValues())
+            for(NodeMapping mapping : mappings.get(var.getName()))
+                if(mapping instanceof ParametrisedMapping)
+                    canBeLimited = false;
+
+        StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(UsedVariable var : getVariables().getValues())
+        for(UsedVariable var : variables.getValues())
         {
             appendComma(builder, hasSelect);
             hasSelect = true;
@@ -763,6 +809,8 @@ public class SqlTableAccess extends SqlIntercode
             }
         }
 
+        if(canBeLimited)
+            builder.append(" LIMIT 1");
 
         return builder.toString();
     }

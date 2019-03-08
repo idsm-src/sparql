@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
@@ -33,7 +34,7 @@ public class SqlProcedureCall extends SqlIntercode
             LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
             SqlIntercode context)
     {
-        super(variables);
+        super(variables, context.isDeterministic()); //TODO: is procedure deterministic?
         this.procedure = procedure;
         this.parameters = parameters;
         this.results = results;
@@ -43,7 +44,7 @@ public class SqlProcedureCall extends SqlIntercode
 
     public static SqlIntercode create(ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
-            SqlIntercode context)
+            SqlIntercode context, HashSet<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
         boolean hasSolution = true;
@@ -188,6 +189,22 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
+
+        for(Node paramater : parameters.values())
+            if(paramater instanceof VariableOrBlankNode)
+                contextRestrictions.add(((VariableOrBlankNode) paramater).getName());
+
+        //FIXME: is procedure deterministic?
+        SqlIntercode optimized = context.optimize(schema, contextRestrictions, reduced);
+
+        return create(procedure, parameters, results, optimized, restrictions);
+    }
+
+
+    @Override
     public String translate()
     {
         StringBuilder builder = new StringBuilder();
@@ -205,6 +222,9 @@ public class SqlProcedureCall extends SqlIntercode
 
 
             String name = ((VariableOrBlankNode) node).getName();
+
+            if(variables.get(name) == null)
+                continue;
 
             ResultDefinition definition = entry.getKey();
             ResourceClass resultClass = definition.getResultClass();
@@ -235,8 +255,11 @@ public class SqlProcedureCall extends SqlIntercode
         }
 
 
-        for(UsedVariable variable : getVariables().getValues())
+        for(UsedVariable variable : variables.getValues())
         {
+            if(variables.get(variable.getName()) == null)
+                continue;
+
             for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
             {
                 if(context.getVariables().contains(variable.getName(), resClass))
@@ -389,7 +412,6 @@ public class SqlProcedureCall extends SqlIntercode
         if(!hasWhere)
             builder.append("true");
 
-        System.err.println(builder.toString());
         return builder.toString();
     }
 
@@ -479,6 +501,9 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(UsedVariable variable : context.getVariables().getValues())
         {
+            if(variables.get(variable.getName()) == null)
+                continue;
+
             for(ResourceClass resClass : context.getVariables().get(variable.getName()).getClasses())
             {
                 for(int i = 0; i < resClass.getPatternPartsCount(); i++)

@@ -1,8 +1,11 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import java.util.HashSet;
 import java.util.List;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 
 
@@ -13,11 +16,27 @@ public class SqlFilter extends SqlIntercode
     private final List<SqlExpressionIntercode> conditions;
 
 
-    public SqlFilter(SqlIntercode child, List<SqlExpressionIntercode> conditions)
+    public SqlFilter(UsedVariables variables, SqlIntercode child, List<SqlExpressionIntercode> conditions)
     {
-        super(child.variables);
+        super(variables, child.isDeterministic() && conditions.stream().allMatch(c -> c.isDeterministic()));
         this.child = child;
         this.conditions = conditions;
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
+
+        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+
+        for(SqlExpressionIntercode condition : conditions)
+            childRestrictions.addAll(condition.getVariables());
+
+        SqlIntercode optimized = child.optimize(schema, childRestrictions, reduced);
+
+        return new SqlFilter(optimized.getVariables().restrict(restrictions), optimized, conditions);
     }
 
 
@@ -29,7 +48,7 @@ public class SqlFilter extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(UsedVariable variable : child.variables.getValues())
+        for(UsedVariable variable : variables.getValues())
         {
             for(ResourceClass resClass : variable.getClasses())
             {

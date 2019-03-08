@@ -1,10 +1,13 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -17,15 +20,15 @@ public class SqlMinus extends SqlIntercode
     private final SqlIntercode right;
 
 
-    protected SqlMinus(SqlIntercode left, SqlIntercode right)
+    protected SqlMinus(UsedVariables variables, SqlIntercode left, SqlIntercode right)
     {
-        super(left.getVariables());
+        super(variables, left.isDeterministic() && right.isDeterministic());
         this.left = left;
         this.right = right;
     }
 
 
-    public static SqlIntercode minus(SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode minus(SqlIntercode left, SqlIntercode right, HashSet<String> restrictions)
     {
         boolean shareVariables = false;
 
@@ -36,7 +39,20 @@ public class SqlMinus extends SqlIntercode
         if(shareVariables == false)
             return left;
 
-        return new SqlMinus(left, right);
+        return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        HashSet<String> childRestrictions = new HashSet<String>();
+        childRestrictions.addAll(left.getVariables().getNames());
+        childRestrictions.retainAll(right.getVariables().getNames());
+        childRestrictions.addAll(restrictions);
+
+        return minus(left.optimize(schema, childRestrictions, reduced),
+                right.optimize(schema, childRestrictions, reduced), restrictions);
     }
 
 
@@ -49,7 +65,7 @@ public class SqlMinus extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(UsedVariable variable : left.getVariables().getValues())
+        for(UsedVariable variable : variables.getValues())
         {
             String varName = variable.getName();
 

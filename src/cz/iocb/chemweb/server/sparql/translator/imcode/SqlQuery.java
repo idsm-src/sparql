@@ -2,10 +2,12 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -21,9 +23,23 @@ public class SqlQuery extends SqlIntercode
 
     public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
     {
-        super(child.variables);
+        super(child.variables, child.isDeterministic());
         this.selectedVariables = selectedVariables;
         this.child = child;
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    public SqlIntercode optimize(DatabaseSchema schema)
+    {
+        HashSet<String> restrictions = new HashSet<String>(selectedVariables);
+        return new SqlQuery(selectedVariables, child.optimize(schema, restrictions, false));
     }
 
 

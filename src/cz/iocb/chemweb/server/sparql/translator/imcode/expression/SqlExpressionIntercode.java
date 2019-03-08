@@ -39,13 +39,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             xsdDecimal, xsdFloat, xsdDouble);
 
     private final boolean canBeNull;
+    private final boolean isDeterministic;
     private final boolean isBoxed;
     private final Set<ResourceClass> resourceClasses;
+    protected final Set<String> variables = new HashSet<String>();
 
 
-    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull)
+    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull, boolean isDeterministic)
     {
         this.canBeNull = canBeNull;
+        this.isDeterministic = isDeterministic;
         this.isBoxed = getExpressionResourceClass(resourceClasses) == null;
         this.resourceClasses = resourceClasses;
     }
@@ -69,9 +72,21 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public boolean isDeterministic()
+    {
+        return isDeterministic;
+    }
+
+
     public Set<ResourceClass> getResourceClasses()
     {
         return resourceClasses;
+    }
+
+
+    public Set<String> getVariables()
+    {
+        return variables;
     }
 
 

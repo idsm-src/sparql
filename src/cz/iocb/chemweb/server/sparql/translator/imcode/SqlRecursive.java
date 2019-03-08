@@ -1,11 +1,12 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -29,7 +30,7 @@ public class SqlRecursive extends SqlIntercode
     protected SqlRecursive(UsedVariables variables, SqlIntercode init, SqlIntercode next, UsedVariable endVar,
             String joinName, String subjectName, Node cndNode)
     {
-        super(variables);
+        super(variables, init.isDeterministic() && next.isDeterministic());
         this.init = init;
         this.next = next;
         this.endVar = endVar;
@@ -39,23 +40,20 @@ public class SqlRecursive extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(SqlIntercode init, SqlIntercode next, Node subject, BlankNode joinNode,
-            VariableOrBlankNode endNode, Node cndNode)
+    public static SqlIntercode create(SqlIntercode init, SqlIntercode next, String subjectName, String joinName,
+            String endName, Node cndNode, HashSet<String> restrictions)
     {
-        String subjectName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getName() : null;
-        String joinName = joinNode.getName();
-        String endName = endNode.getName();
-
-
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable var : init.getVariables().getValues())
-            if(!var.getName().equals(joinName))
+            if(!var.getName().equals(joinName) && (restrictions == null || restrictions.contains(var.getName())))
                 variables.add(var);
 
 
         UsedVariable endVar = new UsedVariable(endName, false);
-        variables.add(endVar);
+
+        if(restrictions == null || restrictions.contains(endName))
+            variables.add(endVar);
 
         Set<ResourceClass> initEndClasses = init.getVariables().get(joinName).getClasses();
         Set<ResourceClass> nextEndClasses = next.getVariables().get(endName).getClasses();
@@ -81,6 +79,22 @@ public class SqlRecursive extends SqlIntercode
         }
 
         return new SqlRecursive(variables, init, next, endVar, joinName, subjectName, cndNode);
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        HashSet<String> initRestrictions = new HashSet<String>(restrictions);
+        initRestrictions.add(joinName);
+
+        HashSet<String> nextRestrictions = new HashSet<String>();
+        nextRestrictions.add(joinName);
+        nextRestrictions.add(endVar.getName());
+
+        return create(init.optimize(schema, initRestrictions, reduced),
+                next.optimize(schema, nextRestrictions, reduced), subjectName, joinName, endVar.getName(), cndNode,
+                restrictions);
     }
 
 
@@ -263,7 +277,7 @@ public class SqlRecursive extends SqlIntercode
 
         boolean hasFinalSelect = buildInitColumns(builder, null);
 
-        if(cndNode == null)
+        if(cndNode == null && variables.get(endVar.getName()) != null)
         {
             for(ResourceClass resClass : endVar.getClasses())
             {
@@ -384,7 +398,7 @@ public class SqlRecursive extends SqlIntercode
 
         for(UsedVariable var : init.getVariables().getValues())
         {
-            if(var.getName() == joinName)
+            if(var.getName() == joinName || variables.get(var.getName()) == null)
                 continue;
 
             for(ResourceClass resClass : var.getClasses())

@@ -16,13 +16,17 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
     private static final AtomicInteger variableId = new AtomicInteger();
     private final String name;
 
+
     public Variable(String name)
     {
-        if(name.startsWith("?") || name.startsWith("$"))
-            name = name.substring(1);
+        if(name.startsWith("$"))
+            name = '?' + name.substring(1);
+        else if(!name.startsWith("?") && !name.startsWith("@"))
+            name = '?' + name;
 
         this.name = name;
     }
+
 
     public static Variable getNewVariable()
     {
@@ -30,14 +34,13 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
         return new Variable(prefix + id);
     }
 
-    /**
-     * The variable name, without the '?' (or '$') prefix.
-     */
+
     @Override
     public String getName()
     {
         return name;
     }
+
 
     @Override
     public boolean equals(Object o)
@@ -52,11 +55,13 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
         return name.equals(variable.name);
     }
 
+
     @Override
     public int hashCode()
     {
         return name.hashCode();
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

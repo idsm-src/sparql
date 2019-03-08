@@ -21,10 +21,12 @@ public class SqlExists extends SqlExpressionIntercode
 
     protected SqlExists(boolean negated, SqlIntercode pattern, VariableAccessor variableAccessor)
     {
-        super(asSet(xsdBoolean), false);
+        super(asSet(xsdBoolean), false, pattern.isDeterministic());
         this.negated = negated;
         this.pattern = pattern;
         this.variableAccessor = variableAccessor;
+
+        this.variables.addAll(pattern.getVariables().getNames());
     }
 
 

@@ -16,8 +16,10 @@ public class SqlInExpression extends SqlExpressionIntercode
 
         protected OperandWrapper(SqlExpressionIntercode operand)
         {
-            super(operand.getResourceClasses(), operand.canBeNull());
+            super(operand.getResourceClasses(), operand.canBeNull(), operand.isDeterministic());
             this.operand = operand;
+
+            this.variables.addAll(operand.getVariables());
         }
 
         public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
@@ -51,12 +53,18 @@ public class SqlInExpression extends SqlExpressionIntercode
     public SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
             SqlExpressionIntercode expression)
     {
-        super(asSet(xsdBoolean), expression.canBeNull());
+        super(asSet(xsdBoolean), expression.canBeNull(),
+                left.isDeterministic() && rights.stream().allMatch(r -> r.isDeterministic()));
 
         this.negated = negated;
         this.left = left;
         this.rights = rights;
         this.expression = expression;
+
+        this.variables.addAll(left.getVariables());
+
+        for(SqlExpressionIntercode right : rights)
+            this.variables.addAll(right.getVariables());
     }
 
 

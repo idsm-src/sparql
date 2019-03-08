@@ -1,7 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Set;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
@@ -18,9 +20,16 @@ public class SqlValues extends SqlIntercode
     public SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
             ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
     {
-        super(usedVariables);
+        super(usedVariables, true);
         this.typedVariables = typedVariables;
         this.typedValuesList = typedValuesList;
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        return new SqlValues(variables.restrict(restrictions), typedVariables, typedValuesList);
     }
 
 
@@ -43,6 +52,9 @@ public class SqlValues extends SqlIntercode
             {
                 Pair<String, Set<ResourceClass>> typedVariable = typedVariables.get(j);
                 Pair<Node, ResourceClass> value = valueList.get(j);
+
+                if(variables.get(typedVariable.getKey()) == null)
+                    continue;
 
                 if(!typedVariable.getValue().isEmpty())
                 {
@@ -91,6 +103,9 @@ public class SqlValues extends SqlIntercode
 
         for(Pair<String, Set<ResourceClass>> typedVariable : typedVariables)
         {
+            if(variables.get(typedVariable.getKey()) == null)
+                continue;
+
             if(!typedVariable.getValue().isEmpty())
             {
                 for(ResourceClass resClass : typedVariable.getValue())

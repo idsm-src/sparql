@@ -94,7 +94,7 @@ public class PostgresDatabase
                     for(int i = 0; i < metadata.getColumnCount(); i++)
                     {
                         String var = metadata.getColumnName(i + 1);
-                        String name = var.replaceAll("#.*", "");
+                        String name = var.substring(1).replaceAll("#.*", "");
 
                         if(!name.equals(lastName))
                         {
@@ -159,8 +159,8 @@ public class PostgresDatabase
                                         break;
 
                                     case FLOAT:
-                                        Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString())
-                                                : value;
+                                        Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) :
+                                                value;
                                         rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatIri);
                                         break;
 

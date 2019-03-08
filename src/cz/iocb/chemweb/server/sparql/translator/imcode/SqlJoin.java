@@ -1,8 +1,10 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.DatabaseSchema;
@@ -21,24 +23,23 @@ public class SqlJoin extends SqlIntercode
     private static final String rightTable = "tab1";
 
     private final ArrayList<SqlIntercode> childs;
-    private final boolean strip;
 
 
-    protected SqlJoin(UsedVariables variables, ArrayList<SqlIntercode> childs, boolean strip)
+    protected SqlJoin(UsedVariables variables, ArrayList<SqlIntercode> childs)
     {
-        super(variables);
+        super(variables, childs.stream().allMatch(c -> c.isDeterministic()));
         this.childs = childs;
-        this.strip = strip;
     }
 
 
     public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right)
     {
-        return join(schema, left, right, false);
+        return join(schema, left, right, null);
     }
 
 
-    public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right, boolean strip)
+    public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right,
+            HashSet<String> restrictions)
     {
         /* special cases */
 
@@ -75,7 +76,7 @@ public class SqlJoin extends SqlIntercode
 
             for(SqlIntercode leftChild : leftChilds)
                 for(SqlIntercode rightChild : rightChilds)
-                    union = SqlUnion.union(union, join(schema, leftChild, rightChild, strip));
+                    union = SqlUnion.union(union, join(schema, leftChild, rightChild, restrictions));
 
             return union;
         }
@@ -84,7 +85,7 @@ public class SqlJoin extends SqlIntercode
         /* standard join */
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = getUsedVariable(pairs, strip);
+        UsedVariables variables = getUsedVariable(pairs, restrictions);
 
         if(variables == null)
             return new SqlNoSolution();
@@ -102,14 +103,14 @@ public class SqlJoin extends SqlIntercode
         else
             childs.add(right);
 
-        SqlJoin join = new SqlJoin(variables, childs, strip);
+        SqlJoin join = new SqlJoin(variables, childs);
 
 
-        return optimize(join, schema, strip);
+        return optimize(join, schema, restrictions);
     }
 
 
-    private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema, boolean strip)
+    private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema, HashSet<String> restrictions)
     {
         if(schema == null)
             return join;
@@ -143,7 +144,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantA != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, strip);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, restrictions);
                         join.childs.set(j, merge);
                         join.childs.remove(i);
                         continue loop;
@@ -154,7 +155,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantB != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, strip);
+                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, restrictions);
                         join.childs.set(i, merge);
                         join.childs.remove(j);
                         continue loop;
@@ -163,7 +164,7 @@ public class SqlJoin extends SqlIntercode
 
                     if(SqlTableAccess.canBeMerged(schema, left, right))
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, strip);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, restrictions);
 
                         join.childs.set(i, merge);
                         join.childs.remove(j);
@@ -184,26 +185,49 @@ public class SqlJoin extends SqlIntercode
 
 
     @Override
-    public String translate()
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
     {
-        String joinResult = null;
-        UsedVariables joinVariables = null;
+        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
+        HashMap<String, Integer> variableCounts = new HashMap<String, Integer>();
 
         for(SqlIntercode child : childs)
+            for(String var : child.getVariables().getNames())
+                variableCounts.put(var, variableCounts.get(var) == null ? 1 : variableCounts.get(var) + 1);
+
+        for(Entry<String, Integer> entry : variableCounts.entrySet())
+            if(entry.getValue() > 1)
+                childRestrictions.add(entry.getKey());
+
+
+        SqlIntercode result = new SqlEmptySolution();
+
+        for(SqlIntercode child : childs)
+            result = join(schema, result, child.optimize(schema, childRestrictions, reduced), restrictions);
+
+        return result;
+    }
+
+
+    @Override
+    public String translate()
+    {
+        String joinResult = childs.get(0).translate();
+        UsedVariables joinVariables = childs.get(0).getVariables();
+
+
+        for(int idx = 1; idx < childs.size(); idx++)
         {
-            if(joinResult == null)
-            {
-                joinResult = child.translate();
-                joinVariables = child.getVariables();
-                continue;
-            }
-
-
-            /* join */
-
+            SqlIntercode child = childs.get(idx);
             ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(joinVariables, child.getVariables());
-            UsedVariables variables = getUsedVariable(pairs, strip);
+
+            HashSet<String> restrictions = new HashSet<String>(variables.getNames());
+
+            for(int i = idx + 1; i < childs.size(); i++)
+                restrictions.addAll(childs.get(i).getVariables().getNames());
+
+            UsedVariables variables = getUsedVariable(pairs, restrictions);
+
             Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
 
             StringBuilder builder = new StringBuilder();
@@ -388,7 +412,7 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, boolean strip)
+    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, HashSet<String> restrictions)
     {
         UsedVariables variables = new UsedVariables();
 
@@ -404,7 +428,7 @@ public class SqlJoin extends SqlIntercode
 
             UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
 
-            if(strip == false || leftVariable == null || rightVariable == null)
+            if(restrictions == null || restrictions.contains(var))
                 variables.add(variable);
 
             for(PairedClass pairedClass : pair.getClasses())

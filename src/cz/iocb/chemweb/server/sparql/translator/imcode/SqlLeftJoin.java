@@ -31,7 +31,8 @@ public class SqlLeftJoin extends SqlIntercode
     protected SqlLeftJoin(UsedVariables variables, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions)
     {
-        super(variables);
+        super(variables, left.isDeterministic() && right.isDeterministic()
+                && conditions.stream().allMatch(c -> c.isDeterministic()));
         this.left = left;
         this.right = right;
         this.conditions = conditions;
@@ -39,7 +40,7 @@ public class SqlLeftJoin extends SqlIntercode
 
 
     public static SqlIntercode leftJoin(DatabaseSchema schema, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> condition)
+            List<SqlExpressionIntercode> condition, HashSet<String> restrictions)
     {
         /* special cases */
 
@@ -67,7 +68,7 @@ public class SqlLeftJoin extends SqlIntercode
                 List<SqlExpressionIntercode> optimizedCondition = condition.stream()
                         .map(f -> SqlEffectiveBooleanValue.create(f.optimize(accessor))).collect(Collectors.toList());
 
-                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right, optimizedCondition));
+                newUnion = SqlUnion.union(newUnion, leftJoin(schema, child, right, optimizedCondition, restrictions));
             }
 
             return newUnion;
@@ -97,8 +98,9 @@ public class SqlLeftJoin extends SqlIntercode
             boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
 
             UsedVariable variable = new UsedVariable(var, canBeLeftNull);
-            variables.add(variable);
 
+            if(restrictions == null || restrictions.contains(var))
+                variables.add(variable);
 
             int produceOnCondition = 0;
 
@@ -193,6 +195,24 @@ public class SqlLeftJoin extends SqlIntercode
         }
 
         return true;
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
+
+        HashSet<String> childRestrictions = new HashSet<String>();
+        childRestrictions.addAll(left.getVariables().getNames());
+        childRestrictions.retainAll(right.getVariables().getNames());
+        childRestrictions.addAll(restrictions);
+
+        for(SqlExpressionIntercode condition : conditions)
+            childRestrictions.addAll(condition.getVariables());
+
+        return leftJoin(schema, left.optimize(schema, childRestrictions, reduced),
+                right.optimize(schema, childRestrictions, reduced), conditions, restrictions);
     }
 
 

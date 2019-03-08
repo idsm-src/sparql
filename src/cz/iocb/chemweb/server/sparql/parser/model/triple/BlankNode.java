@@ -15,9 +15,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
  */
 public final class BlankNode extends BaseComplexNode implements Node, VariableOrBlankNode
 {
-    private static final String prefix = "bn";
+    private static final String prefix = "@bn";
     private static final AtomicInteger nodeId = new AtomicInteger();
     private String name;
+
 
     protected BlankNode()
     {
@@ -25,27 +26,31 @@ public final class BlankNode extends BaseComplexNode implements Node, VariableOr
         this.name = prefix + id;
     }
 
+
     public BlankNode(String name)
     {
         if(name.startsWith("_:"))
-            name = name.substring(2);
-
-        if(name.startsWith(prefix))
-            name = prefix + name;
+            name = '_' + name.substring(2);
+        else if(!name.startsWith("_") && !name.startsWith("@"))
+            name = '_' + name;
 
         this.name = name;
     }
 
+
     public static BlankNode getNewBlankNode()
     {
-        return new BlankNode();
+        int id = nodeId.incrementAndGet();
+        return new BlankNode(prefix + id);
     }
+
 
     @Override
     public String getName()
     {
         return name;
     }
+
 
     @Override
     public boolean equals(Object o)
@@ -60,11 +65,13 @@ public final class BlankNode extends BaseComplexNode implements Node, VariableOr
         return name.equals(blankNode.name);
     }
 
+
     @Override
     public int hashCode()
     {
         return name.hashCode();
     }
+
 
     @Override
     public <T> T accept(ElementVisitor<T> visitor)

@@ -12,8 +12,10 @@ public abstract class SqlUnary extends SqlExpressionIntercode
 
     protected SqlUnary(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
+        super(resourceClasses, canBeNull, operand.isDeterministic());
         this.operand = operand;
+
+        this.variables.addAll(operand.getVariables());
     }
 
 

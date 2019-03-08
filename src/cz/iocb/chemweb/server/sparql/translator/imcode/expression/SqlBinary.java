@@ -14,9 +14,12 @@ public abstract class SqlBinary extends SqlExpressionIntercode
     protected SqlBinary(SqlExpressionIntercode left, SqlExpressionIntercode right, Set<ResourceClass> resourceClasses,
             boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
+        super(resourceClasses, canBeNull, left.isDeterministic() && right.isDeterministic());
         this.left = left;
         this.right = right;
+
+        this.variables.addAll(left.getVariables());
+        this.variables.addAll(right.getVariables());
     }
 
 

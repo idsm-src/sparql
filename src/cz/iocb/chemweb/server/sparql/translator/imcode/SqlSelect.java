@@ -11,11 +11,12 @@ import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpr
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
 import java.math.BigInteger;
-import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -26,18 +27,15 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 public class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
-    private final Collection<String> selectedVariables;
     private final LinkedHashMap<String, Direction> orderByVariables;
     private boolean distinct = false;
     private BigInteger limit = null;
     private BigInteger offset = null;
 
 
-    public SqlSelect(Collection<String> selectedVariables, UsedVariables variables, SqlIntercode child,
-            LinkedHashMap<String, Direction> orderByVariables)
+    public SqlSelect(UsedVariables variables, SqlIntercode child, LinkedHashMap<String, Direction> orderByVariables)
     {
-        super(variables);
-        this.selectedVariables = selectedVariables;
+        super(variables, child.isDeterministic());
         this.orderByVariables = orderByVariables;
         this.child = child;
     }
@@ -58,6 +56,32 @@ public class SqlSelect extends SqlIntercode
     public final void setOffset(BigInteger offset)
     {
         this.offset = offset;
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        restrictions = new HashSet<String>(restrictions);
+        restrictions.retainAll(variables.getNames());
+
+        if(orderByVariables.isEmpty() && distinct == false && limit == null
+                && (offset == null || offset.equals(BigInteger.ZERO)))
+            return child.optimize(schema, restrictions, distinct || reduced);
+
+
+        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+        childRestrictions.addAll(orderByVariables.keySet());
+
+        SqlIntercode optimized = child.optimize(schema, childRestrictions, distinct);
+
+        SqlSelect result = new SqlSelect(optimized.getVariables().restrict(restrictions), optimized, orderByVariables);
+
+        result.setDistinct(distinct);
+        result.setLimit(limit);
+        result.setOffset(offset);
+
+        return result;
     }
 
 
@@ -118,13 +142,8 @@ public class SqlSelect extends SqlIntercode
 
         boolean hasSelect = false;
 
-        for(String variableName : selectedVariables)
+        for(UsedVariable variable : variables.getValues())
         {
-            UsedVariable variable = variables.get(variableName);
-
-            if(variable == null)
-                continue;
-
             for(ResourceClass resClass : variable.getClasses())
             {
                 for(int i = 0; i < resClass.getPatternPartsCount(); i++)

@@ -45,10 +45,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
+        super(resourceClasses, canBeNull,
+                !function.equals("rand") && arguments.stream().allMatch(r -> r.isDeterministic()));
         this.function = function;
         this.distinct = distinct;
         this.arguments = arguments;
+
+        for(SqlExpressionIntercode argument : arguments)
+            this.variables.addAll(argument.getVariables());
     }
 
 

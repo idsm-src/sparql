@@ -18,7 +18,7 @@ public class SqlExpressionError extends SqlExpressionIntercode
 
     protected SqlExpressionError(Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
+        super(resourceClasses, canBeNull, true);
     }
 
 

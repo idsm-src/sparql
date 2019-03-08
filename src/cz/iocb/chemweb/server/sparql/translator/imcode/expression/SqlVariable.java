@@ -19,6 +19,8 @@ public class SqlVariable extends SqlNodeValue
         super(resourceClasses, canBeNull);
         this.usedVariable = usedVariable;
         this.variableAccessor = variableAccessor;
+
+        this.variables.add(usedVariable.getName());
     }
 
 

@@ -3,16 +3,15 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map.Entry;
+import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.parser.model.Variable;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
@@ -21,30 +20,57 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionI
 
 public class SqlAggregation extends SqlIntercode
 {
-    private final List<Variable> groupVariables;
-    private final LinkedHashMap<Variable, SqlExpressionIntercode> aggregations;
+    private final HashSet<String> groupVariables;
+    private final LinkedHashMap<String, SqlExpressionIntercode> aggregations;
     private final SqlIntercode child;
 
 
-    protected SqlAggregation(UsedVariables variables, List<Variable> groupVariables,
-            LinkedHashMap<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child)
+    protected SqlAggregation(UsedVariables variables, boolean isDeterministic, HashSet<String> groupVariables,
+            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
-        super(variables);
+        super(variables, isDeterministic);
         this.groupVariables = groupVariables;
         this.aggregations = aggregations;
         this.child = child;
     }
 
 
-    public static SqlIntercode aggregate(List<Variable> groupVariables,
-            LinkedHashMap<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child)
+    public static SqlIntercode aggregate(HashSet<String> groupVariables,
+            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child,
+            HashSet<String> restrictions)
     {
         UsedVariables variables = new UsedVariables();
-        groupVariables.stream().map(v -> child.getVariables().get(v.getName())).forEach(v -> variables.add(v));
-        aggregations.entrySet().stream().forEach(v -> variables.add(
-                new UsedVariable(v.getKey().getName(), v.getValue().getResourceClasses(), v.getValue().canBeNull())));
 
-        return new SqlAggregation(variables, groupVariables, aggregations, child);
+        for(String variable : groupVariables)
+            if(restrictions == null || restrictions.contains(variable))
+                variables.add(child.getVariables().get(variable));
+
+        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+            if(restrictions == null || restrictions.contains(entry.getKey()))
+                variables.add(new UsedVariable(entry.getKey(), entry.getValue().getResourceClasses(),
+                        entry.getValue().canBeNull()));
+
+
+        boolean isDeterministic = child.isDeterministic();
+
+        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+            if(restrictions == null || restrictions.contains(entry.getKey()))
+                isDeterministic &= entry.getValue().isDeterministic();
+
+        return new SqlAggregation(variables, isDeterministic, groupVariables, aggregations, child);
+    }
+
+
+    @Override
+    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    {
+        HashSet<String> childRestrictions = new HashSet<String>(groupVariables);
+
+        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+            if(restrictions == null || restrictions.contains(entry.getKey()))
+                childRestrictions.addAll(entry.getValue().getVariables());
+
+        return aggregate(groupVariables, aggregations, child.optimize(schema, childRestrictions, false), restrictions);
     }
 
 
@@ -64,9 +90,12 @@ public class SqlAggregation extends SqlIntercode
             builder.append("SELECT ");
             boolean hasSelect = false;
 
-            for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
+            for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
             {
-                Variable variable = entry.getKey();
+                if(variables.get(entry.getKey()) == null)
+                    continue;
+
+                String variable = entry.getKey();
                 SqlExpressionIntercode expression = entry.getValue();
 
 
@@ -79,14 +108,13 @@ public class SqlAggregation extends SqlIntercode
                             appendComma(builder, hasSelect);
                             hasSelect = true;
 
-                            builder.append(resClass.getSqlColumn(variable.getName(), i));
+                            builder.append(resClass.getSqlColumn(variable, i));
                         }
                     }
                 }
                 else
                 {
-                    String variableName = variable.getName();
-                    String columnName = '"' + variableName + "#expression\"";
+                    String columnName = '"' + variable + "#expression\"";
 
 
                     boolean splitDateTimeClasses = expression.getResourceClasses().stream()
@@ -113,7 +141,7 @@ public class SqlAggregation extends SqlIntercode
                             builder.append("'::int4 THEN ");
                             builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
                             builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variableName, 0));
+                            builder.append(resourceClass.getSqlColumn(variable, 0));
                         }
                         else if(resourceClass instanceof DateConstantZoneClass && splitDateClasses)
                         {
@@ -127,7 +155,7 @@ public class SqlAggregation extends SqlIntercode
                             builder.append("'::int4 THEN ");
                             builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
                             builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variableName, 0));
+                            builder.append(resourceClass.getSqlColumn(variable, 0));
                         }
                         else if(resourceClass instanceof LangStringConstantTagClass && splitLangClasses)
                         {
@@ -141,7 +169,7 @@ public class SqlAggregation extends SqlIntercode
                             builder.append("'::varchar THEN ");
                             builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
                             builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variableName, 0));
+                            builder.append(resourceClass.getSqlColumn(variable, 0));
                         }
                         else
                         {
@@ -152,7 +180,7 @@ public class SqlAggregation extends SqlIntercode
 
                                 builder.append(resourceClass.getPatternCode(columnName, i, expression.isBoxed()));
                                 builder.append(" AS ");
-                                builder.append(resourceClass.getSqlColumn(variableName, i));
+                                builder.append(resourceClass.getSqlColumn(variable, i));
                             }
                         }
                     }
@@ -160,20 +188,25 @@ public class SqlAggregation extends SqlIntercode
             }
 
 
-            for(VariableOrBlankNode variable : groupVariables)
+            for(String variable : groupVariables)
             {
-                for(ResourceClass resClass : child.getVariables().get(variable.getName()).getClasses())
+                if(variables.get(variable) == null)
+                    continue;
+
+                for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
                 {
                     for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                     {
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        builder.append(resClass.getSqlColumn(variable.getName(), i));
+                        builder.append(resClass.getSqlColumn(variable, i));
                     }
                 }
             }
 
+            if(!hasSelect)
+                builder.append("1");
 
             builder.append(" FROM (");
         }
@@ -182,23 +215,25 @@ public class SqlAggregation extends SqlIntercode
         builder.append("SELECT ");
         boolean hasSelect = false;
 
-        for(Entry<Variable, SqlExpressionIntercode> entry : aggregations.entrySet())
+        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
         {
+            if(variables.get(entry.getKey()) == null)
+                continue;
+
             appendComma(builder, hasSelect);
             hasSelect = true;
 
-            Variable variable = entry.getKey();
+            String variable = entry.getKey();
             SqlExpressionIntercode expression = entry.getValue();
 
-            String variableName = variable.getName();
-            String columnName = '"' + variableName + "#expression\"";
+            String columnName = '"' + variable + "#expression\"";
 
             if(expression.isBoxed() == false && expression.getResourceClasses().size() == 1)
             {
                 ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
 
                 if(!(resourceClass instanceof UserIriClass) && resourceClass.getPatternPartsCount() == 1)
-                    columnName = resourceClass.getSqlColumn(variableName, 0);
+                    columnName = resourceClass.getSqlColumn(variable, 0);
             }
 
             builder.append(expression.translate());
@@ -206,16 +241,19 @@ public class SqlAggregation extends SqlIntercode
             builder.append(columnName);
         }
 
-        for(Variable variable : groupVariables)
+        for(String variable : groupVariables)
         {
-            for(ResourceClass resClass : child.getVariables().get(variable.getName()).getClasses())
+            if(variables.get(variable) == null)
+                continue;
+
+            for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
             {
                 for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
 
-                    builder.append(resClass.getSqlColumn(variable.getName(), i));
+                    builder.append(resClass.getSqlColumn(variable, i));
                 }
             }
         }
@@ -229,16 +267,16 @@ public class SqlAggregation extends SqlIntercode
             builder.append(" GROUP BY ");
             boolean hasGroupBy = false;
 
-            for(Variable variable : groupVariables)
+            for(String variable : groupVariables)
             {
-                for(ResourceClass resClass : child.getVariables().get(variable.getName()).getClasses())
+                for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
                 {
                     for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                     {
                         appendComma(builder, hasGroupBy);
                         hasGroupBy = true;
 
-                        builder.append(resClass.getSqlColumn(variable.getName(), i));
+                        builder.append(resClass.getSqlColumn(variable, i));
                     }
                 }
             }
