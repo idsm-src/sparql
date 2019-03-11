@@ -1155,17 +1155,17 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
         for(DataBlockValuesContext block : ctx.dataBlockValues())
         {
-            ValuesList valueList = withRange(new ValuesList(mapList(block.dataBlockValue(), this::createVal)), block);
+            List<Expression> values = mapList(block.dataBlockValue(), this::createVal);
 
-            if(valueList.getValues().size() != variables.size())
+            if(values.size() != variables.size())
             {
-                messages.add(new TranslateMessage(MessageType.wrongNumberOfValues, valueList.getRange()));
+                messages.add(new TranslateMessage(MessageType.wrongNumberOfValues, Range.compute(block)));
 
-                for(int i = 0; i < variables.size() - valueList.getValues().size(); i++)
-                    valueList.getValues().add(null);
+                for(int i = 0; i < variables.size() - values.size(); i++)
+                    values.add(null);
             }
 
-            valuesLists.add(valueList);
+            valuesLists.add(withRange(new ValuesList(values), block));
         }
 
         return withRange(new Values(variables, valuesLists), ctx);
