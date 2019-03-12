@@ -20,6 +20,7 @@ import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValuesContext;
@@ -111,6 +112,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 {
     private final SparqlDatabaseConfiguration config;
     private final Stack<VarOrIri> services;
+    private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
     private Prologue prologue;
 
@@ -119,16 +121,18 @@ public class QueryVisitor extends BaseVisitor<Query>
     {
         this.config = config;
         this.services = new Stack<VarOrIri>();
+        this.usedBlankNodes = new HashSet<String>();
         this.messages = messages;
     }
 
 
     public QueryVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
 
@@ -136,6 +140,17 @@ public class QueryVisitor extends BaseVisitor<Query>
     @Override
     public Query visitQuery(QueryContext ctx)
     {
+        new BaseVisitor<Void>()
+        {
+            @Override
+            public Void visitBlankNode(BlankNodeContext ctx)
+            {
+                usedBlankNodes.add(ctx.getText().replaceFirst("^:_", ""));
+                return null;
+            }
+        }.visit(ctx);
+
+        
         if(ctx.prologue() != null)
         {
             PrologueVisitor visitor = new PrologueVisitor(config, messages);
@@ -177,7 +192,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(dataBlockCtx == null)
             return null;
 
-        return (Values) new PatternVisitor(config, prologue, services, messages).visit(dataBlockCtx);
+        return (Values) new PatternVisitor(config, prologue, services, usedBlankNodes, messages).visit(dataBlockCtx);
     }
 
 
@@ -323,7 +338,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
 
 
-        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, messages).visit(whereClauseCtx);
+        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                .visit(whereClauseCtx);
         Values values = parseValues(valuesClauseContext);
 
         Select result = new Select(projections, pattern, values, isSubSelect);
@@ -354,7 +370,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(variableCtx.expression() != null)
         {
-            Expression expression = new ExpressionVisitor(config, prologue, services, messages)
+            Expression expression = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
                     .visit(variableCtx.expression());
 
             return new Projection(expression, variable);
@@ -384,7 +400,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
     private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+                messages);
 
         if(ctx.expression() != null)
         {
@@ -409,7 +426,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(ctx == null)
             return new ArrayList<Expression>();
 
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+                messages);
 
         return mapList(ctx.havingCondition(), expressionVisitor::visit);
     }
@@ -432,11 +450,12 @@ public class QueryVisitor extends BaseVisitor<Query>
                     OrderCondition.Direction.Descending;
 
             return new OrderCondition(direction,
-                    new ExpressionVisitor(config, prologue, services, messages).visit(ctx.expression()));
+                    new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
+                            .visit(ctx.expression()));
         }
 
-        return withRange(new OrderCondition(new ExpressionVisitor(config, prologue, services, messages).visit(ctx)),
-                ctx);
+        return withRange(new OrderCondition(
+                new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages).visit(ctx)), ctx);
     }
 
 
@@ -520,15 +539,17 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
+    private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
 
 
     public GraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
 
@@ -553,8 +574,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, messages).visit(ctx)
-                .collect(Collectors.toList());
+        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                .visit(ctx).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
@@ -563,8 +584,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        return withRange(new QueryVisitor(config, prologue, services, messages).parseSelect(ctx.selectClause(), null,
-                ctx.whereClause(), ctx.solutionModifier(), ctx.valuesClause(), true), ctx);
+        return withRange(new QueryVisitor(config, prologue, services, usedBlankNodes, messages).parseSelect(
+                ctx.selectClause(), null, ctx.whereClause(), ctx.solutionModifier(), ctx.valuesClause(), true), ctx);
     }
 }
 
@@ -575,15 +596,20 @@ class TripleExpander extends ComplexElementVisitor<Node>
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
+    private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
+
+    private final String blankNodePrefix = "blanknode";
+    private int blankNodeId = 0;
 
 
     public TripleExpander(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
 
@@ -779,7 +805,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
     @Override
     public Node visit(BlankNodePropertyList blankNodePropertyList)
     {
-        BlankNode blankNode = BlankNode.getNewBlankNode();
+        BlankNode blankNode = getBlankNode();
         blankNode.setRange(blankNodePropertyList.getRange());
 
         // take advantage of triple processing
@@ -797,7 +823,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
         if(rdfCollection.getNodes().isEmpty())
             return new IRI(Rdf.NIL);
 
-        BlankNode firstNode = BlankNode.getNewBlankNode();
+        BlankNode firstNode = getBlankNode();
         firstNode.setRange(rdfCollection.getRange());
 
         BlankNode currentNode = firstNode;
@@ -818,7 +844,7 @@ class TripleExpander extends ComplexElementVisitor<Node>
             }
             else
             {
-                nextNode = BlankNode.getNewBlankNode();
+                nextNode = getBlankNode();
                 nextNode.setRange(rdfCollection.getRange());
 
                 restObject = nextNode;
@@ -840,6 +866,21 @@ class TripleExpander extends ComplexElementVisitor<Node>
     {
         return null;
     }
+
+
+    private BlankNode getBlankNode()
+    {
+        String name = null;
+
+        do
+        {
+            name = blankNodePrefix + blankNodeId++;
+        }
+        while(usedBlankNodes.contains(name));
+
+        usedBlankNodes.add(name);
+        return new BlankNode(name);
+    }
 }
 
 
@@ -848,15 +889,17 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
+    private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
 
 
     public GroupGraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
 
@@ -904,7 +947,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
             }
         }
 
-        TripleExpander tripleExpander = new TripleExpander(config, prologue, services, messages);
+        TripleExpander tripleExpander = new TripleExpander(config, prologue, services, usedBlankNodes, messages);
 
         for(ComplexTriple triple : repairExpandedProcedureCalls(triples))
             tripleExpander.visit(triple);
@@ -916,7 +959,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, messages);
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, usedBlankNodes, messages);
 
         Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
 
@@ -1049,13 +1092,13 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
 
     public PatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
         this.services = services;
         this.messages = messages;
-        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, messages);
-        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, messages);
+        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages);
+        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages);
     }
 
 

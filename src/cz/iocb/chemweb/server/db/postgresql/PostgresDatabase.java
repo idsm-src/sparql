@@ -94,7 +94,7 @@ public class PostgresDatabase
                     for(int i = 0; i < metadata.getColumnCount(); i++)
                     {
                         String var = metadata.getColumnName(i + 1);
-                        String name = var.substring(1).replaceAll("#.*", "");
+                        String name = var.replaceAll("#.*", "");
 
                         if(!name.equals(lastName))
                         {

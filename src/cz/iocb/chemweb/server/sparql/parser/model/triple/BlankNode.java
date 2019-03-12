@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.parser.model.triple;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.chemweb.server.sparql.parser.BaseComplexNode;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
@@ -15,33 +14,15 @@ import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
  */
 public final class BlankNode extends BaseComplexNode implements Node, VariableOrBlankNode
 {
-    private static final String prefix = "@bn";
-    private static final AtomicInteger nodeId = new AtomicInteger();
     private String name;
-
-
-    protected BlankNode()
-    {
-        int id = nodeId.incrementAndGet();
-        this.name = prefix + id;
-    }
 
 
     public BlankNode(String name)
     {
         if(name.startsWith("_:"))
-            name = '_' + name.substring(2);
-        else if(!name.startsWith("_") && !name.startsWith("@"))
-            name = '_' + name;
+            name = name.substring(2);
 
         this.name = name;
-    }
-
-
-    public static BlankNode getNewBlankNode()
-    {
-        int id = nodeId.incrementAndGet();
-        return new BlankNode(prefix + id);
     }
 
 

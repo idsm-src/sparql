@@ -18,7 +18,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.AlternativePath;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BracketedPath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.InversePath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.NegatedPath;
@@ -39,6 +38,9 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 
 public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 {
+    private static final String variablePrefix = "@pathvar";
+    private int variableId = 0;
+
     private final DatabaseSchema schema;
     private final List<QuadMapping> mappings;
     private final List<DataSet> datasets;
@@ -108,7 +110,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             nodes.add(subject);
 
             for(int i = 0; i < path.size() - 1; i++)
-                nodes.add(BlankNode.getNewBlankNode());
+                nodes.add(new Variable(variablePrefix + variableId++));
 
             nodes.add(object);
 
@@ -150,7 +152,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         assert repeatedPath.getKind() == Kind.OneOrMore;
 
-        BlankNode joinNode = BlankNode.getNewBlankNode();
+        Variable joinNode = new Variable(variablePrefix + variableId++);
         String joinName = joinNode.getName();
 
 
@@ -172,7 +174,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         Node endNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? object :
-                BlankNode.getNewBlankNode();
+                new Variable(variablePrefix + variableId++);
         Node cndNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? null : object;
         String endName = ((VariableOrBlankNode) endNode).getName();
         String subjectName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getName() : null;
@@ -419,7 +421,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         SqlIntercode translatedPattern = new SqlNoSolution();
 
-        BlankNode fakePredicate = BlankNode.getNewBlankNode();
+        Variable fakePredicate = new Variable(variablePrefix + variableId++);
 
         matching:
         for(QuadMapping mapping : mappings)

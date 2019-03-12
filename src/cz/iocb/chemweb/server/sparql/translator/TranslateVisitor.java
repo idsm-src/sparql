@@ -118,6 +118,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     private static final int serviceContextLimit = 200;
     private static final int serviceResultLimit = 10000;
+    private static final String variablePrefix = "@additionalvar";
+    private int variableId = 0;
 
     private final Stack<VarOrIri> graphRestrictions = new Stack<>();
     private final List<TranslateMessage> messages;
@@ -202,7 +204,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 Variable variable = groupBy.getVariable();
 
                 if(variable == null)
-                    variable = Variable.getNewVariable();
+                    variable = new Variable(variablePrefix + variableId++);
 
                 groupByVariables.add(variable.getName());
                 String name = variable.getName();
@@ -341,7 +343,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else
             {
-                Variable variable = Variable.getNewVariable();
+                Variable variable = new Variable(variablePrefix + variableId++);
                 orderByVariables.put(variable.getName(), condition.getDirection());
 
                 Bind bind = new Bind(condition.getExpression(), variable);
