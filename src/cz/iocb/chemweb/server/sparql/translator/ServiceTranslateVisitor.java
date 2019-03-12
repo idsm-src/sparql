@@ -69,6 +69,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
         if(select.isReduced())
             builder.append("reduced ");
 
+        if(select.getProjections().isEmpty())
+            builder.append("* ");
+
         for(Projection projection : select.getProjections())
             result.addAll(visitElement(projection));
 
