@@ -12,6 +12,8 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import javax.sql.DataSource;
+import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.db.schema.Table;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -236,11 +238,11 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
                 {
                     while(result.next())
                     {
-                        String parentTable = result.getString(1);
-                        List<String> parentColumns = Arrays.asList((String[]) result.getArray(2).getArray());
+                        Table parentTable = new Table(result.getString(1));
+                        List<Column> parentColumns = getColumns((String[]) result.getArray(2).getArray());
 
-                        String foreignTable = result.getString(3);
-                        List<String> foreignColumns = Arrays.asList((String[]) result.getArray(4).getArray());
+                        Table foreignTable = new Table(result.getString(3));
+                        List<Column> foreignColumns = getColumns((String[]) result.getArray(4).getArray());
 
                         schema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
                     }
@@ -255,11 +257,11 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
                 {
                     while(result.next())
                     {
-                        String leftTable = result.getString(1);
-                        List<String> leftColumns = Arrays.asList((String[]) result.getArray(2).getArray());
+                        Table leftTable = new Table(result.getString(1));
+                        List<Column> leftColumns = getColumns((String[]) result.getArray(2).getArray());
 
-                        String rightTable = result.getString(3);
-                        List<String> rightColumns = Arrays.asList((String[]) result.getArray(4).getArray());
+                        Table rightTable = new Table(result.getString(3));
+                        List<Column> rightColumns = getColumns((String[]) result.getArray(4).getArray());
 
                         schema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
                         schema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);

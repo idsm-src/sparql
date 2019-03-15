@@ -2,13 +2,16 @@ package cz.iocb.chemweb.server.sparql.config;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import javax.sql.DataSource;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
 import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
+import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.db.schema.ConstantColumn;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.Table;
+import cz.iocb.chemweb.server.db.schema.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -53,13 +56,13 @@ public abstract class SparqlDatabaseConfiguration
 
     public NodeMapping createIriMapping(IriClass iriClass, String... columns)
     {
-        return new ParametrisedIriMapping(iriClass, Arrays.asList(columns));
+        return new ParametrisedIriMapping(iriClass, getColumns(columns));
     }
 
 
     public NodeMapping createIriMapping(String iriClassName, String... columns)
     {
-        return new ParametrisedIriMapping(getIriClass(iriClassName), Arrays.asList(columns));
+        return new ParametrisedIriMapping(getIriClass(iriClassName), getColumns(columns));
     }
 
 
@@ -99,9 +102,9 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public NodeMapping createLiteralMapping(LiteralClass literalClass, String... column)
+    public NodeMapping createLiteralMapping(LiteralClass literalClass, String... columns)
     {
-        return new ParametrisedLiteralMapping(literalClass, Arrays.asList(column));
+        return new ParametrisedLiteralMapping(literalClass, getColumns(columns));
     }
 
 
@@ -155,7 +158,7 @@ public abstract class SparqlDatabaseConfiguration
     public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        QuadMapping map = new QuadMapping(table, graph, subject, predicate, object);
+        QuadMapping map = new QuadMapping(new Table(table), graph, subject, predicate, object);
         mappings.add(map);
     }
 
@@ -163,8 +166,22 @@ public abstract class SparqlDatabaseConfiguration
     public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String condition)
     {
-        QuadMapping map = new QuadMapping(table, graph, subject, predicate, object, condition);
+        QuadMapping map = new QuadMapping(new Table(table), graph, subject, predicate, object, condition);
         mappings.add(map);
+    }
+
+
+    public static List<Column> getColumns(String[] values)
+    {
+        List<Column> columns = new ArrayList<Column>(values.length);
+
+        for(String value : values)
+            if(value.matches(".*::[_a-zA-Z0-9]+"))
+                columns.add(new ConstantColumn(value));
+            else
+                columns.add(new TableColumn(value));
+
+        return columns;
     }
 
 

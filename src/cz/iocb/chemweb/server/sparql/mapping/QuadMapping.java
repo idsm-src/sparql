@@ -1,12 +1,13 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import cz.iocb.chemweb.server.db.schema.Table;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
 public class QuadMapping
 {
-    private final String table;
+    private final Table table;
     private final String condition;
     private final NodeMapping graph;
     private final NodeMapping subject;
@@ -14,14 +15,14 @@ public class QuadMapping
     private final NodeMapping object;
 
 
-    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+    public QuadMapping(Table table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
         this(table, graph, subject, predicate, object, null);
     }
 
 
-    public QuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+    public QuadMapping(Table table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String condition)
     {
         //TODO: add support for ParametrisedIriMapping graphs
@@ -67,7 +68,7 @@ public class QuadMapping
     }
 
 
-    public final String getTable()
+    public final Table getTable()
     {
         return table;
     }

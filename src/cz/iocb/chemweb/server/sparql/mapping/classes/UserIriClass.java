@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.db.SQLRuntimeException;
+import cz.iocb.chemweb.server.db.schema.Column;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -281,7 +282,7 @@ public class UserIriClass extends IriClass
 
 
     @Override
-    public String getIriValueCode(List<String> columns)
+    public String getIriValueCode(List<Column> columns)
     {
         StringBuffer strBuf = new StringBuffer();
 
@@ -293,7 +294,7 @@ public class UserIriClass extends IriClass
             if(i > 0)
                 strBuf.append(", ");
 
-            strBuf.append(columns.get(i));
+            strBuf.append(columns.get(i).getCode());
         }
 
         strBuf.append(")");

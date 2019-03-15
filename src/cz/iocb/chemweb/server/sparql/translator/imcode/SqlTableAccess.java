@@ -8,8 +8,10 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
-import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.db.schema.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -29,7 +31,7 @@ public class SqlTableAccess extends SqlIntercode
     /**
      * Name of the table for which the access is generated
      */
-    private final String table;
+    private final Table table;
 
     /**
      * Extra sql condition used in the generated where clause
@@ -55,7 +57,7 @@ public class SqlTableAccess extends SqlIntercode
     private final boolean reduced;
 
 
-    public SqlTableAccess(String table, String condition, boolean reduced)
+    public SqlTableAccess(Table table, String condition, boolean reduced)
     {
         super(new UsedVariables(), true);
         this.table = table;
@@ -64,7 +66,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public SqlTableAccess(String table, String condition)
+    public SqlTableAccess(Table table, String condition)
     {
         this(table, condition, false);
     }
@@ -173,7 +175,7 @@ public class SqlTableAccess extends SqlIntercode
             return false;
 
 
-        LinkedList<String> columns = new LinkedList<String>();
+        LinkedList<Column> columns = new LinkedList<Column>();
 
         for(Entry<String, ArrayList<NodeMapping>> leftEntry : left.mappings.entrySet())
         {
@@ -198,8 +200,8 @@ public class SqlTableAccess extends SqlIntercode
                     {
                         for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
                         {
-                            String leftColumn = ((ParametrisedMapping) leftMap).getSqlColumn(i);
-                            String rightColumn = ((ParametrisedMapping) rightMap).getSqlColumn(i);
+                            Column leftColumn = ((ParametrisedMapping) leftMap).getSqlColumn(i);
+                            Column rightColumn = ((ParametrisedMapping) rightMap).getSqlColumn(i);
 
                             if(leftColumn.equals(rightColumn))
                                 columns.add(leftColumn);
@@ -229,8 +231,8 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < leftMap.getResourceClass().getPatternPartsCount(); i++)
                 {
-                    String leftColumn = leftMap.getSqlColumn(i);
-                    String rightColumn = rightMap.getSqlColumn(i);
+                    Column leftColumn = leftMap.getSqlColumn(i);
+                    Column rightColumn = rightMap.getSqlColumn(i);
 
                     if(leftColumn.equals(rightColumn))
                         columns.add(leftColumn);
@@ -317,7 +319,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
         ArrayList<ColumnPair> columns = new ArrayList<ColumnPair>();
-        LinkedHashSet<String> parentColumns = new LinkedHashSet<String>();
+        LinkedHashSet<Column> parentColumns = new LinkedHashSet<Column>();
 
         for(Entry<String, ArrayList<NodeMapping>> parentEntry : parent.mappings.entrySet())
         {
@@ -349,8 +351,8 @@ public class SqlTableAccess extends SqlIntercode
                     {
                         for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
                         {
-                            String parentColumn = ((ParametrisedMapping) parentMap).getSqlColumn(i);
-                            String foreignColumn = ((ParametrisedMapping) foreignMap).getSqlColumn(i);
+                            Column parentColumn = ((ParametrisedMapping) parentMap).getSqlColumn(i);
+                            Column foreignColumn = ((ParametrisedMapping) foreignMap).getSqlColumn(i);
 
                             columns.add(new ColumnPair(parentColumn, foreignColumn));
                         }
@@ -381,8 +383,8 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < parentMap.getResourceClass().getPatternPartsCount(); i++)
                 {
-                    String parentColumn = parentMap.getSqlColumn(i);
-                    String foreignColumn = foreignMap.getSqlColumn(i);
+                    Column parentColumn = parentMap.getSqlColumn(i);
+                    Column foreignColumn = foreignMap.getSqlColumn(i);
 
                     columns.add(new ColumnPair(parentColumn, foreignColumn));
                 }
@@ -700,10 +702,10 @@ public class SqlTableAccess extends SqlIntercode
             builder.append("1");
 
 
-        if(table != null)
+        if(table.getName() != null)
         {
             builder.append(" FROM ");
-            builder.append(table);
+            builder.append(table.getCode());
         }
 
 

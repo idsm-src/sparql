@@ -16,7 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;

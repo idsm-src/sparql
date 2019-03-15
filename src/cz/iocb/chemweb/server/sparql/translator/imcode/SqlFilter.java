@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.HashSet;
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;

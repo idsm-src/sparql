@@ -4,7 +4,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;

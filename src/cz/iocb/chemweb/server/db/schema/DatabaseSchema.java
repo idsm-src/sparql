@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.db;
+package cz.iocb.chemweb.server.db.schema;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,12 +9,12 @@ import java.util.List;
 
 public abstract class DatabaseSchema
 {
-    public static class StringPair
+    public static class Pair<T>
     {
-        protected final String left;
-        protected final String right;
+        protected final T left;
+        protected final T right;
 
-        public StringPair(String left, String right)
+        public Pair(T left, T right)
         {
             this.left = left;
             this.right = right;
@@ -35,66 +35,67 @@ public abstract class DatabaseSchema
             if(obj == null || getClass() != obj.getClass())
                 return false;
 
-            StringPair other = (StringPair) obj;
+            @SuppressWarnings("rawtypes")
+            Pair other = (Pair) obj;
 
             return left.equals(other.left) && right.equals(other.right);
         }
 
-        public final String getLeft()
+        public final T getLeft()
         {
             return left;
         }
 
-        public final String getRight()
+        public final T getRight()
         {
             return right;
         }
     }
 
 
-    public static class TablePair extends StringPair
+    public static class TablePair extends Pair<Table>
     {
-        public TablePair(String parent, String foreign)
+        public TablePair(Table parent, Table foreign)
         {
             super(parent, foreign);
         }
     }
 
 
-    public static class ColumnPair extends StringPair
+    public static class ColumnPair extends Pair<Column>
     {
-        public ColumnPair(String parent, String foreign)
+        public ColumnPair(Column parent, Column foreign)
         {
             super(parent, foreign);
         }
     }
 
 
-    private final HashMap<String, List<List<String>>> primaryKeys = new HashMap<String, List<List<String>>>();
+    private final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
     private final HashMap<TablePair, List<List<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<List<ColumnPair>>>();
     private final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
 
 
-    public void addPrimaryKeys(String table, List<String> columns)
+    public void addPrimaryKeys(Table table, List<Column> columns)
     {
-        List<List<String>> primaryKeyList = primaryKeys.get(table);
+        List<List<Column>> primaryKeyList = primaryKeys.get(table);
 
         if(primaryKeyList == null)
         {
-            primaryKeyList = new ArrayList<List<String>>();
+            primaryKeyList = new ArrayList<List<Column>>();
             primaryKeys.put(table, primaryKeyList);
         }
 
 
-        ArrayList<String> key = new ArrayList<String>();
+        ArrayList<Column> key = new ArrayList<Column>();
         key.addAll(columns);
 
         primaryKeyList.add(key);
     }
 
 
-    public void addForeignKeys(String parentTable, List<String> parentColumns, String foreignTable,
-            List<String> foreignColumns)
+    public void addForeignKeys(Table parentTable, List<Column> parentColumns, Table foreignTable,
+            List<Column> foreignColumns)
     {
         TablePair tablePair = new TablePair(parentTable, foreignTable);
 
@@ -116,8 +117,8 @@ public abstract class DatabaseSchema
     }
 
 
-    public void addUnjoinableColumns(String leftTable, List<String> leftColumns, String rightTable,
-            List<String> rightColumns)
+    public void addUnjoinableColumns(Table leftTable, List<Column> leftColumns, Table rightTable,
+            List<Column> rightColumns)
     {
         TablePair tablePair = new TablePair(leftTable, rightTable);
 
@@ -138,17 +139,17 @@ public abstract class DatabaseSchema
     }
 
 
-    public List<String> getCompatibleKey(String table, List<String> columns)
+    public List<Column> getCompatibleKey(Table table, List<Column> columns)
     {
-        List<List<String>> keys = primaryKeys.get(table);
+        List<List<Column>> keys = primaryKeys.get(table);
 
         if(keys == null)
             return null;
 
         loop:
-        for(List<String> key : keys)
+        for(List<Column> key : keys)
         {
-            for(String part : key)
+            for(Column part : key)
                 if(!columns.contains(part))
                     continue loop;
 
@@ -159,8 +160,8 @@ public abstract class DatabaseSchema
     }
 
 
-    public List<ColumnPair> getCompatibleForeignKey(String parentTable, String foreignTable,
-            ArrayList<ColumnPair> columns, LinkedHashSet<String> parentColumns)
+    public List<ColumnPair> getCompatibleForeignKey(Table parentTable, Table foreignTable,
+            ArrayList<ColumnPair> columns, LinkedHashSet<Column> parentColumns)
     {
         List<List<ColumnPair>> keys = getForeignKeys(parentTable, foreignTable);
 
@@ -175,7 +176,7 @@ public abstract class DatabaseSchema
                 if(!columns.contains(keyPair))
                     continue loop;
 
-            for(String parentColumn : parentColumns)
+            for(Column parentColumn : parentColumns)
                 if(key.stream().noneMatch(keyPair -> keyPair.getLeft().equals(parentColumn)))
                     continue loop;
 
@@ -186,7 +187,7 @@ public abstract class DatabaseSchema
     }
 
 
-    public List<ColumnPair> getUnjoinableColumns(String leftTable, String rightTable, List<ColumnPair> columns)
+    public List<ColumnPair> getUnjoinableColumns(Table leftTable, Table rightTable, List<ColumnPair> columns)
     {
         List<List<ColumnPair>> list = getUnjoinableColumns(leftTable, rightTable);
 
@@ -208,7 +209,7 @@ public abstract class DatabaseSchema
     }
 
 
-    public List<List<ColumnPair>> getForeignKeys(String parentTable, String foreignTable)
+    public List<List<ColumnPair>> getForeignKeys(Table parentTable, Table foreignTable)
     {
         if(parentTable == null || foreignTable == null)
             return null;
@@ -217,7 +218,7 @@ public abstract class DatabaseSchema
     }
 
 
-    public List<List<ColumnPair>> getUnjoinableColumns(String leftTable, String rightTable)
+    public List<List<ColumnPair>> getUnjoinableColumns(Table leftTable, Table rightTable)
     {
         if(leftTable == null || rightTable == null)
             return null;

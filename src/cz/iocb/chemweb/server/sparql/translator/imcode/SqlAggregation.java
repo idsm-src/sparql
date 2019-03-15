@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDa
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;

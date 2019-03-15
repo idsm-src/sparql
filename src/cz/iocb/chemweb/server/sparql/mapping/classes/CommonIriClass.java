@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.Arrays;
 import java.util.List;
+import cz.iocb.chemweb.server.db.schema.Column;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -83,8 +84,8 @@ public class CommonIriClass extends IriClass
 
 
     @Override
-    public String getIriValueCode(List<String> columns)
+    public String getIriValueCode(List<Column> columns)
     {
-        return columns.get(0);
+        return columns.get(0).getCode();
     }
 }

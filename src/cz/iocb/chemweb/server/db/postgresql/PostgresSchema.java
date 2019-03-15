@@ -7,7 +7,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
-import cz.iocb.chemweb.server.db.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.db.schema.Table;
+import cz.iocb.chemweb.server.db.schema.TableColumn;
 
 
 
@@ -23,12 +26,13 @@ public class PostgresSchema extends DatabaseSchema
             {
                 while(tables.next())
                 {
-                    String table = tables.getString("TABLE_NAME");
+                    String tableName = tables.getString("TABLE_NAME");
+                    Table table = new Table(tableName);
 
 
-                    try(ResultSet indexes = metaData.getIndexInfo(null, null, table, true, false))
+                    try(ResultSet indexes = metaData.getIndexInfo(null, null, tableName, true, false))
                     {
-                        List<String> columns = null;
+                        List<Column> columns = null;
 
                         while(indexes.next())
                         {
@@ -42,10 +46,10 @@ public class PostgresSchema extends DatabaseSchema
                                 if(columns != null)
                                     addPrimaryKeys(table, columns);
 
-                                columns = new ArrayList<String>();
+                                columns = new ArrayList<Column>();
                             }
 
-                            columns.add(indexes.getString("COLUMN_NAME"));
+                            columns.add(new TableColumn(indexes.getString("COLUMN_NAME")));
                         }
 
                         if(columns != null)
@@ -53,11 +57,11 @@ public class PostgresSchema extends DatabaseSchema
                     }
 
 
-                    try(ResultSet indexes = metaData.getCrossReference(null, null, table, null, null, null))
+                    try(ResultSet indexes = metaData.getCrossReference(null, null, tableName, null, null, null))
                     {
-                        String foreignTable = null;
-                        List<String> parentColumns = new ArrayList<String>();
-                        List<String> foreignColumns = new ArrayList<String>();
+                        Table foreignTable = null;
+                        List<Column> parentColumns = new ArrayList<Column>();
+                        List<Column> foreignColumns = new ArrayList<Column>();
 
 
                         while(indexes.next())
@@ -70,15 +74,15 @@ public class PostgresSchema extends DatabaseSchema
                                 {
                                     addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
 
-                                    parentColumns = new ArrayList<String>();
-                                    foreignColumns = new ArrayList<String>();
+                                    parentColumns = new ArrayList<Column>();
+                                    foreignColumns = new ArrayList<Column>();
                                 }
 
-                                foreignTable = indexes.getString("FKTABLE_NAME");
+                                foreignTable = new Table(indexes.getString("FKTABLE_NAME"));
                             }
 
-                            parentColumns.add(indexes.getString("PKCOLUMN_NAME"));
-                            foreignColumns.add(indexes.getString("FKCOLUMN_NAME"));
+                            parentColumns.add(new TableColumn(indexes.getString("PKCOLUMN_NAME")));
+                            foreignColumns.add(new TableColumn(indexes.getString("FKCOLUMN_NAME")));
                         }
 
                         if(foreignTable != null)

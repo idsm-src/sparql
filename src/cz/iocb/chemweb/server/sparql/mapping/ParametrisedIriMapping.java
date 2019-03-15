@@ -2,7 +2,8 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.ArrayList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -10,10 +11,10 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class ParametrisedIriMapping extends IriMapping implements ParametrisedMapping
 {
-    private final List<String> columns;
+    private final List<Column> columns;
 
 
-    public ParametrisedIriMapping(IriClass iriClass, List<String> columns)
+    public ParametrisedIriMapping(IriClass iriClass, List<Column> columns)
     {
         super(iriClass);
         this.columns = columns;
@@ -30,12 +31,12 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     @Override
     public String getSqlValueAccess(int part)
     {
-        return columns.get(part);
+        return columns.get(part).getCode();
     }
 
 
     @Override
-    public String getSqlColumn(int part)
+    public Column getSqlColumn(int part)
     {
         return columns.get(part);
     }
@@ -44,11 +45,11 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     @Override
     public NodeMapping remapColumns(List<ColumnPair> columnMap)
     {
-        ArrayList<String> remappedColumns = new ArrayList<String>();
+        ArrayList<Column> remappedColumns = new ArrayList<Column>();
 
-        for(String col : columns)
+        for(Column col : columns)
         {
-            String remapped = columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight();
+            Column remapped = columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight();
             assert remapped != null;
             remappedColumns.add(remapped);
         }
@@ -75,6 +76,7 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     }
 
 
+    @Override
     public String getSqlIriValueAccess()
     {
         return getIriClass().getIriValueCode(columns);

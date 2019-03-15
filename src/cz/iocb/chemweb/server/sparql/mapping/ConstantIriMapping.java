@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
-import cz.iocb.chemweb.server.db.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
