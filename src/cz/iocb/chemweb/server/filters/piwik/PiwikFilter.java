@@ -15,9 +15,9 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.conn.HttpHostConnectException;
+import org.apache.http.HttpResponse;
+import org.apache.http.concurrent.FutureCallback;
 import org.piwik.java.tracking.PiwikRequest;
-import org.piwik.java.tracking.PiwikTracker;
 
 
 
@@ -31,6 +31,7 @@ public class PiwikFilter implements Filter
     private boolean rpc = false;
 
     private String cookieName = null;
+    private PiwikAsyncTracker tracker = null;
 
 
     static
@@ -112,13 +113,23 @@ public class PiwikFilter implements Filter
 
 
         cookieName = "_pk_id." + siteId + ".";
+
+        tracker = new PiwikAsyncTracker(hostUrl, 20000);
+        tracker.start();
     }
 
 
     @Override
     public void destroy()
     {
-
+        try
+        {
+            tracker.close();
+        }
+        catch(IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 
 
@@ -214,15 +225,24 @@ public class PiwikFilter implements Filter
         piwikRequest.setActionTime(actionTime);
 
 
-        PiwikTracker tracker = new PiwikTracker(hostUrl);
+        tracker.sendRequest(piwikRequest, new FutureCallback<HttpResponse>()
+        {
+            @Override
+            public void failed(Exception e)
+            {
+                request.getServletContext().log("PiwikFilter: Exception: " + e.getMessage());
+            }
 
-        try
-        {
-            /*HttpResponse piwikResponse =*/ tracker.sendRequest(piwikRequest);
-        }
-        catch(HttpHostConnectException e)
-        {
-            request.getServletContext().log("PiwikFilter: HttpHostConnectException: " + e.getMessage());
-        }
+            @Override
+            public void cancelled()
+            {
+                request.getServletContext().log("PiwikFilter: cancelled");
+            }
+
+            @Override
+            public void completed(HttpResponse response)
+            {
+            }
+        });
     }
 }
