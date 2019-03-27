@@ -259,6 +259,16 @@
     <url-pattern>/endpoint/sparql/empty</url-pattern>
   </servlet-mapping>
 
+  <servlet>
+    <servlet-name>EmptyEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>EmptyEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sparql/idsm</url-pattern>
+  </servlet-mapping>
+
 
   <!-- Sachem Image Servlets -->
   <servlet>
