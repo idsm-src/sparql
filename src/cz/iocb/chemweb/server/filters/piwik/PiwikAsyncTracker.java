@@ -102,14 +102,7 @@ public class PiwikAsyncTracker
         uriBuilder.replaceQuery(request.getUrlEncodedQueryString());
         HttpGet get = new HttpGet(uriBuilder.build());
 
-        try
-        {
-            return client.execute(get, callback);
-        }
-        finally
-        {
-            get.releaseConnection();
-        }
+        return client.execute(get, callback);
     }
 
 
