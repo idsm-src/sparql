@@ -28,6 +28,8 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlTableAccess extends SqlIntercode
 {
+    private final DatabaseSchema schema;
+
     /**
      * Name of the table for which the access is generated
      */
@@ -57,18 +59,19 @@ public class SqlTableAccess extends SqlIntercode
     private final boolean reduced;
 
 
-    public SqlTableAccess(Table table, String condition, boolean reduced)
+    public SqlTableAccess(DatabaseSchema schema, Table table, String condition, boolean reduced)
     {
         super(new UsedVariables(), true);
+        this.schema = schema;
         this.table = table;
         this.condition = condition;
         this.reduced = reduced;
     }
 
 
-    public SqlTableAccess(Table table, String condition)
+    public SqlTableAccess(DatabaseSchema schema, Table table, String condition)
     {
-        this(table, condition, false);
+        this(schema, table, condition, false);
     }
 
 
@@ -452,7 +455,7 @@ public class SqlTableAccess extends SqlIntercode
             condition = right.condition;
 
 
-        SqlTableAccess merged = new SqlTableAccess(left.table, condition);
+        SqlTableAccess merged = new SqlTableAccess(left.schema, left.table, condition);
 
         for(UsedVariable var : left.getVariables().getValues())
         {
@@ -501,7 +504,7 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlTableAccess leftMerge(SqlTableAccess left, SqlTableAccess right)
     {
-        SqlTableAccess merged = new SqlTableAccess(left.table, left.condition);
+        SqlTableAccess merged = new SqlTableAccess(left.schema, left.table, left.condition);
 
         for(UsedVariable var : left.getVariables().getValues())
         {
@@ -556,7 +559,7 @@ public class SqlTableAccess extends SqlIntercode
             condition = parent.condition;
 
 
-        SqlTableAccess merged = new SqlTableAccess(foreign.table, condition);
+        SqlTableAccess merged = new SqlTableAccess(foreign.schema, foreign.table, condition);
 
         for(UsedVariable var : foreign.getVariables().getValues())
         {
@@ -629,7 +632,7 @@ public class SqlTableAccess extends SqlIntercode
     @Override
     public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
     {
-        SqlTableAccess result = new SqlTableAccess(table, condition, reduced);
+        SqlTableAccess result = new SqlTableAccess(schema, table, condition, reduced);
 
         for(String variable : restrictions)
             if(variables.get(variable) != null)
@@ -709,11 +712,16 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        boolean hasWhereCondition = !valueConditions.isEmpty() || !notNullConditions.isEmpty();
+        boolean hasWhereCondition = !valueConditions.isEmpty();
 
         for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
             if(entry.getValue().size() > 1)
                 hasWhereCondition = true;
+
+        for(ParametrisedMapping mapping : notNullConditions)
+            for(int i = 0; i < mapping.getResourceClass().getPatternPartsCount(); i++)
+                if(schema.isNullableColumn(table, mapping.getSqlColumn(i)))
+                    hasWhereCondition = true;
 
         if(hasWhereCondition)
         {
@@ -749,14 +757,18 @@ public class SqlTableAccess extends SqlIntercode
 
             for(ParametrisedMapping mapping : notNullConditions)
             {
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
-
                 for(int i = 0; i < mapping.getResourceClass().getPatternPartsCount(); i++)
                 {
-                    appendAnd(builder, i > 0);
-                    builder.append(mapping.getSqlValueAccess(i));
-                    builder.append(" IS NOT NULL ");
+                    Column column = mapping.getSqlColumn(i);
+
+                    if(schema.isNullableColumn(table, column))
+                    {
+                        appendAnd(builder, hasWhere);
+                        hasWhere = true;
+
+                        builder.append(column.getCode());
+                        builder.append(" IS NOT NULL ");
+                    }
                 }
             }
 

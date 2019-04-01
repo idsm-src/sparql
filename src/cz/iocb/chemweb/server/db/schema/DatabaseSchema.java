@@ -71,9 +71,24 @@ public abstract class DatabaseSchema
     }
 
 
+    private final HashMap<Table, List<Column>> nullableColumns = new HashMap<Table, List<Column>>();
     private final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
     private final HashMap<TablePair, List<List<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<List<ColumnPair>>>();
     private final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
+
+
+    public void addNullableColumn(Table table, TableColumn column)
+    {
+        List<Column> columnList = nullableColumns.get(table);
+
+        if(columnList == null)
+        {
+            columnList = new ArrayList<Column>();
+            nullableColumns.put(table, columnList);
+        }
+
+        columnList.add(column);
+    }
 
 
     public void addPrimaryKeys(Table table, List<Column> columns)
@@ -136,6 +151,17 @@ public abstract class DatabaseSchema
             columnPairs.add(new ColumnPair(leftColumns.get(i), rightColumns.get(i)));
 
         unjoinableList.add(columnPairs);
+    }
+
+
+    public boolean isNullableColumn(Table table, Column column)
+    {
+        List<Column> columns = nullableColumns.get(table);
+
+        if(columns == null)
+            return false;
+
+        return columns.contains(column);
     }
 
 

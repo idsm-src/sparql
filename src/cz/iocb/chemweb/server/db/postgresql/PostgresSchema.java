@@ -30,6 +30,18 @@ public class PostgresSchema extends DatabaseSchema
                     Table table = new Table(tableName);
 
 
+                    try(ResultSet columns = metaData.getColumns(null, null, tableName, null))
+                    {
+                        while(columns.next())
+                        {
+                            TableColumn column = new TableColumn(columns.getString("COLUMN_NAME"));
+
+                            if(columns.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls)
+                                addNullableColumn(table, column);
+                        }
+                    }
+
+
                     try(ResultSet indexes = metaData.getIndexInfo(null, null, tableName, true, false))
                     {
                         List<Column> columns = null;

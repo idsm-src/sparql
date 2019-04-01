@@ -290,7 +290,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(mapping.match(graph, subject, predicate, object))
             {
-                SqlTableAccess translated = new SqlTableAccess(mapping.getTable(), mapping.getCondition());
+                SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
 
                 processNodeMapping(translated, graph, mapping.getGraph());
                 processNodeMapping(translated, subject, mapping.getSubject());
@@ -449,7 +449,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                     continue;
 
 
-                SqlTableAccess translated = new SqlTableAccess(mapping.getTable(), mapping.getCondition());
+                SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
 
                 processNodeMapping(translated, graph, mapping.getGraph());
                 processNodeMapping(translated, subject, mapping.getSubject());
