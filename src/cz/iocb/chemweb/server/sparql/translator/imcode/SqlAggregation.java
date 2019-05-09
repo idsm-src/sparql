@@ -42,7 +42,7 @@ public class SqlAggregation extends SqlIntercode
         UsedVariables variables = new UsedVariables();
 
         for(String variable : groupVariables)
-            if(restrictions == null || restrictions.contains(variable))
+            if(child.getVariables().get(variable) != null && (restrictions == null || restrictions.contains(variable)))
                 variables.add(child.getVariables().get(variable));
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
@@ -262,13 +262,16 @@ public class SqlAggregation extends SqlIntercode
         builder.append(child.translate());
         builder.append(" ) AS tab");
 
-        if(!groupVariables.isEmpty())
+        if(groupVariables.stream().anyMatch(v -> child.getVariables().get(v) != null))
         {
             builder.append(" GROUP BY ");
             boolean hasGroupBy = false;
 
             for(String variable : groupVariables)
             {
+                if(child.getVariables().get(variable) == null)
+                    continue;
+
                 for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
                 {
                     for(int i = 0; i < resClass.getPatternPartsCount(); i++)
