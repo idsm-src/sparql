@@ -712,7 +712,7 @@ public class SqlTableAccess extends SqlIntercode
         }
 
 
-        boolean hasWhereCondition = !valueConditions.isEmpty();
+        boolean hasWhereCondition = !valueConditions.isEmpty() || condition != null;
 
         for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
             if(entry.getValue().size() > 1)
