@@ -116,6 +116,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
+    private static final int serviceRedirectLimit = 3;
     private static final int serviceContextLimit = 200;
     private static final int serviceResultLimit = 10000;
     private static final String variablePrefix = "@additionalvar";
@@ -1245,19 +1246,27 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             try
             {
                 /* process service query */
-                HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+                HttpURLConnection connection = null;
+                String url = endpoint;
 
-                if(connection instanceof HttpsURLConnection && sslContext != null)
-                    ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
-
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
-                connection.setRequestProperty("accept", "application/sparql-results+xml");
-                connection.setDoOutput(true);
-
-                try(OutputStream out = connection.getOutputStream())
+                for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
                 {
-                    out.write(("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
+                    connection = (HttpURLConnection) new URL(url).openConnection();
+
+                    if(connection instanceof HttpsURLConnection && sslContext != null)
+                        ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
+
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
+                    connection.setRequestProperty("accept", "application/sparql-results+xml");
+                    connection.setDoOutput(true);
+
+                    try(OutputStream out = connection.getOutputStream())
+                    {
+                        out.write(("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
+                    }
+
+                    url = connection.getHeaderField("Location");
                 }
 
                 if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
