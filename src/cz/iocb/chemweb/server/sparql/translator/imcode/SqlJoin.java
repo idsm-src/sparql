@@ -144,7 +144,9 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantA != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, restrictions);
+                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, subrestrictions);
+
                         join.childs.set(j, merge);
                         join.childs.remove(i);
                         continue loop;
@@ -155,7 +157,9 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantB != null)
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, restrictions);
+                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
+                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, subrestrictions);
+
                         join.childs.set(i, merge);
                         join.childs.remove(j);
                         continue loop;
@@ -164,7 +168,8 @@ public class SqlJoin extends SqlIntercode
 
                     if(SqlTableAccess.canBeMerged(schema, left, right))
                     {
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, restrictions);
+                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
+                        SqlTableAccess merge = SqlTableAccess.merge(left, right, subrestrictions);
 
                         join.childs.set(i, merge);
                         join.childs.remove(j);
@@ -409,6 +414,21 @@ public class SqlJoin extends SqlIntercode
 
 
         return joinResult;
+    }
+
+
+    private static HashSet<String> getRestrictions(SqlJoin join, int i, int j, HashSet<String> restrictions)
+    {
+        if(restrictions == null)
+            return null;
+
+        HashSet<String> subrestrictions = new HashSet<String>(restrictions);
+
+        for(int k = 0; k < join.childs.size(); k++)
+            if(k != i && k != j)
+                subrestrictions.addAll(join.childs.get(k).getVariables().getNames());
+
+        return subrestrictions;
     }
 
 

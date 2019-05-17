@@ -39,7 +39,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     private static final String variablePrefix = "@pathvar";
-    private int variableId = 0;
+    private static int variableId = 0;
 
     private final DatabaseSchema schema;
     private final List<QuadMapping> mappings;
@@ -119,7 +119,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             for(int i = 0; i < path.size(); i++)
             {
-                Node subject = nodes.get(i);
+                Node join = nodes.get(i);
                 Node object = nodes.get(i + 1);
 
                 HashSet<String> restrictions = new HashSet<String>();
@@ -130,7 +130,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(object instanceof VariableOrBlankNode)
                     restrictions.add(((VariableOrBlankNode) object).getName());
 
-                subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), subject, object), restrictions);
+                subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), join, object), restrictions);
             }
 
             result = SqlUnion.union(result, subresult);
