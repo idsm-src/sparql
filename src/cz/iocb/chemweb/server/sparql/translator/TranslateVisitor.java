@@ -644,6 +644,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 checkExpressionForGroupedSolutions(projection.getVariable(), groupVars);
         }
 
+
+        for(Projection projection : select.getProjections())
+            if(projection.getExpression() != null)
+                groupVars.add(projection.getVariable().getName());
+
         for(OrderCondition orderCondition : select.getOrderByConditions())
             checkExpressionForGroupedSolutions(orderCondition.getExpression(), groupVars);
     }
