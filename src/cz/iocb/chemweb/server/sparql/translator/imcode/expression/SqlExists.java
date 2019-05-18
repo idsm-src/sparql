@@ -6,6 +6,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
+import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 
@@ -13,7 +14,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 
 public class SqlExists extends SqlExpressionIntercode
 {
-    private static final String table = "tab";
+    private static final String table = "tabcnd";
     private final boolean negated;
     private final SqlIntercode pattern;
     private final VariableAccessor variableAccessor;
@@ -84,6 +85,8 @@ public class SqlExists extends SqlExpressionIntercode
 
         boolean hasWhere = false;
 
+        VariableAccessor patternVariableAccessor = new SimpleVariableAccessor(pattern.getVariables(), table);
+
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
                 variableAccessor.getUsedVariables());
 
@@ -113,7 +116,7 @@ public class SqlExists extends SqlExpressionIntercode
                             appendAnd(builder, use);
                             use = true;
 
-                            builder.append(table).append('.').append(resClass.getSqlColumn(var, i));
+                            builder.append(patternVariableAccessor.getSqlVariableAccess(var, resClass, i));
                             builder.append(" IS NULL");
                         }
                     }
@@ -139,7 +142,7 @@ public class SqlExists extends SqlExpressionIntercode
                             appendAnd(builder, use);
                             use = true;
 
-                            builder.append(resClass.getSqlColumn(var, i));
+                            builder.append(variableAccessor.getSqlVariableAccess(var, resClass, i));
                             builder.append(" IS NULL");
                         }
                     }
@@ -158,33 +161,16 @@ public class SqlExists extends SqlExpressionIntercode
 
                         builder.append("(");
 
-                        if(pairedClass.getLeftClass() == pairedClass.getRightClass())
+                        ResourceClass resClass = pairedClass.getLeftClass() == pairedClass.getRightClass() ?
+                                pairedClass.getLeftClass() : pairedClass.getLeftClass().getGeneralClass();
+
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
                         {
-                            ResourceClass resClass = pairedClass.getLeftClass();
+                            appendAnd(builder, i > 0);
 
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, i > 0);
-
-                                builder.append(table).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" = ");
-                                builder.append(resClass.getSqlColumn(var, i));
-                            }
-                        }
-                        else
-                        {
-                            ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
-
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, i > 0);
-
-                                builder.append(
-                                        pairedClass.getLeftClass().getGeneralisedPatternCode(table, var, i, false));
-                                builder.append(" = ");
-                                builder.append(
-                                        pairedClass.getRightClass().getGeneralisedPatternCode(null, var, i, false));
-                            }
+                            builder.append(patternVariableAccessor.getSqlVariableAccess(var, resClass, i));
+                            builder.append(" = ");
+                            builder.append(variableAccessor.getSqlVariableAccess(var, resClass, i));
                         }
 
                         builder.append(")");

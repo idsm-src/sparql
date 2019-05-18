@@ -12,20 +12,35 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
 
 
 
-public class LeftJoinVariableAccessor extends SimpleVariableAccessor
+public class LeftJoinVariableAccessor extends VariableAccessor
 {
     private static final String leftTable = SqlLeftJoin.leftTable;
     private static final String rightTable = SqlLeftJoin.rightTable;
 
     private final UsedVariables left;
     private final UsedVariables right;
+    private final UsedVariables usedVariables;
 
 
     public LeftJoinVariableAccessor(UsedVariables left, UsedVariables right)
     {
-        super(generateUsedVariables(left, right));
         this.left = left;
         this.right = right;
+        this.usedVariables = generateUsedVariables(left, right);
+    }
+
+
+    @Override
+    public UsedVariables getUsedVariables()
+    {
+        return usedVariables;
+    }
+
+
+    @Override
+    public UsedVariable getUsedVariable(String variable)
+    {
+        return usedVariables.get(variable);
     }
 
 
