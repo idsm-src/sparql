@@ -15,6 +15,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 
 
@@ -46,7 +47,7 @@ public class SqlAggregation extends SqlIntercode
                 variables.add(child.getVariables().get(variable));
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions == null || restrictions.contains(entry.getKey()))
+            if(entry.getValue() != SqlNull.get() && (restrictions == null || restrictions.contains(entry.getKey())))
                 variables.add(new UsedVariable(entry.getKey(), entry.getValue().getResourceClasses(),
                         entry.getValue().canBeNull()));
 
