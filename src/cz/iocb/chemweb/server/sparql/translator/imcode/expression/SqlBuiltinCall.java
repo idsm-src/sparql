@@ -913,19 +913,26 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 builder.append("CASE ");
                 builder.append(condition.translate());
-                builder.append(" WHEN true THEN ");
 
-                if(expressionResourceClass != null)
-                    builder.append(translateAsUnboxedOperand(left, expressionResourceClass));
-                else
-                    builder.append(translateAsBoxedOperand(left, left.getResourceClasses()));
+                if(left != SqlNull.get())
+                {
+                    builder.append(" WHEN true THEN ");
 
-                builder.append(" WHEN false THEN ");
+                    if(expressionResourceClass != null)
+                        builder.append(translateAsUnboxedOperand(left, expressionResourceClass));
+                    else
+                        builder.append(translateAsBoxedOperand(left, left.getResourceClasses()));
+                }
 
-                if(expressionResourceClass != null)
-                    builder.append(translateAsUnboxedOperand(right, expressionResourceClass));
-                else
-                    builder.append(translateAsBoxedOperand(right, right.getResourceClasses()));
+                if(right != SqlNull.get())
+                {
+                    builder.append(" WHEN false THEN ");
+
+                    if(expressionResourceClass != null)
+                        builder.append(translateAsUnboxedOperand(right, expressionResourceClass));
+                    else
+                        builder.append(translateAsBoxedOperand(right, right.getResourceClasses()));
+                }
 
                 builder.append(" END");
 
