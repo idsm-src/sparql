@@ -1,7 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
@@ -23,11 +25,15 @@ import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
 
@@ -131,6 +137,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public static boolean isIntBlankNode(ResourceClass resClass)
+    {
+        return resClass instanceof IntBlankNodeClass;
+    }
+
+
+    public static boolean isStrBlankNode(ResourceClass resClass)
+    {
+        return resClass instanceof StrBlankNodeClass;
+    }
+
+
     public static boolean isLiteral(ResourceClass resClass)
     {
         return resClass instanceof LiteralClass;
@@ -198,6 +216,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     protected static ResourceClass getExpressionResourceClass(Set<ResourceClass> resourceClasses)
     {
+        if(resourceClasses.size() == 0)
+            return null;
+
         if(resourceClasses.contains(rdfLangString) || resourceClasses.contains(unsupportedLiteral))
             return null;
 
@@ -212,6 +233,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
         if(resourceClasses.stream().allMatch(r -> isIri(r)))
             return iri;
+
+        if(resourceClasses.stream().allMatch(r -> isIntBlankNode(r)))
+            return intBlankNode;
+
+        if(resourceClasses.stream().allMatch(r -> isStrBlankNode(r)))
+            return strBlankNode;
 
         return null;
     }
@@ -234,6 +261,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
         if(set.contains(iri))
             set = set.stream().filter(r -> !(r instanceof IriClass && r != iri)).collect(Collectors.toSet());
+
+        if(set.contains(intBlankNode))
+            set = set.stream().filter(r -> !(r instanceof UserIntBlankNodeClass)).collect(Collectors.toSet());
+
+        if(set.contains(strBlankNode))
+            set = set.stream().filter(r -> !(r instanceof UserStrBlankNodeClass)).collect(Collectors.toSet());
 
         return set;
     }
@@ -262,6 +295,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 set.add(resourceClass);
 
             if((resourceClass instanceof UserIriClass || resourceClass == unsupportedIri) && merged.contains(iri))
+                set.add(resourceClass);
+
+            if(resourceClass instanceof UserIntBlankNodeClass && merged.contains(intBlankNode))
+                set.add(resourceClass);
+
+            if(resourceClass instanceof UserStrBlankNodeClass && merged.contains(strBlankNode))
                 set.add(resourceClass);
         }
 
@@ -340,7 +379,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     .filter(r -> r == resourceClass
                             || isNumeric(r) && isNumeric(resourceClass) && isNumericCompatibleWith(r, resourceClass)
                             || isDateTime(r) && isDateTime(resourceClass) || isDate(r) && isDate(resourceClass)
-                            || isIri(r) && isIri(resourceClass))
+                            || isIri(r) && isIri(resourceClass) || isIntBlankNode(r) && isIntBlankNode(resourceClass)
+                            || isStrBlankNode(r) && isStrBlankNode(resourceClass))
                     .collect(Collectors.toList());
 
 
@@ -371,6 +411,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     builder.append(", ");
                     builder.append(((DateConstantZoneClass) compatibleClass).getZone());
                     builder.append("::int4)");
+                }
+                else if(compatibleClass instanceof UserIntBlankNodeClass)
+                {
+                    builder.append("(");
+                    builder.append(code);
+                    builder.append(" & x'FFFFFFFF'::int8)::int4");
+                }
+                else if(compatibleClass instanceof UserStrBlankNodeClass)
+                {
+                    builder.append("substr(");
+                    builder.append(code);
+                    builder.append(", 9)");
                 }
                 else if(compatibleClass instanceof IriClass)
                 {
@@ -418,6 +470,22 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             else if(resourceClass == iri && expressionClass instanceof IriClass)
             {
                 builder.append(operand.translate());
+            }
+            else if(resourceClass == intBlankNode && expressionClass instanceof UserIntBlankNodeClass)
+            {
+                builder.append("('");
+                builder.append(((UserIntBlankNodeClass) expressionClass).getSegment());
+                builder.append("'::int8 << 32 | ");
+                builder.append(operand.translate());
+                builder.append(")");
+            }
+            else if(resourceClass == strBlankNode && expressionClass instanceof UserStrBlankNodeClass)
+            {
+                builder.append("('");
+                builder.append(((UserStrBlankNodeClass) expressionClass).getSegment());
+                builder.append("'::varchar || ");
+                builder.append(operand.translate());
+                builder.append(")");
             }
             else if(operand.isBoxed())
             {

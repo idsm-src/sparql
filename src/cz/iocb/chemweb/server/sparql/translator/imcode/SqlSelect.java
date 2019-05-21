@@ -1,7 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
@@ -17,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -223,28 +222,19 @@ public class SqlSelect extends SqlIntercode
 
 
             // order blank nodes
-            if(variable.containsClass(intBlankNode))
+            for(ResourceClass resClass : variable.getClasses())
             {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
+                if(resClass instanceof BlankNodeClass)
+                {
+                    appendComma(builder, hasOrderCondition);
+                    hasOrderCondition = true;
 
-                builder.append(intBlankNode.getSqlColumn(varName, 0));
-                builder.append(" IS NULL");
+                    builder.append(resClass.getSqlColumn(varName, 0));
+                    builder.append(" IS NULL");
 
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
-
-            if(variable.containsClass(strBlankNode))
-            {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(strBlankNode.getSqlColumn(varName, 0));
-                builder.append(" IS NULL");
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
+                    if(order.getValue() == Direction.Descending)
+                        builder.append(" DESC");
+                }
             }
 
 

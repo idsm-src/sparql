@@ -1,7 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
@@ -24,6 +26,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
@@ -513,6 +517,12 @@ public class SqlBinaryComparison extends SqlBinary
 
         if(leftClass instanceof IriClass && rightClass instanceof IriClass)
             return iri;
+
+        if(leftClass instanceof IntBlankNodeClass && rightClass instanceof IntBlankNodeClass)
+            return intBlankNode;
+
+        if(leftClass instanceof StrBlankNodeClass && rightClass instanceof StrBlankNodeClass)
+            return strBlankNode;
 
         if(leftClass == rightClass)
             return leftClass;

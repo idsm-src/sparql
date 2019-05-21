@@ -40,6 +40,7 @@ import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -48,6 +49,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
@@ -121,6 +123,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private static final int serviceResultLimit = 10000;
     private static final String variablePrefix = "@additionalvar";
     private int variableId = 0;
+    private int serviceId = 0;
 
     private final Stack<VarOrIri> graphRestrictions = new Stack<>();
     private final List<TranslateMessage> messages;
@@ -1182,6 +1185,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
             /* build default result */
+            BlankNodeClass blankNodeClass = new UserStrBlankNodeClass(--serviceId);
             ArrayList<Pair<Node, ResourceClass>> defaulResult = new ArrayList<>(mergedVariables.size());
             ArrayList<ArrayList<Pair<Node, ResourceClass>>> rowResults = new ArrayList<>();
 
@@ -1207,7 +1211,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(node != null)
                 {
-                    ResourceClass resourceClass = getResourceClass(node);
+                    ResourceClass resourceClass = getResourceClass(node, blankNodeClass);
                     typedVariables.get(i).getValue().add(resourceClass);
                     defaulResult.add(new Pair<>(node, resourceClass));
                 }
@@ -1345,7 +1349,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         if(result.get(varIndex).getKey() != null && !result.get(varIndex).getKey().equals(node))
                             throw new SAXException("unexpected value");
 
-                        ResourceClass resourceClass = getResourceClass(node);
+                        ResourceClass resourceClass = getResourceClass(node, blankNodeClass);
                         rowTypedVariables.get(varIndex).getValue().add(resourceClass);
                         result.set(varIndex, new Pair<Node, ResourceClass>(node, resourceClass));
                     }
@@ -1438,7 +1442,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private ResourceClass getResourceClass(Node node)
+    private ResourceClass getResourceClass(Node node, ResourceClass blankNodeClass)
     {
         if(node instanceof Literal)
         {
@@ -1474,7 +1478,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
         else if(node instanceof BlankNode)
         {
-            return BuiltinClasses.strBlankNode;
+            return blankNodeClass;
         }
 
         return null;

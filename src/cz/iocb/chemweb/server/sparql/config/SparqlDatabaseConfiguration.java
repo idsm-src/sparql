@@ -15,9 +15,11 @@ import cz.iocb.chemweb.server.db.schema.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.ParametrisedBlankNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
@@ -99,6 +101,12 @@ public abstract class SparqlDatabaseConfiguration
             iriClass = BuiltinClasses.unsupportedIri;
 
         return new ConstantIriMapping(iriClass, new IRI(iri));
+    }
+
+
+    public NodeMapping createBlankNodeMapping(BlankNodeClass blankNodeClass, String... columns)
+    {
+        return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(columns));
     }
 
 

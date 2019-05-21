@@ -44,10 +44,13 @@ public class BuiltinClasses
     public static final LangStringClass rdfLangString = new LangStringClass();
     public static final UnsupportedLiteralClass unsupportedLiteral = new UnsupportedLiteralClass();
 
-    public static final BlankNodeIntClass intBlankNode = new BlankNodeIntClass();
-    public static final BlankNodeStrClass strBlankNode = new BlankNodeStrClass();
+    public static final IntBlankNodeClass intBlankNode = new CommonIntBlankNodeClass();
+    public static final StrBlankNodeClass strBlankNode = new CommonStrBlankNodeClass();
     public static final CommonIriClass iri = new CommonIriClass();
     public static final CommonIriClass unsupportedIri = new CommonIriClass();
+
+    public static final IntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass(0);
+    public static final StrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass(0);
 
 
     private static final List<LiteralClass> literalClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong,

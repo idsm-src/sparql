@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import java.util.HashSet;
@@ -9,7 +11,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
@@ -136,6 +140,12 @@ public class SqlBind extends SqlIntercode
                 boolean splitLangClasses = expression.getResourceClasses().stream()
                         .filter(r -> r instanceof LangStringConstantTagClass).count() > 1;
 
+                boolean splitIntBlankNodeClasses = expression.getResourceClasses().stream()
+                        .filter(r -> r instanceof UserIntBlankNodeClass).count() > 1;
+
+                boolean splitStrBlankNodeClasses = expression.getResourceClasses().stream()
+                        .filter(r -> r instanceof UserStrBlankNodeClass).count() > 1;
+
 
                 builder.append("SELECT ");
 
@@ -180,6 +190,31 @@ public class SqlBind extends SqlIntercode
                         builder.append(rdfLangString.getPatternCode(columnName, 1, expression.isBoxed()));
                         builder.append(" WHEN '");
                         builder.append(((LangStringConstantTagClass) resourceClass).getTag());
+                        builder.append("'::varchar THEN ");
+                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
+                        builder.append(" END AS ");
+                        builder.append(resourceClass.getSqlColumn(variableName, 0));
+                    }
+                    else if(resourceClass instanceof UserIntBlankNodeClass && splitIntBlankNodeClasses)
+                    {
+                        appendComma(builder, hasSelect);
+                        hasSelect = true;
+
+                        builder.append("CASE (");
+                        builder.append(intBlankNode.getPatternCode(columnName, 0, expression.isBoxed()));
+                        builder.append(" >> 32)::int4 WHEN '");
+                        builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
+                        builder.append("'::int4 THEN ");
+                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
+                        builder.append(" END AS ");
+                        builder.append(resourceClass.getSqlColumn(variableName, 0));
+                    }
+                    else if(resourceClass instanceof UserStrBlankNodeClass && splitStrBlankNodeClasses)
+                    {
+                        builder.append("CASE substr(");
+                        builder.append(strBlankNode.getPatternCode(columnName, 0, expression.isBoxed()));
+                        builder.append(", 0, 9) WHEN '");
+                        builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
                         builder.append("'::varchar THEN ");
                         builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
                         builder.append(" END AS ");

@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.bnodeIntBlankNode;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.bnodeStrBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
@@ -271,7 +271,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 if(arguments.size() == 0)
                 {
-                    return new SqlBuiltinCall(function, arguments, asSet(intBlankNode), false);
+                    return new SqlBuiltinCall(function, arguments, asSet(bnodeIntBlankNode), false);
                 }
                 else
                 {
@@ -280,7 +280,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     if(!operand.getResourceClasses().contains(xsdString))
                         return SqlNull.get();
 
-                    return new SqlBuiltinCall(function, arguments, asSet(strBlankNode),
+                    return new SqlBuiltinCall(function, arguments, asSet(bnodeStrBlankNode),
                             operand.canBeNull() || operand.getResourceClasses().size() > 1);
                 }
             }

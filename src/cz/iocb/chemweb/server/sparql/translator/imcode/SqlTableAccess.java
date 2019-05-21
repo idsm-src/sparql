@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,6 +18,8 @@ import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -91,8 +95,22 @@ public class SqlTableAccess extends SqlIntercode
             if(resourceClass == iri && other.getClasses().stream().anyMatch(r -> r instanceof IriClass))
                 return;
 
+            if(resourceClass == intBlankNode
+                    && other.getClasses().stream().anyMatch(r -> r instanceof IntBlankNodeClass))
+                return;
+
+            if(resourceClass == strBlankNode
+                    && other.getClasses().stream().anyMatch(r -> r instanceof StrBlankNodeClass))
+                return;
+
             if(resourceClass instanceof IriClass)
                 other.getClasses().remove(iri);
+
+            if(resourceClass instanceof IntBlankNodeClass)
+                other.getClasses().remove(intBlankNode);
+
+            if(resourceClass instanceof StrBlankNodeClass)
+                other.getClasses().remove(strBlankNode);
 
             other.addClass(resourceClass);
         }
