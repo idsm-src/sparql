@@ -224,6 +224,14 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
+
+
+        /* fulltext:compoundSearch */
+        ProcedureDefinition compoundSearch = new ProcedureDefinition(fulltext + "compoundSearch", "compound");
+        compoundSearch.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
+        compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
+        compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
+        procedures.put(compoundSearch.getProcedureName(), compoundSearch);
     }
 
 
