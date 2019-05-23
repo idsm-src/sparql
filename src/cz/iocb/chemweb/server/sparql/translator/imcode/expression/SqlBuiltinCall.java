@@ -118,6 +118,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             // functional forms
             case "bound":
             {
+                if(arguments.get(0) == SqlNull.get())
+                    return SqlEffectiveBooleanValue.falseValue;
+
                 if(!arguments.get(0).canBeNull())
                     return SqlEffectiveBooleanValue.trueValue;
 
