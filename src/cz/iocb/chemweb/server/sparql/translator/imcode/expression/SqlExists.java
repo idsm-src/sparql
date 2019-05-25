@@ -73,9 +73,9 @@ public class SqlExists extends SqlExpressionIntercode
         StringBuilder builder = new StringBuilder();
 
         if(negated)
-            builder.append("(NOT ");
+            builder.append("NOT ");
 
-        builder.append("COALESCE((SELECT true FROM (");
+        builder.append("EXISTS ( SELECT 1 FROM (");
 
         builder.append(pattern.translate());
 
@@ -186,10 +186,7 @@ public class SqlExists extends SqlExpressionIntercode
         if(!hasWhere)
             builder.append("true");
 
-        builder.append(" LIMIT 1), false)");
-
-        if(negated)
-            builder.append(")");
+        builder.append(")");
 
         return builder.toString();
     }
