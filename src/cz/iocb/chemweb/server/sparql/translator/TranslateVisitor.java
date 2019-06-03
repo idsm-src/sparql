@@ -368,11 +368,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 variables.add(variable);
         }
 
-        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause, orderByVariables);
 
+        HashSet<String> distinctVariables = new HashSet<String>();
 
         if(select.isDistinct())
-            sqlSelect.setDistinct(true);
+            for(Projection projection : select.getProjections())
+                distinctVariables.add(projection.getVariable().getName());
+
+        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause, distinctVariables, orderByVariables);
+
 
         if(select.getLimit() != null)
             sqlSelect.setLimit(select.getLimit());
@@ -1144,7 +1148,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         try
         {
             /* evaluate context pattern */
-            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context,
+            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context, new HashSet<String>(),
                     new LinkedHashMap<String, Direction>());
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
             SqlQuery query = new SqlQuery(contextVariables, sqlSelect);

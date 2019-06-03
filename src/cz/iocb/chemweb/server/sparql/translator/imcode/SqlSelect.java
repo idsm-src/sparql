@@ -27,22 +27,18 @@ public class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
     private final LinkedHashMap<String, Direction> orderByVariables;
-    private boolean distinct = false;
+    private final HashSet<String> distinctVariables;
     private BigInteger limit = null;
     private BigInteger offset = null;
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child, LinkedHashMap<String, Direction> orderByVariables)
+    public SqlSelect(UsedVariables variables, SqlIntercode child, HashSet<String> distinctVariables,
+            LinkedHashMap<String, Direction> orderByVariables)
     {
         super(variables, child.isDeterministic());
+        this.distinctVariables = distinctVariables;
         this.orderByVariables = orderByVariables;
         this.child = child;
-    }
-
-
-    public final void setDistinct(boolean distinct)
-    {
-        this.distinct = distinct;
     }
 
 
@@ -64,19 +60,20 @@ public class SqlSelect extends SqlIntercode
         restrictions = new HashSet<String>(restrictions);
         restrictions.retainAll(variables.getNames());
 
-        if(orderByVariables.isEmpty() && distinct == false && limit == null
+        if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && limit == null
                 && (offset == null || offset.equals(BigInteger.ZERO)))
-            return child.optimize(schema, restrictions, distinct || reduced);
+            return child.optimize(schema, restrictions, reduced);
 
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
         childRestrictions.addAll(orderByVariables.keySet());
+        childRestrictions.addAll(distinctVariables);
 
-        SqlIntercode optimized = child.optimize(schema, childRestrictions, distinct);
+        SqlIntercode optimized = child.optimize(schema, childRestrictions, !distinctVariables.isEmpty() || reduced);
 
-        SqlSelect result = new SqlSelect(optimized.getVariables().restrict(restrictions), optimized, orderByVariables);
+        SqlSelect result = new SqlSelect(optimized.getVariables().restrict(restrictions), optimized, distinctVariables,
+                orderByVariables);
 
-        result.setDistinct(distinct);
         result.setLimit(limit);
         result.setOffset(offset);
 
@@ -89,20 +86,21 @@ public class SqlSelect extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
+        boolean useRow = orderByVariables.keySet().stream().anyMatch(v -> !distinctVariables.contains(v));
 
-        if(distinct)
+        if(!distinctVariables.isEmpty() && !orderByVariables.isEmpty() && useRow)
         {
             builder.append("SELECT ");
-            builder.append(translateSelectVariables());
+            builder.append(translateSelectVariables(variables));
             builder.append(" FROM (");
         }
 
 
         builder.append("SELECT ");
 
-        builder.append(translateSelectVariables());
+        builder.append(translateSelectVariables(variables));
 
-        if(distinct)
+        if(!distinctVariables.isEmpty() && !orderByVariables.isEmpty() && useRow)
         {
             builder.append(", row_number() OVER (");
             builder.append(translateOrderBy());
@@ -113,15 +111,23 @@ public class SqlSelect extends SqlIntercode
         builder.append(child.translate());
         builder.append(" ) AS tab");
 
-        if(!distinct)
+        if(distinctVariables.isEmpty() && !orderByVariables.isEmpty())
             builder.append(translateOrderBy());
 
 
-        if(distinct)
+        if(!distinctVariables.isEmpty())
         {
-            builder.append(") AS tab GROUP BY ");
-            builder.append(translateSelectVariables());
-            builder.append(" ORDER BY min(\"#rn\")");
+            if(!orderByVariables.isEmpty() && useRow)
+                builder.append(") AS tab");
+
+            builder.append(" GROUP BY ");
+            builder.append(translateSelectVariables(child.getVariables().restrict(distinctVariables)));
+
+            if(!orderByVariables.isEmpty() && !useRow)
+                builder.append(translateOrderBy());
+
+            if(!orderByVariables.isEmpty() && useRow)
+                builder.append(" ORDER BY min(\"#rn\")");
         }
 
 
@@ -135,7 +141,7 @@ public class SqlSelect extends SqlIntercode
     }
 
 
-    private String translateSelectVariables()
+    private String translateSelectVariables(UsedVariables variables)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -164,9 +170,6 @@ public class SqlSelect extends SqlIntercode
 
     private String translateOrderBy()
     {
-        if(orderByVariables.isEmpty())
-            return "";
-
         StringBuilder builder = new StringBuilder();
 
         builder.append(" ORDER BY ");
