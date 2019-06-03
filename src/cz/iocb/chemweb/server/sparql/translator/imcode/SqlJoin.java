@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -10,6 +11,8 @@ import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
+import cz.iocb.chemweb.server.sparql.translator.Pair;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -217,9 +220,25 @@ public class SqlJoin extends SqlIntercode
     @Override
     public String translate()
     {
+        @SuppressWarnings("unchecked")
+        ArrayList<SqlIntercode> childs = (ArrayList<SqlIntercode>) this.childs.clone();
+        childs.sort(new Comparator<SqlIntercode>()
+        {
+            @Override
+            public int compare(SqlIntercode i1, SqlIntercode i2)
+            {
+                if(i1 instanceof SqlValues && !(i2 instanceof SqlValues))
+                    return 1;
+                if(i2 instanceof SqlValues && !(i1 instanceof SqlValues))
+                    return -1;
+                else
+                    return 0;
+            }
+        });
+
+
         String joinResult = childs.get(0).translate();
         UsedVariables joinVariables = childs.get(0).getVariables();
-
 
         for(int idx = 1; idx < childs.size(); idx++)
         {
@@ -232,6 +251,158 @@ public class SqlJoin extends SqlIntercode
                 restrictions.addAll(childs.get(i).getVariables().getNames());
 
             UsedVariables variables = getUsedVariable(pairs, restrictions);
+
+
+            SimpleValuesJoin:
+            if(child instanceof SqlValues)
+            {
+                HashSet<String> shared = new HashSet<String>();
+
+                for(UsedVariable var : child.getVariables().getValues())
+                {
+                    UsedVariable joinVar = joinVariables.get(var.getName());
+
+                    if(joinVar != null)
+                    {
+                        shared.add(var.getName());
+
+                        if(var.canBeNull() || joinVar.canBeNull())
+                            break SimpleValuesJoin;
+                    }
+                    else
+                    {
+                        if(restrictions.contains(var.getName()))
+                            break SimpleValuesJoin;
+                    }
+                }
+
+                SqlValues values = (SqlValues) child;
+
+                for(int k = 0; k < values.typedValuesList.size(); k++)
+                {
+                    for(int l = k + 1; l < values.typedValuesList.size(); l++)
+                    {
+                        boolean equal = true;
+
+                        for(int i = 0; i < values.typedValuesList.get(k).size(); i++)
+                        {
+                            if(shared.contains(values.typedVariables.get(i).getKey()))
+                            {
+                                Node n1 = values.typedValuesList.get(k).get(i).getKey();
+                                Node n2 = values.typedValuesList.get(l).get(i).getKey();
+
+                                if(!n1.equals(n2))
+                                    equal = false;
+                            }
+                        }
+
+                        if(equal)
+                            break SimpleValuesJoin;
+                    }
+                }
+
+                for(UsedPairedVariable pair : pairs)
+                {
+                    if(shared.contains(pair.getName()))
+                    {
+                        for(PairedClass pairedClass : pair.getClasses())
+                        {
+                            if(pairedClass.getRightClass() != null
+                                    && pairedClass.getLeftClass() != pairedClass.getRightClass())
+                                break SimpleValuesJoin;
+                        }
+                    }
+                }
+
+
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("SELECT ");
+                boolean hasSelect = false;
+
+                for(UsedVariable variable : variables.getValues())
+                {
+                    for(ResourceClass resClass : variable.getClasses())
+                    {
+                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                        {
+                            appendComma(builder, hasSelect);
+                            hasSelect = true;
+
+                            builder.append(resClass.getSqlColumn(variable.getName(), i));
+                        }
+                    }
+                }
+
+                if(!hasSelect)
+                    builder.append("1");
+
+                builder.append(" FROM (");
+                builder.append(joinResult);
+                builder.append(" ) AS tab");
+
+                if(!shared.isEmpty())
+                {
+                    builder.append(" WHERE ");
+
+                    boolean hasWhere = false;
+
+                    conditions:
+                    for(ArrayList<Pair<Node, ResourceClass>> row : values.typedValuesList)
+                    {
+                        for(int i = 0; i < values.typedVariables.size(); i++)
+                        {
+                            String varName = values.typedVariables.get(i).getKey();
+
+                            if(shared.contains(varName)
+                                    && !child.getVariables().contains(varName, row.get(i).getValue()))
+                                continue conditions;
+                        }
+
+
+                        appendOr(builder, hasWhere);
+                        hasWhere = true;
+
+                        builder.append("(");
+
+                        boolean hasPart = false;
+
+                        for(int i = 0; i < values.typedVariables.size(); i++)
+                        {
+                            String varName = values.typedVariables.get(i).getKey();
+
+                            if(shared.contains(varName))
+                            {
+                                Node node = row.get(i).getKey();
+                                ResourceClass resClass = row.get(i).getValue();
+
+                                for(int j = 0; j < resClass.getPatternPartsCount(); j++)
+                                {
+                                    appendAnd(builder, hasPart);
+                                    hasPart = true;
+
+                                    builder.append(resClass.getSqlColumn(varName, j));
+                                    builder.append(" = ");
+                                    builder.append(resClass.getPatternCode(node, j));
+                                }
+
+                            }
+                        }
+
+                        builder.append(")");
+                    }
+
+                    if(!hasWhere)
+                        builder.append("true");
+                }
+
+                joinResult = builder.toString();
+                joinVariables = variables;
+
+                continue;
+            }
+
+
 
             Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
 

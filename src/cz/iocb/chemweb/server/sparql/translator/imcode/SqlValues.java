@@ -13,8 +13,8 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlValues extends SqlIntercode
 {
-    private final ArrayList<Pair<String, Set<ResourceClass>>> typedVariables;
-    private final ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList;
+    final ArrayList<Pair<String, Set<ResourceClass>>> typedVariables;
+    final ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList;
 
 
     public SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
