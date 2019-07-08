@@ -102,6 +102,9 @@ public class PiwikAsyncTracker
         uriBuilder.replaceQuery(request.getUrlEncodedQueryString());
         HttpGet get = new HttpGet(uriBuilder.build());
 
+        if(!client.isRunning())
+            client.start();
+
         return client.execute(get, callback);
     }
 
@@ -158,6 +161,9 @@ public class PiwikAsyncTracker
 
         try
         {
+            if(!client.isRunning())
+                client.start();
+
             return client.execute(post, callback);
         }
         finally
@@ -189,12 +195,6 @@ public class PiwikAsyncTracker
         builder.setDefaultRequestConfig(config.build());
 
         return builder.build();
-    }
-
-
-    public void start()
-    {
-        client.start();
     }
 
 

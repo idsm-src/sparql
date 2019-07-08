@@ -115,7 +115,6 @@ public class PiwikFilter implements Filter
         cookieName = "_pk_id." + siteId + ".";
 
         tracker = new PiwikAsyncTracker(hostUrl, 20000);
-        tracker.start();
     }
 
 
