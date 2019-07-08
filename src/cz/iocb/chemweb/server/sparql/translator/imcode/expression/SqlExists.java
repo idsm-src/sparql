@@ -9,6 +9,8 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 
 
 
@@ -34,29 +36,66 @@ public class SqlExists extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern,
             VariableAccessor variableAccessor)
     {
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
-                variableAccessor.getUsedVariables());
-
-        for(UsedPairedVariable pair : pairs)
+        if(pattern instanceof SqlUnion)
         {
-            if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+            SqlIntercode union = new SqlNoSolution();
+
+            for(SqlIntercode child : ((SqlUnion) pattern).getChilds())
             {
-                boolean isJoinable = false;
+                ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(),
+                        variableAccessor.getUsedVariables());
 
-                for(PairedClass pairedClass : pair.getClasses())
+                for(UsedPairedVariable pair : pairs)
                 {
-                    if((pairedClass.getLeftClass() != null || pair.getLeftVariable().canBeNull())
-                            && (pairedClass.getRightClass() != null || pair.getRightVariable().canBeNull()))
+                    if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+                    {
+                        boolean isJoinable = false;
 
-                        isJoinable = true;
+                        for(PairedClass pairedClass : pair.getClasses())
+                        {
+                            if((pairedClass.getLeftClass() != null || pair.getLeftVariable().canBeNull())
+                                    && (pairedClass.getRightClass() != null || pair.getRightVariable().canBeNull()))
+
+                                isJoinable = true;
+                        }
+
+                        if(isJoinable)
+                            union = SqlUnion.union(union, child);
+                    }
                 }
-
-                if(!isJoinable)
-                    return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
             }
-        }
 
-        return new SqlExists(negated, pattern, variableAccessor);
+            if(union instanceof SqlNoSolution)
+                return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
+
+            return new SqlExists(negated, union, variableAccessor);
+        }
+        else
+        {
+            ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
+                    variableAccessor.getUsedVariables());
+
+            for(UsedPairedVariable pair : pairs)
+            {
+                if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+                {
+                    boolean isJoinable = false;
+
+                    for(PairedClass pairedClass : pair.getClasses())
+                    {
+                        if((pairedClass.getLeftClass() != null || pair.getLeftVariable().canBeNull())
+                                && (pairedClass.getRightClass() != null || pair.getRightVariable().canBeNull()))
+
+                            isJoinable = true;
+                    }
+
+                    if(!isJoinable)
+                        return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
+                }
+            }
+
+            return new SqlExists(negated, pattern, variableAccessor);
+        }
     }
 
 
