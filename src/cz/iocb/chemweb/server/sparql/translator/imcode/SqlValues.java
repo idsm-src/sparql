@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
@@ -27,7 +27,7 @@ public class SqlValues extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         return new SqlValues(variables.restrict(restrictions), typedVariables, typedValuesList);
     }

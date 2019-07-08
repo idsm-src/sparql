@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import com.google.common.collect.Lists;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
@@ -193,7 +194,7 @@ public class SqlJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
@@ -211,7 +212,8 @@ public class SqlJoin extends SqlIntercode
         SqlIntercode result = new SqlEmptySolution();
 
         for(SqlIntercode child : childs)
-            result = join(schema, result, child.optimize(schema, childRestrictions, reduced), restrictions);
+            result = join(request.getConfiguration().getSchema(), result,
+                    child.optimize(request, childRestrictions, reduced), restrictions);
 
         return result;
     }

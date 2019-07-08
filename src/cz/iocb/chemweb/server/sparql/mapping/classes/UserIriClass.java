@@ -12,8 +12,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
-import cz.iocb.chemweb.server.db.SQLRuntimeException;
-import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -30,7 +31,6 @@ public class UserIriClass extends IriClass
 
 
     private static final int cacheSize = 10000;
-    private final DataSource connectionPool;
     private final SqlCheck sqlCheck;
     private final String sqlCheckQuery;
     private final Map<String, Boolean> sqlCheckCache;
@@ -39,10 +39,9 @@ public class UserIriClass extends IriClass
     private final List<String> inverseFunction;
 
 
-    public UserIriClass(String name, List<String> sqlTypes, String pattern, DataSource pool, SqlCheck sqlCheck)
+    public UserIriClass(String name, List<String> sqlTypes, String pattern, SqlCheck sqlCheck)
     {
         super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
-        this.connectionPool = pool;
         this.sqlCheck = sqlCheck;
         this.pattern = pattern;
         this.function = name;
@@ -100,7 +99,7 @@ public class UserIriClass extends IriClass
 
     public UserIriClass(String name, List<String> sqlTypes, String pattern)
     {
-        this(name, sqlTypes, pattern, null, SqlCheck.NEVER);
+        this(name, sqlTypes, pattern, SqlCheck.NEVER);
     }
 
 
@@ -220,7 +219,7 @@ public class UserIriClass extends IriClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
         if(node instanceof VariableOrBlankNode)
             return true;
@@ -228,30 +227,76 @@ public class UserIriClass extends IriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match(((IRI) node).getValue());
+        return match(((IRI) node).getValue(), request);
     }
 
 
-    public boolean match(String iri)
+    public boolean match(String iri, Request request)
     {
         if(iri.matches(pattern))
         {
             if(sqlCheck == SqlCheck.IF_MATCH)
-                return check(iri);
+                return check(iri, request);
 
             return true;
         }
         else
         {
             if(sqlCheck == SqlCheck.IF_NOT_MATCH)
-                return check(iri);
+                return check(iri, request);
 
             return false;
         }
     }
 
 
-    private boolean check(String iri)
+    public boolean match(String iri, DataSource connectionPool)
+    {
+        if(iri.matches(pattern))
+        {
+            if(sqlCheck == SqlCheck.IF_MATCH)
+                return check(iri, connectionPool);
+
+            return true;
+        }
+        else
+        {
+            if(sqlCheck == SqlCheck.IF_NOT_MATCH)
+                return check(iri, connectionPool);
+
+            return false;
+        }
+    }
+
+
+    private boolean check(String iri, Request request)
+    {
+        Boolean check = sqlCheckCache.get(iri);
+
+        if(check != null)
+            return check;
+
+        try(PreparedStatement statement = request.getStatement(sqlCheckQuery))
+        {
+            for(int i = 1; i <= getPatternPartsCount(); i++)
+                statement.setString(i, iri);
+
+            try(ResultSet result = statement.executeQuery())
+            {
+                result.next();
+                sqlCheckCache.put(iri, result.getBoolean(1));
+
+                return result.getBoolean(1);
+            }
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
+        }
+    }
+
+
+    private boolean check(String iri, DataSource connectionPool)
     {
         Boolean check = sqlCheckCache.get(iri);
 

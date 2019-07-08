@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.services.check;
 
-import java.sql.SQLException;
 import java.util.List;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -8,8 +7,9 @@ import javax.naming.NamingException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import cz.iocb.chemweb.server.sparql.SparqlEngine;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.Engine;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.shared.services.DatabaseException;
 import cz.iocb.chemweb.shared.services.check.CheckResult;
@@ -22,7 +22,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
 {
     private static final long serialVersionUID = 1L;
 
-    private SparqlEngine engine;
+    private Engine engine;
 
 
     @Override
@@ -37,7 +37,8 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-            engine = new SparqlEngine(sparqlConfig, null);
+
+            engine = new Engine(sparqlConfig, null);
         }
         catch(NamingException e)
         {
@@ -51,28 +52,38 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
     @Override
     public CheckResult check(String code) throws DatabaseException
     {
+        CheckResult result = new CheckResult();
+        List<TranslateMessage> messages = null;
+
+        try(Request request = engine.getRequest())
+        {
+            messages = request.check(code);
+        }
+        catch(Throwable e)
+        {
+            System.err.println("CheckService: log begin");
+            System.err.println(code);
+            e.printStackTrace(System.err);
+            System.err.println("CheckService: log end");
+        }
+
         try
         {
-            CheckResult result = new CheckResult();
-
-            List<TranslateMessage> messages = engine.check(code);
-
             for(TranslateMessage message : messages)
-                addWarning(result, CheckerWarningFactory.create(message.getRange(), message.getCategory().getText(),
+                result.warnings.add(new CheckerWarning(message.getRange().getStart().getLineNumber() - 1,
+                        message.getRange().getStart().getPositionInLine(),
+                        message.getRange().getEnd().getLineNumber() - 1,
+                        message.getRange().getEnd().getPositionInLine() + 1, message.getCategory().getText(),
                         message.getMessage()));
-
-            return result;
         }
-        catch(SQLException e)
+        catch(Throwable e)
         {
-            throw new DatabaseException(e);
+            System.err.println("CheckService: log begin");
+            System.err.println(code);
+            e.printStackTrace(System.err);
+            System.err.println("CheckService: log end");
         }
-    }
 
-
-    private static void addWarning(CheckResult result, CheckerWarning warning)
-    {
-        if(warning != null)
-            result.warnings.add(warning);
+        return result;
     }
 }

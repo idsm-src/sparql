@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.db.schema.Table;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -38,25 +39,25 @@ public class QuadMapping
     }
 
 
-    public boolean match(Node graph, Node subject, Node predicate, Node object)
+    public boolean match(Node graph, Node subject, Node predicate, Node object, Request request)
     {
-        if(!match(this.graph, graph))
+        if(!match(this.graph, graph, request))
             return false;
 
-        if(!match(this.subject, subject))
+        if(!match(this.subject, subject, request))
             return false;
 
-        if(!match(this.predicate, predicate))
+        if(!match(this.predicate, predicate, request))
             return false;
 
-        if(!match(this.object, object))
+        if(!match(this.object, object, request))
             return false;
 
         return true;
     }
 
 
-    private boolean match(NodeMapping mapping, Node node)
+    private boolean match(NodeMapping mapping, Node node, Request request)
     {
         if(node == null)
             return true;
@@ -64,7 +65,7 @@ public class QuadMapping
         if(mapping == null)
             return false;
 
-        return mapping.match(node);
+        return mapping.match(node, request);
     }
 
 

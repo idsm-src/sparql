@@ -23,16 +23,16 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
-import cz.iocb.chemweb.server.db.BlankNode;
-import cz.iocb.chemweb.server.db.IriNode;
-import cz.iocb.chemweb.server.db.LanguageTaggedLiteral;
-import cz.iocb.chemweb.server.db.Literal;
-import cz.iocb.chemweb.server.db.RdfNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.TypedLiteral;
-import cz.iocb.chemweb.server.sparql.SparqlEngine;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.BlankNode;
+import cz.iocb.chemweb.server.sparql.engine.Engine;
+import cz.iocb.chemweb.server.sparql.engine.IriNode;
+import cz.iocb.chemweb.server.sparql.engine.LanguageTaggedLiteral;
+import cz.iocb.chemweb.server.sparql.engine.Literal;
+import cz.iocb.chemweb.server.sparql.engine.RdfNode;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.engine.Result;
+import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -48,7 +48,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private SparqlEngine engine;
+    private Engine engine;
 
 
     @Override
@@ -84,7 +84,7 @@ public class EndpointServlet extends HttpServlet
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
 
-            engine = new SparqlEngine(sparqlConfig, sslContext);
+            engine = new Engine(sparqlConfig, sslContext);
         }
         catch(NamingException | KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
                 | KeyManagementException e)
@@ -177,24 +177,28 @@ public class EndpointServlet extends HttpServlet
         {
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
-            Result result = engine.execute(query, dataSets);
-
-            switch(detectOutputType(req))
+            try(Request request = engine.getRequest())
             {
-                case JSON:
-                    writeJson(res, result, includeWarnings);
-                    break;
-                case XML:
-                    writeXml(res, result, includeWarnings);
-                    break;
-                case TSV:
-                    writeTsv(res, result);
-                    break;
-                case CSV:
-                    writeCsv(res, result);
-                    break;
-                default:
-                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                try(Result result = request.execute(query, dataSets))
+                {
+                    switch(detectOutputType(req))
+                    {
+                        case JSON:
+                            writeJson(res, result, includeWarnings);
+                            break;
+                        case XML:
+                            writeXml(res, result, includeWarnings);
+                            break;
+                        case TSV:
+                            writeTsv(res, result);
+                            break;
+                        case CSV:
+                            writeCsv(res, result);
+                            break;
+                        default:
+                            res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                    }
+                }
             }
         }
         catch(TranslateExceptions e)
@@ -202,8 +206,22 @@ public class EndpointServlet extends HttpServlet
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
-        catch(SQLException e)
+        catch(Throwable e)
         {
+            System.err.println("EndpointServlet: log begin");
+
+            if(defaultGraphs != null)
+                for(String defaultGraph : defaultGraphs)
+                    System.err.println("default graph: " + defaultGraph);
+
+            if(namedGraphs != null)
+                for(String namedGraph : namedGraphs)
+                    System.err.println("named graph: " + namedGraph);
+
+            System.err.println(query);
+            e.printStackTrace(System.err);
+            System.err.println("EndpointServlet: log end");
+
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return;
         }
@@ -266,7 +284,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeXml(HttpServletResponse res, Result result, boolean includeWarnings) throws IOException
+    private static void writeXml(HttpServletResponse res, Result result, boolean includeWarnings)
+            throws IOException, SQLException
     {
         res.setHeader("content-type", "application/sparql-results+xml");
         res.setCharacterEncoding("UTF-8");
@@ -289,20 +308,20 @@ public class EndpointServlet extends HttpServlet
 
         out.println("\t<results>");
 
-        for(Row row : result)
+        while(result.next())
         {
             out.println("\t\t<result>");
 
-            for(String head : result.getHeads())
+            for(int i = 0; i < result.getHeads().size(); i++)
             {
-                RdfNode node = row.get(head);
+                RdfNode node = result.get(i);
 
                 if(node == null)
                     continue;
 
 
                 out.print("\t\t\t<binding name=\"");
-                writeXmlValue(out, head);
+                writeXmlValue(out, result.getHeads().get(i));
                 out.print("\">");
 
                 if(node instanceof IriNode)
@@ -366,7 +385,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeJson(HttpServletResponse res, Result result, boolean includeWarnings) throws IOException
+    private static void writeJson(HttpServletResponse res, Result result, boolean includeWarnings)
+            throws IOException, SQLException
     {
         res.setHeader("content-type", "application/sparql-results+json");
         res.setCharacterEncoding("UTF-8");
@@ -394,7 +414,7 @@ public class EndpointServlet extends HttpServlet
 
         boolean hasResult = false;
 
-        for(Row row : result)
+        while(result.next())
         {
             if(hasResult)
                 out.println(",");
@@ -405,9 +425,9 @@ public class EndpointServlet extends HttpServlet
 
             boolean hasResultHead = false;
 
-            for(String head : result.getHeads())
+            for(int i = 0; i < result.getHeads().size(); i++)
             {
-                RdfNode node = row.get(head);
+                RdfNode node = result.get(i);
 
                 if(node == null)
                     continue;
@@ -419,7 +439,7 @@ public class EndpointServlet extends HttpServlet
                     hasResultHead = true;
 
                 out.print("\t\t\"");
-                writeJsonValue(out, head);
+                writeJsonValue(out, result.getHeads().get(i));
                 out.println("\": {");
 
 
@@ -488,7 +508,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTsv(HttpServletResponse res, Result result) throws IOException
+    private static void writeTsv(HttpServletResponse res, Result result) throws IOException, SQLException
     {
         res.setHeader("content-type", "text/tab-separated-values");
         res.setCharacterEncoding("UTF-8");
@@ -511,18 +531,18 @@ public class EndpointServlet extends HttpServlet
         out.print("\r\n");
 
 
-        for(Row row : result)
+        while(result.next())
         {
             boolean hasResult = false;
 
-            for(String head : result.getHeads())
+            for(int i = 0; i < result.getHeads().size(); i++)
             {
                 if(hasResult)
                     out.print('\t');
                 else
                     hasResult = true;
 
-                RdfNode node = row.get(head);
+                RdfNode node = result.get(i);
 
                 if(node instanceof IriNode)
                 {
@@ -563,7 +583,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeCsv(HttpServletResponse res, Result result) throws IOException
+    private static void writeCsv(HttpServletResponse res, Result result) throws IOException, SQLException
     {
         res.setHeader("content-type", "text/csv");
         res.setCharacterEncoding("UTF-8");
@@ -586,18 +606,18 @@ public class EndpointServlet extends HttpServlet
         out.print("\r\n");
 
 
-        for(Row row : result)
+        while(result.next())
         {
             boolean hasResult = false;
 
-            for(String head : result.getHeads())
+            for(int i = 0; i < result.getHeads().size(); i++)
             {
                 if(hasResult)
                     out.print(',');
                 else
                     hasResult = true;
 
-                RdfNode node = row.get(head);
+                RdfNode node = result.get(i);
 
                 if(node != null)
                     writeCsvValue(out, node.getValue());

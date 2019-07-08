@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -30,16 +30,16 @@ public class SqlQuery extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         throw new UnsupportedOperationException();
     }
 
 
-    public SqlIntercode optimize(DatabaseSchema schema)
+    public SqlIntercode optimize(Request request)
     {
         HashSet<String> restrictions = new HashSet<String>(selectedVariables);
-        return new SqlQuery(selectedVariables, child.optimize(schema, restrictions, false));
+        return new SqlQuery(selectedVariables, child.optimize(request, restrictions, false));
     }
 
 

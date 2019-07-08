@@ -2,8 +2,8 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -25,12 +25,12 @@ public class SqlIri extends SqlNodeValue
     }
 
 
-    public static SqlExpressionIntercode create(IRI iri, LinkedHashMap<String, UserIriClass> iriClasses)
+    public static SqlExpressionIntercode create(IRI iri, Request request)
     {
         IriClass iriClass = unsupportedIri;
 
-        for(UserIriClass userClass : iriClasses.values())
-            if(userClass.match(iri))
+        for(UserIriClass userClass : request.getConfiguration().getIriClasses().values())
+            if(userClass.match(iri, request))
                 iriClass = userClass;
 
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();

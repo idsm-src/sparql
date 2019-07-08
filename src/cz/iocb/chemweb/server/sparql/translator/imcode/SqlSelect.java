@@ -14,7 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
@@ -55,21 +55,21 @@ public class SqlSelect extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         restrictions = new HashSet<String>(restrictions);
         restrictions.retainAll(variables.getNames());
 
         if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && limit == null
                 && (offset == null || offset.equals(BigInteger.ZERO)))
-            return child.optimize(schema, restrictions, reduced);
+            return child.optimize(request, restrictions, reduced);
 
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
         childRestrictions.addAll(orderByVariables.keySet());
         childRestrictions.addAll(distinctVariables);
 
-        SqlIntercode optimized = child.optimize(schema, childRestrictions, !distinctVariables.isEmpty() || reduced);
+        SqlIntercode optimized = child.optimize(request, childRestrictions, !distinctVariables.isEmpty() || reduced);
 
         SqlSelect result = new SqlSelect(optimized.getVariables().restrict(restrictions), optimized, distinctVariables,
                 orderByVariables);

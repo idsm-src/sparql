@@ -15,9 +15,10 @@ import org.apache.velocity.runtime.log.Log;
 import org.apache.velocity.runtime.parser.node.ASTReference;
 import org.apache.velocity.runtime.parser.node.Node;
 import org.apache.velocity.runtime.parser.node.SimpleNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.sparql.SparqlEngine;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.Engine;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.engine.Result;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 
 
@@ -26,7 +27,7 @@ public class SparqlDirective extends Directive
 {
     public static final String SPARQL_CONFIG = "SPARQL_CONFIG";
 
-    private SparqlEngine engine;
+    private Engine engine;
     private Log log;
 
 
@@ -51,7 +52,7 @@ public class SparqlDirective extends Directive
         log = rs.getLog();
 
         SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) rs.getApplicationAttribute(SPARQL_CONFIG);
-        engine = new SparqlEngine(dbConfig, null);
+        engine = new Engine(dbConfig, null);
     }
 
 
@@ -73,12 +74,20 @@ public class SparqlDirective extends Directive
         node.jjtGetChild(node.jjtGetNumChildren() - 1).render(context, blockContent);
         String query = blockContent.toString();
 
-        try
-        {
-            Result result = engine.execute(query);
 
-            context.put(varName, result);
-            return true;
+
+        try(Request request = engine.getRequest())
+        {
+            try(Result result = request.execute(query))
+            {
+                SparqlResult rows = new SparqlResult();
+
+                while(result.next())
+                    rows.add(new SparqlRow(result.getVariableIndexes(), result.getRow()));
+
+                context.put(varName, rows);
+                return true;
+            }
         }
         catch(TranslateExceptions | SQLException e)
         {

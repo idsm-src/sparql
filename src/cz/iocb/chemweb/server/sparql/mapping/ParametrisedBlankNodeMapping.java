@@ -2,8 +2,9 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.ArrayList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.Column;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -22,9 +23,9 @@ public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements Pa
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
-        return getBlankNodeClass().match(node);
+        return getBlankNodeClass().match(node, request);
     }
 
 

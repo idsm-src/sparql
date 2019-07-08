@@ -10,18 +10,19 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.db.schema.Column;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
-import cz.iocb.chemweb.server.db.schema.Table;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -648,7 +649,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         SqlTableAccess result = new SqlTableAccess(schema, table, condition, reduced);
 

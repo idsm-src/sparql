@@ -31,14 +31,13 @@ import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.google.gwt.user.server.rpc.RemoteServiceServlet;
-import cz.iocb.chemweb.server.db.Literal;
-import cz.iocb.chemweb.server.db.RdfNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.postgresql.PostgresHandler;
 import cz.iocb.chemweb.server.services.SessionData;
-import cz.iocb.chemweb.server.sparql.SparqlEngine;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.Engine;
+import cz.iocb.chemweb.server.sparql.engine.Literal;
+import cz.iocb.chemweb.server.sparql.engine.RdfNode;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.engine.Result;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.velocity.NodeUtils;
 import cz.iocb.chemweb.server.velocity.SparqlDirective;
@@ -57,7 +56,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private static class QueryState
     {
         Thread thread;
-        PostgresHandler handler;
+        Request request;
         QueryResult result;
         Throwable exception;
     }
@@ -72,7 +71,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
     private Map<RdfNode, String> nodeHashMap;
     private SparqlDatabaseConfiguration sparqlConfig;
-    private SparqlEngine engine;
+    private Engine engine;
     private VelocityEngine ve;
 
 
@@ -108,7 +107,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
 
-            engine = new SparqlEngine(sparqlConfig, sslContext);
+            engine = new Engine(sparqlConfig, sslContext);
 
 
             Properties properties = new Properties();
@@ -169,7 +168,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
         logger.info(query.replaceAll("\n", "\\\\n"));
 
-        queryState.handler = engine.getHandler();
+        queryState.request = engine.getRequest();
 
 
         final long id = sessionData.insert(httpSession, queryState);
@@ -179,27 +178,25 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             @Override
             public void run()
             {
-                try
+                try(Result result = queryState.request.execute(query, offset, limit, timeout))
                 {
                     Template template = ve.getTemplate("node.vm");
 
-                    Result result = engine.execute(query, offset, limit, timeout, queryState.handler);
-
                     Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
 
-                    for(Row row : result)
+                    while(result.next())
                     {
-                        DataGridNode[] stringRow = new DataGridNode[row.getRdfNodes().length];
+                        DataGridNode[] stringRow = new DataGridNode[result.getHeads().size()];
 
-                        for(int i = 0; i < row.getRdfNodes().length; i++)
+                        for(int i = 0; i < result.getHeads().size(); i++)
                         {
                             stringRow[i] = new DataGridNode();
 
-                            if(row.getRdfNodes()[i] != null && !row.getRdfNodes()[i].isLiteral())
-                                stringRow[i].ref = row.getRdfNodes()[i].getValue();
+                            if(result.get(i) != null && !result.get(i).isLiteral())
+                                stringRow[i].ref = result.get(i).getValue();
 
 
-                            String html = nodeHashMap.get(row.getRdfNodes()[i]);
+                            String html = nodeHashMap.get(result.get(i));
 
                             if(html != null)
                             {
@@ -210,13 +207,13 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                                 VelocityContext context = new VelocityContext();
                                 context.put("urlContext", UrlDirective.Context.NODE);
                                 context.put("utils", new NodeUtils(sparqlConfig.getPrefixes()));
-                                context.put("entity", row.getRdfNodes()[i]);
+                                context.put("entity", result.get(i));
 
                                 StringWriter writer = new StringWriter();
                                 template.merge(context, writer);
 
                                 stringRow[i].html = writer.toString();
-                                nodeHashMap.put(row.getRdfNodes()[i], stringRow[i].html);
+                                nodeHashMap.put(result.get(i), stringRow[i].html);
                             }
                         }
 
@@ -238,6 +235,16 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 catch(Throwable e)
                 {
                     queryState.exception = e;
+                }
+                finally
+                {
+                    try
+                    {
+                        queryState.request.close();
+                    }
+                    catch(Exception e)
+                    {
+                    }
                 }
             }
         };
@@ -303,7 +310,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
         try
         {
-            queryState.handler.cancel();
+            queryState.request.cancel();
         }
         catch(SQLException e)
         {
@@ -315,20 +322,20 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     @Override
     public int countOfProperties(String iri) throws DatabaseException
     {
-        try
+        try(Request request = engine.getRequest())
         {
-            Result result = engine
-                    .execute("SELECT (count(*) as ?C) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }");
+            String query = "SELECT (count(*) as ?C) WHERE { " + "<" + new URI(iri) + "> ?Property ?Value. }";
 
-            if(result.size() != 1)
-                throw new DatabaseException();
+            try(Result result = request.execute(query))
+            {
+                if(!result.next())
+                    throw new DatabaseException();
 
-            Row row = result.iterator().next();
+                if(result.getHeads().size() != 1)
+                    throw new DatabaseException();
 
-            if(row.getRdfNodes().length != 1)
-                throw new DatabaseException();
-
-            return Integer.parseInt(((Literal) row.getRdfNodes()[0]).getValue());
+                return Integer.parseInt(((Literal) result.get(0)).getValue());
+            }
         }
         catch(URISyntaxException | TranslateExceptions | SQLException e)
         {

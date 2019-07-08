@@ -6,6 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
 import java.util.Arrays;
 import java.util.Hashtable;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
@@ -157,9 +158,9 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
-        if(!super.match(node))
+        if(!super.match(node, request))
             return false;
 
         if(!(node instanceof Literal))

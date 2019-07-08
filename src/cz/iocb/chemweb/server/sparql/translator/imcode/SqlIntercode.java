@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.HashSet;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
@@ -19,7 +19,7 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced);
+    public abstract SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced);
 
 
     public abstract String translate();

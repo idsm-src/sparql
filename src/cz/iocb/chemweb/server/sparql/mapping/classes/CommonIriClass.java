@@ -2,7 +2,8 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.Arrays;
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.Column;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -74,7 +75,7 @@ public class CommonIriClass extends IriClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
         if(node instanceof VariableOrBlankNode || node instanceof IRI)
             return true;

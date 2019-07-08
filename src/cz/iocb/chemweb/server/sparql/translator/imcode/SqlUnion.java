@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -89,12 +89,12 @@ public class SqlUnion extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         SqlIntercode result = new SqlNoSolution();
 
         for(SqlIntercode child : childs)
-            result = union(result, child.optimize(schema, restrictions, reduced));
+            result = union(result, child.optimize(request, restrictions, reduced));
 
         return result;
     }

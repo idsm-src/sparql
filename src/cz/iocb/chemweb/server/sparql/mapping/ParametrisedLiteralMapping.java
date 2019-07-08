@@ -2,8 +2,9 @@ package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.ArrayList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.Column;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -22,9 +23,9 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
-        return getLiteralClass().match(node);
+        return getLiteralClass().match(node, request);
     }
 
 

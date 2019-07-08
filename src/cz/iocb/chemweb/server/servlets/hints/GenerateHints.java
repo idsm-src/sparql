@@ -19,12 +19,12 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import cz.iocb.chemweb.server.db.RdfNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.Row;
 import cz.iocb.chemweb.server.servlets.hints.NormalizeIRI.PrefixedName;
-import cz.iocb.chemweb.server.sparql.SparqlEngine;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.Engine;
+import cz.iocb.chemweb.server.sparql.engine.RdfNode;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.engine.Result;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
@@ -146,59 +146,63 @@ public class GenerateHints extends HttpServlet
         StringWriter stringWriter = new StringWriter();
         PrintWriter out = new PrintWriter(stringWriter);
 
-        SparqlEngine engine = new SparqlEngine(sparqlConfig, null);
-        Result result = engine.execute(builder.toString());
-
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
+        Engine engine = new Engine(sparqlConfig, null);
 
-        for(Row row : result)
+        try(Request request = engine.getRequest())
         {
-            RdfNode text = row.get("H");
-            RdfNode type = row.get("T");
-            RdfNode label = row.get("L");
-
-            PrefixedName iri = NormalizeIRI.decompose(sparqlConfig, text.getValue());
-
-            if(iri == null)
-                continue;
-
-            ArrayList<Item> list = hints.get(iri.prefix.toLowerCase());
-
-            if(list == null)
+            try(Result result = request.execute(builder.toString()))
             {
-                list = new ArrayList<Item>();
-                hints.put(iri.prefix.toLowerCase(), list);
+                while(result.next())
+                {
+                    RdfNode text = result.get("H");
+                    RdfNode type = result.get("T");
+                    RdfNode label = result.get("L");
+
+                    PrefixedName iri = NormalizeIRI.decompose(sparqlConfig, text.getValue());
+
+                    if(iri == null)
+                        continue;
+
+                    ArrayList<Item> list = hints.get(iri.prefix.toLowerCase());
+
+                    if(list == null)
+                    {
+                        list = new ArrayList<Item>();
+                        hints.put(iri.prefix.toLowerCase(), list);
+                    }
+
+
+                    String typeCode = null;
+
+                    switch(type.getValue())
+                    {
+                        case "http://www.w3.org/2002/07/owl#Class":
+                            typeCode = "C";
+                            break;
+
+                        case "http://www.w3.org/2002/07/owl#NamedIndividual":
+                            typeCode = "I";
+                            break;
+
+                        case "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property":
+                            typeCode = "P";
+                            break;
+
+                        default:
+                            continue;
+                    }
+
+                    Item item = new Item();
+                    item.type = typeCode;
+                    item.name = iri.name;
+
+                    if(label != null)
+                        item.info = label.getValue().replaceAll("\"", "\\\"");
+
+                    list.add(item);
+                }
             }
-
-
-            String typeCode = null;
-
-            switch(type.getValue())
-            {
-                case "http://www.w3.org/2002/07/owl#Class":
-                    typeCode = "C";
-                    break;
-
-                case "http://www.w3.org/2002/07/owl#NamedIndividual":
-                    typeCode = "I";
-                    break;
-
-                case "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property":
-                    typeCode = "P";
-                    break;
-
-                default:
-                    continue;
-            }
-
-            Item item = new Item();
-            item.type = typeCode;
-            item.name = iri.name;
-
-            if(label != null)
-                item.info = label.getValue().replaceAll("\"", "\\\"");
-
-            list.add(item);
         }
 
 

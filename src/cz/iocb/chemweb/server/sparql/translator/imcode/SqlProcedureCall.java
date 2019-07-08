@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
@@ -44,7 +44,7 @@ public class SqlProcedureCall extends SqlIntercode
 
     public static SqlIntercode create(ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
-            SqlIntercode context, HashSet<String> restrictions)
+            SqlIntercode context, Request request, HashSet<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
         boolean hasSolution = true;
@@ -78,7 +78,7 @@ public class SqlProcedureCall extends SqlIntercode
                     usedVariable.getClasses().add(definition.getParameterClass());
                 }
             }
-            else if(node == null || !definition.getParameterClass().match(node))
+            else if(node == null || !definition.getParameterClass().match(node, request))
             {
                 hasSolution = false;
             }
@@ -110,7 +110,7 @@ public class SqlProcedureCall extends SqlIntercode
                     usedVariable.getClasses().add(definition.getResultClass());
                 }
             }
-            else if(node == null || !definition.getResultClass().match(node))
+            else if(node == null || !definition.getResultClass().match(node, request))
             {
                 hasSolution = false;
             }
@@ -189,7 +189,7 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
 
@@ -198,9 +198,9 @@ public class SqlProcedureCall extends SqlIntercode
                 contextRestrictions.add(((VariableOrBlankNode) paramater).getName());
 
         //FIXME: is procedure deterministic?
-        SqlIntercode optimized = context.optimize(schema, contextRestrictions, reduced);
+        SqlIntercode optimized = context.optimize(request, contextRestrictions, reduced);
 
-        return create(procedure, parameters, results, optimized, restrictions);
+        return create(procedure, parameters, results, optimized, request, restrictions);
     }
 
 

@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -15,7 +16,7 @@ public abstract class BlankNodeClass extends ResourceClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Node node, Request request)
     {
         return node instanceof VariableOrBlankNode;
     }

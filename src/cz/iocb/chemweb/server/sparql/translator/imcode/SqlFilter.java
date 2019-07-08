@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.HashSet;
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
@@ -25,7 +25,7 @@ public class SqlFilter extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
 
@@ -34,7 +34,7 @@ public class SqlFilter extends SqlIntercode
         for(SqlExpressionIntercode condition : conditions)
             childRestrictions.addAll(condition.getVariables());
 
-        SqlIntercode optimized = child.optimize(schema, childRestrictions, reduced);
+        SqlIntercode optimized = child.optimize(request, childRestrictions, reduced);
 
         return new SqlFilter(optimized.getVariables().restrict(restrictions), optimized, conditions);
     }

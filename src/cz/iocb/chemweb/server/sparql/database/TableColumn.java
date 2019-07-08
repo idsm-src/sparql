@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.db.schema;
+package cz.iocb.chemweb.server.sparql.database;
 
 
 

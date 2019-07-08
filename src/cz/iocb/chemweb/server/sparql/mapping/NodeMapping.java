@@ -1,7 +1,8 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -18,7 +19,7 @@ public abstract class NodeMapping
     }
 
 
-    public abstract boolean match(Node node);
+    public abstract boolean match(Node node, Request request);
 
     public abstract String getSqlValueAccess(int part);
 

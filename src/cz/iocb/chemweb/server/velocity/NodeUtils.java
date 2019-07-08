@@ -3,8 +3,8 @@ package cz.iocb.chemweb.server.velocity;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.StringEscapeUtils;
-import cz.iocb.chemweb.server.db.Literal;
-import cz.iocb.chemweb.server.db.ReferenceNode;
+import cz.iocb.chemweb.server.sparql.engine.Literal;
+import cz.iocb.chemweb.server.sparql.engine.ReferenceNode;
 import cz.iocb.chemweb.shared.utils.Encode;
 
 

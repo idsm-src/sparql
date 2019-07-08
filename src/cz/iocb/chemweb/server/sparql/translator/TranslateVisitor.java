@@ -11,6 +11,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -27,17 +28,16 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-import cz.iocb.chemweb.server.db.IriNode;
-import cz.iocb.chemweb.server.db.LanguageTaggedLiteral;
-import cz.iocb.chemweb.server.db.RdfNode;
-import cz.iocb.chemweb.server.db.ReferenceNode;
-import cz.iocb.chemweb.server.db.Result;
-import cz.iocb.chemweb.server.db.Row;
-import cz.iocb.chemweb.server.db.SQLRuntimeException;
-import cz.iocb.chemweb.server.db.TypedLiteral;
-import cz.iocb.chemweb.server.db.postgresql.PostgresDatabase;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
+import cz.iocb.chemweb.server.sparql.engine.IriNode;
+import cz.iocb.chemweb.server.sparql.engine.LanguageTaggedLiteral;
+import cz.iocb.chemweb.server.sparql.engine.RdfNode;
+import cz.iocb.chemweb.server.sparql.engine.ReferenceNode;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.engine.Result;
+import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
@@ -132,6 +132,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
+    private final Request request;
     private final SSLContext sslContext;
     private final boolean evalSeriveces;
 
@@ -139,16 +140,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private Prologue prologue;
 
 
-    public TranslateVisitor(SparqlDatabaseConfiguration configuration, SSLContext sslContext,
-            List<TranslateMessage> messages, boolean evalSeriveces)
+    public TranslateVisitor(Request request, List<TranslateMessage> messages, boolean evalSeriveces)
     {
-        this.configuration = configuration;
+        this.configuration = request.getConfiguration();
         this.iriClasses = configuration.getIriClasses();
         this.schema = configuration.getSchema();
         this.procedures = configuration.getProcedures();
-        this.sslContext = sslContext;
-        this.evalSeriveces = evalSeriveces;
+        this.request = request;
+        this.sslContext = request.getSslContext();
         this.messages = messages;
+        this.evalSeriveces = evalSeriveces;
     }
 
 
@@ -513,7 +514,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                         for(ResourceClass resClass : iriClasses.values())
                             if(resClass instanceof IriClass)
-                                if(resClass.match((Node) value))
+                                if(resClass.match((Node) value, request))
                                     valueType = resClass;
                     }
                     else
@@ -554,7 +555,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             graph = graphRestrictions.peek();
 
 
-        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(this, datasets);
+        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, datasets);
         SqlIntercode translatedPattern = pathVisitor.visitElement(predicate, graph, subject, object);
 
 
@@ -1109,7 +1110,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context, null);
+        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context, request, null);
     }
 
 
@@ -1143,7 +1144,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
 
 
-        Result result = null;
+        ArrayList<RdfNode[]> rows = new ArrayList<RdfNode[]>();
+        HashMap<String, Integer> varIndexes = null;
 
         try
         {
@@ -1153,15 +1155,23 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
             SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
 
-            PostgresDatabase db = new PostgresDatabase(configuration.getConnectionPool());
-            result = db.query(query.translate());
+            String code = query.optimize(request).translate();
+
+            try(Result result = new Result(request.getStatement().executeQuery(code)))
+            {
+                varIndexes = result.getVariableIndexes();
+
+                while(result.next())
+                    rows.add(result.getRow());
+            }
         }
         catch(SQLException e)
         {
             throw new SQLRuntimeException(e);
         }
 
-        if(result.size() > serviceContextLimit)
+
+        if(rows.size() > serviceContextLimit)
         {
             messages.add(new TranslateMessage(MessageType.serviceContextLimitExceeded, service.getRange()));
             return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
@@ -1178,14 +1188,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Pair<Node, ResourceClass> emptyResult = new Pair<Node, ResourceClass>(null, null);
 
 
-        for(Row row : result)
+        for(RdfNode[] row : rows)
         {
             String endpoint = null;
 
             if(name instanceof IRI)
                 endpoint = ((IRI) name).getValue();
-            else if(row.get(((Variable) name).getName()) instanceof IriNode)
-                endpoint = row.get(((Variable) name).getName()).getValue();
+            else if(row[varIndexes.get(((Variable) name).getName())] instanceof IriNode)
+                endpoint = row[varIndexes.get(((Variable) name).getName())].getValue();
 
 
             /* build default result */
@@ -1201,7 +1211,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             for(int i = 0; i < mergedVariables.size(); i++)
             {
-                RdfNode term = row.get(mergedVariables.get(i));
+                RdfNode term = row[varIndexes.get(mergedVariables.get(i))];
                 Node node = null;
 
                 if(term instanceof IriNode)
@@ -1242,7 +1252,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 for(String variable : sharedVariables)
                 {
-                    RdfNode term = row.get(variable);
+                    RdfNode term = row[varIndexes.get(variable)];
 
                     if(term != null && (term instanceof IriNode || term.isLiteral()))
                         sparqlQueryBuilder.append(term).append(" ");
@@ -1475,7 +1485,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             for(ResourceClass resClass : iriClasses.values())
                 if(resClass instanceof IriClass)
-                    if(resClass.match(node))
+                    if(resClass.match(node, request))
                         resourceClass = resClass;
 
             return resourceClass;
@@ -1494,7 +1504,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         try
         {
             SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
-            return imcode.optimize(schema).translate();
+            return imcode.optimize(request).translate();
         }
         catch(SQLRuntimeException e)
         {
@@ -1509,9 +1519,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SparqlDatabaseConfiguration getConfiguration()
+    public Request getRequest()
     {
-        return configuration;
+        return request;
     }
 
 

@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDa
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -63,7 +63,7 @@ public class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>(groupVariables);
 
@@ -71,7 +71,7 @@ public class SqlAggregation extends SqlIntercode
             if(restrictions == null || restrictions.contains(entry.getKey()))
                 childRestrictions.addAll(entry.getValue().getVariables());
 
-        return aggregate(groupVariables, aggregations, child.optimize(schema, childRestrictions, false), restrictions);
+        return aggregate(groupVariables, aggregations, child.optimize(request, childRestrictions, false), restrictions);
     }
 
 

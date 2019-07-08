@@ -13,7 +13,7 @@ class Protein
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("protein", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*", config.getConnectionPool(), SqlCheck.IF_MATCH));
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/.*", SqlCheck.IF_MATCH));
     }
 
 

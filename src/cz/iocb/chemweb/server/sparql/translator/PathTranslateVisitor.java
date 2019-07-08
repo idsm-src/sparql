@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -41,6 +42,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private static final String variablePrefix = "@pathvar";
     private static int variableId = 0;
 
+    private final Request request;
     private final DatabaseSchema schema;
     private final List<QuadMapping> mappings;
     private final List<DataSet> datasets;
@@ -50,10 +52,11 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private Node object = null;
 
 
-    public PathTranslateVisitor(TranslateVisitor translateVisitor, List<DataSet> datasets)
+    public PathTranslateVisitor(Request request, List<DataSet> datasets)
     {
-        this.schema = translateVisitor.getConfiguration().getSchema();
-        this.mappings = translateVisitor.getConfiguration().getMappings();
+        this.request = request;
+        this.schema = request.getConfiguration().getSchema();
+        this.mappings = request.getConfiguration().getMappings();
         this.datasets = datasets;
     }
 
@@ -169,7 +172,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 return visitElement(repeatedPath.getChild(), subject, object);
 
             return SqlRecursive.create(init, next, null, joinName, ((VariableOrBlankNode) subject).getName(), null,
-                    null);
+                    request, null);
         }
 
 
@@ -196,13 +199,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
         else if(cndNode != null)
         {
-            if(next.getVariables().get(endName).getClasses().stream().noneMatch(r -> r.match(cndNode)))
+            if(next.getVariables().get(endName).getClasses().stream().noneMatch(r -> r.match(cndNode, request)))
                 return visitElement(repeatedPath.getChild(), subject, object);
         }
 
 
         return SqlRecursive.create(init, next, subjectName, joinName, ((VariableOrBlankNode) endNode).getName(),
-                cndNode, null);
+                cndNode, request, null);
     }
 
 
@@ -288,7 +291,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
 
 
-            if(mapping.match(graph, subject, predicate, object))
+            if(mapping.match(graph, subject, predicate, object, request))
             {
                 SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
 
@@ -441,7 +444,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                     continue;
             }
 
-            if(mapping.match(graph, subject, fakePredicate, object))
+            if(mapping.match(graph, subject, fakePredicate, object, request))
             {
                 IRI predicate = (IRI) mapping.getPredicate().getValue();
 

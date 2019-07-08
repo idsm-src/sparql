@@ -54,7 +54,7 @@ class Ontology
         String ontologyPattern = builder.toString();
 
         config.addIriClass(new UserIriClass("ontology_resource", Arrays.asList("smallint", "integer"), ontologyPattern,
-                config.getConnectionPool(), UserIriClass.SqlCheck.IF_NOT_MATCH));
+                UserIriClass.SqlCheck.IF_NOT_MATCH));
     }
 
 

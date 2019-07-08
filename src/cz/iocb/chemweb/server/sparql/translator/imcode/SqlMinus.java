@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -44,15 +44,15 @@ public class SqlMinus extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>();
         childRestrictions.addAll(left.getVariables().getNames());
         childRestrictions.retainAll(right.getVariables().getNames());
         childRestrictions.addAll(restrictions);
 
-        return minus(left.optimize(schema, childRestrictions, reduced),
-                right.optimize(schema, childRestrictions, reduced), restrictions);
+        return minus(left.optimize(request, childRestrictions, reduced),
+                right.optimize(request, childRestrictions, reduced), restrictions);
     }
 
 

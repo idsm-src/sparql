@@ -5,7 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -199,7 +200,7 @@ public class SqlLeftJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
 
@@ -211,8 +212,8 @@ public class SqlLeftJoin extends SqlIntercode
         for(SqlExpressionIntercode condition : conditions)
             childRestrictions.addAll(condition.getVariables());
 
-        return leftJoin(schema, left.optimize(schema, childRestrictions, reduced),
-                right.optimize(schema, childRestrictions, reduced), conditions, restrictions);
+        return leftJoin(request.getConfiguration().getSchema(), left.optimize(request, childRestrictions, reduced),
+                right.optimize(request, childRestrictions, reduced), conditions, restrictions);
     }
 
 

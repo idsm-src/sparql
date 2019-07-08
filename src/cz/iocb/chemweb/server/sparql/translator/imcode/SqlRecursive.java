@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -25,10 +25,11 @@ public class SqlRecursive extends SqlIntercode
     private final String joinName;
     private final String subjectName;
     private final Node cndNode;
+    private final ResourceClass cndClass;
 
 
     protected SqlRecursive(UsedVariables variables, SqlIntercode init, SqlIntercode next, UsedVariable endVar,
-            String joinName, String subjectName, Node cndNode)
+            String joinName, String subjectName, Node cndNode, ResourceClass cndClass)
     {
         super(variables, init.isDeterministic() && next.isDeterministic());
         this.init = init;
@@ -37,11 +38,12 @@ public class SqlRecursive extends SqlIntercode
         this.joinName = joinName;
         this.subjectName = subjectName;
         this.cndNode = cndNode;
+        this.cndClass = cndClass;
     }
 
 
     public static SqlIntercode create(SqlIntercode init, SqlIntercode next, String subjectName, String joinName,
-            String endName, Node cndNode, HashSet<String> restrictions)
+            String endName, Node cndNode, Request request, HashSet<String> restrictions)
     {
         UsedVariables variables = new UsedVariables();
 
@@ -78,12 +80,25 @@ public class SqlRecursive extends SqlIntercode
                 endVar.addClass(nextClass);
         }
 
-        return new SqlRecursive(variables, init, next, endVar, joinName, subjectName, cndNode);
+
+        ResourceClass cndClass = null;
+
+        if(cndNode != null)
+        {
+            for(ResourceClass resClass : endVar.getClasses())
+                if(resClass.match(cndNode, request))
+                    cndClass = resClass;
+
+            if(cndClass == null)
+                return new SqlEmptySolution();
+        }
+
+        return new SqlRecursive(variables, init, next, endVar, joinName, subjectName, cndNode, cndClass);
     }
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         HashSet<String> initRestrictions = new HashSet<String>(restrictions);
         initRestrictions.add(joinName);
@@ -92,9 +107,9 @@ public class SqlRecursive extends SqlIntercode
         nextRestrictions.add(joinName);
         nextRestrictions.add(endVar.getName());
 
-        return create(init.optimize(schema, initRestrictions, reduced),
-                next.optimize(schema, nextRestrictions, reduced), subjectName, joinName, endVar.getName(), cndNode,
-                restrictions);
+        return create(init.optimize(request, initRestrictions, reduced),
+                next.optimize(request, nextRestrictions, reduced), subjectName, joinName, endVar.getName(), cndNode,
+                request, restrictions);
     }
 
 
@@ -345,23 +360,12 @@ public class SqlRecursive extends SqlIntercode
             }
             else
             {
-                boolean hasVariant = false;
-
-                for(ResourceClass resClass : endVar.getClasses())
+                for(int i = 0; i < cndClass.getPatternPartsCount(); i++)
                 {
-                    if(resClass.match(cndNode))
-                    {
-                        appendAnd(builder, hasVariant);
-                        hasVariant = true;
-
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, i > 0);
-                            builder.append(resClass.getSqlColumn(endVar.getName(), i));
-                            builder.append(" = ");
-                            builder.append(resClass.getPatternCode(cndNode, i));
-                        }
-                    }
+                    appendAnd(builder, i > 0);
+                    builder.append(cndClass.getSqlColumn(endVar.getName(), i));
+                    builder.append(" = ");
+                    builder.append(cndClass.getPatternCode(cndNode, i));
                 }
             }
         }

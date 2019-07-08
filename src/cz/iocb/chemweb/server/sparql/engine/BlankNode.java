@@ -1,4 +1,6 @@
-package cz.iocb.chemweb.server.db;
+package cz.iocb.chemweb.server.sparql.engine;
+
+
 
 public class BlankNode extends ReferenceNode
 {

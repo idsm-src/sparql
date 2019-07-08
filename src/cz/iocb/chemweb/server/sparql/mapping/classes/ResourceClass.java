@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
@@ -186,5 +187,5 @@ public abstract class ResourceClass
      * @param node SPARQL node
      * @return true if values from this class can match the given SPARQL node
      */
-    public abstract boolean match(Node node);
+    public abstract boolean match(Node node, Request request);
 }

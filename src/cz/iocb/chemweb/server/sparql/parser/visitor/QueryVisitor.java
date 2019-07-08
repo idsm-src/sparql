@@ -150,7 +150,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             }
         }.visit(ctx);
 
-        
+
         if(ctx.prologue() != null)
         {
             PrologueVisitor visitor = new PrologueVisitor(config, messages);

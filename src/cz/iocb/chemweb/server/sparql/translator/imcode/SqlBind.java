@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBl
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -73,16 +73,16 @@ public class SqlBind extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(DatabaseSchema schema, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
         if(!restrictions.contains(variableName))
-            return context.optimize(schema, restrictions, reduced);
+            return context.optimize(request, restrictions, reduced);
 
         HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
         contextRestrictions.addAll(expression.getVariables());
 
         return bind(variableName, expression,
-                context.optimize(schema, contextRestrictions, reduced && expression.isDeterministic()), restrictions);
+                context.optimize(request, contextRestrictions, reduced && expression.isDeterministic()), restrictions);
     }
 
 

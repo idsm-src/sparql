@@ -6,12 +6,11 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import javax.sql.DataSource;
-import cz.iocb.chemweb.server.db.postgresql.PostgresSchema;
-import cz.iocb.chemweb.server.db.schema.Column;
-import cz.iocb.chemweb.server.db.schema.ConstantColumn;
-import cz.iocb.chemweb.server.db.schema.DatabaseSchema;
-import cz.iocb.chemweb.server.db.schema.Table;
-import cz.iocb.chemweb.server.db.schema.TableColumn;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -46,7 +45,7 @@ public abstract class SparqlDatabaseConfiguration
     protected SparqlDatabaseConfiguration(DataSource connectionPool) throws SQLException
     {
         this.connectionPool = connectionPool;
-        schema = new PostgresSchema(connectionPool);
+        schema = new DatabaseSchema(connectionPool);
     }
 
 
@@ -86,7 +85,7 @@ public abstract class SparqlDatabaseConfiguration
 
         for(ResourceClass c : iriClasses.values())
         {
-            if(c instanceof UserIriClass && ((UserIriClass) c).match(iri))
+            if(c instanceof UserIriClass && ((UserIriClass) c).match(iri, connectionPool))
             {
                 if(iriClass != null)
                     throw new RuntimeException("ambigous iri class for " + value);

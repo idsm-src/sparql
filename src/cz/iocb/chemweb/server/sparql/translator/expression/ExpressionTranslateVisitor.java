@@ -1,14 +1,13 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -48,8 +47,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 {
     private final VariableAccessor variableAccessor;
     private final TranslateVisitor parentTranslator;
+    private final Request request;
     private final Prologue prologue;
-    private final LinkedHashMap<String, UserIriClass> iriClasses;
     private final List<TranslateMessage> messages;
 
 
@@ -57,8 +56,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     {
         this.variableAccessor = variableAccessor;
         this.parentTranslator = parentTranslator;
+        this.request = parentTranslator.getRequest();
         this.prologue = parentTranslator.getPrologue();
-        this.iriClasses = parentTranslator.getConfiguration().getIriClasses();
         this.messages = parentTranslator.getMessages();
     }
 
@@ -156,7 +155,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             arguments.add(visitElement(expression));
 
         if(function.equalsIgnoreCase("iri"))
-            arguments.add(SqlIri.create(prologue.getBase(), iriClasses));
+            arguments.add(SqlIri.create(prologue.getBase(), request));
 
         if(function.equalsIgnoreCase("count") && builtInCallExpression.isDistinct() && arguments.size() == 0)
             variableAccessor.getUsedVariables().getValues().stream()
@@ -209,7 +208,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(IRI iri)
     {
-        return SqlIri.create(iri, iriClasses);
+        return SqlIri.create(iri, request);
     }
 
 
