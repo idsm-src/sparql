@@ -135,6 +135,20 @@
     <url-pattern>/endpoint/sparql/nextprot</url-pattern>
   </filter-mapping>
 
+  <filter>
+    <filter-name>IdsmEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>IDSM SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>IdsmEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sparql/idsm</url-pattern>
+  </filter-mapping>
+
 
   <!-- ChemWeb Servlets -->
   <servlet>
@@ -280,6 +294,16 @@
   <servlet-mapping>
     <servlet-name>NeXtProtEndpointServlet</servlet-name>
     <url-pattern>/endpoint/sparql/nextprot</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>IdsmEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>IdsmEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sparql/idsm</url-pattern>
   </servlet-mapping>
 
 
