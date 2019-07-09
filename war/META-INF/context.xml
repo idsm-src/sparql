@@ -84,6 +84,13 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
+  <Resource name="jdbc:nextprot" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/nextprot" username="SPARQL" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
   <Resource name="sparql:pubchem" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"
@@ -114,5 +121,10 @@
       type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-pubchem" singleton="true" />
+
+  <Resource name="sparql:nextprot" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
+      datasource="jdbc:nextprot" singleton="true" />
 
 </Context>
