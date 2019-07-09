@@ -224,24 +224,33 @@ public class PiwikFilter implements Filter
         piwikRequest.setActionTime(actionTime);
 
 
-        tracker.sendRequest(piwikRequest, new FutureCallback<HttpResponse>()
+        try
         {
-            @Override
-            public void failed(Exception e)
+            tracker.sendRequest(piwikRequest, new FutureCallback<HttpResponse>()
             {
-                request.getServletContext().log("PiwikFilter: Exception: " + e.getMessage());
-            }
+                @Override
+                public void failed(Exception e)
+                {
+                    request.getServletContext().log("PiwikFilter: Exception: " + e.getMessage());
+                }
 
-            @Override
-            public void cancelled()
-            {
-                request.getServletContext().log("PiwikFilter: cancelled");
-            }
+                @Override
+                public void cancelled()
+                {
+                    request.getServletContext().log("PiwikFilter: cancelled");
+                }
 
-            @Override
-            public void completed(HttpResponse response)
-            {
-            }
-        });
+                @Override
+                public void completed(HttpResponse response)
+                {
+                }
+            });
+        }
+        catch(Throwable e)
+        {
+            System.err.println("PiwikFilter: log begin");
+            e.printStackTrace();
+            System.err.println("PiwikFilter: log end");
+        }
     }
 }
