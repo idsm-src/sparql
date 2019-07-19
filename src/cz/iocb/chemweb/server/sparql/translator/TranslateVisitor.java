@@ -423,7 +423,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Union union)
     {
-        SqlIntercode translatedPattern = new SqlNoSolution();
+        SqlIntercode translatedPattern = SqlNoSolution.get();
 
         for(GraphPattern pattern : union.getPatterns())
         {
@@ -740,7 +740,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private SqlIntercode translatePatternList(List<Pattern> patterns)
     {
-        SqlIntercode translatedGroupPattern = new SqlEmptySolution();
+        SqlIntercode translatedGroupPattern = SqlEmptySolution.get();
 
         LinkedList<Filter> filters = new LinkedList<>();
         LinkedList<String> inScopeVariables = new LinkedList<String>();
@@ -901,13 +901,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private SqlIntercode translateSqlFilters(List<SqlExpressionIntercode> filterExpressions, SqlIntercode child)
     {
-        if(child instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(child == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
 
         if(child instanceof SqlUnion)
         {
-            SqlIntercode union = new SqlNoSolution();
+            SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode subChild : ((SqlUnion) child).getChilds())
             {
@@ -938,7 +938,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         if(isFalse)
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
         if(validExpressions.isEmpty())
             return child;
@@ -1122,11 +1122,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         VarOrIri name = service.getName();
 
-        if(context instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(context == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
         if(name instanceof Variable && context.getVariables().get(((Variable) name).getName()) == null)
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
 
         /* create variable lists */
@@ -1422,7 +1422,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         if(results.isEmpty())
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
         return new SqlValues(usedVariables, typedVariables, results);
     }

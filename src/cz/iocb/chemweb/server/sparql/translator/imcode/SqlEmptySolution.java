@@ -8,9 +8,18 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlEmptySolution extends SqlIntercode
 {
-    public SqlEmptySolution()
+    static private final SqlEmptySolution singleton = new SqlEmptySolution();
+
+
+    private SqlEmptySolution()
     {
         super(new UsedVariables(), true);
+    }
+
+
+    public static SqlEmptySolution get()
+    {
+        return singleton;
     }
 
 

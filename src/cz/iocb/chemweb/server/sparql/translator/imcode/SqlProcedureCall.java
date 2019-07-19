@@ -118,15 +118,15 @@ public class SqlProcedureCall extends SqlIntercode
 
 
         if(!hasSolution)
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
 
         SqlIntercode originalContext = null;
 
-        if(!useContext && !(context instanceof SqlEmptySolution))
+        if(!useContext && context != SqlEmptySolution.get())
         {
             originalContext = context;
-            context = new SqlEmptySolution();
+            context = SqlEmptySolution.get();
         }
 
 
@@ -175,7 +175,7 @@ public class SqlProcedureCall extends SqlIntercode
             }
 
             if(variable.getClasses().isEmpty())
-                return new SqlNoSolution();
+                return SqlNoSolution.get();
         }
 
 
@@ -515,7 +515,7 @@ public class SqlProcedureCall extends SqlIntercode
         }
 
 
-        if(!(context instanceof SqlEmptySolution))
+        if(context != SqlEmptySolution.get())
         {
             builder.append(" FROM (");
             builder.append(context.translate());

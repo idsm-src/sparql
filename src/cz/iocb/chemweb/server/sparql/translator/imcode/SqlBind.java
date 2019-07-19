@@ -44,15 +44,15 @@ public class SqlBind extends SqlIntercode
     public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context,
             HashSet<String> restrictions)
     {
-        if(context instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(context == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
         if(expression == SqlNull.get())
             return context;
 
         if(context instanceof SqlUnion)
         {
-            SqlIntercode union = new SqlNoSolution();
+            SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode child : ((SqlUnion) context).getChilds())
             {

@@ -8,9 +8,18 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlNoSolution extends SqlIntercode
 {
-    public SqlNoSolution()
+    static private final SqlNoSolution singleton = new SqlNoSolution();
+
+
+    private SqlNoSolution()
     {
         super(new UsedVariables(), true);
+    }
+
+
+    public static SqlNoSolution get()
+    {
+        return singleton;
     }
 
 

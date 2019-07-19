@@ -71,7 +71,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     SqlIntercode visitElement(Element element, Node subject, Node object)
     {
         if(element == null || subject == null || object == null)
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
         Node prevSubject = this.subject;
         Node prevObject = this.object;
@@ -91,7 +91,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(AlternativePath alternativePath)
     {
-        SqlIntercode result = new SqlNoSolution();
+        SqlIntercode result = SqlNoSolution.get();
 
         for(Path child : alternativePath.getChildren())
             result = SqlUnion.union(result, visitElement(child, subject, object));
@@ -104,7 +104,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     public SqlIntercode visit(SequencePath sequencePath)
     {
         List<List<Path>> paths = expandSequencePath(sequencePath.getChildren());
-        SqlIntercode result = new SqlNoSolution();
+        SqlIntercode result = SqlNoSolution.get();
 
         for(List<Path> path : paths)
         {
@@ -118,7 +118,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             nodes.add(object);
 
 
-            SqlIntercode subresult = new SqlEmptySolution();
+            SqlIntercode subresult = SqlEmptySolution.get();
 
             for(int i = 0; i < path.size(); i++)
             {
@@ -165,8 +165,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode init = visitElement(repeatedPath.getChild(), joinNode, object);
             SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinNode);
 
-            if(init instanceof SqlNoSolution)
-                return new SqlNoSolution();
+            if(init == SqlNoSolution.get())
+                return SqlNoSolution.get();
 
             if(SqlRecursive.getPairs(init.getVariables().get(joinName), next.getVariables().get(joinName)).isEmpty())
                 return visitElement(repeatedPath.getChild(), subject, object);
@@ -186,8 +186,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
 
 
-        if(init instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(init == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
         if(SqlRecursive.getPairs(init.getVariables().get(joinName), next.getVariables().get(joinName)).isEmpty())
             return visitElement(repeatedPath.getChild(), subject, object);
@@ -235,7 +235,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        SqlIntercode translatedPattern = new SqlNoSolution();
+        SqlIntercode translatedPattern = SqlNoSolution.get();
 
         if(!negIriSet.isEmpty())
             translatedPattern = SqlUnion.union(translatedPattern, translateNegatedPath(subject, negIriSet, object));
@@ -270,7 +270,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public SqlIntercode visit(VarOrIri predicate)
     {
-        SqlIntercode translatedPattern = new SqlNoSolution();
+        SqlIntercode translatedPattern = SqlNoSolution.get();
 
         matching:
         for(QuadMapping mapping : mappings)
@@ -422,7 +422,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private SqlIntercode translateNegatedPath(Node subject, List<IRI> negatedIriSet, Node object)
     {
-        SqlIntercode translatedPattern = new SqlNoSolution();
+        SqlIntercode translatedPattern = SqlNoSolution.get();
 
         Variable fakePredicate = new Variable(variablePrefix + variableId++);
 

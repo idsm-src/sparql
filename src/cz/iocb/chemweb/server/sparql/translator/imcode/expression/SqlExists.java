@@ -38,7 +38,7 @@ public class SqlExists extends SqlExpressionIntercode
     {
         if(pattern instanceof SqlUnion)
         {
-            SqlIntercode union = new SqlNoSolution();
+            SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode child : ((SqlUnion) pattern).getChilds())
             {
@@ -65,7 +65,7 @@ public class SqlExists extends SqlExpressionIntercode
                 }
             }
 
-            if(union instanceof SqlNoSolution)
+            if(union == SqlNoSolution.get())
                 return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
 
             return new SqlExists(negated, union, variableAccessor);

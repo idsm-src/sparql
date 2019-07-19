@@ -28,10 +28,10 @@ public class SqlUnion extends SqlIntercode
     {
         /* special cases */
 
-        if(left instanceof SqlNoSolution)
+        if(left == SqlNoSolution.get())
             return right;
 
-        if(right instanceof SqlNoSolution)
+        if(right == SqlNoSolution.get())
             return left;
 
 
@@ -91,7 +91,7 @@ public class SqlUnion extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
-        SqlIntercode result = new SqlNoSolution();
+        SqlIntercode result = SqlNoSolution.get();
 
         for(SqlIntercode child : childs)
             result = union(result, child.optimize(request, restrictions, reduced));

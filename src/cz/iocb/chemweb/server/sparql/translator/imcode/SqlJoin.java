@@ -47,14 +47,14 @@ public class SqlJoin extends SqlIntercode
     {
         /* special cases */
 
-        if(left instanceof SqlNoSolution || right instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(left == SqlNoSolution.get() || right == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
 
-        if(left instanceof SqlEmptySolution)
+        if(left == SqlEmptySolution.get())
             return right;
 
-        if(right instanceof SqlEmptySolution)
+        if(right == SqlEmptySolution.get())
             return left;
 
 
@@ -76,7 +76,7 @@ public class SqlJoin extends SqlIntercode
                 rightChilds = Lists.newArrayList(right);
 
 
-            SqlIntercode union = new SqlNoSolution();
+            SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode leftChild : leftChilds)
                 for(SqlIntercode rightChild : rightChilds)
@@ -92,7 +92,7 @@ public class SqlJoin extends SqlIntercode
         UsedVariables variables = getUsedVariable(pairs, restrictions);
 
         if(variables == null)
-            return new SqlNoSolution();
+            return SqlNoSolution.get();
 
 
         ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
@@ -141,7 +141,7 @@ public class SqlJoin extends SqlIntercode
 
 
                     if(!SqlTableAccess.areCompatible(schema, left, right))
-                        return new SqlNoSolution();
+                        return SqlNoSolution.get();
 
 
                     List<ColumnPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
@@ -209,7 +209,7 @@ public class SqlJoin extends SqlIntercode
                 childRestrictions.add(entry.getKey());
 
 
-        SqlIntercode result = new SqlEmptySolution();
+        SqlIntercode result = SqlEmptySolution.get();
 
         for(SqlIntercode child : childs)
             result = join(request.getConfiguration().getSchema(), result,

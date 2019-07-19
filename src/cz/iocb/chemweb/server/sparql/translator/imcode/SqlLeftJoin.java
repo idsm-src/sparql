@@ -45,22 +45,22 @@ public class SqlLeftJoin extends SqlIntercode
     {
         /* special cases */
 
-        if(left instanceof SqlNoSolution)
-            return new SqlNoSolution();
+        if(left == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
-        if(right instanceof SqlNoSolution)
+        if(right == SqlNoSolution.get())
             return left;
 
-        if(left instanceof SqlEmptySolution)
+        if(left == SqlEmptySolution.get())
             return right;
 
-        if(right instanceof SqlEmptySolution)
+        if(right == SqlEmptySolution.get())
             return left;
 
         if(left instanceof SqlUnion)
         {
             SqlUnion union = (SqlUnion) left;
-            SqlIntercode newUnion = new SqlNoSolution();
+            SqlIntercode newUnion = SqlNoSolution.get();
 
             for(SqlIntercode child : union.getChilds())
             {
@@ -162,7 +162,7 @@ public class SqlLeftJoin extends SqlIntercode
 
     private static SqlIntercode optimizeRightUnion(UsedVariables variables, SqlUnion union)
     {
-        SqlIntercode newUnion = new SqlNoSolution();
+        SqlIntercode newUnion = SqlNoSolution.get();
 
         for(SqlIntercode child : union.getChilds())
             if(areVariablesCompatible(variables, child.getVariables()))

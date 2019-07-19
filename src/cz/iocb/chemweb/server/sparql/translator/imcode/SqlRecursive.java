@@ -90,7 +90,7 @@ public class SqlRecursive extends SqlIntercode
                     cndClass = resClass;
 
             if(cndClass == null)
-                return new SqlEmptySolution();
+                return SqlEmptySolution.get();
         }
 
         return new SqlRecursive(variables, init, next, endVar, joinName, subjectName, cndNode, cndClass);
