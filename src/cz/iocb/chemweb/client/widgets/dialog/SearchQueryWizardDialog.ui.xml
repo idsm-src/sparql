@@ -43,7 +43,7 @@
       font-size: 50px;
       cursor: pointer;
       opacity: 0;
-      filter: alpha(opacity = 0);
+      filter: literal("alpha(opacity = 0)");
     }
   </ui:style>
 
