@@ -4,5 +4,5 @@
 /war/chemweb/
 /war/WEB-INF/classes/
 /war/WEB-INF/deploy/
-/war/*.properties
+/war/META-INF/context.xml
 /src/cz/iocb/chemweb/test/
