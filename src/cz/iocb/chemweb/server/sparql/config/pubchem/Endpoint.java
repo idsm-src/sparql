@@ -28,6 +28,12 @@ class Endpoint
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:IAO_0000136"),
                     config.createIriMapping("substance", "substance"));
+        }
+
+        {
+            String table = "endpoint_outcomes";
+            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:PubChemAssayOutcome"),
                     config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "outcome_id"));
         }
