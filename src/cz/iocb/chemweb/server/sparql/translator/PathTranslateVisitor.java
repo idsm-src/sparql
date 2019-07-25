@@ -324,6 +324,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(processNodesCondition(translated, subject, object, mapping.getSubject(), mapping.getObject()))
                     continue;
 
+                if(processNodesCondition(translated, predicate, object, mapping.getPredicate(), mapping.getObject()))
+                    continue;
+
 
                 translatedPattern = SqlUnion.union(translatedPattern, translated);
             }
