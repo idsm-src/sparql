@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -23,7 +24,7 @@ class Substance
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass substance = config.getIriClass("substance");
-        NodeMapping graph = config.createIriMapping("pubchem:substance");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:substance");
 
         {
             String table = "substance_bases";

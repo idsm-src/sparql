@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -21,7 +22,7 @@ class SubstanceDescriptor
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass descriptorSubstanceVersion = config.getIriClass("substance_version");
-        NodeMapping graph = config.createIriMapping("descriptor:substance");
+        ConstantIriMapping graph = config.createIriMapping("descriptor:substance");
 
         {
             String table = "descriptor_substance_bases";

@@ -13,6 +13,7 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
+import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedBlankNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
@@ -162,18 +163,18 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
+    public void addQuadMapping(String table, ConstantIriMapping graph, NodeMapping subject,
+            ConstantIriMapping predicate, NodeMapping object)
     {
-        QuadMapping map = new QuadMapping(new Table(table), graph, subject, predicate, object);
+        QuadMapping map = new SingleTableQuadMapping(new Table(table), graph, subject, predicate, object);
         mappings.add(map);
     }
 
 
-    public void addQuadMapping(String table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, String condition)
+    public void addQuadMapping(String table, ConstantIriMapping graph, NodeMapping subject,
+            ConstantIriMapping predicate, NodeMapping object, String condition)
     {
-        QuadMapping map = new QuadMapping(new Table(table), graph, subject, predicate, object, condition);
+        QuadMapping map = new SingleTableQuadMapping(new Table(table), graph, subject, predicate, object, condition);
         mappings.add(map);
     }
 

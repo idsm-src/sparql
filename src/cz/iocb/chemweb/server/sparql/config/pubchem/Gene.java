@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
@@ -22,7 +23,7 @@ class Gene
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass gene = config.getIriClass("gene");
-        NodeMapping graph = config.createIriMapping("pubchem:gene");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:gene");
 
         {
             String table = "gene_bases";

@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -61,7 +62,7 @@ class Ontology
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass rdfResource = config.getIriClass("ontology_resource");
-        NodeMapping graph = config.createIriMapping("pubchem:ontology");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:ontology");
 
         {
             String table = "ontology_resource_classes";

@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -21,7 +22,7 @@ class Compound
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass compound = config.getIriClass("compound");
-        NodeMapping graph = config.createIriMapping("pubchem:compound");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:compound");
 
         {
             String table = "compound_bases";

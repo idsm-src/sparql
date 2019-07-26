@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.nextprot;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -32,7 +33,7 @@ class Schema
     private static void addSourceQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass source = config.getIriClass("source");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "source_bases";
@@ -54,7 +55,7 @@ class Schema
     private static void addDatabaseQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass database = config.getIriClass("database");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "database_bases";
@@ -90,7 +91,7 @@ class Schema
     private static void addOntologyQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass schema = config.getIriClass("schema");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "schema_bases";

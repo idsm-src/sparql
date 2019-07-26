@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -20,7 +21,7 @@ class Reference
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass reference = config.getIriClass("reference");
-        NodeMapping graph = config.createIriMapping("pubchem:reference");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:reference");
 
         {
             String table = "reference_bases";

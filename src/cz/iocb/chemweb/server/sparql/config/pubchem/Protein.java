@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
@@ -20,7 +21,7 @@ class Protein
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass protein = config.getIriClass("protein");
-        NodeMapping graph = config.createIriMapping("pubchem:protein");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:protein");
 
         {
             String table = "protein_bases";

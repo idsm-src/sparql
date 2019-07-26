@@ -59,7 +59,7 @@ class CompoundDescriptor
 
     static void addQuadMapping(PubChemConfiguration config)
     {
-        NodeMapping graph = config.createIriMapping("descriptor:compound");
+        ConstantIriMapping graph = config.createIriMapping("descriptor:compound");
         ConstantIriMapping type = config.createIriMapping("rdf:type");
         ConstantIriMapping template = config.createIriMapping("template:itemTemplate");
         ConstantIriMapping value = config.createIriMapping("sio:has-value");

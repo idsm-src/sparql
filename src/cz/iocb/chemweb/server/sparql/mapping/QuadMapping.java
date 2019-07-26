@@ -1,41 +1,28 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class QuadMapping
+public abstract class QuadMapping
 {
-    private final Table table;
-    private final String condition;
-    private final NodeMapping graph;
+    private final ConstantIriMapping graph;
     private final NodeMapping subject;
     private final ConstantIriMapping predicate;
     private final NodeMapping object;
 
 
-    public QuadMapping(Table table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
-    {
-        this(table, graph, subject, predicate, object, null);
-    }
-
-
-    public QuadMapping(Table table, NodeMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, String condition)
+    public QuadMapping(ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         //TODO: add support for ParametrisedIriMapping graphs
-        if(graph != null && !(graph instanceof ConstantIriMapping))
-            throw new IllegalArgumentException();
+        //TODO: add support for ParametrisedIriMapping predicates
 
-        this.table = table;
         this.graph = graph;
         this.subject = subject;
         this.predicate = predicate;
         this.object = object;
-        this.condition = condition;
     }
 
 
@@ -51,6 +38,24 @@ public class QuadMapping
             return false;
 
         if(!match(this.object, object, request))
+            return false;
+
+        if(!checkNodeCondition(graph, subject, getGraph(), getSubject()))
+            return false;
+
+        if(!checkNodeCondition(graph, predicate, getGraph(), getPredicate()))
+            return false;
+
+        if(!checkNodeCondition(graph, object, getGraph(), getObject()))
+            return false;
+
+        if(!checkNodeCondition(subject, predicate, getSubject(), getPredicate()))
+            return false;
+
+        if(!checkNodeCondition(subject, object, getSubject(), getObject()))
+            return false;
+
+        if(!checkNodeCondition(predicate, object, getPredicate(), getObject()))
             return false;
 
         return true;
@@ -69,19 +74,25 @@ public class QuadMapping
     }
 
 
-    public final Table getTable()
+    private boolean checkNodeCondition(Node node1, Node node2, NodeMapping map1, NodeMapping map2)
     {
-        return table;
+        if(!(node1 instanceof VariableOrBlankNode && node2 instanceof VariableOrBlankNode))
+            return true;
+
+        if(!node1.equals(node2))
+            return true;
+
+        if(map1.getResourceClass().getGeneralClass() != map2.getResourceClass().getGeneralClass())
+            return false;
+
+        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping && !map1.equals(map2))
+            return false;
+
+        return true;
     }
 
 
-    public final String getCondition()
-    {
-        return condition;
-    }
-
-
-    public final NodeMapping getGraph()
+    public final ConstantIriMapping getGraph()
     {
         return graph;
     }

@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -21,7 +22,7 @@ class Biosystem
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass biosystem = config.getIriClass("biosystem");
-        NodeMapping graph = config.createIriMapping("pubchem:biosystem");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:biosystem");
 
         {
             String table = "biosystem_bases";

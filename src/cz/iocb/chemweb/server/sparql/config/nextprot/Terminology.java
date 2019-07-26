@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.nextprot;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -20,7 +21,7 @@ class Terminology
     static void addQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass terminology = config.getIriClass("terminology");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "terminology_bases";

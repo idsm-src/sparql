@@ -6,6 +6,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
@@ -67,7 +68,7 @@ class Chromosome
     private static void addIsomorfQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass isoform = config.getIriClass("isoform");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "isoform_bases";
@@ -810,7 +811,7 @@ class Chromosome
     private static void addAnnotationQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass annotation = config.getIriClass("annotation");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "annotation_bases";
@@ -915,7 +916,7 @@ class Chromosome
     private static void addEvidenceQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass evidence = config.getIriClass("evidence");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "evidence_bases";
@@ -970,7 +971,7 @@ class Chromosome
     private static void addEntryQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass entry = config.getIriClass("entry");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "entry_bases";
@@ -1065,7 +1066,7 @@ class Chromosome
     private static void addProteoformQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass proteoform = config.getIriClass("proteoform");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "proteoform_bases";
@@ -1114,7 +1115,7 @@ class Chromosome
     private static void addGeneQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass gene = config.getIriClass("gene");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "gene_bases";
@@ -1157,7 +1158,7 @@ class Chromosome
     private static void addProteinSequenceQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass sequence = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "protein_sequence_bases";
@@ -1183,7 +1184,7 @@ class Chromosome
     private static void addProteinFamilyInfoQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass family = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "family_info_bases";
@@ -1207,7 +1208,7 @@ class Chromosome
     private static void addHistoryQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass history = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             DateConstantZoneClass xsdDateNoZone = DateConstantZoneClass.get(Integer.MIN_VALUE);
@@ -1239,7 +1240,7 @@ class Chromosome
     private static void addIdentifierQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass identifier = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "identifier_bases";
@@ -1261,7 +1262,7 @@ class Chromosome
     private static void addEntryXrefQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "entry_xref_bases";
@@ -1283,7 +1284,7 @@ class Chromosome
     private static void addEvidenceXrefQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "evidence_xref_bases";
@@ -1305,7 +1306,7 @@ class Chromosome
     private static void addChebiXrefQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "chebi_xref_bases";
@@ -1331,7 +1332,7 @@ class Chromosome
     private static void addDrugBankXrefQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "drugbank_xref_bases";
@@ -1357,7 +1358,7 @@ class Chromosome
     private static void addUniProtXrefQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "uniprot_xref_bases";
@@ -1382,7 +1383,7 @@ class Chromosome
 
     private static void addNameQuadMapping(NeXtProtConfiguration config)
     {
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "name_bases";
@@ -1415,7 +1416,7 @@ class Chromosome
     private static void addNameListQuadMapping(NeXtProtConfiguration config)
     {
         BlankNodeClass list = new UserIntBlankNodeClass(config.blankNodeSegment++);
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "name_list_bases";

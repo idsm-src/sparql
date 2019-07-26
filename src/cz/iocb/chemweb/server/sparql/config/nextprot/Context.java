@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -18,7 +19,7 @@ class Context
     static void addQuadMapping(NeXtProtConfiguration config)
     {
         UserIriClass context = config.getIriClass("context");
-        NodeMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
+        ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "context_bases";

@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -20,7 +21,7 @@ class Endpoint
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass endpoint = config.getIriClass("endpoint");
-        NodeMapping graph = config.createIriMapping("pubchem:endpoint");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:endpoint");
 
         {
             String table = "endpoint_bases";

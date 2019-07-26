@@ -7,10 +7,10 @@ import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -272,12 +272,11 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         SqlIntercode translatedPattern = SqlNoSolution.get();
 
-        matching:
         for(QuadMapping mapping : mappings)
         {
             if(!datasets.isEmpty())
             {
-                ConstantIriMapping graphMapping = (ConstantIriMapping) mapping.getGraph();
+                ConstantIriMapping graphMapping = mapping.getGraph();
 
                 if(graphMapping == null)
                     continue;
@@ -293,41 +292,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(mapping.match(graph, subject, predicate, object, request))
             {
-                SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
-
-                processNodeMapping(translated, graph, mapping.getGraph());
-                processNodeMapping(translated, subject, mapping.getSubject());
-                processNodeMapping(translated, predicate, mapping.getPredicate());
-                processNodeMapping(translated, object, mapping.getObject());
-
-                for(UsedVariable usedVariable : translated.getVariables().getValues())
-                    if(usedVariable.getClasses().size() > 1)
-                        continue matching;
-
-                processNodeCondition(translated, graph, mapping.getGraph());
-                processNodeCondition(translated, subject, mapping.getSubject());
-                processNodeCondition(translated, predicate, mapping.getPredicate());
-                processNodeCondition(translated, object, mapping.getObject());
-
-                if(processNodesCondition(translated, graph, subject, mapping.getGraph(), mapping.getSubject()))
-                    continue;
-
-                if(processNodesCondition(translated, graph, predicate, mapping.getGraph(), mapping.getPredicate()))
-                    continue;
-
-                if(processNodesCondition(translated, graph, object, mapping.getGraph(), mapping.getObject()))
-                    continue;
-
-                if(processNodesCondition(translated, subject, predicate, mapping.getSubject(), mapping.getPredicate()))
-                    continue;
-
-                if(processNodesCondition(translated, subject, object, mapping.getSubject(), mapping.getObject()))
-                    continue;
-
-                if(processNodesCondition(translated, predicate, object, mapping.getPredicate(), mapping.getObject()))
-                    continue;
-
-
+                SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object);
                 translatedPattern = SqlUnion.union(translatedPattern, translated);
             }
         }
@@ -338,44 +303,22 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private void processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
-        if(!(node instanceof VariableOrBlankNode))
+        if(node == null)
             return;
 
-        String name = ((VariableOrBlankNode) node).getName();
+        if(node instanceof VariableOrBlankNode)
+        {
+            String name = ((VariableOrBlankNode) node).getName();
 
-        translated.addVariableClass(name, mapping.getResourceClass());
-        translated.addMapping(name, mapping);
-    }
+            translated.addVariableClass(name, mapping.getResourceClass());
+            translated.addMapping(name, mapping);
+        }
 
-
-    private void processNodeCondition(SqlTableAccess translated, Node node, NodeMapping mapping)
-    {
         if(node instanceof VariableOrBlankNode && mapping instanceof ParametrisedMapping)
             translated.addNotNullCondition((ParametrisedMapping) mapping);
 
         if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
             translated.addValueCondition(node, (ParametrisedMapping) mapping);
-    }
-
-
-    private boolean processNodesCondition(SqlTableAccess translated, Node node1, Node node2, NodeMapping map1,
-            NodeMapping map2)
-    {
-        if(!(node1 instanceof VariableOrBlankNode) || !(node2 instanceof VariableOrBlankNode))
-            return false;
-
-        if(!node1.equals(node2))
-            return false;
-
-        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
-        {
-            if(map1.equals(map2))
-                return false;
-            else
-                return true;
-        }
-
-        return false;
     }
 
 
@@ -429,12 +372,11 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         Variable fakePredicate = new Variable(variablePrefix + variableId++);
 
-        matching:
         for(QuadMapping mapping : mappings)
         {
             if(!datasets.isEmpty())
             {
-                ConstantIriMapping graphMapping = (ConstantIriMapping) mapping.getGraph();
+                ConstantIriMapping graphMapping = mapping.getGraph();
 
                 if(graphMapping == null)
                     continue;
@@ -454,35 +396,31 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(negatedIriSet.contains(predicate))
                     continue;
 
-
-                SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
-
-                processNodeMapping(translated, graph, mapping.getGraph());
-                processNodeMapping(translated, subject, mapping.getSubject());
-                processNodeMapping(translated, object, mapping.getObject());
-
-                for(UsedVariable usedVariable : translated.getVariables().getValues())
-                    if(usedVariable.getClasses().size() > 1)
-                        continue matching;
-
-                processNodeCondition(translated, graph, mapping.getGraph());
-                processNodeCondition(translated, subject, mapping.getSubject());
-                processNodeCondition(translated, object, mapping.getObject());
-
-                if(processNodesCondition(translated, graph, subject, mapping.getGraph(), mapping.getSubject()))
-                    continue;
-
-                if(processNodesCondition(translated, graph, object, mapping.getGraph(), mapping.getObject()))
-                    continue;
-
-                if(processNodesCondition(translated, subject, object, mapping.getSubject(), mapping.getObject()))
-                    continue;
-
-
+                SqlIntercode translated = translateMapping(mapping, graph, subject, null, object);
                 translatedPattern = SqlUnion.union(translatedPattern, translated);
             }
         }
 
         return translatedPattern;
+    }
+
+
+    private SqlIntercode translateMapping(QuadMapping mapping, Node graph, Node subject, Node predicate, Node object)
+    {
+        if(mapping instanceof SingleTableQuadMapping)
+        {
+            SingleTableQuadMapping single = (SingleTableQuadMapping) mapping;
+
+            SqlTableAccess translated = new SqlTableAccess(schema, single.getTable(), single.getCondition());
+
+            processNodeMapping(translated, graph, mapping.getGraph());
+            processNodeMapping(translated, subject, mapping.getSubject());
+            processNodeMapping(translated, predicate, mapping.getPredicate());
+            processNodeMapping(translated, object, mapping.getObject());
+
+            return translated;
+        }
+
+        return null;
     }
 }

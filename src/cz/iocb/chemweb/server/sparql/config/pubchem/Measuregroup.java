@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -19,7 +20,7 @@ class Measuregroup
     static void addQuadMapping(PubChemConfiguration config)
     {
         UserIriClass measuregroup = config.getIriClass("measuregroup");
-        NodeMapping graph = config.createIriMapping("pubchem:measuregroup");
+        ConstantIriMapping graph = config.createIriMapping("pubchem:measuregroup");
 
         {
             String table = "measuregroup_bases";
