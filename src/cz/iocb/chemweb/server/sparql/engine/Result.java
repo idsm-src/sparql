@@ -242,6 +242,7 @@ public class Result implements AutoCloseable
     @Override
     public void close() throws SQLException
     {
+        rs.getStatement().close();
         rs.close();
     }
 
