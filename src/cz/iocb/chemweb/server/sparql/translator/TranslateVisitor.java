@@ -1211,17 +1211,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             for(int i = 0; i < mergedVariables.size(); i++)
             {
-                RdfNode term = row[varIndexes.get(mergedVariables.get(i))];
+                Integer idx = varIndexes.get(mergedVariables.get(i));
                 Node node = null;
 
-                if(term instanceof IriNode)
-                    node = new IRI(term.getValue());
-                else if(term instanceof LanguageTaggedLiteral)
-                    node = new Literal(term.getValue(), ((LanguageTaggedLiteral) term).getLanguage());
-                else if(term instanceof TypedLiteral)
-                    node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
-                else if(term instanceof ReferenceNode)
-                    node = new BlankNode(term.getValue());
+                if(idx != null)
+                {
+                    RdfNode term = row[varIndexes.get(mergedVariables.get(i))];
+
+                    if(term instanceof IriNode)
+                        node = new IRI(term.getValue());
+                    else if(term instanceof LanguageTaggedLiteral)
+                        node = new Literal(term.getValue(), ((LanguageTaggedLiteral) term).getLanguage());
+                    else if(term instanceof TypedLiteral)
+                        node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
+                    else if(term instanceof ReferenceNode)
+                        node = new BlankNode(term.getValue());
+                }
 
                 if(node != null)
                 {
