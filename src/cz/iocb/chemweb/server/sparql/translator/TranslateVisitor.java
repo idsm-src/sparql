@@ -556,7 +556,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, datasets);
-        SqlIntercode translatedPattern = pathVisitor.visitElement(predicate, graph, subject, object);
+        SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
 
 
         ArrayList<String> variablesInScope = new ArrayList<String>();

@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.config;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,12 +14,13 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
-import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedBlankNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -175,6 +177,29 @@ public abstract class SparqlDatabaseConfiguration
             ConstantIriMapping predicate, NodeMapping object, String condition)
     {
         QuadMapping map = new SingleTableQuadMapping(new Table(table), graph, subject, predicate, object, condition);
+        mappings.add(map);
+    }
+
+
+    public void addQuadMapping(String subjectTable, String objectTable, String subjectTableJoinColumn,
+            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
+    {
+        QuadMapping map = new JoinTableQuadMapping(new Table(subjectTable), new Table(objectTable),
+                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object);
+        mappings.add(map);
+    }
+
+
+    public void addQuadMapping(String subjectTable, String objectTable, String subjectTableJoinColumn,
+            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object, String subjectCondition, String objectCondition)
+    {
+        QuadMapping map = new JoinTableQuadMapping(new Table(subjectTable), new Table(objectTable),
+                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
+                subjectCondition, objectCondition);
         mappings.add(map);
     }
 

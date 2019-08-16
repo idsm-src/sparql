@@ -7,6 +7,7 @@ import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
@@ -27,6 +28,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RepeatedPath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RepeatedPath.Kind;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.SequencePath;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
@@ -61,10 +63,27 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SqlIntercode visitElement(Element element, Node graph, Node subject, Node object)
+    public SqlIntercode translate(Node graph, Node subject, Verb predicate, Node object)
     {
         this.graph = graph;
-        return visitElement(element, subject, object);
+        SqlIntercode intercode = visitElement(predicate, subject, object);
+
+        HashSet<String> restrictions = new HashSet<String>();
+
+        if(graph instanceof VariableOrBlankNode)
+            restrictions.add(((VariableOrBlankNode) graph).getName());
+
+        if(subject instanceof VariableOrBlankNode)
+            restrictions.add(((VariableOrBlankNode) subject).getName());
+
+        if(predicate instanceof VariableOrBlankNode)
+            restrictions.add(((VariableOrBlankNode) predicate).getName());
+
+        if(object instanceof VariableOrBlankNode)
+            restrictions.add(((VariableOrBlankNode) object).getName());
+
+        // strip path variables
+        return intercode.optimize(request, restrictions, false);
     }
 
 
@@ -405,13 +424,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateMapping(QuadMapping mapping, Node graph, Node subject, Node predicate, Node object)
+    private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object)
     {
-        if(mapping instanceof SingleTableQuadMapping)
+        if(qmapping instanceof SingleTableQuadMapping)
         {
-            SingleTableQuadMapping single = (SingleTableQuadMapping) mapping;
+            SingleTableQuadMapping mapping = (SingleTableQuadMapping) qmapping;
 
-            SqlTableAccess translated = new SqlTableAccess(schema, single.getTable(), single.getCondition());
+            SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
 
             processNodeMapping(translated, graph, mapping.getGraph());
             processNodeMapping(translated, subject, mapping.getSubject());
@@ -419,6 +438,32 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             processNodeMapping(translated, object, mapping.getObject());
 
             return translated;
+        }
+        else if(qmapping instanceof JoinTableQuadMapping)
+        {
+            JoinTableQuadMapping mapping = (JoinTableQuadMapping) qmapping;
+
+            Variable joinvar = new Variable(variablePrefix + variableId++);
+
+
+            SqlTableAccess subjectAcess = new SqlTableAccess(schema, mapping.getSubjectTable(),
+                    mapping.getSubjectCondition());
+
+            processNodeMapping(subjectAcess, graph, mapping.getGraph());
+            processNodeMapping(subjectAcess, subject, mapping.getSubject());
+            processNodeMapping(subjectAcess, predicate, mapping.getPredicate());
+            processNodeMapping(subjectAcess, joinvar, mapping.getSubjectJoinMapping());
+
+
+            SqlTableAccess objectAcess = new SqlTableAccess(schema, mapping.getObjectTable(),
+                    mapping.getObjectCondition());
+
+            //processNodeMapping(objectAcess, graph, mapping.getGraph()); // useless for ConstantIriMapping
+            processNodeMapping(objectAcess, joinvar, mapping.getObjectJoinMapping());
+            //processNodeMapping(objectAcess, predicate, mapping.getPredicate()); // useless for ConstantIriMapping
+            processNodeMapping(objectAcess, object, mapping.getObject());
+
+            return SqlJoin.join(schema, subjectAcess, objectAcess);
         }
 
         return null;
