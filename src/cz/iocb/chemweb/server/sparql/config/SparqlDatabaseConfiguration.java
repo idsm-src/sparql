@@ -10,6 +10,7 @@ import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -209,10 +210,14 @@ public abstract class SparqlDatabaseConfiguration
         List<Column> columns = new ArrayList<Column>(values.length);
 
         for(String value : values)
+        {
+            if(value.startsWith("("))
+                columns.add(new ExpressionColumn(value));
             if(value.matches(".*::[_a-zA-Z0-9]+"))
                 columns.add(new ConstantColumn(value));
             else
                 columns.add(new TableColumn(value));
+        }
 
         return columns;
     }
