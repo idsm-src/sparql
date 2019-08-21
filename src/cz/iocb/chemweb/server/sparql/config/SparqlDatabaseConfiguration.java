@@ -131,6 +131,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public NodeMapping createLiteralMapping(boolean value)
+    {
+        return new ConstantLiteralMapping(BuiltinClasses.xsdBoolean,
+                new Literal(Boolean.toString(value), BuiltinTypes.xsdBooleanIri));
+    }
+
+
     public NodeMapping createLiteralMapping(short value)
     {
         return new ConstantLiteralMapping(BuiltinClasses.xsdShort,
