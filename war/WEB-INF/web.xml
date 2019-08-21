@@ -9,147 +9,6 @@
   </welcome-file-list>
 
 
-  <!-- Cache Filter -->
-  <filter>
-    <filter-name>CacheFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.cache.CacheFilter</filter-class>
-  </filter>
-  <filter-mapping>
-    <filter-name>CacheFilter</filter-name>
-    <url-pattern>*</url-pattern>
-  </filter-mapping>
-
-
-  <!-- Log Filter -->
-  <filter>
-    <filter-name>LogFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.log.LogFilter</filter-class>
-  </filter>
-  <filter-mapping>
-    <filter-name>LogFilter</filter-name>
-    <url-pattern>*</url-pattern>
-  </filter-mapping>
-
-
-  <!-- Piwik Filters -->
-  <filter>
-    <filter-name>ChemwebPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>rpc</param-name><param-value>true</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>ChemwebPiwikFilter</filter-name>
-    <url-pattern>/chemweb/query</url-pattern>
-    <url-pattern>/chemweb/details</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>ChebiEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>ChEBI SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>ChebiEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sachem/chebi</url-pattern>
-    <url-pattern>/endpoint/sparql/chebi</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>ChemblEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>ChEMBL SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>ChemblEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sachem/chembl</url-pattern>
-    <url-pattern>/endpoint/sparql/chembl</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>DrugbankEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>DrugBank SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>DrugbankEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sachem/drugbank</url-pattern>
-    <url-pattern>/endpoint/sparql/drugbank</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>PubchemEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>PubChem SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>PubchemEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sachem/pubchem</url-pattern>
-    <url-pattern>/endpoint/sparql/pubchem</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>EmptyEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>Empty SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>EmptyEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sachem/empty</url-pattern>
-    <url-pattern>/endpoint/sparql/empty</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>NeXtProt SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sparql/nextprot</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>IdsmEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
-    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
-    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
-    <init-param><param-name>actionName</param-name><param-value>IDSM SPARQL Endpoint</param-value></init-param>
-    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>IdsmEndpointPiwikFilter</filter-name>
-    <url-pattern>/endpoint/sparql/idsm</url-pattern>
-  </filter-mapping>
-
-
   <!-- ChemWeb Servlets -->
   <servlet>
     <servlet-name>CheckServiceServlet</servlet-name>
@@ -232,58 +91,23 @@
 
   <!-- SPARQL Endpoint Servlets -->
   <servlet>
-    <servlet-name>ChebiEndpointServlet</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>ChebiEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sachem/chebi</url-pattern>
-    <url-pattern>/endpoint/sparql/chebi</url-pattern>
-  </servlet-mapping>
-
-  <servlet>
-    <servlet-name>ChemblEndpointServlet</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>ChemblEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sachem/chembl</url-pattern>
-    <url-pattern>/endpoint/sparql/chembl</url-pattern>
-  </servlet-mapping>
-
-  <servlet>
-    <servlet-name>DrugbankEndpointServlet</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>DrugbankEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sachem/drugbank</url-pattern>
-    <url-pattern>/endpoint/sparql/drugbank</url-pattern>
-  </servlet-mapping>
-
-  <servlet>
-    <servlet-name>PubChemEndpointServlet</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>PubChemEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sachem/pubchem</url-pattern>
-    <url-pattern>/endpoint/sparql/pubchem</url-pattern>
-  </servlet-mapping>
-
-  <servlet>
     <servlet-name>EmptyEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>sparql:empty</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>EmptyEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sachem/empty</url-pattern>
     <url-pattern>/endpoint/sparql/empty</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>IdsmEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>IdsmEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sparql/idsm</url-pattern>
   </servlet-mapping>
 
   <servlet>
@@ -297,13 +121,47 @@
   </servlet-mapping>
 
   <servlet>
-    <servlet-name>IdsmEndpointServlet</servlet-name>
+    <servlet-name>ChebiSachemEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:pubchem</param-value></init-param>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
   </servlet>
   <servlet-mapping>
-    <servlet-name>IdsmEndpointServlet</servlet-name>
-    <url-pattern>/endpoint/sparql/idsm</url-pattern>
+    <servlet-name>ChebiSachemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/chebi</url-pattern>
+    <url-pattern>/endpoint/sparql/chebi</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>ChemblSachemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-chembl</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChemblSachemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/chembl</url-pattern>
+    <url-pattern>/endpoint/sparql/chembl</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>DrugbankSachemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-drugbank</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DrugbankSachemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/drugbank</url-pattern>
+    <url-pattern>/endpoint/sparql/drugbank</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>PubChemSachemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-pubchem</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>PubChemSachemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/pubchem</url-pattern>
+    <url-pattern>/endpoint/sparql/pubchem</url-pattern>
   </servlet-mapping>
 
 
@@ -364,41 +222,143 @@
   </servlet-mapping>
 
 
-  <!-- SPARQL Configurations -->
-  <resource-env-ref>
-    <description>PubChem SPARQL configuration</description>
-    <resource-env-ref-name>sparql:pubchem</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration</resource-env-ref-type>
-  </resource-env-ref>
+  <!-- Cache Filter -->
+  <filter>
+    <filter-name>CacheFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.cache.CacheFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>CacheFilter</filter-name>
+    <url-pattern>*</url-pattern>
+  </filter-mapping>
 
-  <resource-env-ref>
-    <description>Sachem/ChEBI SPARQL configuration</description>
-    <resource-env-ref-name>sparql:sachem-chebi</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration</resource-env-ref-type>
-  </resource-env-ref>
 
-  <resource-env-ref>
-    <description>Sachem/ChEMBL SPARQL configuration</description>
-    <resource-env-ref-name>sparql:sachem-chembl</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration</resource-env-ref-type>
-  </resource-env-ref>
+  <!-- Log Filter -->
+  <filter>
+    <filter-name>LogFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.log.LogFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>LogFilter</filter-name>
+    <url-pattern>*</url-pattern>
+  </filter-mapping>
 
-  <resource-env-ref>
-    <description>Sachem/DrugBank SPARQL configuration</description>
-    <resource-env-ref-name>sparql:sachem-drugbank</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration</resource-env-ref-type>
-  </resource-env-ref>
 
-  <resource-env-ref>
-    <description>Sachem/PubChem SPARQL configuration</description>
-    <resource-env-ref-name>sparql:sachem-pubchem</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration</resource-env-ref-type>
-  </resource-env-ref>
+  <!-- Piwik Filters -->
+  <filter>
+    <filter-name>ChemwebPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>rpc</param-name><param-value>true</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>ChemwebPiwikFilter</filter-name>
+    <url-pattern>/chemweb/query</url-pattern>
+    <url-pattern>/chemweb/details</url-pattern>
+  </filter-mapping>
 
-  <resource-env-ref>
-    <description>Empty SPARQL configuration</description>
-    <resource-env-ref-name>sparql:empty</resource-env-ref-name>
-    <resource-env-ref-type>cz.iocb.chemweb.server.sparql.config.empty.EmptyConfiguration</resource-env-ref-type>
-  </resource-env-ref>
+  <filter>
+    <filter-name>EmptyEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>Empty SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>EmptyEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sparql/empty</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>IdsmEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>IDSM SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>IdsmEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sparql/idsm</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>NeXtProt SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sparql/nextprot</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>ChebiSachemEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>ChEBI SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>ChebiSachemEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sachem/chebi</url-pattern>
+    <url-pattern>/endpoint/sparql/chebi</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>ChemblSachemEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>ChEMBL SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>ChemblSachemEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sachem/chembl</url-pattern>
+    <url-pattern>/endpoint/sparql/chembl</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>DrugbankSachemEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>DrugBank SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>DrugbankSachemEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sachem/drugbank</url-pattern>
+    <url-pattern>/endpoint/sparql/drugbank</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>PubchemSachemEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>PubChem SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>PubchemSachemEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sachem/pubchem</url-pattern>
+    <url-pattern>/endpoint/sparql/pubchem</url-pattern>
+  </filter-mapping>
 
 </web-app>
