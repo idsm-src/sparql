@@ -121,6 +121,16 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>ChemblEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:chembl</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ChemblEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sparql/chembl_25</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>ChebiSachemEndpointServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>sparql:sachem-chebi</param-value></init-param>
@@ -299,6 +309,20 @@
   <filter-mapping>
     <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
     <url-pattern>/endpoint/sparql/nextprot</url-pattern>
+  </filter-mapping>
+
+  <filter>
+    <filter-name>ChemblEndpointPiwikFilter</filter-name>
+    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
+    <init-param><param-name>siteId</param-name><param-value>1</param-value></init-param>
+    <init-param><param-name>hostUrl</param-name><param-value>http://localhost/piwik/piwik.php</param-value></init-param>
+    <init-param><param-name>authToken</param-name><param-value>piwikAuthToken</param-value></init-param>
+    <init-param><param-name>actionName</param-name><param-value>ChEMBL 25 SPARQL Endpoint</param-value></init-param>
+    <init-param><param-name>replaceUrl</param-name><param-value>#/chemweb/endpoint/([a-z]*)/#/$1/endpoint/#</param-value></init-param>
+  </filter>
+  <filter-mapping>
+    <filter-name>ChemblEndpointPiwikFilter</filter-name>
+    <url-pattern>/endpoint/sparql/chembl_25</url-pattern>
   </filter-mapping>
 
   <filter>
