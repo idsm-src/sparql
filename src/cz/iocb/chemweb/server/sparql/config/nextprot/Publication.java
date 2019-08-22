@@ -14,7 +14,7 @@ class Publication
     static void addIriClasses(NeXtProtConfiguration config)
     {
         config.addIriClass(new UserIriClass("publication", Arrays.asList("integer"),
-                "http://nextprot.org/rdf/publication/[1-9][0-9]*"));
+                "http://nextprot\\.org/rdf/publication/[1-9][0-9]*"));
     }
 
 

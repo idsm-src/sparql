@@ -14,7 +14,7 @@ class Synonym
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("synonym", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_.*", SqlCheck.IF_MATCH));
+                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/synonym/MD5_.*", SqlCheck.IF_MATCH));
     }
 
 

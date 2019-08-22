@@ -120,7 +120,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Synonym.addIriClasses(this);
 
 
-        String sachem = prefixes.get("sachem");
+        String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
         addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatPattern));

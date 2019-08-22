@@ -14,7 +14,7 @@ class Terminology
     static void addIriClasses(NeXtProtConfiguration config)
     {
         config.addIriClass(new UserIriClass("terminology", Arrays.asList("integer"),
-                "http://nextprot.org/rdf/terminology/.*", IF_MATCH));
+                "http://nextprot\\.org/rdf/terminology/.*", IF_MATCH));
     }
 
 

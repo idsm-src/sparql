@@ -14,11 +14,11 @@ class Schema
     static void addIriClasses(NeXtProtConfiguration config)
     {
         config.addIriClass(
-                new UserIriClass("source", Arrays.asList("integer"), "http://nextprot.org/rdf/source/.*", IF_MATCH));
+                new UserIriClass("source", Arrays.asList("integer"), "http://nextprot\\.org/rdf/source/.*", IF_MATCH));
         config.addIriClass(
-                new UserIriClass("database", Arrays.asList("integer"), "http://nextprot.org/rdf/db/.*", IF_MATCH));
+                new UserIriClass("database", Arrays.asList("integer"), "http://nextprot\\.org/rdf/db/.*", IF_MATCH));
         config.addIriClass(
-                new UserIriClass("schema", Arrays.asList("integer"), "http://nextprot.org/rdf#.*", IF_MATCH));
+                new UserIriClass("schema", Arrays.asList("integer"), "http://nextprot\\.org/rdf#.*", IF_MATCH));
     }
 
 

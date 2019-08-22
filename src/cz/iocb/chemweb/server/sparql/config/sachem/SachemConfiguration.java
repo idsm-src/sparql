@@ -26,7 +26,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         super(connectionPool);
 
         loadPrefixes(iriPrefix);
-        loadClasses(iriPrefix, idPattern);
+        loadClasses(iriPrefix.replaceAll("\\.", "\\\\\\.") + idPattern);
         loadQuadMapping();
         loadProcedures();
     }
@@ -45,9 +45,9 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
     }
 
 
-    private void loadClasses(String iriPrefix, String idPattern)
+    private void loadClasses(String pattern)
     {
-        String sachem = prefixes.get("sachem");
+        String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
         addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatPattern));
@@ -67,8 +67,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
         addIriClass(new UserIriClass("tautomerMode", Arrays.asList("integer"), tautomerModePattern));
 
-        addIriClass(new UserIriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
-        addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), iriPrefix + idPattern + "_Molfile"));
+        addIriClass(new UserIriClass("compound", Arrays.asList("integer"), pattern));
+        addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), pattern + "_Molfile"));
     }
 
 

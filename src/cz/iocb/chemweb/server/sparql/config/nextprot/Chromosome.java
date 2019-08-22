@@ -19,27 +19,27 @@ class Chromosome
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(
-                new UserIriClass("isoform", Arrays.asList("integer"), "http://nextprot.org/rdf/isoform/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass("annotation", Arrays.asList("integer"),
-                "http://nextprot.org/rdf/annotation/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass("evidence", Arrays.asList("integer"), "http://nextprot.org/rdf/evidence/.*",
+        config.addIriClass(new UserIriClass("isoform", Arrays.asList("integer"), "http://nextprot\\.org/rdf/isoform/.*",
                 IF_MATCH));
+        config.addIriClass(new UserIriClass("annotation", Arrays.asList("integer"),
+                "http://nextprot\\.org/rdf/annotation/.*", IF_MATCH));
+        config.addIriClass(new UserIriClass("evidence", Arrays.asList("integer"),
+                "http://nextprot\\.org/rdf/evidence/.*", IF_MATCH));
         config.addIriClass(
-                new UserIriClass("entry", Arrays.asList("integer"), "http://nextprot.org/rdf/entry/.*", IF_MATCH));
+                new UserIriClass("entry", Arrays.asList("integer"), "http://nextprot\\.org/rdf/entry/.*", IF_MATCH));
         config.addIriClass(new UserIriClass("proteoform", Arrays.asList("integer"),
-                "http://nextprot.org/rdf/proteoform/.*", IF_MATCH));
+                "http://nextprot\\.org/rdf/proteoform/.*", IF_MATCH));
         config.addIriClass(
-                new UserIriClass("gene", Arrays.asList("integer"), "http://nextprot.org/rdf/gene/.*", IF_MATCH));
+                new UserIriClass("gene", Arrays.asList("integer"), "http://nextprot\\.org/rdf/gene/.*", IF_MATCH));
 
         config.addIriClass(new UserIriClass("chebi", Arrays.asList("integer"),
-                "http://purl.obolibrary.org/obo/CHEBI_[1-9][0-9]*"));
+                "http://purl\\.obolibrary\\.org/obo/CHEBI_[1-9][0-9]*"));
         config.addIriClass(new UserIriClass("drugbank", Arrays.asList("integer"),
-                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB[0-9]{5}"));
+                "http://wifo5-04\\.informatik\\.uni-mannheim\\.de/drugbank/resource/drugs/DB[0-9]{5}"));
         config.addIriClass(new UserIriClass("purl_uniprot", Arrays.asList("integer"),
-                "http://purl.uniprot.org/uniprot/.*", IF_MATCH));
-        config.addIriClass(
-                new UserIriClass("uniprot", Arrays.asList("integer"), "http://www.uniprot.org/uniprot/.*", IF_MATCH));
+                "http://purl\\.uniprot\\.org/uniprot/.*", IF_MATCH));
+        config.addIriClass(new UserIriClass("uniprot", Arrays.asList("integer"),
+                "http://www\\.uniprot\\.org/uniprot/.*", IF_MATCH));
     }
 
 

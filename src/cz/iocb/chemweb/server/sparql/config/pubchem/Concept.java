@@ -14,7 +14,7 @@ class Concept
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("concept", Arrays.asList("smallint"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/.*", SqlCheck.IF_MATCH));
+                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/concept/.*", SqlCheck.IF_MATCH));
     }
 
 

@@ -12,7 +12,7 @@ class Bioassay
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID[1-9][0-9]*";
+        String prefix = "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/bioassay/AID[1-9][0-9]*";
 
         config.addIriClass(new UserIriClass("bioassay", Arrays.asList("integer"), prefix));
         config.addIriClass(new UserIriClass("bioassay_data", Arrays.asList("integer", "smallint"),

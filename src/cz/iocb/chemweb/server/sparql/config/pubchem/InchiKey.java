@@ -14,7 +14,7 @@ class InchiKey
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("inchikey", Arrays.asList("integer"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/.*", SqlCheck.IF_MATCH));
+                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/inchikey/.*", SqlCheck.IF_MATCH));
     }
 
 

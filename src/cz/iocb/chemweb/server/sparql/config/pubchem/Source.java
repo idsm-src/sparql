@@ -14,7 +14,7 @@ class Source
     static void addIriClasses(PubChemConfiguration config)
     {
         config.addIriClass(new UserIriClass("source", Arrays.asList("smallint"),
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/source/.*", SqlCheck.IF_MATCH));
+                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/source/.*", SqlCheck.IF_MATCH));
     }
 
 

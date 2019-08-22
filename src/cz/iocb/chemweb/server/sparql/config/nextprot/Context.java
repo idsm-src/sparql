@@ -12,7 +12,7 @@ class Context
     static void addIriClasses(NeXtProtConfiguration config)
     {
         config.addIriClass(
-                new UserIriClass("context", Arrays.asList("integer"), "http://nextprot.org/rdf/context/[1-9][0-9]*"));
+                new UserIriClass("context", Arrays.asList("integer"), "http://nextprot\\.org/rdf/context/[1-9][0-9]*"));
     }
 
 
