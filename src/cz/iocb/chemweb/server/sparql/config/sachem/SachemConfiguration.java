@@ -69,12 +69,6 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         addIriClass(new UserIriClass("compound", Arrays.asList("integer"), iriPrefix + idPattern));
         addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), iriPrefix + idPattern + "_Molfile"));
-
-        String classPattern = "http://semanticscience.org/resource/SIO_011120";
-        addIriClass(new UserIriClass("class", Arrays.asList("integer"), classPattern));
-
-        String propertyPattern = "(http://www.w3.org/1999/02/22-rdf-syntax-ns#type|http://semanticscience.org/resource/(is-attribute-of|has-value))";
-        addIriClass(new UserIriClass("property", Arrays.asList("integer"), propertyPattern));
     }
 
 
