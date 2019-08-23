@@ -50,22 +50,22 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
-        addIriClass(new UserIriClass("queryFormat", Arrays.asList("integer"), queryFormatPattern));
+        addIriClass(new UserIriClass("query_format", Arrays.asList("integer"), queryFormatPattern));
 
         String searchModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass("searchMode", Arrays.asList("integer"), searchModePattern));
+        addIriClass(new UserIriClass("search_mode", Arrays.asList("integer"), searchModePattern));
 
         String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
-        addIriClass(new UserIriClass("chargeMode", Arrays.asList("integer"), chargeModePattern));
+        addIriClass(new UserIriClass("charge_mode", Arrays.asList("integer"), chargeModePattern));
 
         String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
-        addIriClass(new UserIriClass("isotopeMode", Arrays.asList("integer"), isotopeModePattern));
+        addIriClass(new UserIriClass("isotope_mode", Arrays.asList("integer"), isotopeModePattern));
 
         String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
-        addIriClass(new UserIriClass("stereoMode", Arrays.asList("integer"), stereoModePattern));
+        addIriClass(new UserIriClass("stereo_mode", Arrays.asList("integer"), stereoModePattern));
 
         String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
-        addIriClass(new UserIriClass("tautomerMode", Arrays.asList("integer"), tautomerModePattern));
+        addIriClass(new UserIriClass("tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
 
         addIriClass(new UserIriClass("compound", Arrays.asList("integer"), pattern));
         addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), pattern + "_Molfile"));
@@ -96,18 +96,18 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         ProcedureDefinition subsearch = new cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition(
                 sachem + "substructureSearch", "sachem_substructure_search");
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
-        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
         subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
-        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("searchMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("search_mode"),
                 new IRI(sachem + "substructureSearch")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("chargeMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("charge_mode"),
                 new IRI(sachem + "defaultChargeAsAny")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotopeMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
                 new IRI(sachem + "ignoreIsotopes")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereoMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "ignoreStrereo")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomerMode"),
+        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         subsearch.addResult(new ResultDefinition(molClass));
         procedures.put(subsearch.getProcedureName(), subsearch);
@@ -117,7 +117,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
                 "sachem_similarity_search");
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
-        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
         simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
         simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
@@ -130,7 +130,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
                 "sachem_similarity_search");
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("queryFormat"),
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
         simcmpsearch
                 .addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
