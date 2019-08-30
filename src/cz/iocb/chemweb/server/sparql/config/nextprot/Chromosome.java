@@ -1026,7 +1026,7 @@ class Chromosome
             NodeMapping subject = config.createIriMapping(entry, "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createIriMapping("name", "name"));
+                    config.createBlankNodeMapping(config.nameClass, "name"));
         }
 
         {
@@ -1034,7 +1034,7 @@ class Chromosome
             NodeMapping subject = config.createIriMapping(entry, "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createIriMapping("name", "name"));
+                    config.createBlankNodeMapping(config.nameClass, "name"));
         }
 
         {
@@ -1042,7 +1042,7 @@ class Chromosome
             NodeMapping subject = config.createIriMapping(entry, "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":additionalNames"),
-                    config.createIriMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
         }
 
         {
@@ -1050,7 +1050,7 @@ class Chromosome
             NodeMapping subject = config.createIriMapping(entry, "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":cleavedRegionNames"),
-                    config.createIriMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
         }
 
         {
@@ -1058,7 +1058,7 @@ class Chromosome
             NodeMapping subject = config.createIriMapping(entry, "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":fonctionalRegionNames"),
-                    config.createIriMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
         }
     }
 
@@ -1415,12 +1415,11 @@ class Chromosome
 
     private static void addNameListQuadMapping(NeXtProtConfiguration config)
     {
-        BlankNodeClass list = new UserIntBlankNodeClass(config.blankNodeSegment++);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             String table = "name_list_bases";
-            NodeMapping subject = config.createBlankNodeMapping(list, "id");
+            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":NameList"));
@@ -1428,18 +1427,18 @@ class Chromosome
 
         {
             String table = "name_list_recommended_names";
-            NodeMapping subject = config.createBlankNodeMapping(list, "list");
+            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createIriMapping("name", "name"));
+                    config.createBlankNodeMapping(config.nameClass, "name"));
         }
 
         {
             String table = "name_list_alternative_names";
-            NodeMapping subject = config.createBlankNodeMapping(list, "list");
+            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createIriMapping("name", "name"));
+                    config.createBlankNodeMapping(config.nameClass, "name"));
         }
     }
 }

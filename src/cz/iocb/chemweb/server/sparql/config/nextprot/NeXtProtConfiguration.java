@@ -3,12 +3,18 @@ package cz.iocb.chemweb.server.sparql.config.nextprot;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 
 
 
 public class NeXtProtConfiguration extends SparqlDatabaseConfiguration
 {
     int blankNodeSegment = 1;
+
+    BlankNodeClass nameListClass = new UserIntBlankNodeClass(blankNodeSegment++);
+    BlankNodeClass nameClass = new UserIntBlankNodeClass(blankNodeSegment++);
+
 
 
     public NeXtProtConfiguration(DataSource connectionPool) throws SQLException
