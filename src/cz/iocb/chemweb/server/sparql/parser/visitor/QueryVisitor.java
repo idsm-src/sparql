@@ -6,9 +6,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,6 +80,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BracketedExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -90,7 +94,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.MultiProcedureCall;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Optional;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCall;
-import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase.Parameter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
@@ -113,6 +116,8 @@ public class QueryVisitor extends BaseVisitor<Query>
     private final SparqlDatabaseConfiguration config;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
+    private final HashSet<Node> usedParameterNodes;
+    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
     private Prologue prologue;
 
@@ -122,17 +127,22 @@ public class QueryVisitor extends BaseVisitor<Query>
         this.config = config;
         this.services = new Stack<VarOrIri>();
         this.usedBlankNodes = new HashSet<String>();
+        this.usedParameterNodes = new HashSet<Node>();
+        this.usedResultNodes = new HashSet<Node>();
         this.messages = messages;
     }
 
 
     public QueryVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
+            List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
+        this.usedParameterNodes = usedParameterNodes;
+        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -171,6 +181,36 @@ public class QueryVisitor extends BaseVisitor<Query>
             SelectQuery result = new SelectQuery(prologue, select);
             result.setPrologue(prologue);
 
+
+            //TODO: the check could be less strict in a future version
+            new ElementVisitor<Void>()
+            {
+                @Override
+                public Void visit(Variable variable)
+                {
+                    if(usedParameterNodes.contains(variable))
+                        messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, variable.getRange()));
+
+                    if(usedResultNodes.contains(variable))
+                        messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, variable.getRange()));
+
+                    return defaultResult();
+                }
+
+                @Override
+                public Void visit(BlankNode blankNode)
+                {
+                    if(usedParameterNodes.contains(blankNode))
+                        messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, blankNode.getRange()));
+
+                    if(usedResultNodes.contains(blankNode))
+                        messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, blankNode.getRange()));
+
+                    return defaultResult();
+                }
+            }.visit(result);
+
+
             prologue = null;
             return result;
         }
@@ -192,7 +232,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(dataBlockCtx == null)
             return null;
 
-        return (Values) new PatternVisitor(config, prologue, services, usedBlankNodes, messages).visit(dataBlockCtx);
+        return (Values) new PatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                usedResultNodes, messages).visit(dataBlockCtx);
     }
 
 
@@ -338,8 +379,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
 
 
-        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
-                .visit(whereClauseCtx);
+        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                usedResultNodes, messages).visit(whereClauseCtx);
         Values values = parseValues(valuesClauseContext);
 
         Select result = new Select(projections, pattern, values, isSubSelect);
@@ -370,8 +411,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(variableCtx.expression() != null)
         {
-            Expression expression = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
-                    .visit(variableCtx.expression());
+            Expression expression = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+                    usedParameterNodes, usedResultNodes, messages).visit(variableCtx.expression());
 
             return new Projection(expression, variable);
         }
@@ -401,7 +442,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                messages);
+                usedParameterNodes, usedResultNodes, messages);
 
         if(ctx.expression() != null)
         {
@@ -427,7 +468,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             return new ArrayList<Expression>();
 
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                messages);
+                usedParameterNodes, usedResultNodes, messages);
 
         return mapList(ctx.havingCondition(), expressionVisitor::visit);
     }
@@ -449,13 +490,12 @@ public class QueryVisitor extends BaseVisitor<Query>
             OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending :
                     OrderCondition.Direction.Descending;
 
-            return new OrderCondition(direction,
-                    new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
-                            .visit(ctx.expression()));
+            return new OrderCondition(direction, new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+                    usedParameterNodes, usedResultNodes, messages).visit(ctx.expression()));
         }
 
-        return withRange(new OrderCondition(
-                new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages).visit(ctx)), ctx);
+        return withRange(new OrderCondition(new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+                usedParameterNodes, usedResultNodes, messages).visit(ctx)), ctx);
     }
 
 
@@ -540,16 +580,21 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
+    private final HashSet<Node> usedParameterNodes;
+    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
 
 
     public GraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
+            List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
+        this.usedParameterNodes = usedParameterNodes;
+        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -574,8 +619,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
-                .visit(ctx).collect(Collectors.toList());
+        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes,
+                usedParameterNodes, usedResultNodes, messages).visit(ctx).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
@@ -584,33 +629,26 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        return withRange(new QueryVisitor(config, prologue, services, usedBlankNodes, messages).parseSelect(
-                ctx.selectClause(), null, ctx.whereClause(), ctx.solutionModifier(), ctx.valuesClause(), true), ctx);
+        return withRange(new QueryVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                usedResultNodes, messages).parseSelect(ctx.selectClause(), null, ctx.whereClause(),
+                        ctx.solutionModifier(), ctx.valuesClause(), true),
+                ctx);
     }
 }
 
 
 class TripleExpander extends ComplexElementVisitor<Node>
 {
-    private final List<Pattern> results = new ArrayList<>();
-    private final SparqlDatabaseConfiguration config;
-    private final Prologue prologue;
-    private final Stack<VarOrIri> services;
+    private final List<Pattern> results = new ArrayList<Pattern>();
     private final HashSet<String> usedBlankNodes;
-    private final List<TranslateMessage> messages;
 
     private final String blankNodePrefix = "blanknode";
     private int blankNodeId = 0;
 
 
-    public TripleExpander(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+    public TripleExpander(HashSet<String> usedBlankNodes)
     {
-        this.config = config;
-        this.prologue = prologue;
-        this.services = services;
         this.usedBlankNodes = usedBlankNodes;
-        this.messages = messages;
     }
 
 
@@ -643,162 +681,22 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
         for(Property property : triple.getProperties())
         {
+            if(subject == null)
+                subject = visitElement(triple.getNode());
+
             Verb verb = property.getVerb();
-            ProcedureDefinition callDefinition = services.isEmpty() && verb instanceof IRI ?
-                    config.getProcedures().get(((IRI) verb).getValue()) : null;
 
-            if(callDefinition != null)
+            for(ComplexNode objectNode : property.getObjects())
             {
-                IRI procedureName = (IRI) verb;
+                Node object = visitElement(objectNode);
 
-                for(ComplexNode objectNode : property.getObjects())
-                {
-                    List<ProcedureCall.Parameter> parameters = new LinkedList<ProcedureCall.Parameter>();
-
-                    if(objectNode instanceof BlankNodePropertyList)
-                    {
-                        for(Property parameterProperty : ((BlankNodePropertyList) objectNode).getProperties())
-                        {
-                            Parameter parameter = parseParameter(parameterProperty);
-
-                            if(parameter != null)
-                                parameters.add(parameter);
-                        }
-                    }
-                    else
-                    {
-                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject, objectNode.getRange(),
-                                procedureName.toString(prologue)));
-                    }
-
-
-
-                    ComplexNode originalSubject = triple.getNode();
-
-                    ProcedureCallBase result;
-
-                    if(!callDefinition.isSimple())
-                    {
-                        if(triple.getProperties().size() > 1)
-                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallPredicateCombinaion,
-                                    triple.getProperties().get(1).getRange()));
-
-                        List<ProcedureCall.Parameter> results = new LinkedList<ProcedureCall.Parameter>();
-
-                        if(originalSubject instanceof BlankNodePropertyList)
-                        {
-                            for(Property resultProperty : ((BlankNodePropertyList) originalSubject).getProperties())
-                            {
-                                Parameter resultParameter = parseResultParameter(resultProperty);
-
-                                if(resultParameter != null)
-                                    results.add(resultParameter);
-                            }
-                        }
-                        else
-                        {
-                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(prologue)));
-                        }
-
-                        result = new MultiProcedureCall(results, procedureName, parameters);
-                    }
-                    else
-                    {
-                        if(originalSubject instanceof BlankNodePropertyList || originalSubject instanceof Node)
-                        {
-                            if(subject == null)
-                                subject = visitElement(triple.getNode());
-                        }
-                        else
-                        {
-                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallSubject,
-                                    originalSubject.getRange(), procedureName.toString(prologue)));
-                        }
-
-                        result = new ProcedureCall(subject, procedureName, parameters);
-                    }
-
-                    result.setRange(triple.getRange());
-                    results.add(result);
-                }
-            }
-            else
-            {
-                new ElementVisitor<Void>()
-                {
-                    @Override
-                    public Void visit(IRI iri)
-                    {
-                        if(services.isEmpty() && config.getProcedures().get(iri.getValue()) != null)
-                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange()));
-
-                        return null;
-                    }
-                }.visitElement(verb);
-
-
-                if(subject == null)
-                    subject = visitElement(triple.getNode());
-
-                for(ComplexNode objectNode : property.getObjects())
-                {
-                    Node object = visitElement(objectNode);
-
-                    Triple resultTriple = new Triple(subject, verb, object);
-                    resultTriple.setRange(triple.getRange());
-                    results.add(resultTriple);
-                }
+                Triple resultTriple = new Triple(subject, verb, object);
+                resultTriple.setRange(triple.getRange());
+                results.add(resultTriple);
             }
         }
 
         return null;
-    }
-
-
-    private ProcedureCall.Parameter parseParameter(Property property)
-    {
-        if(!(property.getVerb() instanceof IRI))
-        {
-            messages.add(
-                    new TranslateMessage(MessageType.invalidProcedureParameterValue, property.getVerb().getRange()));
-            return null;
-        }
-
-        IRI parameterName = (IRI) property.getVerb();
-
-        if(property.getObjects().size() != 1)
-        {
-            messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValueNumber, property.getRange()));
-            return null;
-        }
-
-        Node parameterValue = visitElement(property.getObjects().get(0));
-
-        return new ProcedureCall.Parameter(parameterName, parameterValue);
-    }
-
-
-    private ProcedureCall.Parameter parseResultParameter(Property property)
-    {
-        if(!(property.getVerb() instanceof IRI))
-        {
-            messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue, property.getVerb().getRange()));
-            return null;
-        }
-
-        IRI parameterName = (IRI) property.getVerb();
-
-        if(property.getObjects().size() != 1)
-        {
-            messages.add(new TranslateMessage(MessageType.invalidProcedureResultValueNumber, property.getRange()));
-            return null;
-        }
-
-        Node parameterValue = visitElement(property.getObjects().get(0));
-
-        return new ProcedureCall.Parameter(parameterName, parameterValue);
     }
 
 
@@ -890,16 +788,21 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
+    private final HashSet<Node> usedParameterNodes;
+    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
 
 
     public GroupGraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
+            List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
+        this.usedParameterNodes = usedParameterNodes;
+        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -947,19 +850,21 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
             }
         }
 
-        TripleExpander tripleExpander = new TripleExpander(config, prologue, services, usedBlankNodes, messages);
 
-        for(ComplexTriple triple : repairExpandedProcedureCalls(triples))
+        TripleExpander tripleExpander = new TripleExpander(usedBlankNodes);
+
+        for(ComplexTriple triple : triples)
             tripleExpander.visit(triple);
 
-        return tripleExpander.getResults().stream();
+        return assembleProcedureCalls(tripleExpander.getResults()).stream();
     }
 
 
     @Override
     public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, usedBlankNodes, messages);
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, usedBlankNodes,
+                usedParameterNodes, usedResultNodes, messages);
 
         Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
 
@@ -969,115 +874,183 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     }
 
 
-    /**
-     * Quick (and dirty) fix to merge triplets representing a procedure call splitted by a remote endpoint.
-     *
-     * TODO: need to be addressed more generally
-     */
-    private List<ComplexTriple> repairExpandedProcedureCalls(List<ComplexTriple> patterns)
+
+    private List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
     {
         if(!services.empty())
             return patterns;
 
-        LinkedList<ComplexTriple> removed = new LinkedList<ComplexTriple>();
+
+        HashSet<Pattern> callPatterns = new HashSet<Pattern>();
+        HashMap<Node, List<Parameter>> parameterNodeMap = new HashMap<Node, List<Parameter>>();
+        HashMap<Node, List<Parameter>> resultNodeMap = new HashMap<Node, List<Parameter>>();
 
 
-        for(ComplexTriple triple : patterns)
+        for(Pattern pattern : patterns)
         {
-            if(removed.contains(triple))
-                continue;
+            Triple triple = (Triple) pattern;
+            Verb predicate = triple.getPredicate();
 
-            List<Property> properties = triple.getProperties();
-
-            if(properties.size() != 1)
-                continue;
-
-            Property property = properties.get(0);
-            Verb verb = property.getVerb();
-
-            if(!(verb instanceof IRI))
-                continue;
-
-            ProcedureDefinition callDefinition = config.getProcedures().get(((IRI) verb).getValue());
-
-            if(callDefinition == null)
-                continue;
-
-            List<ComplexNode> objects = property.getObjects();
-
-            if(objects.size() != 1)
-                continue;
-
-            ComplexNode object = objects.get(0);
-
-            if(!(object instanceof Variable) && !(object instanceof BlankNode))
-                continue;
-
-
-            /* procedure call object needs to be fixed */
-            BlankNodePropertyList objectBlanknode = new BlankNodePropertyList();
-            objectBlanknode.setRange(object.getRange());
-            property.getObjects().set(0, objectBlanknode);
-
-            for(ComplexTriple subPattern : patterns)
+            if(predicate instanceof IRI)
             {
-                if(subPattern == triple)
-                    continue;
+                IRI procedureName = (IRI) predicate;
+                ProcedureDefinition definition = config.getProcedures().get(procedureName.getValue());
 
-                if(!(subPattern instanceof ComplexTriple))
-                    continue;
-
-                ComplexTriple subTriple = subPattern;
-
-                ComplexNode subSubject = subTriple.getNode();
-
-                if(subSubject.equals(object))
+                if(definition != null)
                 {
-                    objectBlanknode.getProperties().addAll(subTriple.getProperties());
-                    removed.add(subPattern);
+                    callPatterns.add(triple);
+
+                    Node parameterNode = triple.getObject();
+
+                    if(parameterNode instanceof VariableOrBlankNode)
+                    {
+                        parameterNodeMap.put(parameterNode, new ArrayList<Parameter>());
+
+                        if(!usedParameterNodes.contains(parameterNode) && !usedResultNodes.contains(parameterNode))
+                            usedParameterNodes.add(parameterNode);
+                        else
+                            messages.add(new TranslateMessage(MessageType.reuseOfParameterNode,
+                                    parameterNode.getRange(), procedureName.toString(prologue)));
+                    }
+                    else
+                    {
+                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject,
+                                parameterNode.getRange(), procedureName.toString(prologue)));
+                    }
+
+
+                    if(!definition.isSimple())
+                    {
+                        Node resultNode = triple.getSubject();
+
+                        if(resultNode instanceof VariableOrBlankNode)
+                        {
+                            resultNodeMap.put(resultNode, new ArrayList<Parameter>());
+
+                            if(!usedParameterNodes.contains(resultNode) && !usedResultNodes.contains(resultNode))
+                                usedResultNodes.add(resultNode);
+                            else
+                                messages.add(new TranslateMessage(MessageType.reuseOfResultNode, resultNode.getRange(),
+                                        procedureName.toString(prologue)));
+                        }
+                        else
+                        {
+                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
+                                    resultNode.getRange(), procedureName.toString(prologue)));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                new ElementVisitor<Void>()
+                {
+                    @Override
+                    public Void visit(IRI iri)
+                    {
+                        //TODO: could be supported in a future version
+                        if(config.getProcedures().get(iri.getValue()) != null)
+                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
+                                    iri.getRange()));
+
+                        return null;
+                    }
+                }.visitElement(predicate);
+            }
+        }
+
+
+
+        List<Pattern> resultPatterns = new ArrayList<Pattern>(patterns);
+
+        Iterator<Pattern> iterator = resultPatterns.iterator();
+
+        while(iterator.hasNext())
+        {
+            Triple triple = (Triple) iterator.next();
+
+            if(callPatterns.contains(triple))
+                continue;
+
+
+            List<Parameter> parameters = parameterNodeMap.get(triple.getSubject());
+
+            if(parameters != null)
+            {
+                iterator.remove();
+
+                if(triple.getPredicate() instanceof IRI)
+                {
+                    IRI name = (IRI) triple.getPredicate();
+                    parameters.add(new Parameter(name, triple.getObject()));
+                }
+                else
+                {
+                    //TODO: could be supported in a future version
+                    messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
+                            triple.getPredicate().getRange()));
                 }
             }
 
 
-            if(callDefinition.isSimple())
-                continue;
+            List<Parameter> results = resultNodeMap.get(triple.getSubject());
 
-            ComplexNode subject = triple.getNode();
-
-            if(!(subject instanceof Variable) && !(subject instanceof BlankNode))
-                continue;
-
-
-            /* procedure call subject needs to be fixed */
-            BlankNodePropertyList subjectBlanknode = new BlankNodePropertyList();
-            subjectBlanknode.setRange(subject.getRange());
-            triple.setNode(subjectBlanknode);
-
-            for(ComplexTriple subPattern : patterns)
+            if(results != null)
             {
-                if(subPattern == triple)
-                    continue;
+                iterator.remove();
 
-                if(!(subPattern instanceof ComplexTriple))
-                    continue;
-
-                ComplexTriple subTriple = subPattern;
-
-                ComplexNode subSubject = subTriple.getNode();
-
-                if(subSubject.equals(subject))
+                if(triple.getPredicate() instanceof IRI)
                 {
-                    subjectBlanknode.getProperties().addAll(subTriple.getProperties());
-                    removed.add(subPattern);
+                    IRI name = (IRI) triple.getPredicate();
+                    results.add(new Parameter(name, triple.getObject()));
+                }
+                else
+                {
+                    //TODO: could be supported in a future version
+                    messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
+                            triple.getPredicate().getRange()));
                 }
             }
         }
 
 
-        patterns = new LinkedList<ComplexTriple>(patterns);
-        patterns.removeAll(removed);
+        ListIterator<Pattern> listIterator = resultPatterns.listIterator();
 
-        return patterns;
+        while(listIterator.hasNext())
+        {
+            Triple triple = (Triple) listIterator.next();
+
+            if(!callPatterns.contains(triple))
+                continue;
+
+            IRI name = (IRI) triple.getPredicate();
+            ProcedureDefinition definition = config.getProcedures().get(name.getValue());
+
+            List<Parameter> parameters = parameterNodeMap.get(triple.getObject());
+
+            if(parameters == null)
+                parameters = new ArrayList<Parameter>();
+
+
+            if(definition.isSimple())
+            {
+                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters);
+                listIterator.set(call);
+            }
+            else
+            {
+                List<Parameter> results = resultNodeMap.get(triple.getSubject());
+
+                if(results == null)
+                    results = new ArrayList<Parameter>();
+
+                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters);
+                listIterator.set(call);
+            }
+        }
+
+
+        return resultPatterns;
     }
 }
 
@@ -1092,13 +1065,16 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
 
     public PatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
+            List<TranslateMessage> messages)
     {
         this.prologue = prologue;
         this.services = services;
         this.messages = messages;
-        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages);
-        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages);
+        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, usedBlankNodes,
+                usedParameterNodes, usedResultNodes, messages);
+        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                usedResultNodes, messages);
     }
 
 

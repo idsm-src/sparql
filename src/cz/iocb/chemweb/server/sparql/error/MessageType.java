@@ -13,37 +13,27 @@ public enum MessageType
 
     unknownPrefix(ERROR, "Could not resolve the prefix: '%s'"),
 
-    invalidProcedureCallObject(ERROR, "The procedure '%s' requires abbreviated blank node syntax for its parameters."),
+    invalidProcedureCallObject(ERROR, "The procedure '%s' requires blank node syntax for its parameters."),
 
-    invalidMultiProcedureCallSubject(
-            ERROR,
-            "The procedure '%s' requires an abbreviated blank node syntax as its result."),
-
-    invalidMultiProcedureCallPredicateCombinaion(
-            ERROR,
-            "Cannot combine procedure call with multiple return values with other predicates."),
-
-    invalidProcedureCallSubject(
-            ERROR,
-            "The procedure '%s' requires a node or an abbreviated blank node syntax as its result."),
+    invalidMultiProcedureCallSubject(ERROR, "The procedure '%s' requires an blank node syntax as its result."),
 
     invalidProcedureCallPropertyPathCombinaion(ERROR, "Cannot combine procedure call with property paths."),
 
     invalidProcedureParameterValue(ERROR, "Procedure parameter value name has to be an IRI."),
 
-    invalidProcedureParameterValueNumber(ERROR, "Procedure parameter value can have only one value."),
-
     invalidProcedureResultValue(ERROR, "Procedure return value name has to be an IRI."),
 
-    invalidProcedureResultValueNumber(ERROR, "Procedure return value can have only one value."),
+    reuseOfParameterNode(ERROR, "Parameter node of the procedure '%s' is already used."),
+
+    reuseOfResultNode(ERROR, "Result node of the procedure '%s' is already used."),
+
+    invalidUseOfParameterNode(ERROR, "Node is already used as a procedure parameter node."),
+
+    invalidUseOfResultNode(ERROR, "Node is already used as a procedure result node."),
 
     invalidBaseIri(ERROR, "Base IRI must be absolute."),
 
     malformedIri(ERROR, "IRI is malformed."),
-
-
-
-
 
     unimplementedFunction(ERROR, "Function '%s' is not implemented."),
 
