@@ -241,9 +241,9 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
         HashSet<String> result = new HashSet<String>();
         builder.append(" bind (");
 
-        result.addAll(visitElement(bind.getVariable()));
-        builder.append(" as ");
         visitElement(bind.getExpression());
+        builder.append(" as ");
+        result.addAll(visitElement(bind.getVariable()));
 
         builder.append(")");
 
