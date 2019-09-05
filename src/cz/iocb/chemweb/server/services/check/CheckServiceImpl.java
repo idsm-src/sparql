@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.services.check;
 
-import java.util.List;
+import java.sql.SQLException;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -53,35 +53,31 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
     public CheckResult check(String code) throws DatabaseException
     {
         CheckResult result = new CheckResult();
-        List<TranslateMessage> messages = null;
 
         try(Request request = engine.getRequest())
         {
-            messages = request.check(code);
+            for(TranslateMessage message : request.check(code))
+            {
+                try
+                {
+                    result.warnings.add(new CheckerWarning(message.getRange().getStart().getLineNumber() - 1,
+                            message.getRange().getStart().getPositionInLine(),
+                            message.getRange().getEnd().getLineNumber() - 1,
+                            message.getRange().getEnd().getPositionInLine() + 1, message.getCategory().getText(),
+                            message.getMessage()));
+                }
+                catch(Throwable e)
+                {
+                    System.err.println("CheckService: log begin");
+                    System.err.println(code);
+                    e.printStackTrace(System.err);
+                    System.err.println("CheckService: log end");
+                }
+            }
         }
-        catch(Throwable e)
+        catch(SQLException e)
         {
-            System.err.println("CheckService: log begin");
-            System.err.println(code);
-            e.printStackTrace(System.err);
-            System.err.println("CheckService: log end");
-        }
-
-        try
-        {
-            for(TranslateMessage message : messages)
-                result.warnings.add(new CheckerWarning(message.getRange().getStart().getLineNumber() - 1,
-                        message.getRange().getStart().getPositionInLine(),
-                        message.getRange().getEnd().getLineNumber() - 1,
-                        message.getRange().getEnd().getPositionInLine() + 1, message.getCategory().getText(),
-                        message.getMessage()));
-        }
-        catch(Throwable e)
-        {
-            System.err.println("CheckService: log begin");
-            System.err.println(code);
-            e.printStackTrace(System.err);
-            System.err.println("CheckService: log end");
+            throw new DatabaseException(e);
         }
 
         return result;

@@ -43,28 +43,41 @@ public class Request implements AutoCloseable
     }
 
 
-    public List<TranslateMessage> check(String query, List<DataSet> dataSets, int timeout)
-            throws TranslateExceptions, SQLException
+    public List<TranslateMessage> check(String query, List<DataSet> dataSets, int timeout) throws SQLException
     {
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
-        Parser parser = new Parser(messages);
-        ParserRuleContext context = parser.parse(query);
+        try
+        {
+            Parser parser = new Parser(messages);
+            ParserRuleContext context = parser.parse(query);
 
-        QueryVisitor queryVisitor = new QueryVisitor(config, messages);
-        SelectQuery syntaxTree = (SelectQuery) queryVisitor.visit(context);
+            QueryVisitor queryVisitor = new QueryVisitor(config, messages);
+            SelectQuery syntaxTree = (SelectQuery) queryVisitor.visit(context);
 
-        if(dataSets != null && !dataSets.isEmpty())
-            syntaxTree.getSelect().setDataSets(dataSets);
+            if(dataSets != null && !dataSets.isEmpty())
+                syntaxTree.getSelect().setDataSets(dataSets);
 
-        TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
-        translateVisitor.translate(syntaxTree);
+            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
+            translateVisitor.translate(syntaxTree);
+        }
+        catch(SQLException e)
+        {
+            throw e;
+        }
+        catch(Throwable e)
+        {
+            System.err.println("RequestCheck: log begin");
+            System.err.println(query);
+            e.printStackTrace(System.err);
+            System.err.println("RequestCheck: log end");
+        }
 
         return messages;
     }
 
 
-    public List<TranslateMessage> check(String query) throws TranslateExceptions, SQLException
+    public List<TranslateMessage> check(String query) throws SQLException
     {
         return check(query, null, 0);
     }
