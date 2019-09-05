@@ -47,6 +47,7 @@ public class SqlProcedureCall extends SqlIntercode
             SqlIntercode context, Request request, HashSet<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
+        HashSet<String> parameterVariables = new HashSet<String>();
         boolean hasSolution = true;
         boolean useContext = false;
 
@@ -62,6 +63,7 @@ public class SqlProcedureCall extends SqlIntercode
 
                 String name = ((VariableOrBlankNode) node).getName();
                 UsedVariable usedVariable = callVariables.get(name);
+                parameterVariables.add(name);
 
                 if(usedVariable == null)
                 {
@@ -158,13 +160,14 @@ public class SqlProcedureCall extends SqlIntercode
                 }
                 else if(pairedClass.getRightClass() == null)
                 {
-                    if(rightVariable != null && !rightVariable.canBeNull())
+                    if(parameterVariables.contains(leftVariable.getName())
+                            || rightVariable != null && !rightVariable.canBeNull())
                         continue;
 
                     variable.addClass(pairedClass.getLeftClass());
                 }
                 else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass()
-                        && !rightVariable.canBeNull())
+                        && (!rightVariable.canBeNull() || parameterVariables.contains(leftVariable.getName())))
                 {
                     variable.addClass(pairedClass.getRightClass());
                 }
