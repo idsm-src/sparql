@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -199,10 +199,10 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
-        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
         simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
-        simsearch.addResult(new ResultDefinition(sachem + "score", xsdFloat, "score"));
+        simsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
@@ -213,7 +213,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
         simcmpsearch
-                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);

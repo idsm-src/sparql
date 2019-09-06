@@ -425,7 +425,7 @@ public class SearchQueryWizardDialog extends DialogBox
             {
                 query.append(";\n      sachem:cutoff \"");
                 query.append(threshold);
-                query.append("\"^^xsd:float");
+                query.append("\"^^xsd:double");
             }
 
             query.append(" ].\n");
