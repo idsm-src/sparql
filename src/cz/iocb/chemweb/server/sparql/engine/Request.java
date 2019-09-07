@@ -9,7 +9,6 @@ import java.sql.Statement;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.net.ssl.SSLContext;
 import org.antlr.v4.runtime.ParserRuleContext;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.error.MessageCategory;
@@ -26,7 +25,6 @@ import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 public class Request implements AutoCloseable
 {
     private final SparqlDatabaseConfiguration config;
-    private final SSLContext sslContext;
 
     private Connection connection;
     private Statement statement;
@@ -36,10 +34,9 @@ public class Request implements AutoCloseable
     private boolean canceled;
 
 
-    Request(SparqlDatabaseConfiguration config, SSLContext sslContext)
+    Request(SparqlDatabaseConfiguration config)
     {
         this.config = config;
-        this.sslContext = sslContext;
     }
 
 
@@ -279,11 +276,5 @@ public class Request implements AutoCloseable
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
-    }
-
-
-    public SSLContext getSslContext()
-    {
-        return sslContext;
     }
 }

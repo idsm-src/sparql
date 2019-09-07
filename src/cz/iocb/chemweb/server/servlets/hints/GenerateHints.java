@@ -147,7 +147,7 @@ public class GenerateHints extends HttpServlet
         PrintWriter out = new PrintWriter(stringWriter);
 
         LinkedHashMap<String, ArrayList<Item>> hints = new LinkedHashMap<String, ArrayList<Item>>();
-        Engine engine = new Engine(sparqlConfig, null);
+        Engine engine = new Engine(sparqlConfig);
 
         try(Request request = engine.getRequest())
         {

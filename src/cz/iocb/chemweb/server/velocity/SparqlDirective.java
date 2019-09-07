@@ -52,7 +52,7 @@ public class SparqlDirective extends Directive
         log = rs.getLog();
 
         SparqlDatabaseConfiguration dbConfig = (SparqlDatabaseConfiguration) rs.getApplicationAttribute(SPARQL_CONFIG);
-        engine = new Engine(dbConfig, null);
+        engine = new Engine(dbConfig);
     }
 
 

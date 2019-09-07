@@ -38,7 +38,7 @@ public class CheckServiceImpl extends RemoteServiceServlet implements CheckServi
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
 
-            engine = new Engine(sparqlConfig, null);
+            engine = new Engine(sparqlConfig);
         }
         catch(NamingException e)
         {

@@ -2,21 +2,12 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -62,32 +53,12 @@ public class EndpointServlet extends HttpServlet
 
         try
         {
-            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            keyStore.load(config.getServletContext().getResourceAsStream("cacerts"), "changeit".toCharArray());
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(keyStore);
-
-            X509TrustManager trustManager = null;
-
-            for(TrustManager tm : tmf.getTrustManagers())
-                if(tm instanceof X509TrustManager)
-                    trustManager = (X509TrustManager) tm;
-
-            if(trustManager == null)
-                throw new NoSuchAlgorithmException("No X509TrustManager in TrustManagerFactory");
-
-            SSLContext sslContext = SSLContext.getInstance("SSL");
-            sslContext.init(null, new TrustManager[] { trustManager }, null);
-
-
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
 
-            engine = new Engine(sparqlConfig, sslContext);
+            engine = new Engine(sparqlConfig);
         }
-        catch(NamingException | KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException
-                | KeyManagementException e)
+        catch(NamingException e)
         {
             throw new ServletException(e);
         }

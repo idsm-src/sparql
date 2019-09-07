@@ -20,8 +20,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -133,7 +131,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final DatabaseSchema schema;
     private final LinkedHashMap<String, ProcedureDefinition> procedures;
     private final Request request;
-    private final SSLContext sslContext;
     private final boolean evalSeriveces;
 
     private List<DataSet> datasets;
@@ -147,7 +144,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         this.schema = configuration.getSchema();
         this.procedures = configuration.getProcedures();
         this.request = request;
-        this.sslContext = request.getSslContext();
         this.messages = messages;
         this.evalSeriveces = evalSeriveces;
     }
@@ -1280,10 +1276,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
                 {
                     connection = (HttpURLConnection) new URL(url).openConnection();
-
-                    if(connection instanceof HttpsURLConnection && sslContext != null)
-                        ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
-
                     connection.setRequestMethod("POST");
                     connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
                     connection.setRequestProperty("accept", "application/sparql-results+xml");
