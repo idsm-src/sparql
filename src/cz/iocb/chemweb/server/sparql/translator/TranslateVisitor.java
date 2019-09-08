@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -35,6 +36,7 @@ import cz.iocb.chemweb.server.sparql.engine.RdfNode;
 import cz.iocb.chemweb.server.sparql.engine.ReferenceNode;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.engine.Result;
+import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
@@ -53,6 +55,7 @@ import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
+import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -60,6 +63,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
+import cz.iocb.chemweb.server.sparql.parser.model.Query;
 import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
@@ -109,6 +113,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
@@ -157,6 +162,24 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlIntercode translatedSelect = visitElement(selectQuery.getSelect());
         return new SqlQuery(selectQuery.getSelect().getVariablesInScope(), translatedSelect);
+    }
+
+
+    @Override
+    public SqlIntercode visit(AskQuery askQuery)
+    {
+        prologue = askQuery.getPrologue();
+        datasets = askQuery.getSelect().getDataSets();
+
+        LinkedHashSet<String> variablesInScope = new LinkedHashSet<String>();
+        variablesInScope.add("ask");
+
+        SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
+        VariableAccessor variableAccessor = new SimpleVariableAccessor(new UsedVariables());
+        SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, variableAccessor);
+        SqlIntercode bind = SqlBind.bind("ask", expression, SqlEmptySolution.get(), new HashSet<String>());
+
+        return new SqlQuery(variablesInScope, bind);
     }
 
 
@@ -1153,7 +1176,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             String code = query.optimize(request).translate();
 
-            try(Result result = new Result(request.getStatement().executeQuery(code)))
+            try(Result result = new Result(ResultType.SELECT, request.getStatement().executeQuery(code)))
             {
                 varIndexes = result.getVariableIndexes();
 
@@ -1496,7 +1519,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public String translate(SelectQuery sparqlQuery) throws SQLException
+    public String translate(Query sparqlQuery) throws SQLException
     {
         try
         {

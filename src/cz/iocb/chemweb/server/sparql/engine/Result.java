@@ -30,6 +30,12 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 
 public class Result implements AutoCloseable
 {
+    static public enum ResultType
+    {
+        SELECT, ASK
+    }
+
+
     private static final DecimalFormat decimalFormat;
     private static final long USECS_PER_DAY = 86400000000l;
     private static final long USECS_PER_HOUR = 3600000000l;
@@ -38,6 +44,7 @@ public class Result implements AutoCloseable
     private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
             'E', 'F' };
 
+    private final ResultType type;
     private final HashMap<String, Integer> varNames = new HashMap<String, Integer>();
     private final HashMap<String, Integer> columnNames = new HashMap<String, Integer>();
     private final Vector<String> heads = new Vector<String>();
@@ -57,8 +64,9 @@ public class Result implements AutoCloseable
     }
 
 
-    public Result(ResultSet rs) throws SQLException
+    public Result(ResultType type, ResultSet rs) throws SQLException
     {
+        this.type = type;
         this.rs = rs;
         this.metadata = rs.getMetaData();
 
@@ -190,6 +198,12 @@ public class Result implements AutoCloseable
         }
 
         return true;
+    }
+
+
+    public ResultType getResultType()
+    {
+        return type;
     }
 
 

@@ -5,11 +5,11 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
 
 /**
- * The full SELECT query
+ * The full ASK query
  */
-public class SelectQuery extends Query
+public class AskQuery extends Query
 {
-    public SelectQuery(Prologue prologue, Select select)
+    public AskQuery(Prologue prologue, Select select)
     {
         super(prologue, select);
     }

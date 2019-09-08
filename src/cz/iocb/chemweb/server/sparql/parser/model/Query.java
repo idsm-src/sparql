@@ -10,10 +10,12 @@ import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 public abstract class Query extends BaseElement
 {
     private Prologue prologue;
+    private Select select;
 
-    public Query(Prologue prologue)
+    public Query(Prologue prologue, Select select)
     {
         this.prologue = prologue;
+        this.select = select;
     }
 
     public Prologue getPrologue()
@@ -27,5 +29,15 @@ public abstract class Query extends BaseElement
             throw new IllegalArgumentException();
 
         this.prologue = prologue;
+    }
+
+    public Select getSelect()
+    {
+        return select;
+    }
+
+    public void setSelect(Select select)
+    {
+        this.select = select;
     }
 }

@@ -15,12 +15,13 @@ import java.util.ListIterator;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
-import cz.iocb.chemweb.server.sparql.grammar.SparqlParser;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.AggregateContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodeContext;
@@ -66,6 +67,7 @@ import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
+import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -172,51 +174,68 @@ public class QueryVisitor extends BaseVisitor<Query>
             prologue = new Prologue(config.getPrefixes());
         }
 
+
+        Query result = null;
+
         if(ctx.selectQuery() != null)
         {
             Select select = withRange(parseSelect(ctx.selectQuery().selectClause(), ctx.selectQuery().datasetClause(),
                     ctx.selectQuery().whereClause(), ctx.selectQuery().solutionModifier(), ctx.valuesClause(), false),
                     ctx);
 
-            SelectQuery result = new SelectQuery(prologue, select);
-            result.setPrologue(prologue);
+            result = new SelectQuery(prologue, select);
+        }
+        else if(ctx.askQuery() != null)
+        {
+            GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes,
+                    usedParameterNodes, usedResultNodes, messages).visit(ctx.askQuery().whereClause());
+            Values values = parseValues(ctx.valuesClause());
 
+            Select select = withRange(new Select(new LinkedList<Projection>(), pattern, values, true), ctx);
+            select.setReduced(true);
 
-            //TODO: the check could be less strict in a future version
-            new ElementVisitor<Void>()
-            {
-                @Override
-                public Void visit(Variable variable)
-                {
-                    if(usedParameterNodes.contains(variable))
-                        messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, variable.getRange()));
+            if(ctx.askQuery().datasetClause() != null)
+                select.getDataSets().addAll(mapList(ctx.askQuery().datasetClause(), this::parseDataSet));
 
-                    if(usedResultNodes.contains(variable))
-                        messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, variable.getRange()));
+            select.getGroupByConditions().addAll(parseGroupClause(ctx.askQuery().groupClause()));
+            select.getHavingConditions().addAll(parseHavingClause(ctx.askQuery().havingClause()));
+            select.setIsInAggregateMode(isInAggregateMode(ctx.askQuery().groupClause(), ctx.askQuery().havingClause()));
 
-                    return defaultResult();
-                }
-
-                @Override
-                public Void visit(BlankNode blankNode)
-                {
-                    if(usedParameterNodes.contains(blankNode))
-                        messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, blankNode.getRange()));
-
-                    if(usedResultNodes.contains(blankNode))
-                        messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, blankNode.getRange()));
-
-                    return defaultResult();
-                }
-            }.visit(result);
-
-
-            prologue = null;
-            return result;
+            result = new AskQuery(prologue, select);
         }
 
+
+        //TODO: the check could be less strict in a future version
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(Variable variable)
+            {
+                if(usedParameterNodes.contains(variable))
+                    messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, variable.getRange()));
+
+                if(usedResultNodes.contains(variable))
+                    messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, variable.getRange()));
+
+                return defaultResult();
+            }
+
+            @Override
+            public Void visit(BlankNode blankNode)
+            {
+                if(usedParameterNodes.contains(blankNode))
+                    messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, blankNode.getRange()));
+
+                if(usedResultNodes.contains(blankNode))
+                    messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, blankNode.getRange()));
+
+                return defaultResult();
+            }
+        }.visitElement(result);
+
+
         prologue = null;
-        return null;
+        return result;
     }
 
 
@@ -237,7 +256,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
-    public boolean isInAggregateMode(SelectClauseContext selectClauseCtx, SolutionModifierContext solutionModifierCtx)
+    public boolean isInAggregateMode(ParserRuleContext... contexts)
     {
         BaseVisitor<Boolean> visitor = new BaseVisitor<Boolean>()
         {
@@ -253,7 +272,9 @@ public class QueryVisitor extends BaseVisitor<Query>
                 if(tree == null)
                     return false;
 
-                return super.visit(tree);
+                Boolean result = super.visit(tree);
+
+                return result != null && result;
             }
 
             @Override
@@ -269,25 +290,22 @@ public class QueryVisitor extends BaseVisitor<Query>
             }
 
             @Override
-            public Boolean visitAggregate(SparqlParser.AggregateContext ctx)
+            public Boolean visitAggregate(AggregateContext ctx)
+            {
+                return true;
+            }
+
+            @Override
+            public Boolean visitGroupClause(GroupClauseContext ctx)
             {
                 return true;
             }
         };
 
 
-        if(solutionModifierCtx.groupClause() != null)
-            return true;
-
-        for(SelectVariableContext select : selectClauseCtx.selectVariable())
-            if(visitor.visit(select))
+        for(ParserRuleContext ctx : contexts)
+            if(visitor.visit(ctx))
                 return true;
-
-        if(visitor.visit(solutionModifierCtx.orderClause()))
-            return true;
-
-        if(visitor.visit(solutionModifierCtx.havingClause()))
-            return true;
 
         return false;
     }

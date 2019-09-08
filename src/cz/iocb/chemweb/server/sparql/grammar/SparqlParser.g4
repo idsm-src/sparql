@@ -72,7 +72,7 @@ describeQuery
     ;
 
 askQuery
-    : ASK datasetClause* whereClause solutionModifier
+    : ASK datasetClause* whereClause groupClause? havingClause?
     ;
 
 datasetClause

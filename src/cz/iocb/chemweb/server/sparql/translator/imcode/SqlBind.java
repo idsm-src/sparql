@@ -274,9 +274,12 @@ public class SqlBind extends SqlIntercode
             }
         }
 
-        builder.append(" FROM (");
-        builder.append(context.translate());
-        builder.append(" ) AS tab");
+        if(context != SqlEmptySolution.get())
+        {
+            builder.append(" FROM (");
+            builder.append(context.translate());
+            builder.append(" ) AS tab");
+        }
 
         if(useTwoPhases)
             builder.append(" ) AS tab");

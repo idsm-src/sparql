@@ -152,22 +152,49 @@ public class EndpointServlet extends HttpServlet
             {
                 try(Result result = request.execute(query, dataSets))
                 {
-                    switch(detectOutputType(req))
+                    switch(result.getResultType())
                     {
-                        case JSON:
-                            writeJson(res, result, includeWarnings);
+                        case ASK:
+                            switch(detectOutputType(req))
+                            {
+                                case JSON:
+                                    writeAskJson(res, result, includeWarnings);
+                                    break;
+                                case XML:
+                                    writeAskXml(res, result, includeWarnings);
+                                    break;
+                                case TSV:
+                                    // non-standard extension
+                                    writeAskTsv(res, result);
+                                    break;
+                                case CSV:
+                                    // non-standard extension
+                                    writeAskCsv(res, result);
+                                    break;
+                                default:
+                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                            }
                             break;
-                        case XML:
-                            writeXml(res, result, includeWarnings);
+
+                        case SELECT:
+                            switch(detectOutputType(req))
+                            {
+                                case JSON:
+                                    writeSelectJson(res, result, includeWarnings);
+                                    break;
+                                case XML:
+                                    writeSelectXml(res, result, includeWarnings);
+                                    break;
+                                case TSV:
+                                    writeSelectTsv(res, result);
+                                    break;
+                                case CSV:
+                                    writeSelectCsv(res, result);
+                                    break;
+                                default:
+                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                            }
                             break;
-                        case TSV:
-                            writeTsv(res, result);
-                            break;
-                        case CSV:
-                            writeCsv(res, result);
-                            break;
-                        default:
-                            res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
                     }
                 }
             }
@@ -255,7 +282,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeXml(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeSelectXml(HttpServletResponse res, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
         res.setHeader("content-type", "application/sparql-results+xml");
@@ -356,7 +383,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeJson(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeSelectJson(HttpServletResponse res, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
         res.setHeader("content-type", "application/sparql-results+json");
@@ -479,7 +506,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeSelectTsv(HttpServletResponse res, Result result) throws IOException, SQLException
     {
         res.setHeader("content-type", "text/tab-separated-values");
         res.setCharacterEncoding("UTF-8");
@@ -554,7 +581,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeCsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeSelectCsv(HttpServletResponse res, Result result) throws IOException, SQLException
     {
         res.setHeader("content-type", "text/csv");
         res.setCharacterEncoding("UTF-8");
@@ -596,6 +623,65 @@ public class EndpointServlet extends HttpServlet
 
             out.print("\r\n");
         }
+    }
+
+
+    private static void writeAskXml(HttpServletResponse res, Result result, boolean includeWarnings)
+            throws IOException, SQLException
+    {
+        res.setHeader("content-type", "application/sparql-results+xml");
+        res.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = res.getWriter();
+        result.next();
+
+        out.println("<?xml version=\"1.0\"?>");
+        out.println("<sparql xmlns=\"http://www.w3.org/2005/sparql-results#\">");
+        out.println("\t<head></head>");
+        out.println("\t<boolean>" + result.get(0).getValue() + "</boolean>");
+        out.println("</sparql>");
+    }
+
+
+    private static void writeAskJson(HttpServletResponse res, Result result, boolean includeWarnings)
+            throws IOException, SQLException
+    {
+        res.setHeader("content-type", "application/sparql-results+json");
+        res.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = res.getWriter();
+        result.next();
+
+        out.println("{");
+        out.println("\t\"head\": { },");
+        out.println("\t\"boolean\": " + result.get(0).getValue());
+        out.println("}");
+    }
+
+
+    private static void writeAskTsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    {
+        res.setHeader("content-type", "text/tab-separated-values");
+        res.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = res.getWriter();
+        result.next();
+
+        out.println("\"bool\"");
+        out.println(result.get(0).getValue());
+    }
+
+
+    private static void writeAskCsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    {
+        res.setHeader("content-type", "text/csv");
+        res.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = res.getWriter();
+        result.next();
+
+        out.println("\"bool\"");
+        out.println(result.get(0).getValue());
     }
 
 

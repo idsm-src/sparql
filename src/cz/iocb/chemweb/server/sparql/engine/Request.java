@@ -11,11 +11,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ParserRuleContext;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.error.MessageCategory;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
+import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.Query;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
@@ -50,7 +53,7 @@ public class Request implements AutoCloseable
             ParserRuleContext context = parser.parse(query);
 
             QueryVisitor queryVisitor = new QueryVisitor(config, messages);
-            SelectQuery syntaxTree = (SelectQuery) queryVisitor.visit(context);
+            Query syntaxTree = queryVisitor.visit(context);
 
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
@@ -91,7 +94,7 @@ public class Request implements AutoCloseable
         checkForErrors(messages);
 
         QueryVisitor queryVisitor = new QueryVisitor(config, messages);
-        SelectQuery syntaxTree = (SelectQuery) queryVisitor.visit(context);
+        Query syntaxTree = queryVisitor.visit(context);
 
         checkForErrors(messages);
 
@@ -134,11 +137,19 @@ public class Request implements AutoCloseable
 
         checkForErrors(messages);
 
+
+        ResultType type = null;
+
+        if(syntaxTree instanceof SelectQuery)
+            type = ResultType.SELECT;
+        else if(syntaxTree instanceof AskQuery)
+            type = ResultType.ASK;
+
         Statement statement = getStatement();
 
         try
         {
-            return new Result(statement.executeQuery(code));
+            return new Result(type, statement.executeQuery(code));
         }
         catch(Throwable e)
         {
