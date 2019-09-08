@@ -15,11 +15,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.engine.BlankNode;
+import cz.iocb.chemweb.server.sparql.engine.BNode;
 import cz.iocb.chemweb.server.sparql.engine.Engine;
 import cz.iocb.chemweb.server.sparql.engine.IriNode;
 import cz.iocb.chemweb.server.sparql.engine.LanguageTaggedLiteral;
-import cz.iocb.chemweb.server.sparql.engine.Literal;
+import cz.iocb.chemweb.server.sparql.engine.LiteralNode;
 import cz.iocb.chemweb.server.sparql.engine.RdfNode;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.engine.Result;
@@ -195,6 +195,20 @@ public class EndpointServlet extends HttpServlet
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
                             }
                             break;
+
+                        case CONSTRUCT:
+                            switch(detectOutputType(req))
+                            {
+                                case TSV:
+                                    writeSelectTsv(res, result);
+                                    break;
+                                case CSV:
+                                    writeSelectCsv(res, result);
+                                    break;
+                                default:
+                                    res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                            }
+                            break;
                     }
                 }
             }
@@ -344,13 +358,13 @@ public class EndpointServlet extends HttpServlet
                     writeXmlValue(out, node.getValue());
                     out.print("</literal>");
                 }
-                else if(node instanceof Literal)
+                else if(node instanceof LiteralNode)
                 {
                     out.print("<literal>");
                     writeXmlValue(out, node.getValue());
                     out.print("</literal>");
                 }
-                else if(node instanceof BlankNode)
+                else if(node instanceof BNode)
                 {
                     out.print("<bnode>");
                     writeXmlValue(out, node.getValue());
@@ -445,7 +459,7 @@ public class EndpointServlet extends HttpServlet
 
                 if(node instanceof IriNode)
                     out.println("\"uri\",");
-                else if(node instanceof Literal)
+                else if(node instanceof LiteralNode)
                     out.println("\"literal\",");
                 else
                     out.println("\"bnode\",");
@@ -563,13 +577,13 @@ public class EndpointServlet extends HttpServlet
                     writeTsvIriValue(out, ((TypedLiteral) node).getDatatype().getValue());
                     out.print('>');
                 }
-                else if(node instanceof Literal)
+                else if(node instanceof LiteralNode)
                 {
                     out.print('"');
                     writeTsvLiteralValue(out, node.getValue());
                     out.print('"');
                 }
-                else if(node instanceof BlankNode)
+                else if(node instanceof BNode)
                 {
                     out.print("_:");
                     writeTsvValue(out, node.getValue());

@@ -4,7 +4,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
 
 
-public class TypedLiteral extends Literal
+public class TypedLiteral extends LiteralNode
 {
     private final String datatype;
 

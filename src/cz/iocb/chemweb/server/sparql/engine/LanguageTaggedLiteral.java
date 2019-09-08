@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.engine;
 
 
 
-public class LanguageTaggedLiteral extends Literal
+public class LanguageTaggedLiteral extends LiteralNode
 {
     private final String language;
 

@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.engine;
 
 
 
-public class Literal extends RdfNode
+public class LiteralNode extends RdfNode
 {
-    public Literal(String value)
+    public LiteralNode(String value)
     {
         super(value);
     }
@@ -31,9 +31,9 @@ public class Literal extends RdfNode
         if(this == obj)
             return true;
 
-        if(obj == null || !(obj instanceof Literal))
+        if(obj == null || !(obj instanceof LiteralNode))
             return false;
 
-        return value.equals(((Literal) obj).value);
+        return value.equals(((LiteralNode) obj).value);
     }
 }

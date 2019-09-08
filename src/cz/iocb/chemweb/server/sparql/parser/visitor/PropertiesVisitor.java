@@ -67,6 +67,9 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
     private List<ComplexNode> parseNodes(ObjectListContext ctx)
     {
+        if(ctx == null)
+            return new LinkedList<ComplexNode>();
+
         NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
 
         return mapList(ctx.object(), nodeVisitor::visit);

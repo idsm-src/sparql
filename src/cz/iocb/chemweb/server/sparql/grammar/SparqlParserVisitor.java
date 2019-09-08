@@ -443,12 +443,6 @@ public interface SparqlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitConstructTemplate(SparqlParser.ConstructTemplateContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link SparqlParser#constructTriples}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitConstructTriples(SparqlParser.ConstructTriplesContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link SparqlParser#triplesSameSubject}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

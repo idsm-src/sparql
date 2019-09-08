@@ -64,7 +64,7 @@ selectVariable
     ;
 
 constructQuery
-    : CONSTRUCT (constructTemplate datasetClause* whereClause solutionModifier | datasetClause* WHERE '{' triplesTemplate? '}' solutionModifier)
+    : CONSTRUCT (constructTemplate datasetClause* whereClause solutionModifier | datasetClause* WHERE constructTemplate solutionModifier)
     ;
 
 describeQuery
@@ -318,11 +318,7 @@ expressionList
     ;
 
 constructTemplate
-    : '{' constructTriples? '}'
-    ;
-
-constructTriples
-    : triplesSameSubject ('.' constructTriples?)*
+    : '{' triplesTemplate? '}'
     ;
 
 triplesSameSubject

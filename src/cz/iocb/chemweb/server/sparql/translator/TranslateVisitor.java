@@ -37,6 +37,7 @@ import cz.iocb.chemweb.server.sparql.engine.ReferenceNode;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.engine.Result;
 import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
+import cz.iocb.chemweb.server.sparql.engine.SelectResult;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
@@ -56,6 +57,7 @@ import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
+import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -180,6 +182,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode bind = SqlBind.bind("ask", expression, SqlEmptySolution.get(), new HashSet<String>());
 
         return new SqlQuery(variablesInScope, bind);
+    }
+
+
+    @Override
+    public SqlIntercode visit(ConstructQuery constructQuery)
+    {
+        prologue = constructQuery.getPrologue();
+        datasets = constructQuery.getSelect().getDataSets();
+
+        SqlIntercode translatedSelect = visitElement(constructQuery.getSelect());
+        return new SqlQuery(constructQuery.getSelect().getVariablesInScope(), translatedSelect);
     }
 
 
@@ -1176,7 +1189,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             String code = query.optimize(request).translate();
 
-            try(Result result = new Result(ResultType.SELECT, request.getStatement().executeQuery(code)))
+            try(Result result = new SelectResult(ResultType.SELECT, request.getStatement().executeQuery(code)))
             {
                 varIndexes = result.getVariableIndexes();
 

@@ -57,6 +57,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ServiceGraphPatternCon
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SolutionModifierContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.SubSelectContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesBlockContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
@@ -68,6 +69,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
+import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -203,11 +205,99 @@ public class QueryVisitor extends BaseVisitor<Query>
 
             result = new AskQuery(prologue, select);
         }
+        else if(ctx.constructQuery() != null)
+        {
+            PropertiesVisitor propertiesVisitor = new PropertiesVisitor(prologue, messages);
+            NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
+            TripleExpander expander = new TripleExpander(usedBlankNodes);
+
+            if(ctx.constructQuery().constructTemplate().triplesTemplate() != null)
+            {
+                for(TriplesSameSubjectContext triplesCtx : ctx.constructQuery().constructTemplate().triplesTemplate()
+                        .triplesSameSubject())
+                {
+                    if(triplesCtx.varOrTerm() != null)
+                    {
+                        ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
+                        Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListNotEmpty());
+                        expander.visit(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                    }
+                    else
+                    {
+                        ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNode());
+                        Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyList());
+                        expander.visit(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                    }
+                }
+            }
+
+            List<Pattern> templates = expander.getResults();
+
+
+            LinkedList<Projection> projections = new LinkedList<Projection>();
+
+            BaseVisitor<Void> variableVisitor = new BaseVisitor<Void>()
+            {
+                HashSet<String> variables = new HashSet<String>();
+
+                @Override
+                public Void visitVar(VarContext ctx)
+                {
+                    String variable = ctx.getText().substring(1);
+
+                    if(!variables.contains(variable))
+                    {
+                        variables.add(variable);
+                        projections.add(new Projection(new Variable(variable)));
+                    }
+
+                    return null;
+                }
+            };
+
+            variableVisitor.visit(ctx.constructQuery().constructTemplate());
+
+
+            GraphPattern pattern = ctx.constructQuery().whereClause() != null ?
+                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                            usedResultNodes, messages).visit(ctx.constructQuery().whereClause()) :
+                    withRange(
+                            new GroupGraph(new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes,
+                                    usedParameterNodes, usedResultNodes, messages).assembleProcedureCalls(templates)),
+                            ctx.constructQuery().constructTemplate());
+
+            Values values = parseValues(ctx.valuesClause());
+
+            Select select = withRange(new Select(projections, pattern, values, true), ctx);
+            select.setReduced(true);
+
+            if(ctx.constructQuery().datasetClause() != null)
+                select.getDataSets().addAll(mapList(ctx.constructQuery().datasetClause(), this::parseDataSet));
+
+            SolutionModifierContext solutionModifierCtx = ctx.constructQuery().solutionModifier();
+
+            select.getGroupByConditions().addAll(parseGroupClause(solutionModifierCtx.groupClause()));
+            select.getHavingConditions().addAll(parseHavingClause(solutionModifierCtx.havingClause()));
+            select.getOrderByConditions().addAll(parseOrderClause(solutionModifierCtx.orderClause()));
+            select.setLimit(parseLimitClause(solutionModifierCtx.limitOffsetClauses()));
+            select.setOffset(parseOffsetClause(solutionModifierCtx.limitOffsetClauses()));
+            select.setIsInAggregateMode(isInAggregateMode(solutionModifierCtx));
+
+            result = new ConstructQuery(prologue, templates, select);
+        }
 
 
         //TODO: the check could be less strict in a future version
         new ElementVisitor<Void>()
         {
+            @Override
+            public Void visit(ConstructQuery constructQuery)
+            {
+                visitElement(constructQuery.getPrologue());
+                visitElement(constructQuery.getSelect());
+                return defaultResult();
+            }
+
             @Override
             public Void visit(Variable variable)
             {
@@ -893,7 +983,7 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 
 
 
-    private List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
+    public List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
     {
         if(!services.empty())
             return patterns;

@@ -24,7 +24,7 @@ import com.google.gwt.user.server.rpc.RemoteServiceServlet;
 import cz.iocb.chemweb.server.services.SessionData;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.engine.Engine;
-import cz.iocb.chemweb.server.sparql.engine.Literal;
+import cz.iocb.chemweb.server.sparql.engine.LiteralNode;
 import cz.iocb.chemweb.server.sparql.engine.RdfNode;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.engine.Result;
@@ -305,7 +305,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 if(result.getHeads().size() != 1)
                     throw new DatabaseException();
 
-                return Integer.parseInt(((Literal) result.get(0)).getValue());
+                return Integer.parseInt(((LiteralNode) result.get(0)).getValue());
             }
         }
         catch(URISyntaxException | TranslateExceptions | SQLException e)

@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,9 +18,17 @@ import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
+import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Query;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
+import cz.iocb.chemweb.server.sparql.parser.model.Variable;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 
@@ -144,12 +153,35 @@ public class Request implements AutoCloseable
             type = ResultType.SELECT;
         else if(syntaxTree instanceof AskQuery)
             type = ResultType.ASK;
+        else if(syntaxTree instanceof ConstructQuery)
+            type = ResultType.CONSTRUCT;
 
         Statement statement = getStatement();
 
         try
         {
-            return new Result(type, statement.executeQuery(code));
+            if(type == ResultType.CONSTRUCT)
+            {
+                ArrayList<RdfNode[]> templates = new ArrayList<RdfNode[]>();
+
+                for(Pattern pattern : ((ConstructQuery) syntaxTree).getTemplates())
+                {
+                    Triple triple = (Triple) pattern;
+
+                    RdfNode[] template = new RdfNode[3];
+                    templates.add(template);
+
+                    template[0] = convertNodeToTemplate(triple.getSubject());
+                    template[1] = convertNodeToTemplate((Node) triple.getPredicate());
+                    template[2] = convertNodeToTemplate(triple.getObject());
+                }
+
+                return new ConstructResult(templates, statement.executeQuery(code));
+            }
+            else
+            {
+                return new SelectResult(type, statement.executeQuery(code));
+            }
         }
         catch(Throwable e)
         {
@@ -287,5 +319,22 @@ public class Request implements AutoCloseable
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
+    }
+
+
+    private static RdfNode convertNodeToTemplate(Node node)
+    {
+        if(node instanceof IRI)
+            return new IriNode(((IRI) node).getValue());
+        else if(node instanceof BlankNode)
+            return new BNode(((BlankNode) node).getName());
+        else if(node instanceof Variable)
+            return new VariableNode(((Variable) node).getName());
+        else if(((Literal) node).getLanguageTag() != null)
+            return new LanguageTaggedLiteral(((Literal) node).getStringValue(), ((Literal) node).getLanguageTag());
+        else if(((Literal) node).getTypeIri() != null)
+            return new TypedLiteral(((Literal) node).getStringValue(), ((Literal) node).getTypeIri());
+        else
+            return new LiteralNode(((Literal) node).getStringValue());
     }
 }

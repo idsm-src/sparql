@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.engine;
 
 
 
-public class BlankNode extends ReferenceNode
+public class BNode extends ReferenceNode
 {
-    public BlankNode(String value)
+    public BNode(String value)
     {
         super(value);
     }
@@ -23,9 +23,9 @@ public class BlankNode extends ReferenceNode
         if(this == obj)
             return true;
 
-        if(obj == null || !(obj instanceof BlankNode))
+        if(obj == null || !(obj instanceof BNode))
             return false;
 
-        return value.equals(((BlankNode) obj).value);
+        return value.equals(((BNode) obj).value);
     }
 }
