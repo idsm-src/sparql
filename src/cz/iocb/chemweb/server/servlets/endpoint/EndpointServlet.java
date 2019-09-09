@@ -4,7 +4,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -40,7 +43,7 @@ public class EndpointServlet extends HttpServlet
         SPARQL_XML("application/sparql-results+xml", ResultType.SELECT, ResultType.ASK),
         SPARQL_JSON("application/sparql-results+json", ResultType.SELECT, ResultType.ASK),
         RDF_XML("application/rdf+xml"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
-        RDF_JSON("application/rdf+json"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        RDF_JSON("application/rdf+json", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         NTRIPLES("application/n-triples"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
         NQUADS("application/n-quads"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
         TRIG("application/trig"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
@@ -71,6 +74,8 @@ public class EndpointServlet extends HttpServlet
         }
     }
 
+
+    private static int processLimit = 1000000;
 
     private Engine engine;
 
@@ -233,6 +238,9 @@ public class EndpointServlet extends HttpServlet
                         case CONSTRUCT:
                             switch(detectOutputType(req, ResultType.CONSTRUCT))
                             {
+                                case RDF_JSON:
+                                    writeGraphJson(res, result);
+                                    break;
                                 case TSV:
                                     writeSelectTsv(res, result);
                                     break;
@@ -246,6 +254,11 @@ public class EndpointServlet extends HttpServlet
                     }
                 }
             }
+        }
+        catch(OverLimitException e)
+        {
+            res.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+            return;
         }
         catch(TranslateExceptions e)
         {
@@ -487,7 +500,6 @@ public class EndpointServlet extends HttpServlet
                 if(node == null)
                     continue;
 
-
                 if(hasResultHead)
                     out.println(',');
                 else
@@ -495,42 +507,8 @@ public class EndpointServlet extends HttpServlet
 
                 out.print("\t\t\"");
                 writeJsonValue(out, result.getHeads().get(i));
-                out.println("\": {");
-
-
-                out.print("\t\t\t\"type\": ");
-
-                if(node instanceof IriNode)
-                    out.println("\"uri\",");
-                else if(node instanceof LiteralNode)
-                    out.println("\"literal\",");
-                else
-                    out.println("\"bnode\",");
-
-                out.print("\t\t\t\"value\": ");
-
-                out.print('"');
-                writeJsonValue(out, node.getValue());
-                out.print('"');
-
-                if(node instanceof LanguageTaggedLiteral)
-                {
-                    out.print(",\n\t\t\t\"xml:lang\": ");
-
-                    out.print('"');
-                    writeJsonValue(out, ((LanguageTaggedLiteral) node).getLanguage());
-                    out.print('"');
-                }
-                else if(node instanceof TypedLiteral)
-                {
-                    out.print(",\n\t\t\t\"datatype\": ");
-
-                    out.print('"');
-                    writeJsonValue(out, ((TypedLiteral) node).getDatatype().getValue());
-                    out.print('"');
-                }
-
-                out.print("\n\t\t}");
+                out.print("\": ");
+                writeJsonNode(out, node);
             }
 
             out.print("\n\t}");
@@ -742,6 +720,105 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static void writeGraphJson(HttpServletResponse res, Result result)
+            throws IOException, SQLException, OverLimitException
+    {
+        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
+
+        res.setHeader("content-type", "application/rdf+json");
+        res.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = res.getWriter();
+
+        out.println("{");
+
+        boolean hasResult = false;
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            if(hasResult)
+                out.println(",");
+            else
+                hasResult = true;
+
+            out.print("\t\"");
+            writeJsonValue(out, subjects.getKey().getValue());
+            out.println("\" : {");
+
+            boolean hasProperty = false;
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                if(hasProperty)
+                    out.println(",");
+                else
+                    hasProperty = true;
+
+                out.print("\t\t\"");
+                writeJsonValue(out, predicates.getKey().getValue());
+                out.println("\" : [");
+
+                boolean hasValue = false;
+
+                for(RdfNode value : predicates.getValue())
+                {
+                    if(hasValue)
+                        out.println(",");
+                    else
+                        hasValue = true;
+
+                    out.print("\t\t\t");
+                    writeJsonNode(out, value);
+                }
+
+                out.print("\n\t\t]");
+            }
+
+            out.print("\n\t}");
+        }
+
+        out.println("\n}");
+    }
+
+
+    private static void writeJsonNode(PrintWriter out, RdfNode node) throws IOException
+    {
+        out.print("{ \"type\": ");
+
+        if(node instanceof IriNode)
+            out.print("\"uri\",");
+        else if(node instanceof LiteralNode)
+            out.print("\"literal\",");
+        else
+            out.print("\"bnode\",");
+
+        out.print(" \"value\": ");
+
+        out.print('"');
+        writeJsonValue(out, node.getValue());
+        out.print('"');
+
+        if(node instanceof LanguageTaggedLiteral)
+        {
+            out.print(", \"xml:lang\": ");
+
+            out.print('"');
+            writeJsonValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+            out.print('"');
+        }
+        else if(node instanceof TypedLiteral)
+        {
+            out.print(", \"datatype\": ");
+
+            out.print('"');
+            writeJsonValue(out, ((TypedLiteral) node).getDatatype().getValue());
+            out.print('"');
+        }
+
+        out.print(" }");
+    }
+
+
     private static void writeXmlValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -872,4 +949,51 @@ public class EndpointServlet extends HttpServlet
         if(mustBeQuoted)
             out.print('"');
     }
+
+
+    private static LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> processResult(Result result)
+            throws SQLException, OverLimitException
+    {
+        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = new LinkedHashMap<>();
+
+        int count = 0;
+
+        while(result.next())
+        {
+            if(count++ > processLimit)
+                throw new OverLimitException();
+
+            RdfNode subject = result.get(0);
+            RdfNode predicate = result.get(1);
+            RdfNode object = result.get(2);
+
+            LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>> properties = data.get(subject);
+
+            if(properties == null)
+            {
+                properties = new LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>();
+                data.put(subject, properties);
+            }
+
+
+            LinkedHashSet<RdfNode> values = properties.get(predicate);
+
+            if(values == null)
+            {
+                values = new LinkedHashSet<RdfNode>();
+                properties.put(predicate, values);
+            }
+
+            values.add(object);
+        }
+
+        return data;
+    }
+}
+
+
+@SuppressWarnings("serial")
+class OverLimitException extends Exception
+{
+
 }
