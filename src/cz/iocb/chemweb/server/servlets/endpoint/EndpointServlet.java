@@ -47,8 +47,8 @@ public class EndpointServlet extends HttpServlet
         RDF_JSON("application/rdf+json", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         NTRIPLES("application/n-triples", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         NQUADS("application/n-quads", ResultType.DESCRIBE, ResultType.CONSTRUCT),
-        TRIG("application/trig"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
-        TURTLE("text/turtle"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        TRIG("application/trig", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+        TURTLE("text/turtle", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         TSV("text/tab-separated-values", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT),
         CSV("text/csv", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT);
 
@@ -253,6 +253,10 @@ public class EndpointServlet extends HttpServlet
                                     break;
                                 case RDF_JSON:
                                     writeGraphJson(res.getWriter(), result);
+                                    break;
+                                case TURTLE:
+                                case TRIG:
+                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes());
                                     break;
                                 case NTRIPLES:
                                 case NQUADS:
@@ -833,6 +837,76 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static void writeGraphTurtle(PrintWriter out, Result result, HashMap<String, String> systemPrefixes)
+            throws IOException, SQLException, OverLimitException
+    {
+        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
+        HashMap<String, String> prefixes = new HashMap<String, String>();
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            selectPrefix(subjects.getKey(), systemPrefixes, prefixes);
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                selectPrefix(predicates.getKey(), systemPrefixes, prefixes);
+
+                for(RdfNode value : predicates.getValue())
+                {
+                    selectPrefix(value, systemPrefixes, prefixes);
+                }
+            }
+        }
+
+
+        for(Entry<String, String> prefix : prefixes.entrySet())
+        {
+            out.print("@prefix ");
+            out.print(prefix.getKey());
+            out.print(": <");
+            writeTsvIriValue(out, prefix.getValue());
+            out.println("> .");
+        }
+
+        if(prefixes.size() > 0)
+            out.println();
+
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            writeTripleNode(out, subjects.getKey(), prefixes);
+            out.print(" ");
+
+            boolean hasProperty = false;
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                if(hasProperty)
+                    out.print(";\n\t");
+                else
+                    hasProperty = true;
+
+                writeTripleNode(out, predicates.getKey(), prefixes);
+                out.print(" ");
+
+                boolean hasValue = false;
+
+                for(RdfNode value : predicates.getValue())
+                {
+                    if(hasValue)
+                        out.print(",\n\t\t");
+                    else
+                        hasValue = true;
+
+                    writeTripleNode(out, value, prefixes);
+                }
+            }
+
+            out.println(" .");
+        }
+    }
+
+
     private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
     {
         while(result.next())
@@ -920,6 +994,34 @@ public class EndpointServlet extends HttpServlet
             out.print("_:");
             writeTsvValue(out, node.getValue());
         }
+    }
+
+
+    private static void writeTripleNode(PrintWriter out, RdfNode node, HashMap<String, String> prefixes)
+            throws IOException
+    {
+        if(node instanceof IriNode)
+        {
+            String iri = node.getValue();
+
+            for(Entry<String, String> prefix : prefixes.entrySet())
+            {
+                if(iri.startsWith(prefix.getValue()))
+                {
+                    String name = iri.substring(prefix.getValue().length());
+
+                    if(name.matches("[_a-zA-Z][_a-zA-Z0-9]*"))
+                    {
+                        out.print(prefix.getKey());
+                        out.print(':');
+                        out.print(name);
+                        return;
+                    }
+                }
+            }
+        }
+
+        writeTripleNode(out, node);
     }
 
 
@@ -1092,6 +1194,31 @@ public class EndpointServlet extends HttpServlet
         }
 
         return data;
+    }
+
+
+    private static void selectPrefix(RdfNode node, HashMap<String, String> systemPrefixes,
+            HashMap<String, String> prefixes)
+    {
+        if(!(node instanceof IriNode))
+            return;
+
+
+        String iri = node.getValue();
+
+        for(Entry<String, String> prefix : systemPrefixes.entrySet())
+        {
+            if(iri.startsWith(prefix.getValue()))
+            {
+                String name = iri.substring(prefix.getValue().length());
+
+                if(name.matches("[_a-zA-Z][_a-zA-Z0-9]*"))
+                {
+                    prefixes.put(prefix.getKey(), prefix.getValue());
+                    return;
+                }
+            }
+        }
     }
 }
 

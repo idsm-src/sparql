@@ -19,4 +19,10 @@ public class Engine
     {
         return new Request(config);
     }
+
+
+    public SparqlDatabaseConfiguration getConfig()
+    {
+        return config;
+    }
 }
