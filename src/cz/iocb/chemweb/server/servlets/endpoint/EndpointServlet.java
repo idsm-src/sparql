@@ -45,8 +45,8 @@ public class EndpointServlet extends HttpServlet
         SPARQL_JSON("application/sparql-results+json", ResultType.SELECT, ResultType.ASK),
         RDF_XML("application/rdf+xml", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         RDF_JSON("application/rdf+json", ResultType.DESCRIBE, ResultType.CONSTRUCT),
-        NTRIPLES("application/n-triples"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
-        NQUADS("application/n-quads"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        NTRIPLES("application/n-triples", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+        NQUADS("application/n-quads", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         TRIG("application/trig"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
         TURTLE("text/turtle"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
         TSV("text/tab-separated-values", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT),
@@ -72,6 +72,11 @@ public class EndpointServlet extends HttpServlet
             }
 
             return NONE;
+        }
+
+        public String getMime()
+        {
+            return mime;
         }
     }
 
@@ -191,24 +196,28 @@ public class EndpointServlet extends HttpServlet
             {
                 try(Result result = request.execute(query, dataSets))
                 {
+                    OutputType format = detectOutputType(req, result.getResultType());
+                    res.setHeader("content-type", format.getMime());
+                    res.setCharacterEncoding("UTF-8");
+
                     switch(result.getResultType())
                     {
                         case ASK:
                             switch(detectOutputType(req, ResultType.ASK))
                             {
                                 case SPARQL_JSON:
-                                    writeAskJson(res, result, includeWarnings);
+                                    writeAskJson(res.getWriter(), result, includeWarnings);
                                     break;
                                 case SPARQL_XML:
-                                    writeAskXml(res, result, includeWarnings);
+                                    writeAskXml(res.getWriter(), result, includeWarnings);
                                     break;
                                 case TSV:
                                     // non-standard extension
-                                    writeAskTsv(res, result);
+                                    writeAskTsv(res.getWriter(), result);
                                     break;
                                 case CSV:
                                     // non-standard extension
-                                    writeAskCsv(res, result);
+                                    writeAskCsv(res.getWriter(), result);
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
@@ -219,16 +228,16 @@ public class EndpointServlet extends HttpServlet
                             switch(detectOutputType(req, ResultType.SELECT))
                             {
                                 case SPARQL_JSON:
-                                    writeSelectJson(res, result, includeWarnings);
+                                    writeSelectJson(res.getWriter(), result, includeWarnings);
                                     break;
                                 case SPARQL_XML:
-                                    writeSelectXml(res, result, includeWarnings);
+                                    writeSelectXml(res.getWriter(), result, includeWarnings);
                                     break;
                                 case TSV:
-                                    writeSelectTsv(res, result);
+                                    writeSelectTsv(res.getWriter(), result);
                                     break;
                                 case CSV:
-                                    writeSelectCsv(res, result);
+                                    writeSelectCsv(res.getWriter(), result);
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
@@ -240,16 +249,20 @@ public class EndpointServlet extends HttpServlet
                             switch(detectOutputType(req, ResultType.CONSTRUCT))
                             {
                                 case RDF_XML:
-                                    writeGraphXml(res, result);
+                                    writeGraphXml(res.getWriter(), result);
                                     break;
                                 case RDF_JSON:
-                                    writeGraphJson(res, result);
+                                    writeGraphJson(res.getWriter(), result);
+                                    break;
+                                case NTRIPLES:
+                                case NQUADS:
+                                    writeGraphTriples(res.getWriter(), result);
                                     break;
                                 case TSV:
-                                    writeSelectTsv(res, result);
+                                    writeSelectTsv(res.getWriter(), result);
                                     break;
                                 case CSV:
-                                    writeSelectCsv(res, result);
+                                    writeSelectCsv(res.getWriter(), result);
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
@@ -356,14 +369,9 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeSelectXml(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeSelectXml(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
-        res.setHeader("content-type", "application/sparql-results+xml");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
-
         out.println("<?xml version=\"1.0\"?>");
         out.println("<sparql xmlns=\"http://www.w3.org/2005/sparql-results#\">");
 
@@ -457,14 +465,9 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeSelectJson(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeSelectJson(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
-        res.setHeader("content-type", "application/sparql-results+json");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
-
         out.print("{\n\t\"head\": { \"vars\": [ ");
 
         boolean hasHead = false;
@@ -545,14 +548,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeSelectTsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeSelectTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
-        res.setHeader("content-type", "text/tab-separated-values");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
-
-
         boolean hasHead = false;
 
         for(String head : result.getHeads())
@@ -579,40 +576,7 @@ public class EndpointServlet extends HttpServlet
                 else
                     hasResult = true;
 
-                RdfNode node = result.get(i);
-
-                if(node instanceof IriNode)
-                {
-                    out.print('<');
-                    writeTsvIriValue(out, node.getValue());
-                    out.print('>');
-                }
-                else if(node instanceof LanguageTaggedLiteral)
-                {
-                    out.print('"');
-                    writeTsvLiteralValue(out, node.getValue());
-                    out.print("\"@");
-                    writeTsvValue(out, ((LanguageTaggedLiteral) node).getLanguage());
-                }
-                else if(node instanceof TypedLiteral)
-                {
-                    out.print('"');
-                    writeTsvLiteralValue(out, node.getValue());
-                    out.print("\"^^<");
-                    writeTsvIriValue(out, ((TypedLiteral) node).getDatatype().getValue());
-                    out.print('>');
-                }
-                else if(node instanceof LiteralNode)
-                {
-                    out.print('"');
-                    writeTsvLiteralValue(out, node.getValue());
-                    out.print('"');
-                }
-                else if(node instanceof BNode)
-                {
-                    out.print("_:");
-                    writeTsvValue(out, node.getValue());
-                }
+                writeTripleNode(out, result.get(i));
             }
 
             out.print("\r\n");
@@ -620,14 +584,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeSelectCsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeSelectCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
-        res.setHeader("content-type", "text/csv");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
-
-
         boolean hasHead = false;
 
         for(String head : result.getHeads())
@@ -665,13 +623,9 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeAskXml(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeAskXml(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
-        res.setHeader("content-type", "application/sparql-results+xml");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
         result.next();
 
         out.println("<?xml version=\"1.0\"?>");
@@ -682,13 +636,9 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeAskJson(HttpServletResponse res, Result result, boolean includeWarnings)
+    private static void writeAskJson(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
-        res.setHeader("content-type", "application/sparql-results+json");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
         result.next();
 
         out.println("{");
@@ -698,12 +648,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeAskTsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeAskTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
-        res.setHeader("content-type", "text/tab-separated-values");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
         result.next();
 
         out.println("\"bool\"");
@@ -711,12 +657,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeAskCsv(HttpServletResponse res, Result result) throws IOException, SQLException
+    private static void writeAskCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
-        res.setHeader("content-type", "text/csv");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
         result.next();
 
         out.println("\"bool\"");
@@ -724,13 +666,10 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphXml(HttpServletResponse res, Result result)
+    private static void writeGraphXml(PrintWriter out, Result result)
             throws IOException, SQLException, OverLimitException
     {
         LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
-
-        res.setHeader("content-type", "application/rdf+xml");
-        res.setCharacterEncoding("UTF-8");
 
 
         HashMap<String, String> prefixes = new HashMap<String, String>();
@@ -748,8 +687,6 @@ public class EndpointServlet extends HttpServlet
             }
         }
 
-
-        PrintWriter out = res.getWriter();
 
         out.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         out.println("<rdf:RDF");
@@ -840,15 +777,10 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphJson(HttpServletResponse res, Result result)
+    private static void writeGraphJson(PrintWriter out, Result result)
             throws IOException, SQLException, OverLimitException
     {
         LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
-
-        res.setHeader("content-type", "application/rdf+json");
-        res.setCharacterEncoding("UTF-8");
-
-        PrintWriter out = res.getWriter();
 
         out.println("{");
 
@@ -901,6 +833,21 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
+    {
+        while(result.next())
+        {
+            for(int i = 0; i < 3; i++)
+            {
+                writeTripleNode(out, result.get(i));
+                out.print(' ');
+            }
+
+            out.println('.');
+        }
+    }
+
+
     private static void writeJsonNode(PrintWriter out, RdfNode node) throws IOException
     {
         out.print("{ \"type\": ");
@@ -936,6 +883,43 @@ public class EndpointServlet extends HttpServlet
         }
 
         out.print(" }");
+    }
+
+
+    private static void writeTripleNode(PrintWriter out, RdfNode node) throws IOException
+    {
+        if(node instanceof IriNode)
+        {
+            out.print('<');
+            writeTsvIriValue(out, node.getValue());
+            out.print('>');
+        }
+        else if(node instanceof LanguageTaggedLiteral)
+        {
+            out.print('"');
+            writeTsvLiteralValue(out, node.getValue());
+            out.print("\"@");
+            writeTsvValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+        }
+        else if(node instanceof TypedLiteral)
+        {
+            out.print('"');
+            writeTsvLiteralValue(out, node.getValue());
+            out.print("\"^^<");
+            writeTsvIriValue(out, ((TypedLiteral) node).getDatatype().getValue());
+            out.print('>');
+        }
+        else if(node instanceof LiteralNode)
+        {
+            out.print('"');
+            writeTsvLiteralValue(out, node.getValue());
+            out.print('"');
+        }
+        else if(node instanceof BNode)
+        {
+            out.print("_:");
+            writeTsvValue(out, node.getValue());
+        }
     }
 
 
