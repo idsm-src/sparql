@@ -53,7 +53,7 @@ public class ConstructResult extends Result
         for(int i = 0; i < 3; i++)
         {
             if(template[i] instanceof BNode)
-                rowData[i] = new BNode("T" + template[i].getValue() + "#" + groupIdx);
+                rowData[i] = new BNode("T" + template[i].getValue() + "_" + groupIdx);
             else if(template[i] instanceof VariableNode)
                 rowData[i] = subresult.get(template[i].getValue());
             else

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,7 +43,7 @@ public class EndpointServlet extends HttpServlet
         NONE(""),
         SPARQL_XML("application/sparql-results+xml", ResultType.SELECT, ResultType.ASK),
         SPARQL_JSON("application/sparql-results+json", ResultType.SELECT, ResultType.ASK),
-        RDF_XML("application/rdf+xml"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        RDF_XML("application/rdf+xml", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         RDF_JSON("application/rdf+json", ResultType.DESCRIBE, ResultType.CONSTRUCT),
         NTRIPLES("application/n-triples"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
         NQUADS("application/n-quads"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
@@ -238,6 +239,9 @@ public class EndpointServlet extends HttpServlet
                         case CONSTRUCT:
                             switch(detectOutputType(req, ResultType.CONSTRUCT))
                             {
+                                case RDF_XML:
+                                    writeGraphXml(res, result);
+                                    break;
                                 case RDF_JSON:
                                     writeGraphJson(res, result);
                                     break;
@@ -301,7 +305,7 @@ public class EndpointServlet extends HttpServlet
                 if(form == ResultType.ASK || form == ResultType.SELECT)
                     return OutputType.SPARQL_XML;
                 else
-                    return OutputType.TSV;
+                    return OutputType.RDF_XML;
             }
         }
 
@@ -717,6 +721,122 @@ public class EndpointServlet extends HttpServlet
 
         out.println("\"bool\"");
         out.println(result.get(0).getValue());
+    }
+
+
+    private static void writeGraphXml(HttpServletResponse res, Result result)
+            throws IOException, SQLException, OverLimitException
+    {
+        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
+
+        res.setHeader("content-type", "application/rdf+xml");
+        res.setCharacterEncoding("UTF-8");
+
+
+        HashMap<String, String> prefixes = new HashMap<String, String>();
+        prefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                String predicate = predicates.getKey().getValue();
+                String prefix = predicate.replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
+
+                if(!prefixes.containsKey(prefix))
+                    prefixes.put(prefix, "ns" + prefixes.size());
+            }
+        }
+
+
+        PrintWriter out = res.getWriter();
+
+        out.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        out.println("<rdf:RDF");
+
+        for(Entry<String, String> prefix : prefixes.entrySet())
+        {
+            out.print("\txmlns:");
+            out.print(prefix.getValue());
+            out.print("=\"");
+            out.print(prefix.getKey());
+            out.println("\"");
+        }
+
+        out.println(">");
+
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            out.print("\t<rdf:Description ");
+
+            if(subjects.getKey() instanceof IriNode)
+                out.print("rdf:about=\"");
+            else
+                out.print("rdf:nodeID=\"");
+
+            writeXmlValue(out, subjects.getKey().getValue());
+
+            out.println("\">");
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                String predicate = predicates.getKey().getValue();
+                String prefix = predicate.replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
+                String name = predicate.substring(prefix.length());
+
+                for(RdfNode value : predicates.getValue())
+                {
+                    out.print("\t\t<");
+                    out.print(prefixes.get(prefix));
+                    out.print(":");
+                    out.print(name);
+
+                    if(value instanceof IriNode)
+                    {
+                        out.print(" rdf:resource=\"");
+                        writeXmlValue(out, value.getValue());
+                        out.println("\"/>");
+                    }
+                    else if(value instanceof BNode)
+                    {
+                        out.print(" rdf:nodeID=\"");
+                        writeXmlValue(out, value.getValue());
+                        out.println("\"/>");
+                    }
+                    else
+                    {
+                        if(value instanceof LanguageTaggedLiteral)
+                        {
+                            out.print(" xml:lang=\"");
+                            writeXmlValue(out, ((LanguageTaggedLiteral) value).getLanguage());
+                            out.print("\">");
+                        }
+                        else if(value instanceof TypedLiteral)
+                        {
+                            out.print(" rdf:datatype=\"");
+                            writeXmlValue(out, ((TypedLiteral) value).getDatatype().getValue());
+                            out.print("\">");
+                        }
+                        else
+                        {
+                            out.print(">");
+                        }
+
+                        writeXmlValue(out, value.getValue());
+                        out.print("</");
+                        out.print(prefixes.get(prefix));
+                        out.print(":");
+                        out.print(name);
+                        out.println(">");
+                    }
+                }
+            }
+
+            out.println("\t</rdf:Description>");
+        }
+
+        out.println("</rdf:RDF>");
     }
 
 
