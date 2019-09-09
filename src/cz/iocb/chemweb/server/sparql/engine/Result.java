@@ -11,7 +11,7 @@ public abstract class Result implements AutoCloseable
 {
     static public enum ResultType
     {
-        SELECT, ASK, CONSTRUCT
+        SELECT, ASK, DESCRIBE, CONSTRUCT
     }
 
 

@@ -23,6 +23,7 @@ import cz.iocb.chemweb.server.sparql.engine.LiteralNode;
 import cz.iocb.chemweb.server.sparql.engine.RdfNode;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.engine.Result;
+import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -35,7 +36,39 @@ public class EndpointServlet extends HttpServlet
 {
     static enum OutputType
     {
-        NONE, XML, JSON, TSV, CSV
+        NONE(""),
+        SPARQL_XML("application/sparql-results+xml", ResultType.SELECT, ResultType.ASK),
+        SPARQL_JSON("application/sparql-results+json", ResultType.SELECT, ResultType.ASK),
+        RDF_XML("application/rdf+xml"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        RDF_JSON("application/rdf+json"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        NTRIPLES("application/n-triples"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        NQUADS("application/n-quads"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        TRIG("application/trig"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        TURTLE("text/turtle"/*, ResultType.DESCRIBE, ResultType.CONSTRUCT*/),
+        TSV("text/tab-separated-values", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT),
+        CSV("text/csv", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT);
+
+        private final String mime;
+        private final ResultType[] variants;
+
+        private OutputType(String mime, ResultType... variants)
+        {
+            this.mime = mime;
+            this.variants = variants;
+        }
+
+        public static OutputType getOutputType(String mime, ResultType variant)
+        {
+            for(OutputType value : OutputType.values())
+            {
+                if(value.mime.equals(mime))
+                    for(ResultType v : value.variants)
+                        if(v == variant)
+                            return value;
+            }
+
+            return NONE;
+        }
     }
 
 
@@ -155,12 +188,12 @@ public class EndpointServlet extends HttpServlet
                     switch(result.getResultType())
                     {
                         case ASK:
-                            switch(detectOutputType(req))
+                            switch(detectOutputType(req, ResultType.ASK))
                             {
-                                case JSON:
+                                case SPARQL_JSON:
                                     writeAskJson(res, result, includeWarnings);
                                     break;
-                                case XML:
+                                case SPARQL_XML:
                                     writeAskXml(res, result, includeWarnings);
                                     break;
                                 case TSV:
@@ -177,12 +210,12 @@ public class EndpointServlet extends HttpServlet
                             break;
 
                         case SELECT:
-                            switch(detectOutputType(req))
+                            switch(detectOutputType(req, ResultType.SELECT))
                             {
-                                case JSON:
+                                case SPARQL_JSON:
                                     writeSelectJson(res, result, includeWarnings);
                                     break;
-                                case XML:
+                                case SPARQL_XML:
                                     writeSelectXml(res, result, includeWarnings);
                                     break;
                                 case TSV:
@@ -196,8 +229,9 @@ public class EndpointServlet extends HttpServlet
                             }
                             break;
 
+                        case DESCRIBE:
                         case CONSTRUCT:
-                            switch(detectOutputType(req))
+                            switch(detectOutputType(req, ResultType.CONSTRUCT))
                             {
                                 case TSV:
                                     writeSelectTsv(res, result);
@@ -240,59 +274,68 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static OutputType detectOutputType(HttpServletRequest req)
+    private static OutputType detectOutputType(HttpServletRequest req, ResultType form)
     {
         // IOCB SPARQL protocol extension
-        String format = req.getParameter("format");
+        String accepts = req.getParameter("format");
 
-        if(format != null)
+        if(accepts == null)
         {
-            switch(format)
+            accepts = req.getHeader("accept");
+
+            if(accepts == null)
             {
-                case "xml":
-                    return OutputType.XML;
-                case "json":
-                    return OutputType.JSON;
-                case "tsv":
+                if(form == ResultType.ASK || form == ResultType.SELECT)
+                    return OutputType.SPARQL_XML;
+                else
                     return OutputType.TSV;
-                case "csv":
-                    return OutputType.CSV;
-                default:
-                    return OutputType.NONE;
             }
         }
 
 
-        String accepts = req.getHeader("accept");
+        OutputType type = OutputType.NONE;
+        double quality = 0;
 
-        if(accepts == null)
-            return OutputType.XML;
+        // to not split around a comma inside quotation marks
+        accepts = accepts.replaceAll("\"[^\"]*\"", "");
 
-        boolean common = false;
-
-        for(String value : accepts.split(" *, *"))
+        for(String value : accepts.split("[\t ]*,[\t ]*"))
         {
-            if(value.equals("*") || value.equals("*/*") || value.equals("application/*"))
-                common = true;
+            String[] parts = value.split("[\t ]*;[\t ]*");
 
-            if(value.matches("application/sparql-results\\+xml;?.*"))
-                return OutputType.XML;
+            if(parts.length == 0)
+                continue;
 
-            if(value.matches("application/sparql-results\\+json;?.*"))
-                return OutputType.JSON;
+            double qvalue = 1;
 
-            if(value.matches("text/tab-separated-values;?.*"))
-                return OutputType.TSV;
+            for(int i = 1; i < parts.length; i++)
+                if(parts[i].matches("q=(0(\\.[0-9]{0,3})?|1(\\.0{0,3})?)[\\t ]*"))
+                    qvalue = Double.parseDouble(parts[i].substring(2).replaceAll("[\t ]", ""));
 
-            if(value.matches("text/csv;?.*"))
-                return OutputType.CSV;
+            if(qvalue == 0)
+                continue;
+
+            String mime = parts[0].replaceAll("[\t ]", "");
+            OutputType detected = OutputType.getOutputType(mime, form);
+
+            if(detected != OutputType.NONE && qvalue >= quality)
+            {
+                type = detected;
+                quality = qvalue;
+            }
+            else if(mime.equals("text/*") && qvalue > quality)
+            {
+                quality = qvalue;
+                type = OutputType.TSV;
+            }
+            else if((mime.equals("*") || mime.equals("*/*") || mime.equals("application/*")) && qvalue > quality)
+            {
+                quality = qvalue;
+                type = form == ResultType.ASK || form == ResultType.SELECT ? OutputType.SPARQL_XML : OutputType.RDF_XML;
+            }
         }
 
-        if(common)
-            return OutputType.XML;
-
-
-        return OutputType.NONE;
+        return type;
     }
 
 
