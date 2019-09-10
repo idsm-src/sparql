@@ -1,10 +1,10 @@
 package cz.iocb.chemweb.server.velocity;
 
 import java.util.HashMap;
-import java.util.Map.Entry;
 import org.apache.commons.lang3.StringEscapeUtils;
 import cz.iocb.chemweb.server.sparql.engine.LiteralNode;
 import cz.iocb.chemweb.server.sparql.engine.ReferenceNode;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.shared.utils.Encode;
 
 
@@ -31,13 +31,8 @@ public class NodeUtils
 
     public String prefixedIRI(ReferenceNode node)
     {
-        String result = node.getValue();
-
-        for(Entry<String, String> prefix : prefixes.entrySet())
-            if(result.startsWith(prefix.getValue()))
-                return result.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
-
-        return result;
+        String iri = IRI.toPrefixedIRI(node.getValue(), prefixes);
+        return iri != null ? iri : node.getValue();
     }
 
 

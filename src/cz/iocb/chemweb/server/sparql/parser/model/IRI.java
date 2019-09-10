@@ -2,11 +2,8 @@ package cz.iocb.chemweb.server.sparql.parser.model;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map.Entry;
 import cz.iocb.chemweb.server.sparql.parser.BaseComplexNode;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
@@ -18,6 +15,17 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Path;
  */
 public final class IRI extends BaseComplexNode implements VarOrIri, Path
 {
+    private static String PN_CHARS_BASE = "([A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-"
+            + "\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD]|"
+            + "[\\uD840-\\uDBBF][\\uDC00–\\uDFFF])";
+    private static String PN_CHARS_U = "(" + PN_CHARS_BASE + "|_)";
+    private static String PN_CHARS = "(" + PN_CHARS_U + "|[-0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040])";
+    private static String PERCENT = "(%[0-9A-Fa-f][0-9A-Fa-f])";
+    private static String PN_LOCAL_ESC = "(\\\\[-_~.!$&'()*+,;=/?#@%])";
+    private static String PLX = "(" + PERCENT + "|" + PN_LOCAL_ESC + ")";
+    private static String PN_LOCAL = "((" + PN_CHARS_U + "|[0-9:]|" + PLX + ")((" + PN_CHARS + "|[.:]|" + PLX + ")*("
+            + PN_CHARS + "|:|" + PLX + "))?)?";
+
     private final String value;
 
 
@@ -40,45 +48,46 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
     }
 
 
+    public static String toPrefixedIRI(String iri, HashMap<String, String> prefixes)
+    {
+        String result = null;
+        int size = iri.length();
+
+        for(Entry<String, String> prefix : prefixes.entrySet())
+        {
+            if(iri.startsWith(prefix.getValue()))
+            {
+                String name = iri.substring(prefix.getValue().length());
+
+                if(name.length() < size && name.matches(PN_LOCAL))
+                {
+                    result = prefix.getKey() + ":" + name;
+                    size = name.length();
+                }
+            }
+        }
+
+        return result;
+    }
+
+
     public String toString(Prologue prologue)
     {
         if(prologue == null)
             return '<' + value + '>';
 
-        Collection<Prefix> prefixes = prologue.getPrefixes();
+        String prefixedIRI = toPrefixedIRI(value, prologue.getPrefixes());
 
-        if(!prefixes.isEmpty())
+        if(prefixedIRI != null)
+            return prefixedIRI;
+
+        try
         {
-            List<String> options = new ArrayList<>();
-
-            String thisString = value.toString();
-
-            for(Prefix prefix : prefixes)
-            {
-                String prefixString = prefix.getIri();
-
-                if(thisString.startsWith(prefixString)
-                /*&& thisString.substring(prefixString.length()).matches("[a-zA-Z0-9_]*")*/)
-                {
-                    options.add(prefix.getName() + ':' + thisString.substring(prefixString.length())
-                            .replaceAll("[-~.!$&'()*+,;=/?#@%]", "\\\\$0"));
-                }
-            }
-
-            if(!options.isEmpty())
-                return options.stream().collect(Collectors.minBy(Comparator.comparingInt(s -> s.length()))).get();
-        }
-
-
-        if(prologue.getBase() != null)
-        {
-            try
-            {
+            if(prologue.getBase() != null)
                 return '<' + new URI(prologue.getBase().getValue()).relativize(new URI(value)).toString() + '>';
-            }
-            catch(URISyntaxException e)
-            {
-            }
+        }
+        catch(URISyntaxException e)
+        {
         }
 
         return '<' + value + '>';

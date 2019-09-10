@@ -74,7 +74,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
-import cz.iocb.chemweb.server.sparql.parser.model.Prefix;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.PrefixedName;
 import cz.iocb.chemweb.server.sparql.parser.model.Projection;
@@ -1362,17 +1361,16 @@ class IriVisitor extends BaseVisitor<IRI>
     {
         PrefixedName prefixedName = parsePrefixedName(ctx);
 
-        java.util.Optional<Prefix> prefix = prologue.getPrefixes().stream()
-                .filter(p -> p.getName().equals(prefixedName.getPrefix())).findFirst();
+        String prefix = prologue.getPrefixes().get(prefixedName.getPrefix());
 
-        if(!prefix.isPresent())
+        if(prefix == null)
         {
             messages.add(
                     new TranslateMessage(MessageType.unknownPrefix, prefixedName.getRange(), prefixedName.getPrefix()));
             return new IRI(prefixedName.getPrefix() + ":" + prefixedName.getLocalName());
         }
 
-        return new IRI(prefix.get().getIri() + prefixedName.getLocalName());
+        return new IRI(prefix + prefixedName.getLocalName());
     }
 
 

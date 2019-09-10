@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.servlets.hints;
 
 import java.util.Map.Entry;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
 
 
@@ -19,11 +20,8 @@ public class NormalizeIRI
         if(iri == null)
             return null;
 
-        for(Entry<String, String> prefix : dbConfig.getPrefixes().entrySet())
-            if(iri.startsWith(prefix.getValue()))
-                return iri.replaceFirst(prefix.getValue(), prefix.getKey() + ":");
-
-        return iri;
+        String prefixedIRI = IRI.toPrefixedIRI(iri, dbConfig.getPrefixes());
+        return prefixedIRI != null ? prefixedIRI : iri;
     }
 
 

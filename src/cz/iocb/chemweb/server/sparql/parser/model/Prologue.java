@@ -1,11 +1,9 @@
 package cz.iocb.chemweb.server.sparql.parser.model;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map.Entry;
 import cz.iocb.chemweb.server.sparql.parser.BaseElement;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 
@@ -20,19 +18,15 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 public class Prologue extends BaseElement
 {
     private IRI base;
-    private final LinkedHashMap<String, Prefix> prefixes;
+    private final LinkedHashMap<String, String> prefixes;
     private final List<PrefixDefinition> prefixDefinitions;
-    //private final LinkedHashMap<String, String> prefixMap;
 
 
     public Prologue(HashMap<String, String> predefinedPrefixes)
     {
         setBase(new IRI(""));
         prefixDefinitions = new ArrayList<PrefixDefinition>();
-        prefixes = new LinkedHashMap<String, Prefix>();
-
-        for(Entry<String, String> entry : predefinedPrefixes.entrySet())
-            prefixes.put(entry.getKey(), new Prefix(entry.getKey(), entry.getValue()));
+        prefixes = new LinkedHashMap<String, String>(predefinedPrefixes);
     }
 
 
@@ -51,9 +45,7 @@ public class Prologue extends BaseElement
     public void addPrefixDefinition(PrefixDefinition definition)
     {
         prefixDefinitions.add(definition);
-
-        prefixes.remove(definition.getName());
-        prefixes.put(definition.getName(), new Prefix(definition.getName(), definition.getIri().getValue()));
+        prefixes.put(definition.getName(), definition.getIri().getValue());
     }
 
     public List<PrefixDefinition> getPrefixeDefinitions()
@@ -62,9 +54,9 @@ public class Prologue extends BaseElement
     }
 
 
-    public Collection<Prefix> getPrefixes()
+    public LinkedHashMap<String, String> getPrefixes()
     {
-        return prefixes.values();
+        return prefixes;
     }
 
 
