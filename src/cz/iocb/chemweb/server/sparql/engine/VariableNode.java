@@ -15,4 +15,11 @@ public class VariableNode extends RdfNode
     {
         throw new UnsupportedOperationException();
     }
+
+
+    @Override
+    public boolean isIri()
+    {
+        throw new UnsupportedOperationException();
+    }
 }

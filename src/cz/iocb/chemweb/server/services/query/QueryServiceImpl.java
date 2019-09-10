@@ -163,7 +163,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                         {
                             stringRow[i] = new DataGridNode();
 
-                            if(result.get(i) != null && !result.get(i).isLiteral())
+                            if(result.get(i) != null && result.get(i).isIri())
                                 stringRow[i].ref = result.get(i).getValue();
 
 

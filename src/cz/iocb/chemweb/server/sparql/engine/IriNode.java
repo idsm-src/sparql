@@ -11,6 +11,13 @@ public class IriNode extends ReferenceNode
 
 
     @Override
+    public boolean isIri()
+    {
+        return true;
+    }
+
+
+    @Override
     public String toString()
     {
         return "<" + value + ">";

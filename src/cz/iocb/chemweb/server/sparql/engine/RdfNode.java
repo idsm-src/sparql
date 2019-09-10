@@ -34,4 +34,7 @@ public abstract class RdfNode
 
 
     public abstract boolean isLiteral();
+
+
+    public abstract boolean isIri();
 }

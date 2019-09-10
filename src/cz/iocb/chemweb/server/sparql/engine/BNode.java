@@ -11,6 +11,13 @@ public class BNode extends ReferenceNode
 
 
     @Override
+    public boolean isIri()
+    {
+        return false;
+    }
+
+
+    @Override
     public String toString()
     {
         return "_:" + value;

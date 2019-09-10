@@ -26,6 +26,13 @@ public class LiteralNode extends RdfNode
 
 
     @Override
+    public boolean isIri()
+    {
+        return false;
+    }
+
+
+    @Override
     public boolean equals(Object obj)
     {
         if(this == obj)
