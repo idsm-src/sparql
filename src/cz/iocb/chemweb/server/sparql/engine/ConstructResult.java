@@ -11,11 +11,15 @@ public class ConstructResult extends Result
 {
     private final ArrayList<RdfNode[]> templates;
     private final SelectResult subresult;
+    private final int limit;
+    private final int offset;
     private int templateIdx;
     private int groupIdx = 0;
+    private int count;
 
 
-    public ConstructResult(ArrayList<RdfNode[]> templates, ResultSet executeQuery) throws SQLException
+    public ConstructResult(ArrayList<RdfNode[]> templates, ResultSet executeQuery, int limit, int offset)
+            throws SQLException
     {
         super(ResultType.CONSTRUCT);
 
@@ -27,6 +31,8 @@ public class ConstructResult extends Result
 
         this.templates = templates;
         this.subresult = new SelectResult(ResultType.SELECT, executeQuery);
+        this.limit = limit;
+        this.offset = offset;
         this.rowData = new RdfNode[heads.size()];
         this.templateIdx = templates.size();
     }
@@ -35,35 +41,47 @@ public class ConstructResult extends Result
     @Override
     public boolean next() throws SQLException
     {
-        if(templates.size() == 0)
-            return false;
-
-        if(templateIdx == templates.size())
+        loop:
+        while(true)
         {
-            if(subresult.next() == false)
+            if(count >= offset + limit)
                 return false;
 
-            groupIdx++;
-            templateIdx = 0;
+            if(templates.size() == 0)
+                return false;
+
+            if(templateIdx == templates.size())
+            {
+                if(subresult.next() == false)
+                    return false;
+
+                groupIdx++;
+                templateIdx = 0;
+            }
+
+
+            RdfNode[] template = templates.get(templateIdx++);
+
+            for(int i = 0; i < 3; i++)
+            {
+                if(template[i] instanceof BNode)
+                    rowData[i] = new BNode("T" + template[i].getValue() + "_" + groupIdx);
+                else if(template[i] instanceof VariableNode)
+                    rowData[i] = subresult.get(template[i].getValue());
+                else
+                    rowData[i] = template[i];
+
+                if(rowData[i] == null || i < 2 && rowData[i] instanceof LiteralNode
+                        || i == 1 && rowData[i] instanceof BNode)
+                    continue loop;
+            }
+
+            
+            if(count++ < offset)
+                continue loop;
+
+            return true;
         }
-
-
-        RdfNode[] template = templates.get(templateIdx++);
-
-        for(int i = 0; i < 3; i++)
-        {
-            if(template[i] instanceof BNode)
-                rowData[i] = new BNode("T" + template[i].getValue() + "_" + groupIdx);
-            else if(template[i] instanceof VariableNode)
-                rowData[i] = subresult.get(template[i].getValue());
-            else
-                rowData[i] = template[i];
-
-            if(i < 2 && rowData[i] instanceof LiteralNode)
-                return next();
-        }
-
-        return true;
     }
 
 

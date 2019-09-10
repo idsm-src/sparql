@@ -111,32 +111,35 @@ public class Request implements AutoCloseable
             syntaxTree.getSelect().setDataSets(dataSets);
 
 
-        if(offset > 0)
+        if(syntaxTree instanceof SelectQuery)
         {
-            BigInteger oldOffset = syntaxTree.getSelect().getOffset();
-            BigInteger newOffset = BigInteger.valueOf(offset);
+            if(offset > 0)
+            {
+                BigInteger oldOffset = syntaxTree.getSelect().getOffset();
+                BigInteger newOffset = BigInteger.valueOf(offset);
 
-            if(oldOffset != null)
-                newOffset = newOffset.add(oldOffset);
+                if(oldOffset != null)
+                    newOffset = newOffset.add(oldOffset);
 
-            syntaxTree.getSelect().setOffset(newOffset);
-        }
+                syntaxTree.getSelect().setOffset(newOffset);
+            }
 
-        if(limit >= 0)
-        {
-            BigInteger oldLimit = syntaxTree.getSelect().getLimit();
-            BigInteger newLimit = BigInteger.valueOf(limit + 1);
+            if(limit >= 0)
+            {
+                BigInteger oldLimit = syntaxTree.getSelect().getLimit();
+                BigInteger newLimit = BigInteger.valueOf(limit + 1);
 
-            if(oldLimit != null && offset > 0)
-                oldLimit = oldLimit.subtract(BigInteger.valueOf(offset));
+                if(oldLimit != null && offset > 0)
+                    oldLimit = oldLimit.subtract(BigInteger.valueOf(offset));
 
-            if(oldLimit != null && oldLimit.signum() == -1)
-                oldLimit = BigInteger.ZERO;
+                if(oldLimit != null && oldLimit.signum() == -1)
+                    oldLimit = BigInteger.ZERO;
 
-            if(oldLimit == null || oldLimit.compareTo(newLimit) == 1)
-                syntaxTree.getSelect().setLimit(newLimit);
-            else
-                syntaxTree.getSelect().setLimit(oldLimit);
+                if(oldLimit == null || oldLimit.compareTo(newLimit) == 1)
+                    syntaxTree.getSelect().setLimit(newLimit);
+                else
+                    syntaxTree.getSelect().setLimit(oldLimit);
+            }
         }
 
         setTimeout(timeout);
@@ -176,7 +179,7 @@ public class Request implements AutoCloseable
                     template[2] = convertNodeToTemplate(triple.getObject());
                 }
 
-                return new ConstructResult(templates, statement.executeQuery(code));
+                return new ConstructResult(templates, statement.executeQuery(code), limit + 1, offset);
             }
             else
             {
