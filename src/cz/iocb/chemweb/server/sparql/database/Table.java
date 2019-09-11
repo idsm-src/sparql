@@ -46,6 +46,6 @@ public class Table
 
         Table other = (Table) obj;
 
-        return value.equals(other.value);
+        return value == null && other.value == null || value != null && value.equals(other.value);
     }
 }
