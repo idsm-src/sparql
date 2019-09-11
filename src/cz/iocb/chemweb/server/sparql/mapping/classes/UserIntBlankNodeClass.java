@@ -26,7 +26,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
         if(!(node instanceof VariableOrBlankNode))
             throw new IllegalArgumentException();
 
-        return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
+        return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
     }
 
 

@@ -23,8 +23,14 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
     }
 
 
-    @Override
     public String getName()
+    {
+        return name;
+    }
+
+
+    @Override
+    public String getSqlName()
     {
         return name;
     }

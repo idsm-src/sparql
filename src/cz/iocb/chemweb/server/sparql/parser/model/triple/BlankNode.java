@@ -26,10 +26,16 @@ public final class BlankNode extends BaseComplexNode implements Node, VariableOr
     }
 
 
-    @Override
     public String getName()
     {
         return name;
+    }
+
+
+    @Override
+    public String getSqlName()
+    {
+        return "@bn" + name;
     }
 
 

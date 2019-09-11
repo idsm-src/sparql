@@ -107,7 +107,7 @@ public class UserIriClass extends IriClass
     public String getPatternCode(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
+            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
 
         IRI iri = (IRI) node;
 

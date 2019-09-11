@@ -26,7 +26,7 @@ public abstract class LiteralClass extends ResourceClass
     public final String getPatternCode(Node node, int part)
     {
         if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getName(), part);
+            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
         else
             return getLiteralPatternCode((Literal) node, part);
     }

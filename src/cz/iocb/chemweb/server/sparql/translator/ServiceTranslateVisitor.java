@@ -495,7 +495,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
     public HashSet<String> visit(Variable variable)
     {
         HashSet<String> result = new HashSet<String>();
-        result.add(variable.getName());
+        result.add(variable.getSqlName());
 
         builder.append(" ?");
         builder.append(variable.getName());

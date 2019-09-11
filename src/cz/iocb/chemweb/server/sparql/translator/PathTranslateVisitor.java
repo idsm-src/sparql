@@ -71,16 +71,16 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         HashSet<String> restrictions = new HashSet<String>();
 
         if(graph instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) graph).getName());
+            restrictions.add(((VariableOrBlankNode) graph).getSqlName());
 
         if(subject instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) subject).getName());
+            restrictions.add(((VariableOrBlankNode) subject).getSqlName());
 
         if(predicate instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) predicate).getName());
+            restrictions.add(((VariableOrBlankNode) predicate).getSqlName());
 
         if(object instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) object).getName());
+            restrictions.add(((VariableOrBlankNode) object).getSqlName());
 
         // strip path variables
         return intercode.optimize(request, restrictions, false);
@@ -147,10 +147,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 HashSet<String> restrictions = new HashSet<String>();
 
                 if(subject instanceof VariableOrBlankNode)
-                    restrictions.add(((VariableOrBlankNode) subject).getName());
+                    restrictions.add(((VariableOrBlankNode) subject).getSqlName());
 
                 if(object instanceof VariableOrBlankNode)
-                    restrictions.add(((VariableOrBlankNode) object).getName());
+                    restrictions.add(((VariableOrBlankNode) object).getSqlName());
 
                 subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), join, object), restrictions);
             }
@@ -175,7 +175,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         assert repeatedPath.getKind() == Kind.OneOrMore;
 
         Variable joinNode = new Variable(variablePrefix + variableId++);
-        String joinName = joinNode.getName();
+        String joinName = joinNode.getSqlName();
 
 
         // if it is more suitable, the reverse order is used
@@ -190,7 +190,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             if(SqlRecursive.getPairs(init.getVariables().get(joinName), next.getVariables().get(joinName)).isEmpty())
                 return visitElement(repeatedPath.getChild(), subject, object);
 
-            return SqlRecursive.create(init, next, null, joinName, ((VariableOrBlankNode) subject).getName(), null,
+            return SqlRecursive.create(init, next, null, joinName, ((VariableOrBlankNode) subject).getSqlName(), null,
                     request, null);
         }
 
@@ -198,8 +198,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         Node endNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? object :
                 new Variable(variablePrefix + variableId++);
         Node cndNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? null : object;
-        String endName = ((VariableOrBlankNode) endNode).getName();
-        String subjectName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getName() : null;
+        String endName = ((VariableOrBlankNode) endNode).getSqlName();
+        String subjectName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getSqlName() :
+                null;
 
         SqlIntercode init = visitElement(repeatedPath.getChild(), subject, joinNode);
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
@@ -223,7 +224,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        return SqlRecursive.create(init, next, subjectName, joinName, ((VariableOrBlankNode) endNode).getName(),
+        return SqlRecursive.create(init, next, subjectName, joinName, ((VariableOrBlankNode) endNode).getSqlName(),
                 cndNode, request, null);
     }
 
@@ -327,7 +328,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(node instanceof VariableOrBlankNode)
         {
-            String name = ((VariableOrBlankNode) node).getName();
+            String name = ((VariableOrBlankNode) node).getSqlName();
 
             translated.addVariableClass(name, mapping.getResourceClass());
             translated.addMapping(name, mapping);

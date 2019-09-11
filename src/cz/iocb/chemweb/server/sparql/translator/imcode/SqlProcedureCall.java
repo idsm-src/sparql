@@ -61,7 +61,7 @@ public class SqlProcedureCall extends SqlIntercode
             {
                 useContext = true;
 
-                String name = ((VariableOrBlankNode) node).getName();
+                String name = ((VariableOrBlankNode) node).getSqlName();
                 UsedVariable usedVariable = callVariables.get(name);
                 parameterVariables.add(name);
 
@@ -94,7 +94,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             if(node instanceof VariableOrBlankNode)
             {
-                String name = ((VariableOrBlankNode) node).getName();
+                String name = ((VariableOrBlankNode) node).getSqlName();
                 UsedVariable usedVariable = callVariables.get(name);
 
                 if(usedVariable == null)
@@ -198,7 +198,7 @@ public class SqlProcedureCall extends SqlIntercode
 
         for(Node paramater : parameters.values())
             if(paramater instanceof VariableOrBlankNode)
-                contextRestrictions.add(((VariableOrBlankNode) paramater).getName());
+                contextRestrictions.add(((VariableOrBlankNode) paramater).getSqlName());
 
         //FIXME: is procedure deterministic?
         SqlIntercode optimized = context.optimize(request, contextRestrictions, reduced);
@@ -224,7 +224,7 @@ public class SqlProcedureCall extends SqlIntercode
                 continue;
 
 
-            String name = ((VariableOrBlankNode) node).getName();
+            String name = ((VariableOrBlankNode) node).getSqlName();
 
             if(variables.get(name) == null)
                 continue;
@@ -307,7 +307,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             if(node instanceof VariableOrBlankNode)
             {
-                String name = ((VariableOrBlankNode) node).getName();
+                String name = ((VariableOrBlankNode) node).getSqlName();
                 ResultDefinition previousDefinition = notUsedInWhere.get(name);
 
                 UsedVariable variable = context.getVariables().get(name);
@@ -440,7 +440,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             if(node instanceof VariableOrBlankNode)
             {
-                String varName = ((VariableOrBlankNode) node).getName();
+                String varName = ((VariableOrBlankNode) node).getSqlName();
                 UsedVariable variable = context.getVariables().get(varName);
 
                 if(variable.getClasses().contains(resClass))

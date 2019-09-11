@@ -222,6 +222,6 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(Variable variable)
     {
-        return SqlVariable.create(variable.getName(), variableAccessor);
+        return SqlVariable.create(variable.getSqlName(), variableAccessor);
     }
 }
