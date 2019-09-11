@@ -71,6 +71,12 @@ public interface SparqlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitDescribeQuery(SparqlParser.DescribeQueryContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SparqlParser#describeClause}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDescribeClause(SparqlParser.DescribeClauseContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SparqlParser#askQuery}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

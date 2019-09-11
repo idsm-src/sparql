@@ -11,6 +11,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -59,6 +60,7 @@ import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.DescribeQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -114,10 +116,13 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
 
@@ -182,6 +187,65 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode bind = SqlBind.bind("ask", expression, SqlEmptySolution.get(), new HashSet<String>());
 
         return new SqlQuery(variablesInScope, bind);
+    }
+
+
+    @Override
+    public SqlIntercode visit(DescribeQuery describeQuery)
+    {
+        prologue = describeQuery.getPrologue();
+        datasets = describeQuery.getSelect().getDataSets();
+
+        Variable subject = new Variable("@subject");
+        Variable predicate = new Variable("@predikate");
+        Variable object = new Variable("@object");
+
+        HashSet<String> restrictions = new LinkedHashSet<String>();
+        restrictions.add(subject.getName());
+        restrictions.add(predicate.getName());
+        restrictions.add(object.getName());
+
+        PathTranslateVisitor visitor = new PathTranslateVisitor(request, datasets);
+        SqlIntercode result = SqlNoSolution.get();
+        SqlIntercode select = visitElement(describeQuery.getSelect());
+
+        for(VarOrIri resource : describeQuery.getResources())
+        {
+            if(resource instanceof IRI)
+            {
+                IRI iri = (IRI) resource;
+                SqlExpressionIntercode expression = SqlIri.create(iri, request);
+
+                SqlIntercode subjectPattern = visitor.translate(null, iri, predicate, object);
+                subjectPattern = SqlBind.bind(subject.getName(), expression, subjectPattern, restrictions);
+                result = SqlUnion.union(result, subjectPattern);
+
+                SqlIntercode objectPattern = visitor.translate(null, subject, predicate, iri);
+                objectPattern = SqlBind.bind(object.getName(), expression, objectPattern, restrictions);
+                result = SqlUnion.union(result, objectPattern);
+            }
+            else
+            {
+                Variable variable = (Variable) resource;
+                SqlExpressionIntercode expression = SqlVariable.create(variable.getName(),
+                        new SimpleVariableAccessor(select.getVariables()));
+
+                SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, Arrays.asList(expression));
+                SqlIntercode source = translateSqlFilters(Arrays.asList(filter), select);
+
+                SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
+                subjectPattern = SqlJoin.join(schema, source, subjectPattern);
+                subjectPattern = SqlBind.bind(subject.getName(), expression, subjectPattern, restrictions);
+                result = SqlUnion.union(result, subjectPattern);
+
+                SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
+                objectPattern = SqlJoin.join(schema, source, objectPattern);
+                objectPattern = SqlBind.bind(object.getName(), expression, objectPattern, restrictions);
+                result = SqlUnion.union(result, objectPattern);
+            }
+        }
+
+        return new SqlQuery(restrictions, result).optimize(request);
     }
 
 
@@ -1532,12 +1596,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public String translate(Query sparqlQuery) throws SQLException
+    public SqlQuery translate(Query sparqlQuery) throws SQLException
     {
         try
         {
             SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
-            return imcode.optimize(request).translate();
+            return (SqlQuery) imcode.optimize(request);
         }
         catch(SQLRuntimeException e)
         {

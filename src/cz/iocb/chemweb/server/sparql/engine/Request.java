@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.engine;
 
-import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -20,6 +19,7 @@ import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.DescribeQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Query;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
@@ -31,6 +31,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.visitor.QueryVisitor;
 import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 
 
 
@@ -111,44 +112,7 @@ public class Request implements AutoCloseable
             syntaxTree.getSelect().setDataSets(dataSets);
 
 
-        if(syntaxTree instanceof SelectQuery)
-        {
-            if(offset > 0)
-            {
-                BigInteger oldOffset = syntaxTree.getSelect().getOffset();
-                BigInteger newOffset = BigInteger.valueOf(offset);
-
-                if(oldOffset != null)
-                    newOffset = newOffset.add(oldOffset);
-
-                syntaxTree.getSelect().setOffset(newOffset);
-            }
-
-            if(limit >= 0)
-            {
-                BigInteger oldLimit = syntaxTree.getSelect().getLimit();
-                BigInteger newLimit = BigInteger.valueOf(limit + 1);
-
-                if(oldLimit != null && offset > 0)
-                    oldLimit = oldLimit.subtract(BigInteger.valueOf(offset));
-
-                if(oldLimit != null && oldLimit.signum() == -1)
-                    oldLimit = BigInteger.ZERO;
-
-                if(oldLimit == null || oldLimit.compareTo(newLimit) == 1)
-                    syntaxTree.getSelect().setLimit(newLimit);
-                else
-                    syntaxTree.getSelect().setLimit(oldLimit);
-            }
-        }
-
         setTimeout(timeout);
-
-        TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
-        String code = translateVisitor.translate(syntaxTree);
-
-        checkForErrors(messages);
-
 
         ResultType type = null;
 
@@ -156,8 +120,24 @@ public class Request implements AutoCloseable
             type = ResultType.SELECT;
         else if(syntaxTree instanceof AskQuery)
             type = ResultType.ASK;
+        else if(syntaxTree instanceof DescribeQuery)
+            type = ResultType.DESCRIBE;
         else if(syntaxTree instanceof ConstructQuery)
             type = ResultType.CONSTRUCT;
+
+
+        TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
+        SqlQuery imcode = translateVisitor.translate(syntaxTree);
+
+        if(type != ResultType.CONSTRUCT)
+        {
+            imcode.setOffset(offset);
+            imcode.setLimit(limit + 1);
+        }
+
+        String code = imcode.translate();
+
+        checkForErrors(messages);
 
         Statement statement = getStatement();
 

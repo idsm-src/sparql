@@ -53,7 +53,7 @@ public enum MessageType
             ERROR,
             "Variable '%s' mentioned in the GROUP BY clause cannot be used in the aggregate."),
 
-    invalidProjection(ERROR, "Use of SELECT * is only permitted when the query does not have a GROUP BY clause."),
+    invalidProjection(ERROR, "Use of * is only permitted when the query does not use grouping."),
 
     variableUsedBeforeBind(
             ERROR,

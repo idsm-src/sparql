@@ -19,6 +19,8 @@ public class SqlQuery extends SqlIntercode
 {
     private final Collection<String> selectedVariables;
     private final SqlIntercode child;
+    private int offset;
+    private int limit;
 
 
     public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
@@ -62,7 +64,7 @@ public class SqlQuery extends SqlIntercode
                 hasSelect = true;
 
                 builder.append("NULL AS \"");
-                builder.append(variableName);
+                builder.append(variableName.replaceFirst("^@", ""));
                 builder.append('#');
                 builder.append(ResultTag.NULL.getTag());
                 builder.append('"');
@@ -113,7 +115,7 @@ public class SqlQuery extends SqlIntercode
 
                         builder.append(" AS \"");
 
-                        builder.append(variableName);
+                        builder.append(variableName.replaceFirst("^@", ""));
                         builder.append('#');
                         builder.append(tags.get(part).getTag());
                         builder.append('"');
@@ -133,6 +135,30 @@ public class SqlQuery extends SqlIntercode
         builder.append(child.translate());
         builder.append(") AS tab");
 
+        if(offset > 0)
+        {
+            builder.append(" OFFSET ");
+            builder.append(offset);
+        }
+
+        if(offset >= 0)
+        {
+            builder.append(" LIMIT ");
+            builder.append(limit);
+        }
+
         return builder.toString();
+    }
+
+
+    public void setOffset(int offset)
+    {
+        this.offset = offset;
+    }
+
+
+    public void setLimit(int limit)
+    {
+        this.limit = limit;
     }
 }

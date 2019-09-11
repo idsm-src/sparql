@@ -68,7 +68,11 @@ constructQuery
     ;
 
 describeQuery
-    : DESCRIBE (varOrIRI+ | '*') datasetClause* whereClause? solutionModifier
+    : describeClause datasetClause* whereClause? solutionModifier
+    ;
+
+describeClause
+    : DESCRIBE (varOrIRI+ | '*')
     ;
 
 askQuery

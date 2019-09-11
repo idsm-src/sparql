@@ -61,6 +61,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectCont
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.TriplesSameSubjectPathContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarOrIRIContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
@@ -71,6 +72,7 @@ import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.DescribeQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -203,6 +205,57 @@ public class QueryVisitor extends BaseVisitor<Query>
             select.setIsInAggregateMode(isInAggregateMode(ctx.askQuery().groupClause(), ctx.askQuery().havingClause()));
 
             result = new AskQuery(prologue, select);
+        }
+        else if(ctx.describeQuery() != null)
+        {
+            NodeVisitor visitor = new NodeVisitor(prologue, messages);
+            LinkedList<VarOrIri> resources = new LinkedList<VarOrIri>();
+
+            for(VarOrIRIContext item : ctx.describeQuery().describeClause().varOrIRI())
+                resources.add((VarOrIri) visitor.visit(item));
+
+
+            GraphPattern pattern = ctx.describeQuery().whereClause() != null ?
+                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
+                            usedResultNodes, messages).visit(ctx.describeQuery().whereClause()) :
+                    new GroupGraph(new ArrayList<Pattern>(0));
+
+            Values values = parseValues(ctx.valuesClause());
+
+
+            if(ctx.describeQuery().describeClause().varOrIRI().isEmpty())
+            {
+                if(!isInAggregateMode(ctx.describeQuery().solutionModifier()))
+                    for(String variable : pattern.getVariablesInScope())
+                        resources.add(new Variable(variable));
+                else
+                    messages.add(new TranslateMessage(MessageType.invalidProjection,
+                            Range.compute(ctx.describeQuery().describeClause())));
+            }
+
+            LinkedList<Projection> projections = new LinkedList<Projection>();
+
+            for(VarOrIri resource : resources)
+                if(resource instanceof Variable)
+                    projections.add(new Projection((Variable) resource));
+
+
+            Select select = withRange(new Select(projections, pattern, values, true), ctx);
+            select.setReduced(true);
+
+            if(ctx.describeQuery().datasetClause() != null)
+                select.getDataSets().addAll(mapList(ctx.describeQuery().datasetClause(), this::parseDataSet));
+
+            SolutionModifierContext solutionModifierCtx = ctx.describeQuery().solutionModifier();
+
+            select.getGroupByConditions().addAll(parseGroupClause(solutionModifierCtx.groupClause()));
+            select.getHavingConditions().addAll(parseHavingClause(solutionModifierCtx.havingClause()));
+            select.getOrderByConditions().addAll(parseOrderClause(solutionModifierCtx.orderClause()));
+            select.setLimit(parseLimitClause(solutionModifierCtx.limitOffsetClauses()));
+            select.setOffset(parseOffsetClause(solutionModifierCtx.limitOffsetClauses()));
+            select.setIsInAggregateMode(isInAggregateMode(solutionModifierCtx));
+
+            result = new DescribeQuery(prologue, resources, select);
         }
         else if(ctx.constructQuery() != null)
         {

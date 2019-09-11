@@ -6,6 +6,7 @@ import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
+import cz.iocb.chemweb.server.sparql.parser.model.DescribeQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition;
@@ -105,6 +106,12 @@ public abstract class ElementVisitor<T>
     public T visit(AskQuery askQuery)
     {
         return aggregateResult(visitElement(askQuery.getPrologue()), visitElement(askQuery.getSelect()));
+    }
+
+    public T visit(DescribeQuery describeQuery)
+    {
+        return aggregateResult(visitElement(describeQuery.getPrologue()), visitElements(describeQuery.getResources()),
+                visitElement(describeQuery.getSelect()));
     }
 
     public T visit(ConstructQuery constructQuery)
