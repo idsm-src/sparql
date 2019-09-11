@@ -4,7 +4,7 @@ import java.util.Collection;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
@@ -28,12 +28,12 @@ public class ProcedureCall extends ProcedureCallBase
         super(procedure, parameters);
         this.result = result;
 
-        if(result instanceof VariableOrBlankNode)
-            variablesInScope.add(((VariableOrBlankNode) result).getName());
+        if(result instanceof Variable)
+            variablesInScope.add(((Variable) result).getName());
 
         for(Parameter parameter : parameters)
-            if(parameter.getValue() instanceof VariableOrBlankNode)
-                variablesInScope.add(((VariableOrBlankNode) parameter.getValue()).getName());
+            if(parameter.getValue() instanceof Variable)
+                variablesInScope.add(((Variable) parameter.getValue()).getName());
     }
 
 

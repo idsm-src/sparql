@@ -536,7 +536,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         final int size = values.getVariables().size();
 
-        ArrayList<String> variablesInScope = new ArrayList<String>();
+        ArrayList<String> variables = new ArrayList<String>();
         UsedVariables usedVariables = new UsedVariables();
 
 
@@ -551,8 +551,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             String variable = values.getVariables().get(i).getName();
 
-            if(!variablesInScope.contains(variable))
-                variablesInScope.add(variable);
+            if(!variables.contains(variable))
+                variables.add(variable);
             else
                 messages.add(new TranslateMessage(MessageType.repeatOfValuesVariable,
                         values.getVariables().get(i).getRange(), variable));
@@ -653,22 +653,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, datasets);
         SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
-
-
-        ArrayList<String> variablesInScope = new ArrayList<String>();
-
-        if(graph instanceof Variable)
-            variablesInScope.add(((Variable) graph).getName());
-
-        if(subject instanceof Variable)
-            variablesInScope.add(((Variable) subject).getName());
-
-        if(predicate instanceof Variable)
-            variablesInScope.add(((Variable) predicate).getName());
-
-        if(object instanceof Variable)
-            variablesInScope.add(((Variable) object).getName());
-
 
         return translatedPattern;
     }

@@ -7,7 +7,7 @@ import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Parser;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 
 
 
@@ -31,12 +31,12 @@ public class MultiProcedureCall extends ProcedureCallBase
         this.results = Collections.unmodifiableList(new ArrayList<>(results));
 
         for(Parameter result : results)
-            if(result.getValue() instanceof VariableOrBlankNode)
-                variablesInScope.add(((VariableOrBlankNode) result.getValue()).getName());
+            if(result.getValue() instanceof Variable)
+                variablesInScope.add(((Variable) result.getValue()).getName());
 
         for(Parameter parameter : parameters)
-            if(parameter.getValue() instanceof VariableOrBlankNode)
-                variablesInScope.add(((VariableOrBlankNode) parameter.getValue()).getName());
+            if(parameter.getValue() instanceof Variable)
+                variablesInScope.add(((Variable) parameter.getValue()).getName());
     }
 
 

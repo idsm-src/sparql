@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.parser.model.triple;
 
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.BasicPattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.PatternElement;
 
@@ -25,14 +25,14 @@ public class Triple extends PatternElement implements BasicPattern
         this.object = object;
 
 
-        if(subject instanceof VariableOrBlankNode)
-            variablesInScope.add(((VariableOrBlankNode) subject).getName());
+        if(subject instanceof Variable)
+            variablesInScope.add(((Variable) subject).getName());
 
-        if(predicate instanceof VariableOrBlankNode)
-            variablesInScope.add(((VariableOrBlankNode) predicate).getName());
+        if(predicate instanceof Variable)
+            variablesInScope.add(((Variable) predicate).getName());
 
-        if(object instanceof VariableOrBlankNode)
-            variablesInScope.add(((VariableOrBlankNode) object).getName());
+        if(object instanceof Variable)
+            variablesInScope.add(((Variable) object).getName());
     }
 
 
