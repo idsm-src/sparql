@@ -19,8 +19,8 @@ public class SqlQuery extends SqlIntercode
 {
     private final Collection<String> selectedVariables;
     private final SqlIntercode child;
-    private int offset;
-    private int limit;
+    private int offset = 0;
+    private int limit = -1;
 
 
     public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
@@ -141,7 +141,7 @@ public class SqlQuery extends SqlIntercode
             builder.append(offset);
         }
 
-        if(offset >= 0)
+        if(limit >= 0)
         {
             builder.append(" LIMIT ");
             builder.append(limit);
