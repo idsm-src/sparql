@@ -186,8 +186,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
         VariableAccessor variableAccessor = new SimpleVariableAccessor(new UsedVariables());
         SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, variableAccessor);
-        SqlIntercode bind = SqlBind.bind(variable.getSqlName(), expression, SqlEmptySolution.get(),
-                new HashSet<String>());
+        SqlIntercode bind = SqlBind.bind(variable.getSqlName(), expression, SqlEmptySolution.get());
 
         return new SqlQuery(variablesInScope, bind);
     }
@@ -220,11 +219,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlExpressionIntercode expression = SqlIri.create(iri, request);
 
                 SqlIntercode subjectPattern = visitor.translate(null, iri, predicate, object);
-                subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern, restrictions);
+                subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
                 result = SqlUnion.union(result, subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, iri);
-                objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern, restrictions);
+                objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern);
                 result = SqlUnion.union(result, objectPattern);
             }
             else
@@ -234,16 +233,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         new SimpleVariableAccessor(select.getVariables()));
 
                 SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, Arrays.asList(expression));
-                SqlIntercode source = translateSqlFilters(Arrays.asList(filter), select);
+                SqlIntercode source = SqlFilter.filter(Arrays.asList(filter), select);
 
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
                 subjectPattern = SqlJoin.join(schema, source, subjectPattern);
-                subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern, restrictions);
+                subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
                 result = SqlUnion.union(result, subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
                 objectPattern = SqlJoin.join(schema, source, objectPattern);
-                objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern, restrictions);
+                objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern);
                 result = SqlUnion.union(result, objectPattern);
             }
         }
@@ -326,7 +325,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 //TODO: optimize based on the expression value
 
-                translatedWhereClause = SqlBind.bind(variable.getSqlName(), expression, translatedWhereClause, null);
+                translatedWhereClause = SqlBind.bind(variable.getSqlName(), expression, translatedWhereClause);
             }
         }
 
@@ -976,56 +975,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
-        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern, null);
+        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern);
         return intercode;
-    }
-
-
-    private SqlIntercode translateSqlFilters(List<SqlExpressionIntercode> filterExpressions, SqlIntercode child)
-    {
-        if(child == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-
-        if(child instanceof SqlUnion)
-        {
-            SqlIntercode union = SqlNoSolution.get();
-
-            for(SqlIntercode subChild : ((SqlUnion) child).getChilds())
-            {
-                VariableAccessor accessor = new SimpleVariableAccessor(subChild.getVariables());
-
-                List<SqlExpressionIntercode> optimizedExpressions = filterExpressions.stream()
-                        .map(f -> SqlEffectiveBooleanValue.create(f.optimize(accessor))).collect(Collectors.toList());
-
-                union = SqlUnion.union(union, translateSqlFilters(optimizedExpressions, subChild));
-            }
-
-            return union;
-        }
-
-
-        List<SqlExpressionIntercode> validExpressions = new LinkedList<SqlExpressionIntercode>();
-        boolean isFalse = false;
-
-        for(SqlExpressionIntercode expression : filterExpressions)
-        {
-            if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
-                isFalse = true;
-            else if(expression instanceof SqlBinaryComparison
-                    && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
-                isFalse = true;
-            else if(expression != SqlEffectiveBooleanValue.trueValue)
-                validExpressions.add(expression);
-        }
-
-        if(isFalse)
-            return SqlNoSolution.get();
-
-        if(validExpressions.isEmpty())
-            return child;
-
-        return new SqlFilter(child.getVariables(), child, validExpressions);
     }
 
 
@@ -1050,7 +1001,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             filterExpressions.add(expression);
         }
 
-        return translateSqlFilters(filterExpressions, groupPattern);
+        return SqlFilter.filter(filterExpressions, groupPattern);
     }
 
 

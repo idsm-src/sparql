@@ -41,8 +41,7 @@ public class SqlBind extends SqlIntercode
     }
 
 
-    public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context,
-            HashSet<String> restrictions)
+    public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context)
     {
         if(context == SqlNoSolution.get())
             return SqlNoSolution.get();
@@ -57,16 +56,18 @@ public class SqlBind extends SqlIntercode
             for(SqlIntercode child : ((SqlUnion) context).getChilds())
             {
                 VariableAccessor variableAccessor = new SimpleVariableAccessor(child.getVariables());
-                union = SqlUnion.union(union,
-                        bind(variable, expression.optimize(variableAccessor), child, restrictions));
+                union = SqlUnion.union(union, bind(variable, expression.optimize(variableAccessor), child));
             }
 
             return union;
         }
 
 
-        UsedVariables variables = context.getVariables().restrict(restrictions);
+        UsedVariables variables = new UsedVariables();
         variables.add(new UsedVariable(variable, expression.getResourceClasses(), expression.canBeNull()));
+
+        for(UsedVariable var : context.getVariables().getValues())
+            variables.add(var);
 
         return new SqlBind(variables, variable, expression, context);
     }
@@ -82,7 +83,7 @@ public class SqlBind extends SqlIntercode
         contextRestrictions.addAll(expression.getVariables());
 
         return bind(variableName, expression,
-                context.optimize(request, contextRestrictions, reduced && expression.isDeterministic()), restrictions);
+                context.optimize(request, contextRestrictions, reduced && expression.isDeterministic()));
     }
 
 
