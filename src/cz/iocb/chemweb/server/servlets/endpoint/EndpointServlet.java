@@ -188,13 +188,28 @@ public class EndpointServlet extends HttpServlet
             res.setHeader("content-disposition", "attachment; filename=\"" + filename + "\"");
 
 
+        int limit = -1;
+
+        // Virtuoso extension
+        try
+        {
+            String value = req.getParameter("maxrows");
+
+            if(value != null)
+                limit = Integer.parseInt(value);
+        }
+        catch(NumberFormatException e)
+        {
+        }
+
+
         try
         {
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
             try(Request request = engine.getRequest())
             {
-                try(Result result = request.execute(query, dataSets))
+                try(Result result = request.execute(query, dataSets, -1, limit, 0))
                 {
                     OutputType format = detectOutputType(req, result.getResultType());
                     res.setHeader("content-type", format.getMime());
