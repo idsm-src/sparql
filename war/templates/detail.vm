@@ -33,7 +33,7 @@
 	  
 	  <div style="margin:10px">
 	    <table cellpadding="10"><tr>
-	      <td><img src="images/emblem-important.png"></td>
+	      <td><img width="32px" height="32px" src="images/dialog-information.png"></td>
 	      <td><b>
 	        #if($triple.P)
 	          There is no template for node #escapeIRI($entity)#if($info.TYPE) (type #escapeIRI($info.TYPE))#end.
