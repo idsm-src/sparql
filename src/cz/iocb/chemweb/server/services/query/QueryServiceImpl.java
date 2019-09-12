@@ -10,6 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -63,6 +66,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     private SparqlDatabaseConfiguration sparqlConfig;
     private Engine engine;
     private VelocityEngine ve;
+    private ExecutorService executorService;
 
 
     @Override
@@ -119,7 +123,16 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
         }
 
 
+        executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
         super.init(config);
+    }
+
+
+    @Override
+    public void destroy()
+    {
+        executorService.shutdown();
     }
 
 
@@ -152,44 +165,60 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
                 try(Result result = queryState.request.execute(query, offset, limit, timeout))
                 {
                     Template template = ve.getTemplate("node.vm");
-
-                    Vector<DataGridNode[]> items = new Vector<DataGridNode[]>();
+                    Vector<Future<DataGridNode[]>> futures = new Vector<Future<DataGridNode[]>>(limit + 1);
 
                     while(result.next())
                     {
-                        DataGridNode[] stringRow = new DataGridNode[result.getHeads().size()];
+                        final RdfNode[] row = result.getRow();
 
-                        for(int i = 0; i < result.getHeads().size(); i++)
-                        {
-                            stringRow[i] = new DataGridNode();
+                        futures.add(executorService.submit(() -> {
+                            DataGridNode[] stringRow = new DataGridNode[row.length];
 
-                            if(result.get(i) != null && result.get(i).isIri())
-                                stringRow[i].ref = result.get(i).getValue();
-
-
-                            String html = nodeHashMap.get(result.get(i));
-
-                            if(html != null)
+                            for(int i = 0; i < row.length; i++)
                             {
-                                stringRow[i].html = html;
+                                stringRow[i] = new DataGridNode();
+
+                                if(row[i] != null && row[i].isIri())
+                                    stringRow[i].ref = row[i].getValue();
+
+
+                                String html = nodeHashMap.get(row[i]);
+
+                                if(html != null)
+                                {
+                                    stringRow[i].html = html;
+                                }
+                                else
+                                {
+                                    try
+                                    {
+                                        VelocityContext context = new VelocityContext();
+                                        context.put("urlContext", UrlDirective.Context.NODE);
+                                        context.put("utils", new NodeUtils(sparqlConfig.getPrefixes()));
+                                        context.put("entity", row[i]);
+
+                                        StringWriter writer = new StringWriter();
+                                        template.merge(context, writer);
+
+                                        stringRow[i].html = writer.toString();
+                                        nodeHashMap.put(row[i], stringRow[i].html);
+                                    }
+                                    catch(Throwable e)
+                                    {
+                                        stringRow[i].html = "&lt;template error&gt;";
+                                    }
+                                }
                             }
-                            else
-                            {
-                                VelocityContext context = new VelocityContext();
-                                context.put("urlContext", UrlDirective.Context.NODE);
-                                context.put("utils", new NodeUtils(sparqlConfig.getPrefixes()));
-                                context.put("entity", result.get(i));
 
-                                StringWriter writer = new StringWriter();
-                                template.merge(context, writer);
-
-                                stringRow[i].html = writer.toString();
-                                nodeHashMap.put(result.get(i), stringRow[i].html);
-                            }
-                        }
-
-                        items.add(stringRow);
+                            return stringRow;
+                        }));
                     }
+
+
+                    Vector<DataGridNode[]> items = new Vector<DataGridNode[]>(futures.size());
+
+                    for(Future<DataGridNode[]> future : futures)
+                        items.add(future.get());
 
 
                     boolean truncated = false;
