@@ -96,6 +96,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
+                if(argument.getResourceClasses().size() == 0)
+                    return SqlNull.get();
+
                 return new SqlBuiltinCall(function, distinct, arguments, argument.getResourceClasses(),
                         argument.canBeNull());
             }
@@ -725,7 +728,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(arguments.size() == 0)
                 {
-                    builder.append("*");
+                    builder.append("1");
                 }
                 else if(arguments.size() == 1 && !(arguments.get(0) instanceof SqlVariable))
                 {
