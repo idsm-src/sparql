@@ -7,6 +7,7 @@ import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
@@ -17,7 +18,7 @@ public class SqlValues extends SqlIntercode
     final ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList;
 
 
-    public SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
+    SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
             ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
     {
         super(usedVariables, true);
@@ -26,10 +27,59 @@ public class SqlValues extends SqlIntercode
     }
 
 
+    public static SqlIntercode create(ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
+            ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
+    {
+        if(typedValuesList.isEmpty())
+            return SqlNoSolution.get();
+
+        UsedVariables usedVariables = new UsedVariables();
+
+        for(int i = 0; i < typedVariables.size(); i++)
+        {
+            final int fi = i;
+            boolean canBeNull = typedValuesList.size() > typedValuesList.stream()
+                    .filter(l -> l.get(fi).getValue() != null).count();
+            usedVariables
+                    .add(new UsedVariable(typedVariables.get(i).getKey(), typedVariables.get(i).getValue(), canBeNull));
+        }
+
+        return new SqlValues(usedVariables, typedVariables, typedValuesList);
+    }
+
+
     @Override
     public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
     {
-        return new SqlValues(variables.restrict(restrictions), typedVariables, typedValuesList);
+        ArrayList<Pair<String, Set<ResourceClass>>> optimizedTypedVariables = new ArrayList<>(typedVariables.size());
+        boolean mask[] = new boolean[typedVariables.size()];
+
+        for(int i = 0; i < typedVariables.size(); i++)
+        {
+            if(restrictions.contains(typedVariables.get(i).getKey()))
+            {
+                mask[i] = true;
+                optimizedTypedVariables.add(typedVariables.get(i));
+            }
+        }
+
+
+        ArrayList<ArrayList<Pair<Node, ResourceClass>>> optimizedTypedValuesList = new ArrayList<>(
+                typedValuesList.size());
+
+        for(ArrayList<Pair<Node, ResourceClass>> values : typedValuesList)
+        {
+            ArrayList<Pair<Node, ResourceClass>> optimizedValues = new ArrayList<>(optimizedTypedVariables.size());
+
+            for(int i = 0; i < values.size(); i++)
+                if(mask[i])
+                    optimizedValues.add(values.get(i));
+
+            optimizedTypedValuesList.add(optimizedValues);
+        }
+
+
+        return SqlValues.create(optimizedTypedVariables, optimizedTypedValuesList);
     }
 
 

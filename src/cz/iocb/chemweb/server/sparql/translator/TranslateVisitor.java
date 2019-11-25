@@ -541,9 +541,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         final int size = values.getVariables().size();
 
         ArrayList<String> variables = new ArrayList<String>();
-        UsedVariables usedVariables = new UsedVariables();
-
-
         ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
         ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
 
@@ -566,8 +563,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             typedVariables.add(new Pair<String, Set<ResourceClass>>(variable.getSqlName(), valueClasses));
 
 
-            int valueCount = 0;
-
             for(int j = 0; j < values.getValuesLists().size(); j++)
             {
                 ValuesList valuesList = values.getValuesLists().get(j);
@@ -576,8 +571,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(value != null)
                 {
-                    valueCount++;
-
                     if(value instanceof Literal)
                     {
                         Literal literal = (Literal) value;
@@ -627,18 +620,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 typedValuesList.get(j).add(new Pair<Node, ResourceClass>((Node) value, valueType));
             }
-
-
-            if(valueCount > 0)
-            {
-                boolean canBeNull = valueCount < values.getValuesLists().size();
-                UsedVariable usedVariable = new UsedVariable(variable.getSqlName(), valueClasses, canBeNull);
-
-                usedVariables.add(usedVariable);
-            }
         }
 
-        return new SqlValues(usedVariables, typedVariables, typedValuesList);
+
+        return SqlValues.create(typedVariables, typedValuesList);
     }
 
 
@@ -1450,48 +1435,25 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        UsedVariables usedVariables = new UsedVariables();
-
-        for(int i = 0; i < mergedVariables.size(); i++)
-        {
-            final int fi = i;
-            Set<ResourceClass> resourceClasses = typedVariables.get(i).getValue();
-            boolean canBeNull = results.size() > results.stream().filter(l -> l.get(fi).getValue() != null).count();
-            usedVariables.add(new UsedVariable(mergedVariables.get(i), resourceClasses, canBeNull));
-        }
-
-        if(results.isEmpty())
-            return SqlNoSolution.get();
-
-        return new SqlValues(usedVariables, typedVariables, results);
+        return SqlValues.create(typedVariables, results);
     }
 
 
     private SqlIntercode createEmptyServiceTranslatedSegment(HashSet<String> serviceInScopeVars, SqlIntercode context)
     {
-        List<String> mergedVariables = context.getVariables().getValues().stream().map(v -> v.getName())
-                .collect(Collectors.toList());
-        serviceInScopeVars.stream().filter(v -> !mergedVariables.contains(v)).forEach(v -> mergedVariables.add(v));
-
+        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
+        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
 
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.addAll(BuiltinClasses.getClasses());
 
-        UsedVariables usedVariables = new UsedVariables();
+        for(String var : serviceInScopeVars)
+        {
+            typedVariables.add(new Pair<String, Set<ResourceClass>>(var, resourceClasses));
+            typedValuesList.add(null);
+        }
 
-        context.getVariables().getValues().stream().filter(v -> !v.canBeNull()).forEach(v -> usedVariables.add(v));
-
-        for(String var : mergedVariables)
-            if(usedVariables.get(var) == null)
-                usedVariables.add(new UsedVariable(var, resourceClasses, true));
-
-
-        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-
-        for(String var : mergedVariables)
-            typedVariables.add(new Pair<String, Set<ResourceClass>>(var, usedVariables.get(var).getClasses()));
-
-        return new SqlValues(usedVariables, typedVariables, new ArrayList<>());
+        return SqlJoin.join(schema, context, SqlValues.create(typedVariables, new ArrayList<>()));
     }
 
 
