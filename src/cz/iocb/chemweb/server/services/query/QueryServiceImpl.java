@@ -133,6 +133,8 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
     public void destroy()
     {
         executorService.shutdown();
+
+        super.destroy();
     }
 
 
