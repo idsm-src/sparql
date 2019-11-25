@@ -446,10 +446,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else
             {
                 Variable variable = new Variable(variablePrefix + variableId++);
-                orderByVariables.put(variable.getSqlName(), condition.getDirection());
+                String varName = variable.getSqlName();
 
                 Bind bind = new Bind(condition.getExpression(), variable);
                 translatedWhereClause = translateBind(bind, translatedWhereClause);
+
+                if(translatedWhereClause.getVariables().get(varName) != null)
+                    orderByVariables.put(varName, condition.getDirection());
             }
         }
 

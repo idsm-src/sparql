@@ -71,8 +71,14 @@ public class SqlSelect extends SqlIntercode
 
         SqlIntercode optimized = child.optimize(request, childRestrictions, !distinctVariables.isEmpty() || reduced);
 
+        LinkedHashMap<String, Direction> optimizedOrderByVariables = new LinkedHashMap<String, Direction>();
+
+        for(Entry<String, Direction> entry : orderByVariables.entrySet())
+            if(optimized.getVariables().get(entry.getKey()) != null)
+                optimizedOrderByVariables.put(entry.getKey(), entry.getValue());
+
         SqlSelect result = new SqlSelect(optimized.getVariables().restrict(restrictions), optimized, distinctVariables,
-                orderByVariables);
+                optimizedOrderByVariables);
 
         result.setLimit(limit);
         result.setOffset(offset);
