@@ -277,7 +277,8 @@ public class QueryVisitor extends BaseVisitor<Query>
                     else
                     {
                         ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNode());
-                        Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyList());
+                        Stream<Property> properties = triplesCtx.propertyList().propertyListNotEmpty() != null ?
+                                propertiesVisitor.visit(triplesCtx.propertyList()) : Stream.empty();
                         expander.visit(new ComplexTriple(node, properties.collect(Collectors.toList())));
                     }
                 }
