@@ -154,7 +154,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : builtInCallExpression.getArguments())
             arguments.add(visitElement(expression));
 
-        if(function.equalsIgnoreCase("iri"))
+        if(function.equalsIgnoreCase("iri") || function.equalsIgnoreCase("uri"))
             arguments.add(SqlIri.create(prologue.getBase(), request));
 
         if(function.equalsIgnoreCase("count") && builtInCallExpression.isDistinct() && arguments.size() == 0)

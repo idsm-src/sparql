@@ -257,6 +257,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             }
 
             case "iri":
+            case "uri":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
 
@@ -1572,6 +1573,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             }
 
             case "iri":
+            case "uri":
             {
                 SqlExpressionIntercode operand = arguments.get(0);
                 SqlExpressionIntercode base = arguments.get(1);
