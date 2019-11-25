@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
@@ -71,6 +73,13 @@ public class SqlInExpression extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights)
     {
+        if(rights.isEmpty() && negated)
+            return trueValue;
+
+        if(rights.isEmpty() && !negated)
+            return falseValue;
+
+
         SqlExpressionIntercode expression = null;
 
         SqlExpressionIntercode wrappedLeft = OperandWrapper.create(left);
