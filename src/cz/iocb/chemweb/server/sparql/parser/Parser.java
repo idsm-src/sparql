@@ -33,13 +33,49 @@ public class Parser
     /**
      * Parses a SPARQL query contained in the given string.
      */
-    public ParserRuleContext parse(String sparqlString)
+    public ParserRuleContext parse(String query)
     {
-        return parse(new ANTLRInputStream(sparqlString));
+        StringBuffer buffer = new StringBuffer(query.length() + 128);
+
+        for(int i = 0; i < query.length() - 1; i++)
+        {
+            if(query.charAt(i) == '\\' && query.charAt(i + 1) == 'u')
+            {
+                String substr = query.substring(i + 2, i + 6);
+
+                if(substr.matches("^[0-9a-fA-F]{4}$"))
+                {
+                    buffer.append((char) Integer.parseInt(substr, 16));
+
+                    i += 5;
+                    continue;
+                }
+            }
+            else if(query.charAt(i) == '\\' && query.charAt(i + 1) == 'U')
+            {
+                String substr = query.substring(i + 2, i + 10);
+
+                if(substr.matches("^(000[0-9a-fA-F]{5})|(0010[0-9a-fA-F]{4})$"))
+                {
+                    buffer.appendCodePoint(Integer.parseInt(substr, 16));
+
+                    i += 9;
+                    continue;
+                }
+            }
+
+            buffer.append(query.charAt(i));
+        }
+
+        buffer.append(query.charAt(query.length() - 1));
+        query = buffer.toString();
+
+
+        return parse(new ANTLRInputStream(query));
     }
 
 
-    public ParserRuleContext parse(CharStream stream)
+    private ParserRuleContext parse(CharStream stream)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
