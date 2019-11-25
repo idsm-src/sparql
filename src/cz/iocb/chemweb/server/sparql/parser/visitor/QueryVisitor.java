@@ -337,6 +337,11 @@ public class QueryVisitor extends BaseVisitor<Query>
 
             result = new ConstructQuery(prologue, templates, select);
         }
+        else if(ctx.updateCommand() != null)
+        {
+            messages.add(
+                    new TranslateMessage(MessageType.unsupportedUpdateCommand, Range.compute(ctx.updateCommand())));
+        }
 
 
         //TODO: the check could be less strict in a future version

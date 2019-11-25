@@ -9,6 +9,8 @@ public enum MessageType
 {
     syntaxError(ERROR, "'%s'"),
 
+    unsupportedUpdateCommand(ERROR, "SPARQL Update operations are not supported."),
+
     wrongNumberOfValues(ERROR, "The number of variables doesn't match the number of values."),
 
     unknownPrefix(ERROR, "Could not resolve the prefix: '%s'"),
