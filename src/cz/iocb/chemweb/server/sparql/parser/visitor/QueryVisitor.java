@@ -25,6 +25,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.AggregateContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BaseDeclContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BindContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodeContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ConstructTemplateContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValueContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.DataBlockValuesContext;
@@ -39,6 +40,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GroupGraphPatternSubCo
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GroupGraphPatternSubListContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.GroupOrUnionGraphPatternContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.HavingClauseContext;
+import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.InlineDataContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.InlineDataFullContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.InlineDataOneVarContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.IriContext;
@@ -65,7 +67,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarOrIRIContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
-import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
@@ -155,12 +156,52 @@ public class QueryVisitor extends BaseVisitor<Query>
     @Override
     public Query visitQuery(QueryContext ctx)
     {
+        final HashSet<String> patternBlankNodes = new HashSet<String>();
+
         new BaseVisitor<Void>()
         {
             @Override
             public Void visitBlankNode(BlankNodeContext ctx)
             {
-                usedBlankNodes.add(ctx.getText().replaceFirst("^:_", ""));
+                String name = ctx.getText().replaceFirst("^:_", "");
+
+                if(usedBlankNodes.contains(name))
+                    messages.add(new TranslateMessage(MessageType.reuseOfBlankNode, Range.compute(ctx), ctx.getText()));
+
+                patternBlankNodes.add(name);
+                return null;
+            }
+
+            @Override
+            public Void visitGroupGraphPattern(GroupGraphPatternContext ctx)
+            {
+                usedBlankNodes.addAll(patternBlankNodes);
+                patternBlankNodes.clear();
+                super.visitGroupGraphPattern(ctx);
+                usedBlankNodes.addAll(patternBlankNodes);
+                patternBlankNodes.clear();
+                return null;
+            }
+
+            @Override
+            public Void visitBind(BindContext ctx)
+            {
+                usedBlankNodes.addAll(patternBlankNodes);
+                patternBlankNodes.clear();
+                return super.visitBind(ctx);
+            }
+
+            @Override
+            public Void visitInlineData(InlineDataContext ctx)
+            {
+                usedBlankNodes.addAll(patternBlankNodes);
+                patternBlankNodes.clear();
+                return super.visitInlineData(ctx);
+            }
+
+            @Override
+            public Void visitConstructTemplate(ConstructTemplateContext ctx)
+            {
                 return null;
             }
         }.visit(ctx);
@@ -825,18 +866,6 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
 
     @Override
-    public Node visitElement(Element element)
-    {
-        Node result = super.visitElement(element);
-
-        if(result == null && element instanceof Node)
-            return (Node) element;
-
-        return result;
-    }
-
-
-    @Override
     public Node visit(ComplexTriple triple)
     {
         Node subject = null;
@@ -926,9 +955,30 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
 
     @Override
+    public Node visit(Variable variable)
+    {
+        return variable;
+    }
+
+
+    @Override
+    public Node visit(IRI iri)
+    {
+        return iri;
+    }
+
+
+    @Override
+    public Node visit(BlankNode node)
+    {
+        return node;
+    }
+
+
+    @Override
     public Node visit(Literal literal)
     {
-        return null;
+        return literal;
     }
 
 

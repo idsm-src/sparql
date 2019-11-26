@@ -25,6 +25,8 @@ public enum MessageType
 
     invalidProcedureResultValue(ERROR, "Procedure return value name has to be an IRI."),
 
+    reuseOfBlankNode(ERROR, "Blank node '%s' is already used in another basic graph pattern."),
+
     reuseOfParameterNode(ERROR, "Parameter node of the procedure '%s' is already used."),
 
     reuseOfResultNode(ERROR, "Result node of the procedure '%s' is already used."),
