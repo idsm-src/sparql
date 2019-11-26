@@ -246,7 +246,7 @@ groupGraphPatternSubList
     ;
     
 triplesBlock
-    :  triplesSameSubjectPath ('.' triplesSameSubjectPath?)*
+    :  triplesSameSubjectPath ('.' triplesSameSubjectPath)* '.'?
     ;
 
 graphPatternNotTriples
