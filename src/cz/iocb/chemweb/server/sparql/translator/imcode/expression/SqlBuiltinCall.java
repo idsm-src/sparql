@@ -545,6 +545,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     resultClasses = nextResourceClasses;
                 }
 
+                if(resultClasses.isEmpty())
+                    return SqlNull.get();
+
                 return new SqlBuiltinCall(function, arguments, resultClasses, canBeNull);
             }
 
