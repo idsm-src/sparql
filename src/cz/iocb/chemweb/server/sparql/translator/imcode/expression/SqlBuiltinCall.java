@@ -313,8 +313,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     boolean canBeNull = operand.canBeNull() || operand.getResourceClasses().size() > 1;
 
-                    if(resourceClass == xsdString)
+                    if(resourceClass == xsdString && operand.getExpressionResourceClass() == xsdString)
                         return operand;
+                    else if(resourceClass == xsdString)
+                        return new SqlBuiltinCall(function, arguments, asSet(xsdString), canBeNull);
                     else if(resourceClass == null)
                         return new SqlBuiltinCall(function, arguments, asSet(unsupportedLiteral), canBeNull);
                     else
