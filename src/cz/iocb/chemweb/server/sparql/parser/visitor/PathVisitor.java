@@ -128,7 +128,7 @@ public class PathVisitor extends BaseVisitor<Path>
 
         if(ctx.path() != null)
         {
-            new BracketedPath(visit(ctx.path()));
+            return new BracketedPath(visit(ctx.path()));
         }
 
         return null;
