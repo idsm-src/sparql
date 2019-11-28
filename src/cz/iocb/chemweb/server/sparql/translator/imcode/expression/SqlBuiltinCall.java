@@ -488,6 +488,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(resourceClasses.size() == 0)
                     return SqlNull.get();
 
+                resourceClasses.add(xsdString);
+
                 return new SqlBuiltinCall(function, arguments, resourceClasses, canBeNull);
             }
 
@@ -1899,8 +1901,6 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "strbefore":
             case "strafter":
             {
-                //TODO: add other optimized variants
-
                 SqlExpressionIntercode left = arguments.get(0);
                 SqlExpressionIntercode right = arguments.get(1);
 
@@ -1910,121 +1910,47 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     SqlNodeValue leftNode = (SqlNodeValue) left;
                     SqlNodeValue rightNode = (SqlNodeValue) right;
-                    int variants = 0;
 
-                    for(ResourceClass leftResClass : left.getResourceClasses())
-                    {
-                        for(ResourceClass rightResClass : right.getResourceClasses())
-                        {
-                            if(isStringLiteral(leftResClass) && rightResClass == xsdString
-                                    || leftResClass == rightResClass
-                                            && leftResClass instanceof LangStringConstantTagClass)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append("sparql.");
-                                builder.append(function);
-                                builder.append("_string_string(");
-                                builder.append(leftNode.getNodeAccess(leftResClass, 0));
-                                builder.append(", ");
-                                builder.append(rightNode.getNodeAccess(rightResClass, 0));
-                                builder.append(")");
-                            }
-                            else if(leftResClass == rdfLangString && isLangString(rightResClass)
-                                    || isLangString(leftResClass) && rightResClass == rdfLangString)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append("CASE WHEN ");
-
-                                if(leftResClass == rdfLangString)
-                                {
-                                    builder.append(leftNode.getNodeAccess(leftResClass, 1));
-                                }
-                                else
-                                {
-                                    builder.append("'");
-                                    builder.append(((LangStringConstantTagClass) leftResClass).getTag());
-                                    builder.append("'::varchar");
-                                }
-
-                                builder.append(" = ");
-
-                                if(rightResClass == rdfLangString)
-                                {
-                                    builder.append(rightNode.getNodeAccess(rightResClass, 1));
-                                }
-                                else
-                                {
-                                    builder.append("'");
-                                    builder.append(((LangStringConstantTagClass) rightResClass).getTag());
-                                    builder.append("'::varchar");
-                                }
-
-                                builder.append(" THEN sparql.");
-                                builder.append(function);
-                                builder.append("_string_string(");
-                                builder.append(leftNode.getNodeAccess(leftResClass, 0));
-                                builder.append(", ");
-                                builder.append(rightNode.getNodeAccess(rightResClass, 0));
-                                builder.append(") END");
-                            }
-                        }
-                    }
-
-                    if(variants > 1)
-                    {
-                        builder.insert(0, "COALESCE(");
-                        builder.append(")");
-                    }
+                    builder.append("sparql.");
+                    builder.append(function);
+                    builder.append("_string_string(");
+                    builder.append(leftNode.getNodeAccess(xsdString, 0));
+                    builder.append(", ");
+                    builder.append(rightNode.getNodeAccess(xsdString, 0));
+                    builder.append(")");
                 }
                 else
                 {
                     builder.append("sparql.");
                     builder.append(function);
 
+                    ResourceClass leftResClass = left.getExpressionResourceClass();
                     ResourceClass rightResClass = right.getExpressionResourceClass();
 
-                    if(!left.isBoxed() && !right.isBoxed())
+                    if(leftResClass == xsdString)
                     {
                         builder.append("_string_string(");
                         builder.append(left.translate());
                         builder.append(", ");
+
+                        if(right.isBoxed())
+                            builder.append("sparql.rdfbox_extract_string(");
+
                         builder.append(right.translate());
+
+                        if(right.isBoxed())
+                            builder.append(")");
+
                         builder.append(")");
                     }
                     else if(left.isBoxed() && (rightResClass == xsdString
                             || rightResClass instanceof LangStringConstantTagClass && left.getResourceClasses().stream()
-                                    .allMatch(r -> r == rightResClass || isStringLiteral(r))))
+                                    .allMatch(r -> r == rightResClass || !isStringLiteral(r))))
                     {
                         builder.append("_rdfbox_string(");
                         builder.append(left.translate());
                         builder.append(", ");
                         builder.append(right.translate());
-                        builder.append(")");
-                    }
-                    else if(!left.isBoxed())
-                    {
-                        ResourceClass l = left.getExpressionResourceClass();
-
-                        Set<ResourceClass> efectiveRightSet = new HashSet<ResourceClass>();
-
-                        for(ResourceClass r : right.getResourceClasses())
-                            if(r == xsdString || r == rdfLangString || l == r)
-                                efectiveRightSet.add(r);
-
-
-                        builder.append("_rdfbox_rdfbox(");
-                        builder.append(translateAsBoxedOperand(left, asSet(l)));
-                        builder.append(", ");
-                        builder.append(translateAsBoxedOperand(right, efectiveRightSet));
-                        builder.append(")");
-
-                        if(l == xsdString)
-                            builder.insert(0, "sparql.rdfbox_extract_string(");
-                        else
-                            builder.insert(0, "sparql.rdfbox_extract_lang_string_string(");
-
                         builder.append(")");
                     }
                     else
@@ -2286,16 +2212,23 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(!(operand instanceof SqlVariable))
                 {
+                    System.err.println("HERE");
+
                     String sqlFunction = "sparql." + function + "_" + getResourceName();
-                    String sqlArgument = "(" + operand.translate() + ")";
+                    String sqlArgument = operand.translate();
 
                     if(!isBoxed() && operand.isBoxed())
-                        sqlArgument = "(sparql.rdfbox_extract_derivated_from_" + getResourceName() + sqlArgument + ")";
+                        sqlArgument = "sparql.rdfbox_extract_derivated_from_" + getResourceName() + "(" + sqlArgument
+                                + ")";
 
                     if(!isBoxed() && !operand.isBoxed() && !getResourceClasses().equals(operand.getResourceClasses()))
-                        sqlArgument = "(sparql.cast_as_integer_from_" + operand.getResourceName() + sqlArgument + ")";
+                        sqlArgument = "sparql.cast_as_integer_from_" + operand.getResourceName() + "(" + sqlArgument
+                                + ")";
 
-                    return sqlFunction + sqlArgument;
+                    if(!function.equals("abs") && getExpressionResourceClass() == xsdInteger)
+                        return sqlArgument;
+
+                    return sqlFunction + "(" + sqlArgument + ")";
                 }
                 else
                 {
@@ -2323,7 +2256,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         if(resClass != effectiveClass)
                             code = "sparql.cast_as_integer_from_" + resClass.getName() + "(" + code + ")";
 
-                        code = "sparql." + function + "_" + effectiveClass.getName() + "(" + code + ")";
+                        if(function.equals("abs") || effectiveClass != xsdInteger)
+                            code = "sparql." + function + "_" + effectiveClass.getName() + "(" + code + ")";
 
                         if(isBoxed())
                             code = "sparql.cast_as_rdfbox_from_" + effectiveClass.getName() + "(" + code + ")";
