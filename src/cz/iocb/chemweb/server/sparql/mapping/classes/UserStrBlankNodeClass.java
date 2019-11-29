@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
@@ -23,10 +24,12 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     @Override
     public String getPatternCode(Node node, int part)
     {
-        if(!(node instanceof VariableOrBlankNode))
-            throw new IllegalArgumentException();
+        if(node instanceof VariableOrBlankNode)
+            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
 
-        return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
+        BlankNodeLiteral literal = (BlankNodeLiteral) node;
+
+        return "'" + literal.getLabel() + "'::varchar";
     }
 
 
