@@ -35,16 +35,42 @@ public class SqlValues extends SqlIntercode
 
         UsedVariables usedVariables = new UsedVariables();
 
+
+        ArrayList<Pair<String, Set<ResourceClass>>> filteredTypedVariables = new ArrayList<>(typedVariables.size());
+        boolean mask[] = new boolean[typedVariables.size()];
+
         for(int i = 0; i < typedVariables.size(); i++)
         {
-            final int fi = i;
-            boolean canBeNull = typedValuesList.size() > typedValuesList.stream()
-                    .filter(l -> l.get(fi).getValue() != null).count();
-            usedVariables
-                    .add(new UsedVariable(typedVariables.get(i).getKey(), typedVariables.get(i).getValue(), canBeNull));
+            if(!typedVariables.get(i).getValue().isEmpty())
+            {
+                mask[i] = true;
+                filteredTypedVariables.add(typedVariables.get(i));
+
+                final int fi = i;
+                boolean canBeNull = typedValuesList.size() > typedValuesList.stream()
+                        .filter(l -> l.get(fi).getValue() != null).count();
+                usedVariables.add(
+                        new UsedVariable(typedVariables.get(i).getKey(), typedVariables.get(i).getValue(), canBeNull));
+            }
         }
 
-        return new SqlValues(usedVariables, typedVariables, typedValuesList);
+
+        ArrayList<ArrayList<Pair<Node, ResourceClass>>> filteredTypedValuesList = new ArrayList<>(
+                typedValuesList.size());
+
+        for(ArrayList<Pair<Node, ResourceClass>> values : typedValuesList)
+        {
+            ArrayList<Pair<Node, ResourceClass>> optimizedValues = new ArrayList<>(filteredTypedVariables.size());
+
+            for(int i = 0; i < values.size(); i++)
+                if(mask[i])
+                    optimizedValues.add(values.get(i));
+
+            filteredTypedValuesList.add(optimizedValues);
+        }
+
+
+        return new SqlValues(usedVariables, filteredTypedVariables, filteredTypedValuesList);
     }
 
 
