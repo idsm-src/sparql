@@ -26,18 +26,20 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
 import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
@@ -300,8 +302,38 @@ public class SqlBinaryComparison extends SqlBinary
             ResourceClass leftClass = pair.getKey();
             ResourceClass rightClass = pair.getValue();
 
-            if(leftClass == xsdBoolean || leftClass == xsdString || leftClass == xsdDayTimeDuration
-                    || isNumeric(leftClass) || leftClass instanceof BlankNodeClass)
+
+            if(leftClass instanceof BlankNodeClass)
+            {
+                String left = leftNode.getNodeAccess(leftClass, 0);
+                String right = rightNode.getNodeAccess(rightClass, 0);
+
+                if(leftClass != rightClass)
+                {
+                    if(leftClass instanceof UserIntBlankNodeClass)
+                        left = "'" + ((UserIntBlankNodeClass) leftClass).getSegment() + "'::int8 << 32 | " + left;
+                    else if(rightClass instanceof UserIntBlankNodeClass)
+                        right = "'" + ((UserIntBlankNodeClass) rightClass).getSegment() + "'::int8 << 32 | " + right;
+                    else if(leftClass instanceof UserStrBlankNodeClass)
+                        left = "'" + ((UserStrBlankNodeClass) leftClass).getSegment() + "'::varchar || " + left;
+                    else if(rightClass instanceof UserStrBlankNodeClass)
+                        right = "'" + ((UserStrBlankNodeClass) rightClass).getSegment() + "'::varchar || " + right;
+
+                    ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
+                    builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());
+                    builder.append("(" + left + ", " + right + ")");
+                }
+                else if(operator == Operator.Equals)
+                {
+                    builder.append("(" + left + " = " + right + ")");
+                }
+                else if(operator == Operator.NotEquals)
+                {
+                    builder.append("(" + left + " != " + right + ")");
+                }
+            }
+            else if(leftClass == xsdBoolean || leftClass == xsdString || leftClass == xsdDayTimeDuration
+                    || isNumeric(leftClass))
             {
                 String left = leftNode.getNodeAccess(leftClass, 0);
                 String right = rightNode.getNodeAccess(rightClass, 0);
