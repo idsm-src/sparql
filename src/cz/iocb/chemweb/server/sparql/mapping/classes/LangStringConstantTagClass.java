@@ -36,6 +36,8 @@ public class LangStringConstantTagClass extends LiteralClass
 
     public static LangStringConstantTagClass get(String lang)
     {
+        lang = lang.toLowerCase();
+
         LangStringConstantTagClass instance = instances.get(lang);
 
         if(instance == null)
