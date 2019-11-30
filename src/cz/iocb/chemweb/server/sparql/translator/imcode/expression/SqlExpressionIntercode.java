@@ -400,17 +400,17 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 {
                     builder.append("sparql.zoneddatetime_create(");
                     builder.append(code);
-                    builder.append(", ");
+                    builder.append(", '");
                     builder.append(((DateTimeConstantZoneClass) compatibleClass).getZone());
-                    builder.append("::int4)");
+                    builder.append("'::int4)");
                 }
                 else if(compatibleClass instanceof DateConstantZoneClass)
                 {
                     builder.append("sparql.zoneddate_create(");
                     builder.append(code);
-                    builder.append(", ");
+                    builder.append(", '");
                     builder.append(((DateConstantZoneClass) compatibleClass).getZone());
-                    builder.append("::int4)");
+                    builder.append("'::int4)");
                 }
                 else if(compatibleClass instanceof UserIntBlankNodeClass)
                 {
@@ -455,17 +455,17 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             {
                 builder.append("sparql.zoneddatetime_create(");
                 builder.append(operand.translate());
-                builder.append(", ");
+                builder.append(", '");
                 builder.append(((DateTimeConstantZoneClass) expressionClass).getZone());
-                builder.append("::int4)");
+                builder.append("'::int4)");
             }
             else if(resourceClass == xsdDate && expressionClass instanceof DateConstantZoneClass)
             {
                 builder.append("sparql.zoneddate_create(");
                 builder.append(operand.translate());
-                builder.append(", ");
+                builder.append(", '");
                 builder.append(((DateConstantZoneClass) expressionClass).getZone());
-                builder.append("::int4)");
+                builder.append("'::int4)");
             }
             else if(resourceClass == iri && expressionClass instanceof IriClass)
             {
