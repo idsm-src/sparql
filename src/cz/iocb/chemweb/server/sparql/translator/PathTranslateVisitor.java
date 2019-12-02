@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,6 +20,9 @@ import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.AlternativePath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.BracketedPath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.InversePath;
@@ -29,13 +33,20 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.RepeatedPath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.RepeatedPath.Kind;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.SequencePath;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
+import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
+import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlDistinct;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlRecursive;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
 
@@ -44,6 +55,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private static final String variablePrefix = "@pathvar";
     private static int variableId = 0;
 
+    private final TranslateVisitor parentTranslator;
     private final Request request;
     private final DatabaseSchema schema;
     private final List<QuadMapping> mappings;
@@ -54,8 +66,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private Node object = null;
 
 
-    public PathTranslateVisitor(Request request, List<DataSet> datasets)
+    public PathTranslateVisitor(Request request, TranslateVisitor parentTranslator, List<DataSet> datasets)
     {
+        this.parentTranslator = parentTranslator;
         this.request = request;
         this.schema = request.getConfiguration().getSchema();
         this.mappings = request.getConfiguration().getMappings();
@@ -65,6 +78,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public SqlIntercode translate(Node graph, Node subject, Verb predicate, Node object)
     {
+        if(predicate instanceof Path)
+            predicate = new PathRewriteVisitor().visitElement(predicate);
+
+
         this.graph = graph;
         SqlIntercode intercode = visitElement(predicate, subject, object);
 
@@ -122,40 +139,86 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(SequencePath sequencePath)
     {
-        List<List<Path>> paths = expandSequencePath(sequencePath.getChildren());
-        SqlIntercode result = SqlNoSolution.get();
+        List<Path> path = sequencePath.getChildren();
 
-        for(List<Path> path : paths)
+        if(path.isEmpty())
         {
-            List<Node> nodes = new ArrayList<Node>(path.size() + 1);
-
-            nodes.add(subject);
-
-            for(int i = 0; i < path.size() - 1; i++)
-                nodes.add(new Variable(variablePrefix + variableId++));
-
-            nodes.add(object);
-
-
-            SqlIntercode subresult = SqlEmptySolution.get();
-
-            for(int i = 0; i < path.size(); i++)
+            if(subject instanceof VariableOrBlankNode && object instanceof VariableOrBlankNode)
             {
-                Node join = nodes.get(i);
-                Node object = nodes.get(i + 1);
+                String subjectName = ((VariableOrBlankNode) subject).getSqlName();
+                String objectName = ((VariableOrBlankNode) object).getSqlName();
 
-                HashSet<String> restrictions = new HashSet<String>();
+                SqlIntercode subjects = visitElement(new Variable(variablePrefix + variableId++), subject,
+                        new Variable(variablePrefix + variableId++));
 
-                if(subject instanceof VariableOrBlankNode)
-                    restrictions.add(((VariableOrBlankNode) subject).getSqlName());
+                SqlIntercode objects = visitElement(new Variable(variablePrefix + variableId++),
+                        new Variable(variablePrefix + variableId++), subject);
 
-                if(object instanceof VariableOrBlankNode)
-                    restrictions.add(((VariableOrBlankNode) object).getSqlName());
+                SqlIntercode child = SqlDistinct.create(SqlUnion.union(subjects, objects));
 
-                subresult = SqlJoin.join(schema, subresult, visitElement(path.get(i), join, object), restrictions);
+                return SqlBind.bind(objectName,
+                        SqlVariable.create(subjectName, new SimpleVariableAccessor(child.getVariables())), child);
             }
+            else if(subject instanceof VariableOrBlankNode)
+            {
+                String subjectName = ((VariableOrBlankNode) subject).getSqlName();
+                SqlIntercode child = SqlEmptySolution.get();
 
-            result = SqlUnion.union(result, subresult);
+                SqlExpressionIntercode expression = (new ExpressionTranslateVisitor(
+                        new SimpleVariableAccessor(child.getVariables()), parentTranslator)).visitElement(object);
+
+                return SqlBind.bind(subjectName, expression, SqlEmptySolution.get());
+            }
+            else if(object instanceof VariableOrBlankNode)
+            {
+                String objectName = ((VariableOrBlankNode) object).getSqlName();
+                SqlIntercode child = SqlEmptySolution.get();
+
+                SqlExpressionIntercode expression = (new ExpressionTranslateVisitor(
+                        new SimpleVariableAccessor(child.getVariables()), parentTranslator)).visitElement(subject);
+
+                return SqlBind.bind(objectName, expression, SqlEmptySolution.get());
+            }
+            else
+            {
+                SqlIntercode child = SqlEmptySolution.get();
+
+                Expression expression = new BinaryExpression(Operator.Equals, (Expression) subject,
+                        (Expression) object);
+                SqlExpressionIntercode filter = (new ExpressionTranslateVisitor(
+                        new SimpleVariableAccessor(child.getVariables()), parentTranslator)).visitElement(expression);
+
+                return SqlFilter.filter(Arrays.asList(filter), child);
+            }
+        }
+
+
+        List<Node> nodes = new ArrayList<Node>(path.size() + 1);
+
+        nodes.add(subject);
+
+        for(int i = 0; i < path.size() - 1; i++)
+            nodes.add(new Variable(variablePrefix + variableId++));
+
+        nodes.add(object);
+
+
+        SqlIntercode result = SqlEmptySolution.get();
+
+        for(int i = 0; i < path.size(); i++)
+        {
+            Node join = nodes.get(i);
+            Node object = nodes.get(i + 1);
+
+            HashSet<String> restrictions = new HashSet<String>();
+
+            if(subject instanceof VariableOrBlankNode)
+                restrictions.add(((VariableOrBlankNode) subject).getSqlName());
+
+            if(object instanceof VariableOrBlankNode)
+                restrictions.add(((VariableOrBlankNode) object).getSqlName());
+
+            result = SqlJoin.join(schema, result, visitElement(path.get(i), join, object), restrictions);
         }
 
         return result;
@@ -172,7 +235,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(RepeatedPath repeatedPath)
     {
-        assert repeatedPath.getKind() == Kind.OneOrMore;
+        if(repeatedPath.getKind() == Kind.ZeroOrOne)
+        {
+            SqlIntercode child = SqlDistinct.create(visitElement(repeatedPath.getChild(), subject, object));
+
+            Expression expression = new BinaryExpression(Operator.NotEquals, (Expression) subject, (Expression) object);
+            SqlExpressionIntercode filter = (new ExpressionTranslateVisitor(
+                    new SimpleVariableAccessor(child.getVariables()), parentTranslator)).visitElement(expression);
+
+            return SqlFilter.filter(Arrays.asList(filter), child);
+        }
+
 
         Variable joinNode = new Variable(variablePrefix + variableId++);
         String joinName = joinNode.getSqlName();
@@ -224,8 +297,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        return SqlRecursive.create(init, next, subjectName, joinName, ((VariableOrBlankNode) endNode).getSqlName(),
-                cndNode, request, null);
+        SqlIntercode intercode = SqlRecursive.create(init, next, subjectName, joinName,
+                ((VariableOrBlankNode) endNode).getSqlName(), cndNode, request, null);
+
+        if(repeatedPath.getKind() == Kind.OneOrMore)
+            return intercode;
+
+
+        Expression expression = new BinaryExpression(Operator.NotEquals, (Expression) subject, (Expression) object);
+        SqlExpressionIntercode filter = (new ExpressionTranslateVisitor(
+                new SimpleVariableAccessor(intercode.getVariables()), parentTranslator)).visitElement(expression);
+
+        return SqlFilter.filter(Arrays.asList(filter), intercode);
     }
 
 
@@ -339,50 +422,6 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
             translated.addValueCondition(node, (ParametrisedMapping) mapping);
-    }
-
-
-    private List<List<Path>> expandSequencePath(List<Path> path)
-    {
-        LinkedList<List<Path>> paths = new LinkedList<List<Path>>();
-
-        if(path.isEmpty())
-        {
-            paths.add(path);
-        }
-        else
-        {
-            Path first = path.get(0);
-
-            for(List<Path> sub : expandSequencePath(path.subList(1, path.size())))
-            {
-                if(first instanceof RepeatedPath && ((RepeatedPath) first).getKind() == Kind.ZeroOrOne)
-                {
-                    LinkedList<Path> result = new LinkedList<Path>();
-                    result.add(((RepeatedPath) first).getChild());
-                    result.addAll(sub);
-                    paths.add(result);
-                    paths.add(sub);
-                }
-                else if(first instanceof RepeatedPath && ((RepeatedPath) first).getKind() == Kind.ZeroOrMore)
-                {
-                    LinkedList<Path> result = new LinkedList<Path>();
-                    result.add(new RepeatedPath(Kind.OneOrMore, ((RepeatedPath) first).getChild()));
-                    result.addAll(sub);
-                    paths.add(result);
-                    paths.add(sub);
-                }
-                else
-                {
-                    LinkedList<Path> result = new LinkedList<Path>();
-                    result.add(first);
-                    result.addAll(sub);
-                    paths.add(result);
-                }
-            }
-        }
-
-        return paths;
     }
 
 

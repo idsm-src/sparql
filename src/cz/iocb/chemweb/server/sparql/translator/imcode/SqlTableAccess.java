@@ -184,6 +184,21 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    public boolean isDistinct()
+    {
+        LinkedList<Column> columns = new LinkedList<Column>();
+
+        for(Entry<String, ArrayList<NodeMapping>> entry : mappings.entrySet())
+            if(!variables.get(entry.getKey()).canBeNull())
+                for(NodeMapping map : entry.getValue())
+                    if(map instanceof ParametrisedMapping)
+                        for(int i = 0; i < map.getResourceClass().getPatternPartsCount(); i++)
+                            columns.add(((ParametrisedMapping) map).getSqlColumn(i));
+
+        return table == null || schema.getCompatibleKey(table, columns) != null;
+    }
+
+
     public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         // currently, merging is allowed only in the case that variables are not joined by different resource classes

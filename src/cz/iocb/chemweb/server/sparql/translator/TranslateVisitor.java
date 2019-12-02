@@ -207,7 +207,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         restrictions.add(predicate.getSqlName());
         restrictions.add(object.getSqlName());
 
-        PathTranslateVisitor visitor = new PathTranslateVisitor(request, datasets);
+        PathTranslateVisitor visitor = new PathTranslateVisitor(request, this, datasets);
         SqlIntercode result = SqlNoSolution.get();
         SqlIntercode select = visitElement(describeQuery.getSelect());
 
@@ -640,7 +640,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             graph = graphRestrictions.peek();
 
 
-        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, datasets);
+        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, datasets);
         SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
 
         return translatedPattern;
