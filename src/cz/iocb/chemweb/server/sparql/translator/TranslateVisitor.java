@@ -273,24 +273,67 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(select.getValues() != null)
         {
-            /*
-             * Quick (and dirty) fix to accept procedure calls with VALUES statements submitted by endpoints
-             *
-             * FIXME: This is not valid in general!
-             */
-
             List<Pattern> patterns = new LinkedList<Pattern>();
-            patterns.add(select.getValues());
 
-            if(pattern instanceof GroupGraph)
-                patterns.addAll(((GroupGraph) pattern).getPatterns());
-            else
-                patterns.add(pattern);
+            for(Pattern subpattern : ((GroupGraph) pattern).getPatterns())
+            {
+                if(subpattern instanceof ProcedureCallBase)
+                {
+                    List<Variable> variables = new LinkedList<Variable>();
+                    boolean[] mask = new boolean[select.getValues().getVariables().size()];
 
-            pattern = new GroupGraph(patterns);
+                    for(Parameter par : ((ProcedureCallBase) subpattern).getParameters())
+                    {
+                        if(par.getValue() instanceof Variable)
+                        {
+                            Variable variable = (Variable) par.getValue();
+                            int idx = select.getValues().getVariables().indexOf(variable);
+
+                            if(idx != -1)
+                            {
+                                variables.add(variable);
+                                mask[idx] = true;
+                            }
+                        }
+                    }
+
+                    if(!variables.isEmpty())
+                    {
+                        List<List<Expression>> selected = new LinkedList<List<Expression>>();
+                        List<ValuesList> values = new LinkedList<ValuesList>();
+
+                        for(ValuesList valuesList : select.getValues().getValuesLists())
+                        {
+                            List<Expression> stripped = new ArrayList<Expression>(variables.size());
+
+                            for(int i = 0; i < valuesList.getValues().size(); i++)
+                                if(mask[i])
+                                    stripped.add(valuesList.getValues().get(i));
+
+                            if(!selected.contains(stripped))
+                            {
+                                selected.add(stripped);
+                                values.add(new ValuesList(stripped));
+                            }
+                        }
+
+                        patterns.add(new Values(variables, values));
+                    }
+                }
+
+                patterns.add(subpattern);
+            }
+
+            GroupGraph rewriten = new GroupGraph(patterns);
+            rewriten.setRange(pattern.getRange());
+            pattern = rewriten;
         }
 
+
         SqlIntercode translatedWhereClause = visitElement(pattern);
+
+        if(select.getValues() != null)
+            translatedWhereClause = SqlJoin.join(schema, translatedWhereClause, visitElement(select.getValues()));
 
 
         // translate the GROUP BY clause
