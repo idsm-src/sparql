@@ -605,7 +605,7 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, HashSet<String> restrictions)
+    public static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, HashSet<String> restrictions)
     {
         UsedVariables variables = new UsedVariables();
 

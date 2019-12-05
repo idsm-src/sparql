@@ -33,6 +33,13 @@ public class ConstantIriMapping extends IriMapping implements ConstantMapping
 
 
     @Override
+    public int hashCode()
+    {
+        return value.hashCode();
+    }
+
+
+    @Override
     public String getSqlValueAccess(int part)
     {
         return getIriClass().getPatternCode(value, part);

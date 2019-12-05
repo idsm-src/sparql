@@ -4,8 +4,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -43,6 +45,7 @@ public abstract class SparqlDatabaseConfiguration
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
     protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
+    protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
 
@@ -178,6 +181,9 @@ public abstract class SparqlDatabaseConfiguration
     {
         QuadMapping map = new SingleTableQuadMapping(new Table(table), graph, subject, predicate, object);
         mappings.add(map);
+
+        if(graph != null)
+            graphs.add(graph);
     }
 
 
@@ -186,6 +192,9 @@ public abstract class SparqlDatabaseConfiguration
     {
         QuadMapping map = new SingleTableQuadMapping(new Table(table), graph, subject, predicate, object, condition);
         mappings.add(map);
+
+        if(graph != null)
+            graphs.add(graph);
     }
 
 
@@ -197,6 +206,9 @@ public abstract class SparqlDatabaseConfiguration
                 Arrays.asList(new TableColumn(subjectTableJoinColumn)),
                 Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object);
         mappings.add(map);
+
+        if(graph != null)
+            graphs.add(graph);
     }
 
 
@@ -209,6 +221,9 @@ public abstract class SparqlDatabaseConfiguration
                 Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
                 subjectCondition, objectCondition);
         mappings.add(map);
+
+        if(graph != null)
+            graphs.add(graph);
     }
 
 
@@ -251,6 +266,12 @@ public abstract class SparqlDatabaseConfiguration
     public List<QuadMapping> getMappings()
     {
         return mappings;
+    }
+
+
+    public Set<ConstantIriMapping> getGraphs()
+    {
+        return graphs;
     }
 
 

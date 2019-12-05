@@ -42,6 +42,7 @@ import cz.iocb.chemweb.server.sparql.engine.SelectResult;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
@@ -108,6 +109,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlFilter;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlJoin;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlLeftJoin;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlMerge;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlMinus;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlProcedureCall;
@@ -513,6 +515,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
+        if(select.isSubSelect() && graphRestrictions.size() > 0 && graphRestrictions.peek() instanceof Variable)
+        {
+            String graphVariableName = ((Variable) graphRestrictions.peek()).getSqlName();
+
+            UsedVariable variable = translatedWhereClause.getVariables().get(graphVariableName);
+
+            if(variable != null)
+                variables.add(variable);
+        }
+
+
         HashSet<String> distinctVariables = new HashSet<String>();
 
         if(select.isDistinct())
@@ -545,11 +558,72 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Graph graph)
     {
-        graphRestrictions.push(graph.getName());
+        boolean rename = false;
+
+        if(graph.getName() instanceof Variable)
+        {
+            rename = new ElementVisitor<Boolean>()
+            {
+                @Override
+                public Boolean visit(Variable variable)
+                {
+                    return variable.equals(graph.getName());
+                }
+
+                @Override
+                protected Boolean aggregateResult(List<Boolean> results)
+                {
+                    return results.stream().anyMatch(e -> e != null && e);
+                }
+            }.visitElement(graph.getPattern());
+        }
+
+
+        VarOrIri graphVariable = graph.getName();
+
+        if(rename)
+            graphVariable = new Variable("@graph" + ((Variable) graphVariable).getName());
+
+        graphRestrictions.push(graphVariable);
 
         SqlIntercode translatedPattern = visitElement(graph.getPattern());
 
         graphRestrictions.pop();
+
+        if(rename)
+            translatedPattern = SqlMerge.create(((Variable) graph.getName()).getSqlName(),
+                    ((Variable) graphVariable).getSqlName(), translatedPattern, false);
+
+
+        if(graph.getName() instanceof Variable)
+        {
+            String varName = ((Variable) graph.getName()).getSqlName();
+            UsedVariable variable = translatedPattern.getVariables().get(varName);
+
+            if(variable == null || variable.canBeNull())
+            {
+                //TODO: can be ignored, if the graph variable is not required outside the graph pattern
+
+                ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
+                ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
+
+                Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
+                typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
+
+                for(ConstantIriMapping g : configuration.getGraphs())
+                {
+                    valueClasses.add(g.getIriClass());
+
+                    ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
+                    list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
+                    typedValuesList.add(list);
+                }
+
+                translatedPattern = SqlJoin.join(schema, translatedPattern,
+                        SqlValues.create(typedVariables, typedValuesList));
+            }
+        }
+
         return translatedPattern;
     }
 
