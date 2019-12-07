@@ -311,13 +311,17 @@ public class SqlBinaryComparison extends SqlBinary
                 if(leftClass != rightClass)
                 {
                     if(leftClass instanceof UserIntBlankNodeClass)
-                        left = "'" + ((UserIntBlankNodeClass) leftClass).getSegment() + "'::int8 << 32 | " + left;
+                        left = "sparql.int_blanknode_create('" + ((UserIntBlankNodeClass) leftClass).getSegment()
+                                + "'::int4, " + left + ")";
                     else if(rightClass instanceof UserIntBlankNodeClass)
-                        right = "'" + ((UserIntBlankNodeClass) rightClass).getSegment() + "'::int8 << 32 | " + right;
+                        right = "sparql.int_blanknode_create('" + ((UserIntBlankNodeClass) rightClass).getSegment()
+                                + "'::int4, " + right + ")";
                     else if(leftClass instanceof UserStrBlankNodeClass)
-                        left = "'" + ((UserStrBlankNodeClass) leftClass).getSegment() + "'::varchar || " + left;
+                        left = "sparql.str_blanknode_create('" + ((UserStrBlankNodeClass) leftClass).getSegment()
+                                + "'::int4, " + left + ")";
                     else if(rightClass instanceof UserStrBlankNodeClass)
-                        right = "'" + ((UserStrBlankNodeClass) rightClass).getSegment() + "'::varchar || " + right;
+                        right = "sparql.str_blanknode_create('" + ((UserStrBlankNodeClass) rightClass).getSegment()
+                                + "'::int4, " + right + ")";
 
                     ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
                     builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());

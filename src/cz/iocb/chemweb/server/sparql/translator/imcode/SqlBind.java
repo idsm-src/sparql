@@ -1,8 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import java.util.HashSet;
@@ -201,9 +199,14 @@ public class SqlBind extends SqlIntercode
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        builder.append("CASE (");
-                        builder.append(intBlankNode.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" >> 32)::int4 WHEN '");
+                        builder.append("CASE sparql.");
+
+                        if(expression.isBoxed())
+                            builder.append("rdfbox_extract_");
+
+                        builder.append("int_blanknode_segment(");
+                        builder.append(columnName);
+                        builder.append(") WHEN '");
                         builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
                         builder.append("'::int4 THEN ");
                         builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
@@ -212,11 +215,19 @@ public class SqlBind extends SqlIntercode
                     }
                     else if(resourceClass instanceof UserStrBlankNodeClass && splitStrBlankNodeClasses)
                     {
-                        builder.append("CASE substr(");
-                        builder.append(strBlankNode.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(", 0, 9) WHEN '");
+                        appendComma(builder, hasSelect);
+                        hasSelect = true;
+
+                        builder.append("CASE sparql.");
+
+                        if(expression.isBoxed())
+                            builder.append("rdfbox_extract_");
+
+                        builder.append("str_blanknode_segment(");
+                        builder.append(columnName);
+                        builder.append(") WHEN '");
                         builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
-                        builder.append("'::varchar THEN ");
+                        builder.append("'::int4 THEN ");
                         builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
                         builder.append(" END AS ");
                         builder.append(resourceClass.getSqlColumn(variableName, 0));

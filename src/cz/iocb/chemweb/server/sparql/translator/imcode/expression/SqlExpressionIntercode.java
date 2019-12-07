@@ -222,6 +222,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(resourceClasses.contains(rdfLangString) || resourceClasses.contains(unsupportedLiteral))
             return null;
 
+        if(resourceClasses.stream().allMatch(r -> isIri(r)))
+            return iri;
+
         if(resourceClasses.size() == 1)
             return resourceClasses.iterator().next();
 
@@ -230,9 +233,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
         if(resourceClasses.stream().allMatch(r -> isDate(r)))
             return xsdDate;
-
-        if(resourceClasses.stream().allMatch(r -> isIri(r)))
-            return iri;
 
         if(resourceClasses.stream().allMatch(r -> isIntBlankNode(r)))
             return intBlankNode;
@@ -396,7 +396,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                if(compatibleClass instanceof DateTimeConstantZoneClass)
+                if(resourceClass == xsdDateTime && compatibleClass instanceof DateTimeConstantZoneClass)
                 {
                     builder.append("sparql.zoneddatetime_create(");
                     builder.append(code);
@@ -404,7 +404,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     builder.append(((DateTimeConstantZoneClass) compatibleClass).getZone());
                     builder.append("'::int4)");
                 }
-                else if(compatibleClass instanceof DateConstantZoneClass)
+                else if(resourceClass == xsdDate && compatibleClass instanceof DateConstantZoneClass)
                 {
                     builder.append("sparql.zoneddate_create(");
                     builder.append(code);
@@ -412,19 +412,23 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     builder.append(((DateConstantZoneClass) compatibleClass).getZone());
                     builder.append("'::int4)");
                 }
-                else if(compatibleClass instanceof UserIntBlankNodeClass)
+                else if(resourceClass == intBlankNode && compatibleClass instanceof UserIntBlankNodeClass)
                 {
-                    builder.append("(");
+                    builder.append("sparql.int_blanknode_create('");
+                    builder.append(((UserIntBlankNodeClass) compatibleClass).getSegment());
+                    builder.append("'::int4, ");
                     builder.append(code);
-                    builder.append(" & x'FFFFFFFF'::int8)::int4");
+                    builder.append(")");
                 }
-                else if(compatibleClass instanceof UserStrBlankNodeClass)
+                else if(resourceClass == strBlankNode && compatibleClass instanceof UserStrBlankNodeClass)
                 {
-                    builder.append("substr(");
+                    builder.append("sparql.str_blanknode_create('");
+                    builder.append(((UserStrBlankNodeClass) compatibleClass).getSegment());
+                    builder.append("'::int4, ");
                     builder.append(code);
-                    builder.append(", 9)");
+                    builder.append(")");
                 }
-                else if(compatibleClass instanceof IriClass)
+                else if(resourceClass == iri && compatibleClass instanceof IriClass)
                 {
                     builder.append(code);
                 }
@@ -473,17 +477,17 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             }
             else if(resourceClass == intBlankNode && expressionClass instanceof UserIntBlankNodeClass)
             {
-                builder.append("('");
+                builder.append("sparql.int_blanknode_create('");
                 builder.append(((UserIntBlankNodeClass) expressionClass).getSegment());
-                builder.append("'::int8 << 32 | ");
+                builder.append("'::int4, ");
                 builder.append(operand.translate());
                 builder.append(")");
             }
             else if(resourceClass == strBlankNode && expressionClass instanceof UserStrBlankNodeClass)
             {
-                builder.append("('");
+                builder.append("sparql.str_blanknode_create('");
                 builder.append(((UserStrBlankNodeClass) expressionClass).getSegment());
-                builder.append("'::varchar || ");
+                builder.append("'::int4, ");
                 builder.append(operand.translate());
                 builder.append(")");
             }

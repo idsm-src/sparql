@@ -11,13 +11,13 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 public class UserStrBlankNodeClass extends StrBlankNodeClass
 {
-    private final String segment;
+    private final int segment;
 
 
     public UserStrBlankNodeClass(int segment)
     {
-        super("str_blanknode_" + Integer.toHexString(segment), Arrays.asList("varchar"));
-        this.segment = String.format("%08X", segment);
+        super("sparql.str_blanknode_" + Integer.toHexString(segment), Arrays.asList("varchar"));
+        this.segment = segment;
     }
 
 
@@ -36,7 +36,8 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     @Override
     public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
     {
-        return "('" + segment + "'::varchar || " + (table != null ? table + "." : "") + getSqlColumn(var, part) + ")";
+        return "sparql.str_blanknode_create('" + segment + "'::int4, " + (table != null ? table + "." : "")
+                + getSqlColumn(var, part) + ")";
     }
 
 
@@ -45,21 +46,21 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append("CASE WHEN substr(");
+        builder.append("CASE WHEN sparql.str_blanknode_segment(");
 
         if(table != null)
             builder.append(table).append(".");
 
         builder.append(strBlankNode.getSqlColumn(var, 1));
-        builder.append(", 0, 9) = '");
+        builder.append(") = '");
         builder.append(segment);
-        builder.append("'::varchar THEN substr(");
+        builder.append("'::int4 THEN sparql.str_blanknode_label(");
 
         if(table != null)
             builder.append(table).append(".");
 
         builder.append(strBlankNode.getSqlColumn(var, 0));
-        builder.append(", 9) END");
+        builder.append(") END");
 
         return builder.toString();
     }
@@ -69,9 +70,9 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     public String getPatternCode(String column, int part, boolean isBoxed)
     {
         if(isBoxed == false)
-            return "substr(" + column + ", 9)";
+            return "sparql.str_blanknode_label(" + column + ")";
 
-        return "substr(sparql.rdfbox_extract_str_blanknode" + "(" + column + "), 9)";
+        return "sparql.rdfbox_extract_str_blanknode_label" + "(" + column + ")";
     }
 
 
@@ -81,7 +82,7 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
         String code = variableAccessor.getSqlVariableAccess(variable, this, 0);
 
         if(rdfbox)
-            code = "sparql.cast_as_rdfbox_from_str_blanknode('" + segment + "'::varchar || " + code + ")";
+            code = "sparql.cast_as_rdfbox_from_str_blanknode('" + segment + "'::int4, " + code + ")";
 
         return code;
     }
@@ -90,11 +91,11 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     @Override
     public String getResultCode(String variable, int part)
     {
-        return "('" + segment + "'::varchar || " + getSqlColumn(variable, part) + ")";
+        return "sparql.str_blanknode_create('" + segment + "'::int4, " + getSqlColumn(variable, part) + ")";
     }
 
 
-    public String getSegment()
+    public int getSegment()
     {
         return segment;
     }
