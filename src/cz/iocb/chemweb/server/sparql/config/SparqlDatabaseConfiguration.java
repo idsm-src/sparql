@@ -48,6 +48,8 @@ public abstract class SparqlDatabaseConfiguration
     protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
 
+    protected boolean strictDefaultGraph = false;
+
 
     protected SparqlDatabaseConfiguration(DataSource connectionPool) throws SQLException
     {
@@ -290,5 +292,17 @@ public abstract class SparqlDatabaseConfiguration
     public DataSource getConnectionPool()
     {
         return connectionPool;
+    }
+
+
+    public boolean isStrictDefaultGraph()
+    {
+        return strictDefaultGraph;
+    }
+
+
+    public void setStrictDefaultGraph(boolean strict)
+    {
+        strictDefaultGraph = strict;
     }
 }
