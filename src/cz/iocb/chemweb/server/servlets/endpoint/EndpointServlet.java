@@ -30,6 +30,7 @@ import cz.iocb.chemweb.server.sparql.engine.Result;
 import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
+import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
@@ -67,7 +68,7 @@ public class EndpointServlet extends HttpServlet
             {
                 if(value.mime.equals(mime))
                     for(ResultType v : value.variants)
-                        if(v == variant)
+                        if(v == variant || variant == null)
                             return value;
             }
 
@@ -112,9 +113,7 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException
     {
-        res.setHeader("access-control-allow-headers",
-                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
-        res.setHeader("access-control-allow-origin", "*");
+        setCrossOriginResourceSharingHeaders(res);
         super.doOptions(req, res);
     }
 
@@ -122,17 +121,24 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
+        setCrossOriginResourceSharingHeaders(res);
+
         String query = req.getParameter("query");
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
         String[] namedGraphs = req.getParameterValues("named-graph-uri");
 
-        process(req, res, query, defaultGraphs, namedGraphs);
+        if(isHtmlRequest(req))
+            processHtmlRequest(res);
+        else
+            process(req, res, query, defaultGraphs, namedGraphs);
     }
 
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
+        setCrossOriginResourceSharingHeaders(res);
+
         String query = null;
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
         String[] namedGraphs = req.getParameterValues("named-graph-uri");
@@ -146,7 +152,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    public void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
+    private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs) throws IOException
     {
         if(query == null)
@@ -173,11 +179,6 @@ public class EndpointServlet extends HttpServlet
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
-
-
-        res.setHeader("access-control-allow-headers",
-                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
-        res.setHeader("access-control-allow-origin", "*");
 
 
         // IOCB SPARQL protocol extension
@@ -298,6 +299,14 @@ public class EndpointServlet extends HttpServlet
         }
         catch(TranslateExceptions e)
         {
+            res.setHeader("content-type", "text/plain");
+            res.setCharacterEncoding("UTF-8");
+
+            PrintWriter out = res.getWriter();
+
+            for(TranslateMessage message : e.getMessages())
+                out.println(message.getCategory().getText() + ": " + message.getRange() + " " + message.getMessage());
+
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -317,9 +326,111 @@ public class EndpointServlet extends HttpServlet
             e.printStackTrace(System.err);
             System.err.println("EndpointServlet: log end");
 
+
+            res.setHeader("content-type", "text/plain");
+            res.setCharacterEncoding("UTF-8");
+
+            res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return;
         }
+    }
+
+
+    private void processHtmlRequest(HttpServletResponse res) throws IOException
+    {
+        res.setCharacterEncoding("UTF-8");
+        res.setHeader("content-type", "text/html");
+
+        // @formatter:off
+        res.getWriter().append("<!DOCTYPE html>\n" +
+                "<html lang='en' manifest='index.html.manifest'>\n" +
+                "  <head>\n" +
+                "    <meta charset='utf-8'>\n" +
+                "    <meta http-equiv='X-UA-Compatible' content='IE=edge'>\n" +
+                "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n" +
+                "    <title>YASGUI</title>\n" +
+                "  <link href='https://cdn.jsdelivr.net/npm/yasgui@2.7.29/dist/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
+                "  </head>\n" +
+                "  <body style='background: #FFF'>\n" +
+                "    <div id='yasgui' style='margin: 20px 25px'></div>\n" +
+                "    <script src='https://cdn.jsdelivr.net/npm/yasgui@2.7.29/dist/yasgui.js'></script>\n" +
+                "    <script type='text/javascript'>\n" +
+                "      var endpoint = window.location.protocol + '//' + window.location.host + window.location.pathname;\n" +
+                "      if(window.location.search || window.location.hash) YASGUI.defaults.tabs = [];\n" +
+                "      YASGUI.defaults.catalogueEndpoints = [];\n" +
+                "      YASGUI.YASR.defaults.outputPlugins = ['error', 'boolean', 'table', 'rawResponse', 'pivot', 'gchart'];\n" +
+                "      YASGUI.YASQE.defaults.autocompleters = [];\n" +
+                "      YASGUI.YASQE.defaults.value = 'SELECT * WHERE\\n{\\n  ?S ?P ?O.\\n}\\nLIMIT 10';\n" +
+                "      YASGUI(document.getElementById('yasgui'),\n" +
+                "      {\n" +
+                "        'persistencyPrefix': false,\n" +
+                "        'endpoint': endpoint,\n" +
+                "        'catalogueEndpoints': [ {endpoint: endpoint } ]\n" +
+                "      });\n" +
+                "      window.history.replaceState({}, document.title, endpoint);\n" +
+                "    </script>\n" +
+                "  </body>\n" +
+                "</html>\n" +
+                "");
+        // @formatter:on
+    }
+
+
+    private static boolean isHtmlRequest(HttpServletRequest req)
+    {
+        if(req.getParameter("query") == null)
+            return true;
+
+        if(req.getParameter("format") != null)
+            return false;
+
+        if(req.getHeader("accept") == null)
+            return true;
+
+
+        String accepts = req.getHeader("accept");
+        boolean html = false;
+        double quality = 0;
+
+        // to not split around a comma inside quotation marks
+        accepts = accepts.replaceAll("\"[^\"]*\"", "");
+
+        for(String value : accepts.split("[\t ]*,[\t ]*"))
+        {
+            String[] parts = value.split("[\t ]*;[\t ]*");
+
+            if(parts.length == 0)
+                continue;
+
+            double qvalue = 1;
+
+            for(int i = 1; i < parts.length; i++)
+                if(parts[i].matches("q=(0(\\.[0-9]{0,3})?|1(\\.0{0,3})?)[\\t ]*"))
+                    qvalue = Double.parseDouble(parts[i].substring(2).replaceAll("[\t ]", ""));
+
+            if(qvalue == 0 || qvalue < quality)
+                continue;
+
+            String mime = parts[0].replaceAll("[\t ]", "");
+
+            if(mime.equals("text/html") || mime.equals("text/*") || mime.equals("*/*"))
+            {
+                html = true;
+                quality = qvalue;
+            }
+            else if(OutputType.getOutputType(mime, null) != OutputType.NONE)
+            {
+                html = false;
+                quality = qvalue;
+            }
+        }
+
+        if(quality == 0)
+            return true;
+
+        return html;
     }
 
 
@@ -385,6 +496,14 @@ public class EndpointServlet extends HttpServlet
         }
 
         return type;
+    }
+
+
+    private static void setCrossOriginResourceSharingHeaders(HttpServletResponse res)
+    {
+        res.setHeader("access-control-allow-headers",
+                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+        res.setHeader("access-control-allow-origin", "*");
     }
 
 
