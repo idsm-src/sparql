@@ -10,6 +10,8 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 
 public class NeXtProtConfiguration extends SparqlDatabaseConfiguration
 {
+    static final String schema = "nextprot";
+
     int blankNodeSegment = 1;
 
     BlankNodeClass nameListClass = new UserIntBlankNodeClass(blankNodeSegment++);

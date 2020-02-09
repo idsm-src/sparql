@@ -739,7 +739,7 @@ public class SqlTableAccess extends SqlIntercode
             builder.append("1");
 
 
-        if(table.getName() != null)
+        if(table != null)
         {
             builder.append(" FROM ");
             builder.append(table.getCode());

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -35,28 +36,28 @@ public class UserIriClass extends IriClass
     private final String sqlCheckQuery;
     private final Map<String, Boolean> sqlCheckCache;
     private final String pattern;
-    private final String function;
-    private final List<String> inverseFunction;
+    private final Function function;
+    private final List<Function> inverseFunction;
 
 
-    public UserIriClass(String name, List<String> sqlTypes, String pattern, SqlCheck sqlCheck)
+    public UserIriClass(String schema, String name, List<String> sqlTypes, String pattern, SqlCheck sqlCheck)
     {
         super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
         this.sqlCheck = sqlCheck;
         this.pattern = pattern;
-        this.function = name;
+        this.function = new Function(schema, name);
 
 
-        inverseFunction = new ArrayList<String>(sqlTypes.size());
+        inverseFunction = new ArrayList<Function>(sqlTypes.size());
 
         if(sqlTypes.size() == 1)
         {
-            inverseFunction.add(name + "_inverse");
+            inverseFunction.add(new Function(schema, name + "_inverse"));
         }
         else
         {
             for(int i = 0; i < sqlTypes.size(); i++)
-                inverseFunction.add(name + "_inv" + (i + 1));
+                inverseFunction.add(new Function(schema, name + "_inv" + (i + 1)));
         }
 
 
@@ -71,7 +72,7 @@ public class UserIriClass extends IriClass
                 if(i > 0)
                     builder.append(" and ");
 
-                builder.append(inverseFunction.get(i));
+                builder.append(inverseFunction.get(i).getCode());
                 builder.append("(?) is not null");
             }
 
@@ -97,9 +98,9 @@ public class UserIriClass extends IriClass
     }
 
 
-    public UserIriClass(String name, List<String> sqlTypes, String pattern)
+    public UserIriClass(String schema, String name, List<String> sqlTypes, String pattern)
     {
-        this(name, sqlTypes, pattern, SqlCheck.NEVER);
+        this(schema, name, sqlTypes, pattern, SqlCheck.NEVER);
     }
 
 
@@ -111,7 +112,7 @@ public class UserIriClass extends IriClass
 
         IRI iri = (IRI) node;
 
-        return inverseFunction.get(part) + "('" + iri.getValue() + "'::varchar)";
+        return inverseFunction.get(part).getCode() + "('" + iri.getValue() + "'::varchar)";
     }
 
 
@@ -120,7 +121,7 @@ public class UserIriClass extends IriClass
     {
         StringBuffer strBuf = new StringBuffer();
 
-        strBuf.append(function);
+        strBuf.append(function.getCode());
         strBuf.append("(");
 
         for(int i = 0; i < getPatternPartsCount(); i++)
@@ -145,7 +146,7 @@ public class UserIriClass extends IriClass
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append(inverseFunction.get(part));
+        builder.append(inverseFunction.get(part).getCode());
         builder.append("(");
 
         if(table != null)
@@ -162,9 +163,9 @@ public class UserIriClass extends IriClass
     public String getPatternCode(String column, int part, boolean isBoxed)
     {
         if(isBoxed)
-            return inverseFunction.get(part) + "(sparql.rdfbox_extract_iri(" + column + "))";
+            return inverseFunction.get(part).getCode() + "(sparql.rdfbox_extract_iri(" + column + "))";
 
-        return inverseFunction.get(part) + "(" + column + ")";
+        return inverseFunction.get(part).getCode() + "(" + column + ")";
     }
 
 
@@ -176,7 +177,7 @@ public class UserIriClass extends IriClass
         if(rdfbox)
             strBuf.append("sparql.cast_as_rdfbox_from_iri(");
 
-        strBuf.append(function);
+        strBuf.append(function.getCode());
         strBuf.append("(");
 
         for(int i = 0; i < getPatternPartsCount(); i++)
@@ -201,7 +202,7 @@ public class UserIriClass extends IriClass
     {
         StringBuffer strBuf = new StringBuffer();
 
-        strBuf.append(function);
+        strBuf.append(function.getCode());
         strBuf.append("(");
 
         for(int i = 0; i < getPatternPartsCount(); i++)
@@ -331,7 +332,7 @@ public class UserIriClass extends IriClass
     {
         StringBuffer strBuf = new StringBuffer();
 
-        strBuf.append(function);
+        strBuf.append(function.getCode());
         strBuf.append("(");
 
         for(int i = 0; i < getPatternPartsCount(); i++)

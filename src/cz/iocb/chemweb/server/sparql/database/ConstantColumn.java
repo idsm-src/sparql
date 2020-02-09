@@ -8,4 +8,11 @@ public class ConstantColumn extends Column
     {
         super(value);
     }
+
+
+    @Override
+    public String getCode()
+    {
+        return value; //FIXME: add escaping if needed
+    }
 }

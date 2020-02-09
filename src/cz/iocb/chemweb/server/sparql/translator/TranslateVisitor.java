@@ -155,7 +155,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         this.configuration = request.getConfiguration();
         this.iriClasses = configuration.getIriClasses();
-        this.schema = configuration.getSchema();
+        this.schema = configuration.getDatabaseSchema();
         this.procedures = configuration.getProcedures();
         this.request = request;
         this.messages = messages;

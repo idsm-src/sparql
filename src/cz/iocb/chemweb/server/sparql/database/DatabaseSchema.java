@@ -92,11 +92,12 @@ public class DatabaseSchema
             {
                 while(tables.next())
                 {
+                    String tableSchema = tables.getString("TABLE_SCHEM");
                     String tableName = tables.getString("TABLE_NAME");
-                    Table table = new Table(tableName);
+                    Table table = new Table(tableSchema, tableName);
 
 
-                    try(ResultSet columns = metaData.getColumns(null, null, tableName, null))
+                    try(ResultSet columns = metaData.getColumns(null, tableSchema, tableName, null))
                     {
                         while(columns.next())
                         {
@@ -108,7 +109,7 @@ public class DatabaseSchema
                     }
 
 
-                    try(ResultSet indexes = metaData.getIndexInfo(null, null, tableName, true, false))
+                    try(ResultSet indexes = metaData.getIndexInfo(null, tableSchema, tableName, true, false))
                     {
                         List<Column> columns = null;
 
@@ -135,7 +136,7 @@ public class DatabaseSchema
                     }
 
 
-                    try(ResultSet indexes = metaData.getCrossReference(null, null, tableName, null, null, null))
+                    try(ResultSet indexes = metaData.getCrossReference(null, tableSchema, tableName, null, null, null))
                     {
                         Table foreignTable = null;
                         List<Column> parentColumns = new ArrayList<Column>();
@@ -156,7 +157,8 @@ public class DatabaseSchema
                                     foreignColumns = new ArrayList<Column>();
                                 }
 
-                                foreignTable = new Table(indexes.getString("FKTABLE_NAME"));
+                                foreignTable = new Table(indexes.getString("FKTABLE_SCHEM"),
+                                        indexes.getString("FKTABLE_NAME"));
                             }
 
                             parentColumns.add(new TableColumn(indexes.getString("PKCOLUMN_NAME")));

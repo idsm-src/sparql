@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
+import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -22,7 +23,7 @@ class Expression
             String table = "isoform_low_expressions";
             NodeMapping subject = config.createIriMapping(isoform, "isoform");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(":lowExpression"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":lowExpression"),
                     config.createIriMapping("annotation", "annotation"));
         }
 
@@ -30,7 +31,7 @@ class Expression
             String table = "isoform_medium_expressions";
             NodeMapping subject = config.createIriMapping(isoform, "isoform");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(":mediumExpression"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":mediumExpression"),
                     config.createIriMapping("annotation", "annotation"));
         }
 
@@ -38,7 +39,7 @@ class Expression
             String table = "isoform_high_expressions";
             NodeMapping subject = config.createIriMapping(isoform, "isoform");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(":highExpression"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":highExpression"),
                     config.createIriMapping("annotation", "annotation"));
         }
     }

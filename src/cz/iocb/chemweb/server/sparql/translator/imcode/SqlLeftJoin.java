@@ -212,8 +212,9 @@ public class SqlLeftJoin extends SqlIntercode
         for(SqlExpressionIntercode condition : conditions)
             childRestrictions.addAll(condition.getVariables());
 
-        return leftJoin(request.getConfiguration().getSchema(), left.optimize(request, childRestrictions, reduced),
-                right.optimize(request, childRestrictions, reduced), conditions, restrictions);
+        return leftJoin(request.getConfiguration().getDatabaseSchema(),
+                left.optimize(request, childRestrictions, reduced), right.optimize(request, childRestrictions, reduced),
+                conditions, restrictions);
     }
 
 

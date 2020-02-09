@@ -112,7 +112,8 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery("select version, size, checkdate from compound_stats"))
+                try(ResultSet result = statement
+                        .executeQuery("select version, size, checkdate from sachem.compound_stats"))
                 {
                     result.next();
 
@@ -134,7 +135,8 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery("select version, size, checkdate from compound_stats"))
+                try(ResultSet result = statement
+                        .executeQuery("select version, size, checkdate from sachem.compound_stats"))
                 {
                     result.next();
 
@@ -157,7 +159,7 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             try(Statement statement = connection.createStatement())
             {
                 try(ResultSet result = statement.executeQuery(
-                        "select src.name, stat.size, stat.checkdate from compound_stats stat, compound_sources src"))
+                        "select src.name, stat.size, stat.checkdate from sachem.compound_stats stat, sachem.compound_sources src"))
                 {
                     result.next();
 
@@ -183,7 +185,7 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             try(Statement statement = connection.createStatement())
             {
                 try(ResultSet result = statement.executeQuery(
-                        "select src.timestamp, stat.size, stat.checkdate from compound_stats stat, compound_sources src"))
+                        "select src.timestamp, stat.size, stat.checkdate from sachem.compound_stats stat, sachem.compound_sources src"))
                 {
                     result.next();
 

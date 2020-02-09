@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
@@ -21,9 +22,16 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 {
-    protected SachemConfiguration(DataSource connectionPool, String iriPrefix, String idPattern) throws SQLException
+    private final String schema;
+    private final String table;
+
+
+    protected SachemConfiguration(DataSource connectionPool, String schema, String table, String iriPrefix,
+            String idPattern) throws SQLException
     {
         super(connectionPool);
+        this.schema = schema;
+        this.table = table;
 
         loadPrefixes(iriPrefix);
         loadClasses(iriPrefix.replaceAll("\\.", "\\\\\\.") + idPattern);
@@ -50,25 +58,25 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
-        addIriClass(new UserIriClass("query_format", Arrays.asList("integer"), queryFormatPattern));
+        addIriClass(new UserIriClass(schema, "query_format", Arrays.asList("integer"), queryFormatPattern));
 
         String searchModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass("search_mode", Arrays.asList("integer"), searchModePattern));
+        addIriClass(new UserIriClass(schema, "search_mode", Arrays.asList("integer"), searchModePattern));
 
         String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
-        addIriClass(new UserIriClass("charge_mode", Arrays.asList("integer"), chargeModePattern));
+        addIriClass(new UserIriClass(schema, "charge_mode", Arrays.asList("integer"), chargeModePattern));
 
         String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
-        addIriClass(new UserIriClass("isotope_mode", Arrays.asList("integer"), isotopeModePattern));
+        addIriClass(new UserIriClass(schema, "isotope_mode", Arrays.asList("integer"), isotopeModePattern));
 
         String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
-        addIriClass(new UserIriClass("stereo_mode", Arrays.asList("integer"), stereoModePattern));
+        addIriClass(new UserIriClass(schema, "stereo_mode", Arrays.asList("integer"), stereoModePattern));
 
         String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
-        addIriClass(new UserIriClass("tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
+        addIriClass(new UserIriClass(schema, "tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
 
-        addIriClass(new UserIriClass("compound", Arrays.asList("integer"), pattern));
-        addIriClass(new UserIriClass("compound_molfile", Arrays.asList("integer"), pattern + "_Molfile"));
+        addIriClass(new UserIriClass(schema, "compound", Arrays.asList("integer"), pattern));
+        addIriClass(new UserIriClass(schema, "compound_molfile", Arrays.asList("integer"), pattern + "_Molfile"));
     }
 
 
@@ -76,12 +84,12 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
     {
         UserIriClass compound = getIriClass("compound");
 
-        String table = "compounds";
         NodeMapping subject = createIriMapping("compound_molfile", "id");
 
-        addQuadMapping(table, null, subject, createIriMapping("rdf:type"), createIriMapping("sio:SIO_011120"));
-        addQuadMapping(table, null, subject, createIriMapping("sio:is-attribute-of"), createIriMapping(compound, "id"));
-        addQuadMapping(table, null, subject, createIriMapping("sio:has-value"),
+        addQuadMapping(schema, table, null, subject, createIriMapping("rdf:type"), createIriMapping("sio:SIO_011120"));
+        addQuadMapping(schema, table, null, subject, createIriMapping("sio:is-attribute-of"),
+                createIriMapping(compound, "id"));
+        addQuadMapping(schema, table, null, subject, createIriMapping("sio:has-value"),
                 createLiteralMapping(xsdString, "molfile"));
     }
 
@@ -93,8 +101,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition(
-                sachem + "substructureSearch", "sachem_substructure_search");
+        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
+                new Function(schema, "sachem_substructure_search"));
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
@@ -115,7 +123,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* orchem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                "sachem_similarity_search");
+                new Function(schema, "sachem_similarity_search"));
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));
@@ -128,7 +136,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* orchem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                "sachem_similarity_search");
+                new Function(schema, "sachem_similarity_search"));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
                 new IRI(sachem + "UnspecifiedFormat")));

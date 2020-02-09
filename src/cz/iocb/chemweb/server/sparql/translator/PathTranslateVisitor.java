@@ -70,7 +70,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         this.parentTranslator = parentTranslator;
         this.request = request;
-        this.schema = request.getConfiguration().getSchema();
+        this.schema = request.getConfiguration().getDatabaseSchema();
         this.mappings = request.getConfiguration().getMappings();
         this.datasets = datasets;
     }

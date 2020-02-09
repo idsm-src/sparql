@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
+import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
 import java.util.Arrays;
@@ -13,7 +14,7 @@ class Terminology
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(new UserIriClass("terminology", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "terminology", Arrays.asList("integer"),
                 "http://nextprot\\.org/rdf/terminology/.*", IF_MATCH));
     }
 
@@ -27,7 +28,7 @@ class Terminology
             String table = "terminology_bases";
             NodeMapping subject = config.createIriMapping(terminology, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("schema", "type"));
         }
 
@@ -35,7 +36,7 @@ class Terminology
             String table = "terminology_parents";
             NodeMapping subject = config.createIriMapping(terminology, "term");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(":childOf"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":childOf"),
                     config.createIriMapping("terminology", "parent"));
         }
 
@@ -43,7 +44,7 @@ class Terminology
             String table = "terminology_related_terms";
             NodeMapping subject = config.createIriMapping(terminology, "term");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping(":related"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":related"),
                     config.createIriMapping("terminology", "related"));
         }
 
@@ -51,7 +52,7 @@ class Terminology
             String table = "terminology_labels";
             NodeMapping subject = config.createIriMapping(terminology, "term");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
         }
     }

@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -12,11 +13,11 @@ class Substance
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass("substance", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "substance", Arrays.asList("integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/substance/SID[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass("substance_chembl", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "substance_chembl", Arrays.asList("integer"),
                 "http://linkedchemistry\\.info/chembl/chemblid/S?CHEMBL[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass("substance_ebi_chembl", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "substance_ebi_chembl", Arrays.asList("integer"),
                 "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/S?CHEMBL[1-9][0-9]*"));
     }
 
@@ -30,17 +31,17 @@ class Substance
             String table = "substance_bases";
             NodeMapping subject = config.createIriMapping(substance, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Substance.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Substance.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:available"),
                     config.createLiteralMapping(xsdDateM4, "available"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("source", "source"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:modified"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:modified"),
                     config.createLiteralMapping(xsdDateM4, "modified"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
                     config.createIriMapping("compound", "compound"));
         }
 
@@ -48,7 +49,7 @@ class Substance
             String table = "substance_types";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology_resource", Ontology.unitCHEBI, "chebi"));
         }
 
@@ -56,7 +57,7 @@ class Substance
             String table = "endpoint_bases";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
                     config.createIriMapping("measuregroup", "bioassay", "measuregroup"));
         }
 
@@ -64,9 +65,9 @@ class Substance
             String table = "substance_matches";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("substance_chembl", "match"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("substance_ebi_chembl", "match"));
         }
 
@@ -74,7 +75,7 @@ class Substance
             String table = "substance_references";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
                     config.createIriMapping("reference", "reference"));
         }
 
@@ -82,7 +83,7 @@ class Substance
             String table = "substance_pdblinks";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
                     config.createIriMapping("pdblink", "pdblink"));
         }
 
@@ -90,7 +91,7 @@ class Substance
             String table = "substance_synonyms";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("synonym", "synonym"));
         }
 
@@ -98,7 +99,7 @@ class Substance
             String table = "descriptor_substance_bases";
             NodeMapping subject = config.createIriMapping(substance, "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("substance_version", "substance"));
         }
     }

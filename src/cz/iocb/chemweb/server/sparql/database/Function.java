@@ -2,16 +2,16 @@ package cz.iocb.chemweb.server.sparql.database;
 
 
 
-public class Table
+public class Function
 {
     private final String schema;
-    private final String table;
+    private final String function;
 
 
-    public Table(String schema, String table)
+    public Function(String schema, String function)
     {
         this.schema = schema;
-        this.table = table;
+        this.function = function;
     }
 
 
@@ -23,20 +23,20 @@ public class Table
 
     public String getName()
     {
-        return table;
+        return function;
     }
 
 
     public String getCode()
     {
-        return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + table.replaceAll("\"", "\"\"") + "\"";
+        return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + function.replaceAll("\"", "\"\"") + "\"";
     }
 
 
     @Override
     public int hashCode()
     {
-        return table.hashCode();
+        return function.hashCode();
     }
 
 
@@ -49,8 +49,8 @@ public class Table
         if(obj == null || getClass() != obj.getClass())
             return false;
 
-        Table other = (Table) obj;
+        Function other = (Function) obj;
 
-        return schema.equals(other.schema) && table.equals(other.table);
+        return schema.equals(other.schema) && function.equals(other.function);
     }
 }

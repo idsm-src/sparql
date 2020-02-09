@@ -14,6 +14,7 @@ import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
@@ -28,6 +29,9 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
+    static final String sachem = "sachem";
+    static final String schema = "pubchem";
+
     static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
     static final DateConstantZoneClass xsdDateM4 = DateConstantZoneClass.get(-4 * 60 * 60);
 
@@ -123,22 +127,22 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
-        addIriClass(new UserIriClass("query_format", Arrays.asList("integer"), queryFormatPattern));
+        addIriClass(new UserIriClass(schema, "query_format", Arrays.asList("integer"), queryFormatPattern));
 
         String searchModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass("search_mode", Arrays.asList("integer"), searchModePattern));
+        addIriClass(new UserIriClass(schema, "search_mode", Arrays.asList("integer"), searchModePattern));
 
         String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
-        addIriClass(new UserIriClass("charge_mode", Arrays.asList("integer"), chargeModePattern));
+        addIriClass(new UserIriClass(schema, "charge_mode", Arrays.asList("integer"), chargeModePattern));
 
         String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
-        addIriClass(new UserIriClass("isotope_mode", Arrays.asList("integer"), isotopeModePattern));
+        addIriClass(new UserIriClass(schema, "isotope_mode", Arrays.asList("integer"), isotopeModePattern));
 
         String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
-        addIriClass(new UserIriClass("stereo_mode", Arrays.asList("integer"), stereoModePattern));
+        addIriClass(new UserIriClass(schema, "stereo_mode", Arrays.asList("integer"), stereoModePattern));
 
         String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
-        addIriClass(new UserIriClass("tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
+        addIriClass(new UserIriClass(schema, "tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
     }
 
 
@@ -166,68 +170,69 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
     private void loadProcedures()
     {
-        String sachem = prefixes.get("sachem");
+        String prefix = prefixes.get("sachem");
         String fulltext = prefixes.get("fulltext");
         UserIriClass compound = getIriClass("compound");
 
 
         /* orchem:substructureSearch */
-        ProcedureDefinition subsearch = new cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition(
-                sachem + "substructureSearch", "sachem_substructure_search");
-        subsearch.addParameter(new cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition(sachem + "query",
-                xsdString, null));
-        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
-                new IRI(sachem + "UnspecifiedFormat")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
-        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("search_mode"),
-                new IRI(sachem + "substructureSearch")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("charge_mode"),
-                new IRI(sachem + "defaultChargeAsAny")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
-                new IRI(sachem + "ignoreIsotopes")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
-                new IRI(sachem + "ignoreStrereo")));
-        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
-                new IRI(sachem + "ignoreTautomers")));
+        ProcedureDefinition subsearch = new ProcedureDefinition(prefix + "substructureSearch",
+                new Function(sachem, "sachem_substructure_search"));
+        subsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
+                new IRI(prefix + "UnspecifiedFormat")));
+        subsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+        subsearch.addParameter(new ParameterDefinition(prefix + "searchMode", getIriClass("search_mode"),
+                new IRI(prefix + "substructureSearch")));
+        subsearch.addParameter(new ParameterDefinition(prefix + "chargeMode", getIriClass("charge_mode"),
+                new IRI(prefix + "defaultChargeAsAny")));
+        subsearch.addParameter(new ParameterDefinition(prefix + "isotopeMode", getIriClass("isotope_mode"),
+                new IRI(prefix + "ignoreIsotopes")));
+        subsearch.addParameter(new ParameterDefinition(prefix + "stereoMode", getIriClass("stereo_mode"),
+                new IRI(prefix + "ignoreStrereo")));
+        subsearch.addParameter(new ParameterDefinition(prefix + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(prefix + "ignoreTautomers")));
         subsearch.addResult(new ResultDefinition(compound));
         procedures.put(subsearch.getProcedureName(), subsearch);
 
 
         /* orchem:similaritySearch */
-        ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                "sachem_similarity_search");
-        simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
-        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
-                new IRI(sachem + "UnspecifiedFormat")));
-        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
-        simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
-        simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
-        simsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
+        ProcedureDefinition simsearch = new ProcedureDefinition(prefix + "similaritySearch",
+                new Function(sachem, "sachem_similarity_search"));
+        simsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
+        simsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
+                new IRI(prefix + "UnspecifiedFormat")));
+        simsearch.addParameter(new ParameterDefinition(prefix + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
+        simsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+        simsearch.addResult(new ResultDefinition(prefix + "compound", compound, "compound"));
+        simsearch.addResult(new ResultDefinition(prefix + "score", xsdDouble, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* orchem:similarCompoundSearch */
-        ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                "sachem_similarity_search");
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
-                new IRI(sachem + "UnspecifiedFormat")));
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(prefix + "similarCompoundSearch",
+                new Function(sachem, "sachem_similarity_search"));
+        simcmpsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
+        simcmpsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
+                new IRI(prefix + "UnspecifiedFormat")));
         simcmpsearch
-                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
-        simcmpsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+                .addParameter(new ParameterDefinition(prefix + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
+        simcmpsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
         simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
 
 
         /* fulltext:bioassaySearch */
-        ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch", "bioassay");
+        ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch",
+                new Function(schema, "bioassay"));
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
 
 
         /* fulltext:compoundSearch */
-        ProcedureDefinition compoundSearch = new ProcedureDefinition(fulltext + "compoundSearch", "compound");
+        ProcedureDefinition compoundSearch = new ProcedureDefinition(fulltext + "compoundSearch",
+                new Function(schema, "compound"));
         compoundSearch.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
         compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
@@ -241,18 +246,19 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery(
-                        "select parent_table, parent_columns, foreign_table, foreign_columns from schema_foreign_keys"))
+                try(ResultSet result = statement
+                        .executeQuery("select parent_table, parent_columns, foreign_table, foreign_columns from "
+                                + schema + ".schema_foreign_keys"))
                 {
                     while(result.next())
                     {
-                        Table parentTable = new Table(result.getString(1));
+                        Table parentTable = new Table(schema, result.getString(1));
                         List<Column> parentColumns = getColumns((String[]) result.getArray(2).getArray());
 
-                        Table foreignTable = new Table(result.getString(3));
+                        Table foreignTable = new Table(schema, result.getString(3));
                         List<Column> foreignColumns = getColumns((String[]) result.getArray(4).getArray());
 
-                        schema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
+                        databaseSchema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
                     }
                 }
             }
@@ -260,19 +266,20 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery(
-                        "select left_table, left_columns, right_table, right_columns from schema_unjoinable_columns"))
+                try(ResultSet result = statement
+                        .executeQuery("select left_table, left_columns, right_table, right_columns from " + schema
+                                + ".schema_unjoinable_columns"))
                 {
                     while(result.next())
                     {
-                        Table leftTable = new Table(result.getString(1));
+                        Table leftTable = new Table(schema, result.getString(1));
                         List<Column> leftColumns = getColumns((String[]) result.getArray(2).getArray());
 
-                        Table rightTable = new Table(result.getString(3));
+                        Table rightTable = new Table(schema, result.getString(3));
                         List<Column> rightColumns = getColumns((String[]) result.getArray(4).getArray());
 
-                        schema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
-                        schema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
+                        databaseSchema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
+                        databaseSchema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
                     }
                 }
             }

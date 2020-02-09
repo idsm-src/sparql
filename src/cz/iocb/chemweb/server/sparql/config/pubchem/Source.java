@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -13,7 +14,7 @@ class Source
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass("source", Arrays.asList("smallint"),
+        config.addIriClass(new UserIriClass(schema, "source", Arrays.asList("smallint"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/source/.*", SqlCheck.IF_MATCH));
     }
 
@@ -27,11 +28,11 @@ class Source
             String table = "source_bases";
             NodeMapping subject = config.createIriMapping(source, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("dcterms:Dataset"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Source.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
         }
 
@@ -39,7 +40,7 @@ class Source
             String table = "source_subjects";
             NodeMapping subject = config.createIriMapping(source, "source");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("concept", "subject"));
         }
 
@@ -47,7 +48,7 @@ class Source
             String table = "source_alternatives";
             NodeMapping subject = config.createIriMapping(source, "source");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:alternative"),
                     config.createLiteralMapping(rdfLangStringEn, "alternative"));
         }
     }

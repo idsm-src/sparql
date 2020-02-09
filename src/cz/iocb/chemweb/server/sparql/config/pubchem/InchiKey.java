@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -13,7 +14,7 @@ class InchiKey
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass("inchikey", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "inchikey", Arrays.asList("integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/inchikey/.*", SqlCheck.IF_MATCH));
     }
 
@@ -27,9 +28,9 @@ class InchiKey
             String table = "inchikey_bases";
             NodeMapping subject = config.createIriMapping(inchikey, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:CHEMINF_000399"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(rdfLangStringEn, "inchikey"));
         }
 
@@ -37,7 +38,7 @@ class InchiKey
             String table = "inchikey_compounds";
             NodeMapping subject = config.createIriMapping(inchikey, "inchikey");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("compound", "compound"));
         }
 
@@ -45,7 +46,7 @@ class InchiKey
             String table = "inchikey_subjects";
             NodeMapping subject = config.createIriMapping(inchikey, "inchikey");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("mesh", "subject"));
         }
     }

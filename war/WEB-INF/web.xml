@@ -44,6 +44,7 @@
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-pubchem</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>sachem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>CompoundImage</servlet-name>
@@ -180,6 +181,7 @@
     <servlet-name>ChebiCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-chebi</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>sachem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChebiCompoundImage</servlet-name>
@@ -190,6 +192,7 @@
     <servlet-name>ChemblCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-chembl</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>sachem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>ChemblCompoundImage</servlet-name>
@@ -200,6 +203,7 @@
     <servlet-name>DrugbankCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-drugbank</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>sachem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>DrugbankCompoundImage</servlet-name>
@@ -210,6 +214,7 @@
     <servlet-name>PubChemCompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-pubchem</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>sachem</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>PubChemCompoundImage</servlet-name>

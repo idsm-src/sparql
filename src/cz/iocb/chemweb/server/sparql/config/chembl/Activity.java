@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.chembl;
 
+import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;
@@ -13,13 +14,13 @@ class Activity
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass("activity", Arrays.asList("bigint"),
+        config.addIriClass(new UserIriClass(schema, "activity", Arrays.asList("bigint"),
                 "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/activity/CHEMBL_ACT_(0|[1-9][0-9]*)"));
 
-        config.addIriClass(new UserIriClass("uo_unit", Arrays.asList("varchar"),
+        config.addIriClass(new UserIriClass(schema, "uo_unit", Arrays.asList("varchar"),
                 "http://purl\\.obolibrary\\.org/obo/UO_[0-9]{7}"));
 
-        config.addIriClass(new UserIriClass("qudt_unit", Arrays.asList("varchar"),
+        config.addIriClass(new UserIriClass(schema, "qudt_unit", Arrays.asList("varchar"),
                 "(http://qudt\\.org/vocab/unit#(Centimeter|Day|DegreeCelsius|Gram|Hour|InternationalUnitPerLiter|"
                         + "Kilogram|Liter|Micrometer|Millimeter|MilliSecond|MinuteTime|Percent|SecondTime))|"
                         + "(http://www\\.openphacts\\.org/units/(GramPerLiter|MicrogramPerMilliliter|Micromolar|"
@@ -36,73 +37,73 @@ class Activity
         String table = "activities";
         NodeMapping subject = config.createIriMapping(activity, "activity_id");
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("cco:Activity"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0000208"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bao:BAO_0000208"),
                 config.createIriMapping("bao", "bao_endpoint"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasUnitOnto"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:hasUnitOnto"),
                 config.createIriMapping("uo_unit", "uo_units"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasQUDT"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:hasQUDT"),
                 config.createIriMapping("qudt_unit", "qudt_units"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMolecule"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:hasMolecule"),
                 config.createIriMapping("molecule", "molregno"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasDocument"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:hasDocument"),
                 config.createIriMapping("document", "doc_id"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:dataValidityIssue"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:dataValidityIssue"),
                 config.createLiteralMapping(true), "data_validity_comment is not null");
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:potentialDuplicate"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:potentialDuplicate"),
                 config.createLiteralMapping(true), "potential_duplicate = 1::smallint");
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:value"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:value"),
                 config.createLiteralMapping(xsdDouble, "(value::float8)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardValue"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:standardValue"),
                 config.createLiteralMapping(xsdDouble, "(standard_value::float8)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:pChembl"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:pChembl"),
                 config.createLiteralMapping(xsdDouble, "(pchembl_value::float8)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
                 config.createLiteralMapping(xsdString, "('CHEMBL_ACT_' || activity_id)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "('CHEMBL_ACT_' || activity_id)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:units"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:units"),
                 config.createLiteralMapping(xsdString, "units"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:type"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:type"),
                 config.createLiteralMapping(xsdString, "type"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relation"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:relation"),
                 config.createLiteralMapping(xsdString, "relation"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardUnits"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:standardUnits"),
                 config.createLiteralMapping(xsdString, "standard_units"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardType"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:standardType"),
                 config.createLiteralMapping(xsdString, "standard_type"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardRelation"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:standardRelation"),
                 config.createLiteralMapping(xsdString, "standard_relation"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:activityComment"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:activityComment"),
                 config.createLiteralMapping(xsdString, "activity_comment"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:dataValidityComment"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:dataValidityComment"),
                 config.createLiteralMapping(xsdString, "data_validity_comment"));
 
-        config.addQuadMapping(table, graph, config.createIriMapping("molecule", "molregno"),
+        config.addQuadMapping(schema, table, graph, config.createIriMapping("molecule", "molregno"),
                 config.createIriMapping("cco:hasActivity"), subject);
 
-        config.addQuadMapping(table, graph, config.createIriMapping("document", "doc_id"),
+        config.addQuadMapping(schema, table, graph, config.createIriMapping("document", "doc_id"),
                 config.createIriMapping("cco:hasActivity"), subject);
     }
 }

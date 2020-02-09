@@ -423,9 +423,7 @@ public class SqlProcedureCall extends SqlIntercode
     {
         builder.append("SELECT ");
 
-        builder.append('"');
-        builder.append(procedure.getSqlProcedureName());
-        builder.append('"');
+        builder.append(procedure.getSqlProcedure().getCode());
 
         boolean hasParameter = false;
         builder.append("(");

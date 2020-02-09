@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -13,7 +14,7 @@ class Synonym
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass("synonym", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "synonym", Arrays.asList("integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/synonym/MD5_.*", SqlCheck.IF_MATCH));
     }
 
@@ -27,7 +28,7 @@ class Synonym
             String table = "synonym_bases";
             NodeMapping subject = config.createIriMapping(synonym, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Synonym.vm"));
         }
 
@@ -35,7 +36,7 @@ class Synonym
             String table = "synonym_values";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(rdfLangStringEn, "value"));
         }
 
@@ -43,7 +44,7 @@ class Synonym
             String table = "synonym_types";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology_resource", Ontology.unitCHEMINF, "type_id"));
         }
 
@@ -51,7 +52,7 @@ class Synonym
             String table = "synonym_compounds";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("compound", "compound"));
         }
 
@@ -59,7 +60,7 @@ class Synonym
             String table = "synonym_mesh_subjects";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("mesh", "subject"));
         }
 
@@ -67,7 +68,7 @@ class Synonym
             String table = "synonym_concept_subjects";
             NodeMapping subject = config.createIriMapping(synonym, "synonym");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:subject"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:subject"),
                     config.createIriMapping("concept", "concept"));
         }
     }

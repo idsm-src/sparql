@@ -212,7 +212,7 @@ public class SqlJoin extends SqlIntercode
         SqlIntercode result = SqlEmptySolution.get();
 
         for(SqlIntercode child : childs)
-            result = join(request.getConfiguration().getSchema(), result,
+            result = join(request.getConfiguration().getDatabaseSchema(), result,
                     child.optimize(request, childRestrictions, reduced), restrictions);
 
         return result;

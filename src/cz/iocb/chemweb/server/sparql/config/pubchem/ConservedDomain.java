@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -12,7 +13,7 @@ class ConservedDomain
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass("conserveddomain", Arrays.asList("integer"),
+        config.addIriClass(new UserIriClass(schema, "conserveddomain", Arrays.asList("integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/conserveddomain/PSSMID[1-9][0-9]*"));
     }
 
@@ -26,13 +27,13 @@ class ConservedDomain
             String table = "conserveddomain_bases";
             NodeMapping subject = config.createIriMapping(conserveddomain, "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:SO_0000417"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/ConservedDomain.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:abstract"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:abstract"),
                     config.createLiteralMapping(rdfLangStringEn, "abstract"));
         }
 
@@ -40,7 +41,7 @@ class ConservedDomain
             String table = "conserveddomain_references";
             NodeMapping subject = config.createIriMapping(conserveddomain, "domain");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
                     config.createIriMapping("reference", "reference"));
         }
     }

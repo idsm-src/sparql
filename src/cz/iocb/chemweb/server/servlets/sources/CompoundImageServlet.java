@@ -79,26 +79,27 @@ public class CompoundImageServlet extends HttpServlet
             throw new ServletException("Resource name is not set");
 
 
+        String schema = config.getInitParameter("schema");
+
         String table = config.getInitParameter("table");
 
         if(table == null)
             table = "compounds";
 
-        if(!table.matches("^[a-zA-Z0-9_]+$"))
-            throw new ServletException("Table name is not set properly");
+        String id = config.getInitParameter("id");
+
+        if(id == null)
+            id = "id";
+
+        String molfile = config.getInitParameter("molfile");
+
+        if(molfile == null)
+            molfile = "molfile";
 
 
-        String column = config.getInitParameter("column");
-
-        if(column == null)
-            column = "molfile";
-
-        if(!column.matches("^[a-zA-Z0-9_]+$"))
-            throw new ServletException("Column name is not set properly");
-
-
-        queryPattern = "select " + column + " from " + table + " where id = ?";
-
+        queryPattern = "select \"" + molfile.replace("\"", "\"\"") + "\" from \""
+                + (schema != null ? schema.replace("\"", "\"\"") + "\".\"" : "") + table.replace("\"", "\"\"")
+                + "\" where \"" + id.replace("\"", "\"\"") + "\" = ?";
 
         try
         {

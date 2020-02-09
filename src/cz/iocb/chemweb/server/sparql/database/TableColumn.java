@@ -8,4 +8,11 @@ public class TableColumn extends Column
     {
         super(value);
     }
+
+
+    @Override
+    public String getCode()
+    {
+        return "\"" + value.replaceAll("\"", "\"\"") + "\"";
+    }
 }

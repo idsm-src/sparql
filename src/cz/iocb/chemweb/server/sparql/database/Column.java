@@ -4,7 +4,7 @@ package cz.iocb.chemweb.server.sparql.database;
 
 public abstract class Column
 {
-    private final String value;
+    protected final String value;
 
 
     protected Column(String value)
@@ -19,10 +19,7 @@ public abstract class Column
     }
 
 
-    public String getCode()
-    {
-        return value;
-    }
+    public abstract String getCode();
 
 
     @Override

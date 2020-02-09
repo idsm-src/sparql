@@ -2,21 +2,22 @@ package cz.iocb.chemweb.server.sparql.mapping.procedure;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import cz.iocb.chemweb.server.sparql.database.Function;
 
 
 
 public class ProcedureDefinition
 {
     private final String procedureName;
-    private final String sqlProcedureName;
+    private final Function sqlProcedure;
     private final LinkedHashMap<String, ParameterDefinition> parameters;
     private final LinkedHashMap<String, ResultDefinition> results;
 
 
-    public ProcedureDefinition(String procedureName, String sqlProcedureName)
+    public ProcedureDefinition(String procedureName, Function sqlProcedure)
     {
         this.procedureName = procedureName;
-        this.sqlProcedureName = sqlProcedureName;
+        this.sqlProcedure = sqlProcedure;
         this.parameters = new LinkedHashMap<String, ParameterDefinition>();
         this.results = new LinkedHashMap<String, ResultDefinition>();
     }
@@ -70,8 +71,8 @@ public class ProcedureDefinition
     }
 
 
-    public final String getSqlProcedureName()
+    public final Function getSqlProcedure()
     {
-        return sqlProcedureName;
+        return sqlProcedure;
     }
 }

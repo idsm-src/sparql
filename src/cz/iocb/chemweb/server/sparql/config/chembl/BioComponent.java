@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.chembl;
 
+import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -12,7 +13,7 @@ class BioComponent
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass("biocomponent", Arrays.asList("bigint"),
+        config.addIriClass(new UserIriClass(schema, "biocomponent", Arrays.asList("bigint"),
                 "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/biocomponent/CHEMBL_BC_(0|[1-9][0-9]*)"));
     }
 
@@ -25,38 +26,38 @@ class BioComponent
         String table = "bio_component_sequences";
         NodeMapping subject = config.createIriMapping(biocomponent, "component_id");
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("cco:BioComponent"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:taxonomy"),
                 config.createIriMapping("taxonomy", "tax_id"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:taxonomy"),
                 config.createIriMapping("ncbi_taxonomy", "tax_id"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
                 config.createLiteralMapping(xsdString, "('CHEMBL_BC_' || component_id)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "('CHEMBL_BC_' || component_id)"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:componentType"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:componentType"),
                 config.createLiteralMapping(xsdString, "component_type"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:proteinSequence"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:proteinSequence"),
                 config.createLiteralMapping(xsdString, "sequence"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:description"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:description"),
                 config.createLiteralMapping(xsdString, "description"));
 
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:organismName"),
+        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:organismName"),
                 config.createLiteralMapping(xsdString, "organism"));
 
-        config.addQuadMapping(table, graph, config.createIriMapping("taxonomy", "tax_id"),
+        config.addQuadMapping(schema, table, graph, config.createIriMapping("taxonomy", "tax_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(organism || ' (Identifiers.org)')"));
 
-        config.addQuadMapping(table, graph, config.createIriMapping("ncbi_taxonomy", "tax_id"),
+        config.addQuadMapping(schema, table, graph, config.createIriMapping("ncbi_taxonomy", "tax_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(organism || ' (NCBI Taxonomy)')"));
     }
