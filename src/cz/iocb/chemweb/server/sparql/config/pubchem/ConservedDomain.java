@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,8 +13,8 @@ class ConservedDomain
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "conserveddomain", Arrays.asList("integer"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/conserveddomain/PSSMID[1-9][0-9]*"));
+        config.addIriClass(new IntegerUserIriClass("conserveddomain", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/PSSMID"));
     }
 
 

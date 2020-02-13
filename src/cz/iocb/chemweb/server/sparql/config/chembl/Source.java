@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,8 +13,8 @@ class Source
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "source", Arrays.asList("integer"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/source/CHEMBL_SRC_(0|[1-9][0-9]*)"));
+        config.addIriClass(new IntegerUserIriClass("source", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/source/CHEMBL_SRC_"));
     }
 
 

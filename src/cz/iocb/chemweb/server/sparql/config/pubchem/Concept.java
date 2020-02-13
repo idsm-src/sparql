@@ -2,11 +2,12 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -14,8 +15,9 @@ class Concept
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "concept", Arrays.asList("smallint"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/concept/.*", SqlCheck.IF_MATCH));
+        config.addIriClass(
+                new MapUserIriClass("concept", "smallint", new Table(schema, "concept_bases"), new TableColumn("id"),
+                        new TableColumn("iri"), "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/concept/.*"));
     }
 
 

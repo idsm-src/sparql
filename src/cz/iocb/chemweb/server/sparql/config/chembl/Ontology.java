@@ -2,13 +2,14 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -16,10 +17,10 @@ class Ontology
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "ontology_term", Arrays.asList("integer"),
+        config.addIriClass(new MapUserIriClass("ontology_term", "integer", new Table(schema, "ontology_terms"),
+                new TableColumn("term_id"), new TableColumn("iri"),
                 "(http://rdf\\.ebi\\.ac\\.uk/terms/chembl#.*)|(http://purl\\.org/dc/terms/(description|title|date))|"
-                        + "(http://www\\.w3\\.org/2001/XMLSchema#(boolean|float|integer|string))",
-                SqlCheck.IF_MATCH));
+                        + "(http://www\\.w3\\.org/2001/XMLSchema#(boolean|float|integer|string))"));
     }
 
 

@@ -4,11 +4,14 @@ import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.sc
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -16,93 +19,102 @@ class Molecule
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "molecule", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("molecule", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*"));
 
-        config.addIriClass(new UserIriClass(schema, "chebi", Arrays.asList("bigint"),
-                "http://purl\\.obolibrary\\.org/obo/CHEBI_[1-9][0-9]*"));
+        config.addIriClass(new IntegerUserIriClass("chebi", "bigint", "http://purl.obolibrary.org/obo/CHEBI_"));
 
-        config.addIriClass(new UserIriClass(schema, "displayimage", Arrays.asList("varchar"),
-                "https://www\\.ebi\\.ac\\.uk/chembl/compound/displayimage_large/CHEMBL[1-9][0-9]*"));
+        config.addIriClass(new StringUserIriClass("displayimage",
+                "https://www.ebi.ac.uk/chembl/compound/displayimage_large/", "CHEMBL[1-9][0-9]*"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_acd_most_apka", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#acd_most_apka",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_acd_most_apka", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_most_apka"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_acd_most_bpka", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#acd_most_bpka",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_acd_most_bpka", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_most_bpka"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_acd_logd", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#acd_logd", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_acd_logd", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_logd"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_acd_logp", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#acd_logp", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_acd_logp", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_logp"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_alogp", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#alogp", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_alogp", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#alogp"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_aromatic_rings", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#aromatic_rings",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_aromatic_rings", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#aromatic_rings"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_hba", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#hba", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_hba", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#hba"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_hbd", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#hbd", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_hbd", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#hbd"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_heavy_atoms", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#heavy_atoms",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_heavy_atoms", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#heavy_atoms"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_num_ro5_violations", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#num_ro5_violations",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_num_ro5_violations", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#num_ro5_violations"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_psa", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#psa", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_psa", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#psa"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_qed_weighted", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#qed_weighted",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_qed_weighted", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#qed_weighted"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_rtb", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#rtb", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_rtb", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#rtb"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_mw_freebase", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#mw_freebase",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_mw_freebase", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#mw_freebase"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_mw_monoisotopic", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#mw_monoisotopic",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_mw_monoisotopic", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#mw_monoisotopic"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_full_mwt", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#full_mwt", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_full_mwt", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#full_mwt"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_molecular_species", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#molecular_species",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_molecular_species", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#molecular_species"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_ro3_pass", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#ro3_pass", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_ro3_pass", "bigint", new Table(schema, "molecule_dictionary"),
+                new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#ro3_pass"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_full_molformula", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#full_molformula",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_full_molformula", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#full_molformula"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_standard_inchi_key", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#standard_inchi_key",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_standard_inchi_key", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#standard_inchi_key"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_standard_inchi", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#standard_inchi",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_standard_inchi", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#standard_inchi"));
 
-        config.addIriClass(new UserIriClass(schema, "chembl_canonical_smiles", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/CHEMBL[1-9][0-9]*#canonical_smiles",
-                SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("chembl_canonical_smiles", "bigint",
+                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#canonical_smiles"));
     }
 
 

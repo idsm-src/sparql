@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -12,8 +12,7 @@ class Context
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "context", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/context/[1-9][0-9]*"));
+        config.addIriClass(new IntegerUserIriClass("context", "integer", "http://nextprot.org/rdf/context/"));
     }
 
 

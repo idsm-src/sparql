@@ -5,12 +5,14 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBo
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
@@ -20,27 +22,25 @@ class Chromosome
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "isoform", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/isoform/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "annotation", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/annotation/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "evidence", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/evidence/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "entry", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/entry/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "proteoform", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/proteoform/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "gene", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/gene/.*", IF_MATCH));
-
-        config.addIriClass(new UserIriClass(schema, "chebi", Arrays.asList("integer"),
-                "http://purl\\.obolibrary\\.org/obo/CHEBI_[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "drugbank", Arrays.asList("integer"),
-                "http://wifo5-04\\.informatik\\.uni-mannheim\\.de/drugbank/resource/drugs/DB[0-9]{5}"));
-        config.addIriClass(new UserIriClass(schema, "purl_uniprot", Arrays.asList("integer"),
-                "http://purl\\.uniprot\\.org/uniprot/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "uniprot", Arrays.asList("integer"),
-                "http://www\\.uniprot\\.org/uniprot/.*", IF_MATCH));
+        config.addIriClass(new MapUserIriClass("isoform", "integer", new Table(schema, "isoform_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/isoform/", 0));
+        config.addIriClass(new MapUserIriClass("annotation", "integer", new Table(schema, "annotation_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/annotation/", 0));
+        config.addIriClass(new MapUserIriClass("evidence", "integer", new Table(schema, "evidence_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/evidence/", 0));
+        config.addIriClass(new MapUserIriClass("entry", "integer", new Table(schema, "entry_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/entry/", 0));
+        config.addIriClass(new MapUserIriClass("proteoform", "integer", new Table(schema, "proteoform_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
+        config.addIriClass(new MapUserIriClass("gene", "integer", new Table(schema, "gene_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
+        config.addIriClass(new MapUserIriClass("purl_uniprot", "integer", new Table(schema, "purl_uniprot_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://purl.uniprot.org/uniprot/", 0));
+        config.addIriClass(new MapUserIriClass("uniprot", "integer", new Table(schema, "uniprot_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://www.uniprot.org/uniprot/", 0));
+        config.addIriClass(new IntegerUserIriClass("chebi", "integer", "http://purl.obolibrary.org/obo/CHEBI_"));
+        config.addIriClass(new IntegerUserIriClass("drugbank", "integer",
+                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB", 5));
     }
 
 

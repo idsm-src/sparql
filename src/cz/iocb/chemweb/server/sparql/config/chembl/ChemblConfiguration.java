@@ -10,6 +10,7 @@ import java.util.Arrays;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
+import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
@@ -108,22 +109,22 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
         String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
 
         String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
-        addIriClass(new UserIriClass(schema, "query_format", Arrays.asList("integer"), queryFormatPattern));
+        addIriClass(new GeneralUserIriClass(schema, "query_format", Arrays.asList("integer"), queryFormatPattern));
 
         String searchModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass(schema, "search_mode", Arrays.asList("integer"), searchModePattern));
+        addIriClass(new GeneralUserIriClass(schema, "search_mode", Arrays.asList("integer"), searchModePattern));
 
         String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
-        addIriClass(new UserIriClass(schema, "charge_mode", Arrays.asList("integer"), chargeModePattern));
+        addIriClass(new GeneralUserIriClass(schema, "charge_mode", Arrays.asList("integer"), chargeModePattern));
 
         String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
-        addIriClass(new UserIriClass(schema, "isotope_mode", Arrays.asList("integer"), isotopeModePattern));
+        addIriClass(new GeneralUserIriClass(schema, "isotope_mode", Arrays.asList("integer"), isotopeModePattern));
 
         String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
-        addIriClass(new UserIriClass(schema, "stereo_mode", Arrays.asList("integer"), stereoModePattern));
+        addIriClass(new GeneralUserIriClass(schema, "stereo_mode", Arrays.asList("integer"), stereoModePattern));
 
         String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
-        addIriClass(new UserIriClass(schema, "tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
+        addIriClass(new GeneralUserIriClass(schema, "tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
     }
 
 

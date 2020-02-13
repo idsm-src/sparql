@@ -2,11 +2,12 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -14,8 +15,9 @@ class Target
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "target", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/target/CHEMBL[1-9][0-9]*", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("target", "bigint", new Table(schema, "target_dictionary"),
+                new TableColumn("tid"), new TableColumn("chembl_id"), "http://rdf.ebi.ac.uk/resource/chembl/target/",
+                "CHEMBL[1-9][0-9]*"));
     }
 
 

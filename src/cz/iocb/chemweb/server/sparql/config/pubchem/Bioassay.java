@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,11 +13,17 @@ class Bioassay
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/bioassay/AID[1-9][0-9]*";
+        config.addIriClass(
+                new IntegerUserIriClass("bioassay", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID"));
 
-        config.addIriClass(new UserIriClass(schema, "bioassay", Arrays.asList("integer"), prefix));
-        config.addIriClass(new UserIriClass(schema, "bioassay_data", Arrays.asList("integer", "smallint"),
-                prefix + "_(Description|Protocol|Comment)"));
+        config.addIriClass(new IntegerUserIriClass("bioassay_description", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID", "_Description"));
+
+        config.addIriClass(new IntegerUserIriClass("bioassay_protocol", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID", "_Protocol"));
+
+        config.addIriClass(new IntegerUserIriClass("bioassay_comment", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/AID", "_Comment"));
     }
 
 
@@ -52,14 +58,38 @@ class Bioassay
 
         {
             String table = "bioassay_data";
-            NodeMapping subject = config.createIriMapping("bioassay_data", "bioassay", "type_id");
+            NodeMapping subject = config.createIriMapping("bioassay_description", "bioassay");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", Ontology.unitSIO, "type_id"));
+                    config.createIriMapping("ontology_resource", "cheminf:SIO_000136"), "type_id = '136'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
-                    config.createIriMapping(bioassay, "bioassay"));
+                    config.createIriMapping(bioassay, "bioassay"), "type_id = '136'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(rdfLangStringEn, "value"));
+                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '136'::smallint");
+        }
+
+        {
+            String table = "bioassay_data";
+            NodeMapping subject = config.createIriMapping("bioassay_protocol", "bioassay");
+
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology_resource", "cheminf:SIO_001041"), "type_id = '1041'::smallint");
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping(bioassay, "bioassay"), "type_id = '1041'::smallint");
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '1041'::smallint");
+        }
+
+        {
+            String table = "bioassay_data";
+            NodeMapping subject = config.createIriMapping("bioassay_comment", "bioassay");
+
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology_resource", "cheminf:SIO_001041"), "type_id = '1167'::smallint");
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping(bioassay, "bioassay"), "type_id = '1167'::smallint");
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '1167'::smallint");
         }
     }
 }

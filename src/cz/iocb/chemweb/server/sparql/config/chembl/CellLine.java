@@ -2,11 +2,13 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -14,14 +16,14 @@ class CellLine
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "cell_line", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/cell_line/CHEMBL[1-9][0-9]*", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("cell_line", "bigint", new Table(schema, "cell_dictionary"),
+                new TableColumn("cell_id"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/cell_line/", "CHEMBL[1-9][0-9]*"));
 
-        config.addIriClass(new UserIriClass(schema, "clo", Arrays.asList("varchar"),
-                "http://purl\\.obolibrary\\.org/obo/CLO_[0-9]{7}"));
+        config.addIriClass(new StringUserIriClass("clo", "http://purl.obolibrary.org/obo/", "CLO_[0-9]{7}"));
 
-        config.addIriClass(new UserIriClass(schema, "lincs_cell_ref", Arrays.asList("varchar"),
-                "http://life\\.ccs\\.miami\\.edu/life/summary\\?mode=CellLine&source=LINCS&input=LCL-[0-9]{4}"));
+        config.addIriClass(new StringUserIriClass("lincs_cell_ref",
+                "http://life.ccs.miami.edu/life/summary?mode=CellLine&source=LINCS&input=", "LCL-[0-9]{4}"));
     }
 
 

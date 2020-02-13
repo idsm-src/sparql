@@ -2,11 +2,11 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -14,10 +14,8 @@ class Gene
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "gene", Arrays.asList("integer"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/gene/GID[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "ensembl", Arrays.asList("varchar"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/ensembl/.*", SqlCheck.IF_MATCH));
+        config.addIriClass(new IntegerUserIriClass("gene", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID"));
+        config.addIriClass(new StringUserIriClass("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/"));
     }
 
 

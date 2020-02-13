@@ -2,9 +2,10 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,11 +14,10 @@ class TargetComponent
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "targetcomponent", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/targetcomponent/CHEMBL_TC_(0|[1-9][0-9]*)"));
+        config.addIriClass(new IntegerUserIriClass("targetcomponent", "bigint",
+                "http://rdf.ebi.ac.uk/resource/chembl/targetcomponent/CHEMBL_TC_"));
 
-        config.addIriClass(new UserIriClass(schema, "uniprot", Arrays.asList("varchar"),
-                "http://purl\\.uniprot\\.org/uniprot/[A-Z0-9]+"));
+        config.addIriClass(new StringUserIriClass("uniprot", "http://purl.uniprot.org/uniprot/", "[A-Z0-9]+"));
     }
 
 

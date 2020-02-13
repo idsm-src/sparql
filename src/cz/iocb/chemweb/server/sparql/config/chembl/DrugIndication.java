@@ -3,9 +3,10 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -14,11 +15,10 @@ class DrugIndication
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "drug_indication", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/drug_indication/CHEMBL_IND_(0|[1-9][0-9]*)"));
+        config.addIriClass(new IntegerUserIriClass("drug_indication", "bigint",
+                "http://rdf.ebi.ac.uk/resource/chembl/drug_indication/CHEMBL_IND_"));
 
-        config.addIriClass(
-                new UserIriClass(schema, "mesh", Arrays.asList("varchar"), "http://identifiers\\.org/mesh/D[0-9]+"));
+        config.addIriClass(new StringUserIriClass("mesh", "http://identifiers.org/mesh/", "D[0-9]+"));
     }
 
 

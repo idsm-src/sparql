@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,32 +13,41 @@ class TargetComponentReference
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "go_process_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/obo\\.go/GO:[0-9]{7}"));
-        config.addIriClass(new UserIriClass(schema, "go_function_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/obo\\.go/GO:[0-9]{7}"));
-        config.addIriClass(new UserIriClass(schema, "go_component_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/obo\\.go/GO:[0-9]{7}"));
-        config.addIriClass(new UserIriClass(schema, "pdb_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/pdb/[0-9][A-Z0-9]{3}"));
-        config.addIriClass(new UserIriClass(schema, "interpro_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/interpro/IPR[0-9]{6}"));
-        config.addIriClass(new UserIriClass(schema, "reactome_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/reactome/R-[A-Z]{3}-[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "pfam_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/pfam/PF[0-9]{5}"));
-        config.addIriClass(new UserIriClass(schema, "enzyme_class_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/ec-code/((-|[1-9][0-9]*)\\.){3}(-|n?[1-9][0-9]*)"));
-        config.addIriClass(new UserIriClass(schema, "intact_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/intact/[A-Z0-9]{6}"));
-        config.addIriClass(new UserIriClass(schema, "ensembl_gene_reference", Arrays.asList("varchar"),
-                "http://identifiers\\.org/ensembl/ENSG[0-9]{11}"));
-        config.addIriClass(new UserIriClass(schema, "pharmgkb_reference", Arrays.asList("varchar"),
-                "http://www\\.pharmgkb\\.org/gene/PA[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "timbal_reference", Arrays.asList("varchar"),
-                "http://mordred\\.bioc\\.cam\\.ac\\.uk/timbal/[A-Za-z0-9%()-]+"));
-        config.addIriClass(new UserIriClass(schema, "cgd_reference", Arrays.asList("varchar"),
-                "http://research\\.nhgri\\.nih\\.gov/CGD/view/\\?g=[A-Z0-9-]+"));
+        config.addIriClass(
+                new StringUserIriClass("go_process_reference", "http://identifiers.org/obo.go/", "GO:[0-9]{7}"));
+
+        config.addIriClass(
+                new StringUserIriClass("go_function_reference", "http://identifiers.org/obo.go/", "GO:[0-9]{7}"));
+
+        config.addIriClass(
+                new StringUserIriClass("go_component_reference", "http://identifiers.org/obo.go/", "GO:[0-9]{7}"));
+
+        config.addIriClass(new StringUserIriClass("pdb_reference", "http://identifiers.org/pdb/", "[0-9][A-Z0-9]{3}"));
+
+        config.addIriClass(
+                new StringUserIriClass("interpro_reference", "http://identifiers.org/interpro/", "IPR[0-9]{6}"));
+
+        config.addIriClass(new StringUserIriClass("reactome_reference", "http://identifiers.org/reactome/",
+                "R-[A-Z]{3}-[1-9][0-9]*"));
+
+        config.addIriClass(new StringUserIriClass("pfam_reference", "http://identifiers.org/pfam/", "PF[0-9]{5}"));
+
+        config.addIriClass(new StringUserIriClass("enzyme_class_reference", "http://identifiers.org/ec-code/",
+                "((-|[1-9][0-9]*)\\.){3}(-|n?[1-9][0-9]*)"));
+
+        config.addIriClass(new StringUserIriClass("intact_reference", "http://identifiers.org/intact/", "[A-Z0-9]{6}"));
+
+        config.addIriClass(
+                new StringUserIriClass("ensembl_gene_reference", "http://identifiers.org/ensembl/", "ENSG[0-9]{11}"));
+
+        config.addIriClass(
+                new StringUserIriClass("pharmgkb_reference", "http://www.pharmgkb.org/gene/", "PA[1-9][0-9]*"));
+
+        config.addIriClass(new StringUserIriClass("timbal_reference", "http://mordred.bioc.cam.ac.uk/timbal/",
+                "[A-Za-z0-9%()-]+"));
+
+        config.addIriClass(
+                new StringUserIriClass("cgd_reference", "http://research.nhgri.nih.gov/CGD/view/?g=", "[A-Z0-9-]+"));
     }
 
 

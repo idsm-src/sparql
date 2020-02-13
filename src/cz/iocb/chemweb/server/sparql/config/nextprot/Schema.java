@@ -2,10 +2,11 @@ package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -14,12 +15,12 @@ class Schema
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "source", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/source/.*", IF_MATCH));
-        config.addIriClass(new UserIriClass(schema, "database", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/db/.*", IF_MATCH));
-        config.addIriClass(
-                new UserIriClass(schema, "schema", Arrays.asList("integer"), "http://nextprot\\.org/rdf#.*", IF_MATCH));
+        config.addIriClass(new MapUserIriClass("source", "integer", new Table(schema, "source_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/source/", 0));
+        config.addIriClass(new MapUserIriClass("database", "integer", new Table(schema, "database_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/db/", 0));
+        config.addIriClass(new MapUserIriClass("schema", "integer", new Table(schema, "schema_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf#", 0));
     }
 
 
@@ -109,7 +110,7 @@ class Schema
 
         {
             String table = "schema_classes";
-            NodeMapping subject = config.createIriMapping(schema, "entity");
+            NodeMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Class"));
@@ -117,7 +118,7 @@ class Schema
 
         {
             String table = "schema_thing_subclasses";
-            NodeMapping subject = config.createIriMapping(schema, "entity");
+            NodeMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("owl:Thing"));
@@ -125,7 +126,7 @@ class Schema
 
         {
             String table = "schema_restrictions";
-            NodeMapping subject = config.createIriMapping(schema, "entity");
+            NodeMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":notIn"),
                     config.createIriMapping("schema", "notin"));
@@ -133,7 +134,7 @@ class Schema
 
         {
             String table = "schema_related_terms";
-            NodeMapping subject = config.createIriMapping(schema, "entity");
+            NodeMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":related"),
                     config.createIriMapping("terminology", "related"));
@@ -141,7 +142,7 @@ class Schema
 
         {
             String table = "schema_parent_classes";
-            NodeMapping subject = config.createIriMapping(schema, "entity");
+            NodeMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("schema", "parent"));

@@ -2,10 +2,11 @@ package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck.IF_MATCH;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -14,8 +15,8 @@ class Terminology
 {
     static void addIriClasses(NeXtProtConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "terminology", Arrays.asList("integer"),
-                "http://nextprot\\.org/rdf/terminology/.*", IF_MATCH));
+        config.addIriClass(new MapUserIriClass("terminology", "integer", new Table(schema, "terminology_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/terminology/", 0));
     }
 
 

@@ -10,6 +10,7 @@ import java.sql.Statement;
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -55,8 +56,8 @@ class Ontology
 
         String ontologyPattern = builder.toString();
 
-        config.addIriClass(new UserIriClass(schema, "ontology_resource", Arrays.asList("smallint", "integer"),
-                ontologyPattern, UserIriClass.SqlCheck.IF_NOT_MATCH));
+        config.addIriClass(new GeneralUserIriClass(schema, "ontology_resource", Arrays.asList("smallint", "integer"),
+                ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
     }
 
 

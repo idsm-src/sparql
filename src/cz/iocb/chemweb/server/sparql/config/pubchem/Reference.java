@@ -3,9 +3,9 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -14,8 +14,8 @@ class Reference
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "reference", Arrays.asList("integer"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/reference/PMID([1-9][0-9]*|0)"));
+        config.addIriClass(
+                new IntegerUserIriClass("reference", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID"));
     }
 
 

@@ -3,11 +3,13 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass.SqlCheck;
 
 
 
@@ -15,11 +17,12 @@ class Assay
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "assay", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/assay/CHEMBL[1-9][0-9]*", SqlCheck.IF_MATCH));
+        config.addIriClass(new MapUserIriClass("assay", "bigint", new Table(schema, "assays"),
+                new TableColumn("assay_id"), new TableColumn("chembl_id"),
+                "http://rdf.ebi.ac.uk/resource/chembl/assay/", " CHEMBL[1-9][0-9]*"));
 
-        config.addIriClass(new UserIriClass(schema, "pubchem_assay", Arrays.asList("varchar"),
-                "http://pubchem\\.ncbi\\.nlm\\.nih\\.gov/assay/assay\\.cgi?aid=[1-9][0-9]*"));
+        config.addIriClass(new StringUserIriClass("pubchem_assay",
+                "http://pubchem.ncbi.nlm.nih.gov/assay/assay.cgi?aid=", "[1-9][0-9]*"));
     }
 
 

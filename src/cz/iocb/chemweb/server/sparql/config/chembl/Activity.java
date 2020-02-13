@@ -3,9 +3,10 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -14,13 +15,12 @@ class Activity
 {
     static void addIriClasses(ChemblConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "activity", Arrays.asList("bigint"),
-                "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/activity/CHEMBL_ACT_(0|[1-9][0-9]*)"));
+        config.addIriClass(new IntegerUserIriClass("activity", "bigint",
+                "http://rdf.ebi.ac.uk/resource/chembl/activity/CHEMBL_ACT_"));
 
-        config.addIriClass(new UserIriClass(schema, "uo_unit", Arrays.asList("varchar"),
-                "http://purl\\.obolibrary\\.org/obo/UO_[0-9]{7}"));
+        config.addIriClass(new StringUserIriClass("uo_unit", "http://purl.obolibrary.org/obo/", "UO_[0-9]{7}"));
 
-        config.addIriClass(new UserIriClass(schema, "qudt_unit", Arrays.asList("varchar"),
+        config.addIriClass(new StringUserIriClass("qudt_unit", null,
                 "(http://qudt\\.org/vocab/unit#(Centimeter|Day|DegreeCelsius|Gram|Hour|InternationalUnitPerLiter|"
                         + "Kilogram|Liter|Micrometer|Millimeter|MilliSecond|MinuteTime|Percent|SecondTime))|"
                         + "(http://www\\.openphacts\\.org/units/(GramPerLiter|MicrogramPerMilliliter|Micromolar|"

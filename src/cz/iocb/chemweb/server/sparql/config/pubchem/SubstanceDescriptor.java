@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,10 +13,9 @@ class SubstanceDescriptor
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        String prefix = "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/descriptor/SID[1-9][0-9]*_";
+        String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID";
 
-        config.addIriClass(
-                new UserIriClass(schema, "substance_version", Arrays.asList("integer"), prefix + "Substance_Version"));
+        config.addIriClass(new IntegerUserIriClass("substance_version", "integer", prefix, "Substance_Version"));
     }
 
 

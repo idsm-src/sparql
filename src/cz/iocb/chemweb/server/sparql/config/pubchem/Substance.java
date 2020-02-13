@@ -5,6 +5,8 @@ import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.
 import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,11 +15,11 @@ class Substance
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "substance", Arrays.asList("integer"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/substance/SID[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "substance_chembl", Arrays.asList("integer"),
+        config.addIriClass(
+                new IntegerUserIriClass("substance", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/SID"));
+        config.addIriClass(new GeneralUserIriClass(schema, "substance_chembl", Arrays.asList("integer"),
                 "http://linkedchemistry\\.info/chembl/chemblid/S?CHEMBL[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "substance_ebi_chembl", Arrays.asList("integer"),
+        config.addIriClass(new GeneralUserIriClass(schema, "substance_ebi_chembl", Arrays.asList("integer"),
                 "http://rdf\\.ebi\\.ac\\.uk/resource/chembl/molecule/S?CHEMBL[1-9][0-9]*"));
     }
 

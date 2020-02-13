@@ -6,11 +6,12 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdSt
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
 import java.sql.SQLException;
-import java.util.Arrays;
+import java.util.HashMap;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
@@ -53,30 +54,62 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
     }
 
 
+    @SuppressWarnings("serial")
     private void loadClasses(String pattern)
     {
-        String sachem = "http://bioinfo\\.uochb\\.cas\\.cz/rdf/v1\\.0/sachem#";
+        String sachem = "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#";
 
-        String queryFormatPattern = sachem + "(UnspecifiedFormat|SMILES|MolFile|RGroup)";
-        addIriClass(new UserIriClass(schema, "query_format", Arrays.asList("integer"), queryFormatPattern));
+        addIriClass(new EnumUserIriClass("query_format", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "UnspecifiedFormat");
+                put("1", sachem + "SMILES");
+                put("2", sachem + "MolFile");
+                put("3", sachem + "RGroup");
+            }
+        }));
 
-        String searchModePattern = sachem + "(substructureSearch|exactSearch)";
-        addIriClass(new UserIriClass(schema, "search_mode", Arrays.asList("integer"), searchModePattern));
+        addIriClass(new EnumUserIriClass("search_mode", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "substructureSearch");
+                put("1", sachem + "exactSearch");
+            }
+        }));
 
-        String chargeModePattern = sachem + "(ignoreCharges|defaultChargeAsZero|defaultChargeAsAny)";
-        addIriClass(new UserIriClass(schema, "charge_mode", Arrays.asList("integer"), chargeModePattern));
+        addIriClass(new EnumUserIriClass("charge_mode", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "ignoreCharges");
+                put("1", sachem + "defaultChargeAsZero");
+                put("2", sachem + "defaultChargeAsAny");
+            }
+        }));
 
-        String isotopeModePattern = sachem + "(ignoreIsotopes|defaultIsotopeAsStandard|defaultIsotopeAsAny)";
-        addIriClass(new UserIriClass(schema, "isotope_mode", Arrays.asList("integer"), isotopeModePattern));
+        addIriClass(new EnumUserIriClass("isotope_mode", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "ignoreIsotopes");
+                put("1", sachem + "defaultIsotopeAsStandard");
+                put("2", sachem + "defaultIsotopeAsAny");
+            }
+        }));
 
-        String stereoModePattern = sachem + "(ignoreStrereo|strictStereo)";
-        addIriClass(new UserIriClass(schema, "stereo_mode", Arrays.asList("integer"), stereoModePattern));
+        addIriClass(new EnumUserIriClass("stereo_mode", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "ignoreStrereo");
+                put("1", sachem + "strictStereo");
+            }
+        }));
 
-        String tautomerModePattern = sachem + "(ignoreTautomers|inchiTautomers)";
-        addIriClass(new UserIriClass(schema, "tautomer_mode", Arrays.asList("integer"), tautomerModePattern));
-
-        addIriClass(new UserIriClass(schema, "compound", Arrays.asList("integer"), pattern));
-        addIriClass(new UserIriClass(schema, "compound_molfile", Arrays.asList("integer"), pattern + "_Molfile"));
+        addIriClass(new EnumUserIriClass("tautomer_mode", "integer", new HashMap<String, String>()
+        {
+            {
+                put("0", sachem + "ignoreTautomers");
+                put("1", sachem + "inchiTautomers");
+            }
+        }));
     }
 
 

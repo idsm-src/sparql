@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
@@ -13,10 +13,9 @@ class Biosystem
 {
     static void addIriClasses(PubChemConfiguration config)
     {
-        config.addIriClass(new UserIriClass(schema, "biosystem", Arrays.asList("integer"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/biosystem/BSID[1-9][0-9]*"));
-        config.addIriClass(new UserIriClass(schema, "wikipathway", Arrays.asList("integer"),
-                "http://identifiers\\.org/wikipathways/WP[1-9][0-9]*"));
+        config.addIriClass(
+                new IntegerUserIriClass("biosystem", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/biosystem/BSID"));
+        config.addIriClass(new IntegerUserIriClass("wikipathway", "integer", "http://identifiers.org/wikipathways/WP"));
     }
 
 
