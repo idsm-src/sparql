@@ -61,7 +61,7 @@ class Bioassay
             NodeMapping subject = config.createIriMapping("bioassay_description", "bioassay");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", "cheminf:SIO_000136"), "type_id = '136'::smallint");
+                    config.createIriMapping("cheminf:SIO_000136"), "type_id = '136'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping(bioassay, "bioassay"), "type_id = '136'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
@@ -73,7 +73,7 @@ class Bioassay
             NodeMapping subject = config.createIriMapping("bioassay_protocol", "bioassay");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", "cheminf:SIO_001041"), "type_id = '1041'::smallint");
+                    config.createIriMapping("cheminf:SIO_001041"), "type_id = '1041'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping(bioassay, "bioassay"), "type_id = '1041'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
@@ -85,7 +85,7 @@ class Bioassay
             NodeMapping subject = config.createIriMapping("bioassay_comment", "bioassay");
 
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", "cheminf:SIO_001041"), "type_id = '1167'::smallint");
+                    config.createIriMapping("cheminf:SIO_001041"), "type_id = '1167'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping(bioassay, "bioassay"), "type_id = '1167'::smallint");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
