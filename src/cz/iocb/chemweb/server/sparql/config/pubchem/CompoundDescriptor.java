@@ -64,9 +64,10 @@ class CompoundDescriptor
             String field = "hydrogen_bond_acceptor_count";
             NodeMapping subject = config.createIriMapping("hydrogen_bond_acceptor_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -75,9 +76,10 @@ class CompoundDescriptor
             String field = "tautomer_count";
             NodeMapping subject = config.createIriMapping("tautomer_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -86,9 +88,10 @@ class CompoundDescriptor
             String field = "defined_atom_stereo_count";
             NodeMapping subject = config.createIriMapping("defined_atom_stereo_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -97,9 +100,10 @@ class CompoundDescriptor
             String field = "defined_bond_stereo_count";
             NodeMapping subject = config.createIriMapping("defined_bond_stereo_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -108,9 +112,10 @@ class CompoundDescriptor
             String field = "undefined_bond_stereo_count";
             NodeMapping subject = config.createIriMapping("undefined_bond_stereo_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -119,9 +124,10 @@ class CompoundDescriptor
             String field = "isotope_atom_count";
             NodeMapping subject = config.createIriMapping("isotope_atom_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -130,9 +136,10 @@ class CompoundDescriptor
             String field = "covalent_unit_count";
             NodeMapping subject = config.createIriMapping("covalent_unit_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -141,9 +148,10 @@ class CompoundDescriptor
             String field = "hydrogen_bond_donor_count";
             NodeMapping subject = config.createIriMapping("hydrogen_bond_donor_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -152,9 +160,10 @@ class CompoundDescriptor
             String field = "non_hydrogen_atom_count";
             NodeMapping subject = config.createIriMapping("non_hydrogen_atom_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -163,9 +172,10 @@ class CompoundDescriptor
             String field = "rotatable_bond_count";
             NodeMapping subject = config.createIriMapping("rotatable_bond_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -174,9 +184,10 @@ class CompoundDescriptor
             String field = "undefined_atom_stereo_count";
             NodeMapping subject = config.createIriMapping("undefined_atom_stereo_count", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -185,9 +196,10 @@ class CompoundDescriptor
             String field = "total_formal_charge";
             NodeMapping subject = config.createIriMapping("total_formal_charge", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
@@ -196,9 +208,10 @@ class CompoundDescriptor
             String field = "structure_complexity";
             NodeMapping subject = config.createIriMapping("structure_complexity", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
@@ -207,11 +220,13 @@ class CompoundDescriptor
             String field = "mono_isotopic_weight";
             NodeMapping subject = config.createIriMapping("mono_isotopic_weight", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
+            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
+                    field + " is not null");
         }
 
         {
@@ -219,9 +234,10 @@ class CompoundDescriptor
             String field = "xlogp3_aa";
             NodeMapping subject = config.createIriMapping("xlogp3_aa", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
@@ -230,11 +246,13 @@ class CompoundDescriptor
             String field = "exact_mass";
             NodeMapping subject = config.createIriMapping("exact_mass", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
+            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
+                    field + " is not null");
         }
 
         {
@@ -242,11 +260,13 @@ class CompoundDescriptor
             String field = "molecular_weight";
             NodeMapping subject = config.createIriMapping("molecular_weight", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"));
+            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
+                    field + " is not null");
         }
 
         {
@@ -254,11 +274,13 @@ class CompoundDescriptor
             String field = "tpsa";
             NodeMapping subject = config.createIriMapping("tpsa", "compound");
 
-            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"));
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"),
+                    field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
-            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"));
+            config.addQuadMapping(schema, table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"),
+                    field + " is not null");
         }
 
         {
