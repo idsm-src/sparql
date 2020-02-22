@@ -80,18 +80,12 @@ public class CompoundImageServlet extends HttpServlet
 
 
         String schema = config.getInitParameter("schema");
-
         String table = config.getInitParameter("table");
-
-        if(table == null)
-            table = "compounds";
-
         String id = config.getInitParameter("id");
+        String molfile = config.getInitParameter("molfile");
 
         if(id == null)
             id = "id";
-
-        String molfile = config.getInitParameter("molfile");
 
         if(molfile == null)
             molfile = "molfile";

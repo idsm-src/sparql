@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.sachem;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.molecules;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -39,14 +39,14 @@ class Compound
         }
 
         {
-            String table = "compounds";
+            String table = "pubchem";
             NodeMapping subject = config.createIriMapping("compound_molfile", "id");
 
-            config.addQuadMapping(sachem, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(molecules, table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_011120"));
-            config.addQuadMapping(sachem, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+            config.addQuadMapping(molecules, table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping(compound, "id"));
-            config.addQuadMapping(sachem, table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping(molecules, table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdString, "molfile"));
         }
 
