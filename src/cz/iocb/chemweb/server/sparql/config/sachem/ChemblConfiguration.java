@@ -9,7 +9,7 @@ public class ChemblConfiguration extends SachemConfiguration
 {
     public ChemblConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(connectionPool, "chembl", "chembl", "compounds", "http://rdf.ebi.ac.uk/resource/chembl/molecule/",
-                "CHEMBL[1-9][0-9]*");
+        super(connectionPool, "chembl", "molecules", "chembl", "http://rdf.ebi.ac.uk/resource/chembl/molecule/",
+                "CHEMBL", 0);
     }
 }

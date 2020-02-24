@@ -13,6 +13,7 @@ import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
@@ -28,23 +29,32 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
     private final String schema;
     private final String table;
 
+    private final String iriPrefix;
+    private final String idPrefix;
+    private final int idNumberLength;
+
 
     protected SachemConfiguration(DataSource connectionPool, String index, String schema, String table,
-            String iriPrefix, String idPattern) throws SQLException
+            String iriPrefix, String idPrefix, int idNumberLength) throws SQLException
     {
         super(connectionPool);
+
         this.index = index;
         this.schema = schema;
         this.table = table;
 
-        loadPrefixes(iriPrefix);
-        loadClasses(iriPrefix.replaceAll("\\.", "\\\\\\.") + idPattern);
+        this.iriPrefix = iriPrefix;
+        this.idPrefix = idPrefix;
+        this.idNumberLength = idNumberLength;
+
+        loadPrefixes();
+        loadClasses();
         loadQuadMapping();
         loadProcedures();
     }
 
 
-    private void loadPrefixes(String iriPrefix)
+    private void loadPrefixes()
     {
         prefixes.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
         prefixes.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
@@ -58,11 +68,11 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
 
     @SuppressWarnings("serial")
-    private void loadClasses(String pattern)
+    private void loadClasses()
     {
         String sachem = "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#";
 
-        addIriClass(new EnumUserIriClass("query_format", "query_format", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("query_format", "sachem.query_format", new HashMap<String, String>()
         {
             {
                 put("UNSPECIFIED", sachem + "UnspecifiedFormat");
@@ -72,7 +82,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("search_mode", "search_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("search_mode", "sachem.search_mode", new HashMap<String, String>()
         {
             {
                 put("SUBSTRUCTURE", sachem + "substructureSearch");
@@ -80,7 +90,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("charge_mode", "charge_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("charge_mode", "sachem.charge_mode", new HashMap<String, String>()
         {
             {
                 put("IGNORE", sachem + "ignoreCharges");
@@ -89,7 +99,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("isotope_mode", "isotope_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("isotope_mode", "sachem.isotope_mode", new HashMap<String, String>()
         {
             {
                 put("IGNORE", sachem + "ignoreIsotopes");
@@ -98,7 +108,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("stereo_mode", "stereo_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("stereo_mode", "sachem.stereo_mode", new HashMap<String, String>()
         {
             {
                 put("IGNORE", sachem + "ignoreStereo");
@@ -106,7 +116,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("aromaticity_mode", "aromaticity_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("aromaticity_mode", "sachem.aromaticity_mode", new HashMap<String, String>()
         {
             {
                 put("PRESERVE", sachem + "preserveAromaticity");
@@ -115,13 +125,18 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
-        addIriClass(new EnumUserIriClass("tautomer_mode", "tautomer_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("tautomer_mode", "sachem.tautomer_mode", new HashMap<String, String>()
         {
             {
                 put("IGNORE", sachem + "ignoreTautomers");
                 put("INCHI", sachem + "inchiTautomers");
             }
         }));
+
+
+        addIriClass(new IntegerUserIriClass("compound", "integer", iriPrefix + idPrefix, idNumberLength));
+        addIriClass(new IntegerUserIriClass("compound_molfile", "integer", iriPrefix + idPrefix, idNumberLength,
+                "_Molfile"));
     }
 
 
@@ -147,7 +162,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                new Function(sachem, "substructure_search"));
+                new Function("sachem", "substructure_search"));
 
         subsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal(index, xsdStringIri)));
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -173,7 +188,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                new Function(sachem, "similarity_search"));
+                new Function("sachem", "similarity_search"));
 
         simsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal(index, xsdStringIri)));
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -195,7 +210,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                new Function(sachem, "similarity_search"));
+                new Function("sachem", "similarity_search"));
 
         simcmpsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal(index, xsdStringIri)));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));

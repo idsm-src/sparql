@@ -9,7 +9,7 @@ public class PubChemConfiguration extends SachemConfiguration
 {
     public PubChemConfiguration(DataSource connectionPool) throws SQLException
     {
-        super(connectionPool, "pubchem", "pubchem", "compounds", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/",
-                "CID[1-9][0-9]*");
+        super(connectionPool, "pubchem", "molecules", "pubchem", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID",
+                0);
     }
 }
