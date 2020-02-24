@@ -113,7 +113,9 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             try(Statement statement = connection.createStatement())
             {
                 try(ResultSet result = statement
-                        .executeQuery("select version, size, checkdate from sachem.compound_stats"))
+                        .executeQuery("select s.version, sachem.index_size('drugbank'), s.checkdate "
+                                + "from sachem.compound_stats s, sachem.configuration c "
+                                + "where s.index = c.id and c.index_name = 'drugbank'"))
                 {
                     result.next();
 
@@ -136,7 +138,9 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             try(Statement statement = connection.createStatement())
             {
                 try(ResultSet result = statement
-                        .executeQuery("select version, size, checkdate from sachem.compound_stats"))
+                        .executeQuery("select s.version, sachem.index_size('pubchem'), s.checkdate "
+                                + "from sachem.compound_stats s, sachem.configuration c "
+                                + "where s.index = c.id and c.index_name = 'pubchem'"))
                 {
                     result.next();
 
@@ -158,8 +162,9 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery(
-                        "select src.name, stat.size, stat.checkdate from sachem.compound_stats stat, sachem.compound_sources src"))
+                try(ResultSet result = statement.executeQuery("select f.name, sachem.index_size('chembl'), s.checkdate "
+                        + "from sachem.compound_stats s, sachem.configuration c, sachem.compound_sources f "
+                        + "where s.index = c.id and f.index = c.id and c.index_name = 'chembl'"))
                 {
                     result.next();
 
@@ -184,8 +189,10 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery(
-                        "select src.timestamp, stat.size, stat.checkdate from sachem.compound_stats stat, sachem.compound_sources src"))
+                try(ResultSet result = statement
+                        .executeQuery("select f.timestamp, sachem.index_size('chebi'), s.checkdate "
+                                + "from sachem.compound_stats s, sachem.configuration c, sachem.compound_sources f "
+                                + "where s.index = c.id and f.index = c.id and c.index_name = 'chebi'"))
                 {
                     result.next();
 
