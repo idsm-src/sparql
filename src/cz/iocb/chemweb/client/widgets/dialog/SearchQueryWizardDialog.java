@@ -405,7 +405,7 @@ public class SearchQueryWizardDialog extends DialogBox
             {
                 query.append(";\n      sachem:topn \"");
                 query.append(limit);
-                query.append("\"^^xsd:int");
+                query.append("\"^^xsd:integer");
             }
 
             if(method == Methods.EXACTSEARCH)
@@ -425,7 +425,7 @@ public class SearchQueryWizardDialog extends DialogBox
             {
                 query.append(";\n      sachem:cutoff \"");
                 query.append(threshold);
-                query.append("\"^^xsd:float");
+                query.append("\"^^xsd:double");
             }
 
             query.append(" ].\n");
@@ -545,11 +545,11 @@ public class SearchQueryWizardDialog extends DialogBox
         switch(orderByListBox.getSelectedValue())
         {
             case "COMPOUND":
-                query.append("ORDER BY xsd:integer(substr(str(?COMPOUND), 49))\n");
+                query.append("ORDER BY xsd:int(substr(str(?COMPOUND), 49))\n");
                 break;
 
             case "BIOASSAY":
-                query.append("ORDER BY xsd:integer(substr(str(?BIOASSAY), 49))\n");
+                query.append("ORDER BY xsd:int(substr(str(?BIOASSAY), 49))\n");
                 break;
 
             case "SCORE":

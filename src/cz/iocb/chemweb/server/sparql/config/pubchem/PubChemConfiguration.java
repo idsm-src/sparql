@@ -1,10 +1,12 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
+import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -32,7 +34,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
     static final String molecules = "molecules";
-    static final String sachem = "sachem";
     static final String schema = "pubchem";
 
     static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
@@ -128,66 +129,66 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Synonym.addIriClasses(this);
 
 
-        String prefix = "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#";
+        String sachem = prefixes.get("sachem");
 
-        addIriClass(new EnumUserIriClass("query_format", sachem + ".query_format", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("query_format", "sachem.query_format", new HashMap<String, String>()
         {
             {
-                put("UNSPECIFIED", prefix + "UnspecifiedFormat");
-                put("SMILES", prefix + "SMILES");
-                put("MOLFILE", prefix + "MolFile");
-                put("RGROUP", prefix + "RGroup");
+                put("UNSPECIFIED", sachem + "UnspecifiedFormat");
+                put("SMILES", sachem + "SMILES");
+                put("MOLFILE", sachem + "MolFile");
+                put("RGROUP", sachem + "RGroup");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("search_mode", sachem + ".search_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("search_mode", "sachem.search_mode", new HashMap<String, String>()
         {
             {
-                put("SUBSTRUCTURE", prefix + "substructureSearch");
-                put("EXACT", prefix + "exactSearch");
+                put("SUBSTRUCTURE", sachem + "substructureSearch");
+                put("EXACT", sachem + "exactSearch");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("charge_mode", sachem + ".charge_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("charge_mode", "sachem.charge_mode", new HashMap<String, String>()
         {
             {
-                put("IGNORE", prefix + "ignoreCharges");
-                put("DEFAULT_AS_UNCHARGED", prefix + "defaultChargeAsZero");
-                put("DEFAULT_AS_ANY", prefix + "defaultChargeAsAny");
+                put("IGNORE", sachem + "ignoreCharges");
+                put("DEFAULT_AS_UNCHARGED", sachem + "defaultChargeAsZero");
+                put("DEFAULT_AS_ANY", sachem + "defaultChargeAsAny");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("isotope_mode", sachem + ".isotope_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("isotope_mode", "sachem.isotope_mode", new HashMap<String, String>()
         {
             {
-                put("IGNORE", prefix + "ignoreIsotopes");
-                put("DEFAULT_AS_STANDARD", prefix + "defaultIsotopeAsStandard");
-                put("DEFAULT_AS_ANY", prefix + "defaultIsotopeAsAny");
+                put("IGNORE", sachem + "ignoreIsotopes");
+                put("DEFAULT_AS_STANDARD", sachem + "defaultIsotopeAsStandard");
+                put("DEFAULT_AS_ANY", sachem + "defaultIsotopeAsAny");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("stereo_mode", sachem + ".stereo_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("stereo_mode", "sachem.stereo_mode", new HashMap<String, String>()
         {
             {
-                put("IGNORE", prefix + "ignoreStereo");
-                put("STRICT", prefix + "strictStereo");
+                put("IGNORE", sachem + "ignoreStereo");
+                put("STRICT", sachem + "strictStereo");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("aromaticity_mode", sachem + ".aromaticity_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("aromaticity_mode", "sachem.aromaticity_mode", new HashMap<String, String>()
         {
             {
-                put("PRESERVE", prefix + "preserveAromaticity");
-                put("DETECT", prefix + "detectAromaticity");
-                put("AUTO", prefix + "detectAromaticityIfNeeded");
+                put("PRESERVE", sachem + "aromaticityFromQuery");
+                put("DETECT", sachem + "aromaticityDetect");
+                put("AUTO", sachem + "aromaticityDetectIfMissing");
             }
         }));
 
-        addIriClass(new EnumUserIriClass("tautomer_mode", sachem + ".tautomer_mode", new HashMap<String, String>()
+        addIriClass(new EnumUserIriClass("tautomer_mode", "sachem.tautomer_mode", new HashMap<String, String>()
         {
             {
-                put("IGNORE", prefix + "ignoreTautomers");
-                put("INCHI", prefix + "inchiTautomers");
+                put("IGNORE", sachem + "ignoreTautomers");
+                put("INCHI", sachem + "inchiTautomers");
             }
         }));
     }
@@ -217,76 +218,114 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
     private void loadProcedures()
     {
-        String prefix = prefixes.get("sachem");
+        String index = "pubchem";
+        String sachem = prefixes.get("sachem");
         String fulltext = prefixes.get("fulltext");
         UserIriClass compound = getIriClass("compound");
 
 
         /* sachem:substructureSearch */
-        ProcedureDefinition subsearch = new ProcedureDefinition(prefix + "substructureSearch",
-                new Function(sachem, "substructure_search"));
+        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
+                new Function("sachem", "substructure_search"));
 
-        subsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal("pubchem", xsdStringIri)));
-        subsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
-        subsearch.addParameter(new ParameterDefinition(prefix + "searchMode", getIriClass("search_mode"),
-                new IRI(prefix + "substructureSearch")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "chargeMode", getIriClass("charge_mode"),
-                new IRI(prefix + "defaultChargeAsAny")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "isotopeMode", getIriClass("isotope_mode"),
-                new IRI(prefix + "ignoreIsotopes")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "stereoMode", getIriClass("stereo_mode"),
-                new IRI(prefix + "ignoreStereo")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(prefix + "detectAromaticityIfNeeded")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "tautomerMode", getIriClass("tautomer_mode"),
-                new IRI(prefix + "ignoreTautomers")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
-                new IRI(prefix + "UnspecifiedFormat")));
-        subsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+        subsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
+        subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("search_mode"),
+                new IRI(sachem + "substructureSearch")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsAny")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
+                new IRI(sachem + "ignoreIsotopes")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
+                new IRI(sachem + "ignoreStereo")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
+                new IRI(sachem + "aromaticityDetectIfMissing")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
+        subsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
+        subsearch.addParameter(
+                new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
 
         subsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(subsearch.getProcedureName(), subsearch);
 
 
+        /* sachem:scoredSubstructureSearch */
+        ProcedureDefinition scoredsubsearch = new ProcedureDefinition(sachem + "scoredSubstructureSearch",
+                new Function("sachem", "substructure_search"));
+
+        scoredsubsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("search_mode"),
+                new IRI(sachem + "substructureSearch")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsAny")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
+                new IRI(sachem + "ignoreIsotopes")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
+                new IRI(sachem + "ignoreStereo")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetectIfMissing")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        scoredsubsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
+        scoredsubsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
+        scoredsubsearch.addParameter(
+                new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
+
+        scoredsubsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
+        scoredsubsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
+        procedures.put(scoredsubsearch.getProcedureName(), scoredsubsearch);
+
+
         /* sachem:similaritySearch */
-        ProcedureDefinition simsearch = new ProcedureDefinition(prefix + "similaritySearch",
-                new Function(sachem, "similarity_search"));
+        ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
+                new Function("sachem", "similarity_search"));
 
-        simsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal("pubchem", xsdStringIri)));
-        simsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
-        simsearch.addParameter(new ParameterDefinition(prefix + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+        simsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        simsearch.addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
         simsearch.addParameter(
-                new ParameterDefinition(prefix + "similarityFingerprintDepth", xsdInt, new Literal("1", xsdIntIri)));
-        simsearch.addParameter(new ParameterDefinition(prefix + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(prefix + "detectAromaticityIfNeeded")));
-        simsearch.addParameter(new ParameterDefinition(prefix + "tautomerMode", getIriClass("tautomer_mode"),
-                new IRI(prefix + "ignoreTautomers")));
-        simsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
-                new IRI(prefix + "UnspecifiedFormat")));
-        simsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+                new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerIri)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
+                new IRI(sachem + "aromaticityDetectIfMissing")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
+        simsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
 
-        simsearch.addResult(new ResultDefinition(prefix + "compound", compound, "compound"));
-        simsearch.addResult(new ResultDefinition(prefix + "score", xsdFloat, "score"));
+        simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
+        simsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
         procedures.put(simsearch.getProcedureName(), simsearch);
 
 
         /* sachem:similarCompoundSearch */
-        ProcedureDefinition simcmpsearch = new ProcedureDefinition(prefix + "similarCompoundSearch",
-                new Function(sachem, "similarity_search"));
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
+                new Function("sachem", "similarity_search"));
 
-        simcmpsearch.addParameter(new ParameterDefinition(null, xsdString, new Literal("pubchem", xsdStringIri)));
-        simcmpsearch.addParameter(new ParameterDefinition(prefix + "query", xsdString, null));
+        simcmpsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
         simcmpsearch
-                .addParameter(new ParameterDefinition(prefix + "cutoff", xsdFloat, new Literal("0.8", xsdFloatIri)));
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleIri)));
         simcmpsearch.addParameter(
-                new ParameterDefinition(prefix + "similarityFingerprintDepth", xsdInt, new Literal("1", xsdIntIri)));
-        simcmpsearch.addParameter(new ParameterDefinition(prefix + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(prefix + "detectAromaticityIfNeeded")));
-        simcmpsearch.addParameter(new ParameterDefinition(prefix + "tautomerMode", getIriClass("tautomer_mode"),
-                new IRI(prefix + "ignoreTautomers")));
-        simcmpsearch.addParameter(new ParameterDefinition(prefix + "queryFormat", getIriClass("query_format"),
-                new IRI(prefix + "UnspecifiedFormat")));
-        simcmpsearch.addParameter(new ParameterDefinition(prefix + "topn", xsdInt, new Literal("-1", xsdIntIri)));
+                new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerIri)));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
+                new IRI(sachem + "aromaticityDetectIfMissing")));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simcmpsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
+        simcmpsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
 
         simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
         procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
