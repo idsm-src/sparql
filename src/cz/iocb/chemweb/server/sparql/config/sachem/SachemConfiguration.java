@@ -164,7 +164,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                new Function("sachem", "substructure_search"));
+                new Function("sachem", "substructure_search_stub"));
 
         subsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -193,7 +193,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:scoredSubstructureSearch */
         ProcedureDefinition scoredsubsearch = new ProcedureDefinition(sachem + "scoredSubstructureSearch",
-                new Function("sachem", "substructure_search"));
+                new Function("sachem", "substructure_search_stub"));
 
         scoredsubsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -224,7 +224,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                new Function("sachem", "similarity_search"));
+                new Function("sachem", "similarity_search_stub"));
 
         simsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -247,7 +247,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
         /* sachem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                new Function("sachem", "similarity_search"));
+                new Function("sachem", "similarity_search_stub"));
 
         simcmpsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
