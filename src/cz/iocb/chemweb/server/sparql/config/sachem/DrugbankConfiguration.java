@@ -10,6 +10,6 @@ public class DrugbankConfiguration extends SachemConfiguration
     public DrugbankConfiguration(DataSource connectionPool) throws SQLException
     {
         super(connectionPool, "drugbank", "molecules", "drugbank",
-                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/", "DB5", 5);
+                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/", "DB", 5);
     }
 }
