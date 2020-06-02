@@ -154,12 +154,12 @@ class Target
 
         config.addQuadMapping(schema, "target_components", graph, subject, config.createIriMapping("skos:exactMatch"),
                 config.createIriMapping("targetcomponent", "component_id"),
-                "exists(select true from target_dictionary where tid = target_components.tid and "
+                "exists(select true from " + schema + ".target_dictionary where tid = target_components.tid and "
                         + "target_type = 'SINGLE PROTEIN')");
 
         config.addQuadMapping(schema, "target_components", graph, subject, config.createIriMapping("skos:relatedMatch"),
                 config.createIriMapping("targetcomponent", "component_id"),
-                "exists(select true from target_dictionary where tid = target_components.tid and "
+                "exists(select true from " + schema + ".target_dictionary where tid = target_components.tid and "
                         + "target_type != 'NUCLEIC-ACID' and target_type != 'SINGLE PROTEIN')");
 
 

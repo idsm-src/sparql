@@ -647,7 +647,8 @@ class Molecule
         config.addQuadMapping(schema, "compound_structures", graph,
                 config.createIriMapping("chembl_standard_inchi_key", "molregno"), config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString,
-                        "((select chembl_id from molecule_dictionary where molregno = compound_structures.molregno) ||"
+                        "((select chembl_id from " + schema
+                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
                                 + " ' Standard InChi Key: ' || standard_inchi_key)"),
                 "standard_inchi_key is not null");
 
@@ -668,7 +669,8 @@ class Molecule
         config.addQuadMapping(schema, "compound_structures", graph,
                 config.createIriMapping("chembl_standard_inchi", "molregno"), config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString,
-                        "((select chembl_id from molecule_dictionary where molregno = compound_structures.molregno) ||"
+                        "((select chembl_id from " + schema
+                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
                                 + " ' Standard InChi')"),
                 "standard_inchi is not null");
 
@@ -689,7 +691,8 @@ class Molecule
         config.addQuadMapping(schema, "compound_structures", graph,
                 config.createIriMapping("chembl_canonical_smiles", "molregno"), config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString,
-                        "((select chembl_id from molecule_dictionary where molregno = compound_structures.molregno) ||"
+                        "((select chembl_id from " + schema
+                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
                                 + " ' Canonical Smiles')"),
                 "canonical_smiles is not null");
 

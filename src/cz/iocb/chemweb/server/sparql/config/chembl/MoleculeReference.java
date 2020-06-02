@@ -379,8 +379,8 @@ class MoleculeReference
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString,
                         "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' Selleck Chemicals Reference: ' || url_decode(reference))"),
+                                + ".molecule_references.molregno) || " + "' Selleck Chemicals Reference: ' || " + schema
+                                + ".url_decode(reference))"),
                 "reference_type = 'SELLECK'");
 
         config.addQuadMapping(schema, "molecule_reference_types", graph,
@@ -410,8 +410,8 @@ class MoleculeReference
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString,
                         "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' Gene Expression Atlas Reference: ' || url_decode(reference))"),
+                                + ".molecule_references.molregno) || " + "' Gene Expression Atlas Reference: ' || "
+                                + schema + ".url_decode(reference))"),
                 "reference_type = 'ATLAS'");
 
         config.addQuadMapping(schema, "molecule_reference_types", graph,
