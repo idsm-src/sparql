@@ -398,6 +398,30 @@ public class QueryVisitor extends BaseVisitor<Query>
             }
 
             @Override
+            public Void visit(Select select)
+            {
+                for(Projection projection : select.getProjections())
+                    visitElement(projection.getExpression());
+
+                visitElements(select.getDataSets());
+                visitElement(select.getPattern());
+
+                for(GroupCondition condition : select.getGroupByConditions())
+                    if(!(condition.getExpression() instanceof Variable) || condition.getVariable() != null)
+                        visitElement(condition);
+
+                visitElements(select.getHavingConditions());
+
+                for(OrderCondition condition : select.getOrderByConditions())
+                    if(!(condition.getExpression() instanceof Variable))
+                        visitElement(condition);
+
+                visitElement(select.getValues());
+
+                return defaultResult();
+            }
+
+            @Override
             public Void visit(Variable variable)
             {
                 if(usedParameterNodes.contains(variable))
