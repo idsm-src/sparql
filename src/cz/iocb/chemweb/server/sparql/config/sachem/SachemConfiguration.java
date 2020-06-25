@@ -110,6 +110,15 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
             }
         }));
 
+        addIriClass(new EnumUserIriClass("radical_mode", "sachem.radical_mode", new HashMap<String, String>()
+        {
+            {
+                put("IGNORE", sachem + "ignoreSpinMultiplicity");
+                put("DEFAULT_AS_STANDARD", sachem + "defaultSpinMultiplicityAsZero");
+                put("DEFAULT_AS_ANY", sachem + "defaultSpinMultiplicityAsAny");
+            }
+        }));
+
         addIriClass(new EnumUserIriClass("stereo_mode", "sachem.stereo_mode", new HashMap<String, String>()
         {
             {
@@ -162,6 +171,38 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         UserIriClass compound = getIriClass("compound");
 
 
+        /* sachem:exactSearch */
+        ProcedureDefinition exactsearch = new ProcedureDefinition(sachem + "exactSearch",
+                new Function("sachem", "substructure_search_stub"));
+
+        exactsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringIri)));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "searchMode", getIriClass("search_mode"),
+                new IRI(sachem + "exactSearch")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsZero")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
+                new IRI(sachem + "defaultIsotopeAsStandard")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", getIriClass("radical_mode"),
+                new IRI(sachem + "defaultSpinMultiplicityAsZero")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
+                new IRI(sachem + "strictStereo")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
+                new IRI(sachem + "aromaticityDetectIfMissing")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        exactsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
+        exactsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
+        exactsearch.addParameter(
+                new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
+
+        exactsearch.addResult(new ResultDefinition(null, compound, "compound"));
+        procedures.put(exactsearch.getProcedureName(), exactsearch);
+
+
         /* sachem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
                 new Function("sachem", "substructure_search_stub"));
@@ -174,6 +215,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
                 new IRI(sachem + "defaultChargeAsAny")));
         subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
                 new IRI(sachem + "ignoreIsotopes")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", getIriClass("radical_mode"),
+                new IRI(sachem + "ignoreSpinMultiplicity")));
         subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "ignoreStereo")));
         subsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
@@ -203,6 +246,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
                 new IRI(sachem + "defaultChargeAsAny")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", getIriClass("isotope_mode"),
                 new IRI(sachem + "ignoreIsotopes")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", getIriClass("radical_mode"),
+                new IRI(sachem + "ignoreSpinMultiplicity")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "ignoreStereo")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
