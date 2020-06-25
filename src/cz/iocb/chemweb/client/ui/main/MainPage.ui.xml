@@ -12,12 +12,7 @@
 
   <g:DockLayoutPanel>
     <g:north size="60">
-      <g:HTML>
-        <div class="gradient" style="padding: 10px;">
-          <span style="font-size: 32px; font-weight: bold; color:white">&nbsp;IOCB RDF Platform: PubChem data</span>
-          <span style="font-size: 12px; color:white">&nbsp;(technical preview)</span>
-        </div>
-      </g:HTML>
+      <g:HTML/>
     </g:north>
     <g:center>
       <g:SplitLayoutPanel addStyleNames="{style.main}" ui:field="mainSplitLayoutPanel">
