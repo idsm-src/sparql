@@ -2212,8 +2212,6 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(!(operand instanceof SqlVariable))
                 {
-                    System.err.println("HERE");
-
                     String sqlFunction = "sparql." + function + "_" + getResourceName();
                     String sqlArgument = operand.translate();
 
