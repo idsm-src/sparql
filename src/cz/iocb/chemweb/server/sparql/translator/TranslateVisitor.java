@@ -602,25 +602,60 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(variable == null || variable.canBeNull())
             {
-                //TODO: can be ignored, if the graph variable is not required outside the graph pattern
-
-                ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-                ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
-
-                Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
-                typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
-
-                for(ConstantIriMapping g : configuration.getGraphs())
+                if(translatedPattern.isDeterministic())
                 {
-                    valueClasses.add(g.getIriClass());
+                    //TODO: can be ignored, if the graph variable is not required outside the graph pattern
 
-                    ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
-                    list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
-                    typedValuesList.add(list);
+                    ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
+                    ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
+
+                    Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
+                    typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
+
+                    for(ConstantIriMapping g : configuration.getGraphs())
+                    {
+                        valueClasses.add(g.getIriClass());
+
+                        ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
+                        list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
+                        typedValuesList.add(list);
+                    }
+
+                    translatedPattern = SqlJoin.join(schema, translatedPattern,
+                            SqlValues.create(typedVariables, typedValuesList));
                 }
+                else if(variable == null)
+                {
+                    SqlIntercode innerPattern = translatedPattern;
+                    translatedPattern = SqlNoSolution.get();
 
-                translatedPattern = SqlJoin.join(schema, translatedPattern,
-                        SqlValues.create(typedVariables, typedValuesList));
+                    for(ConstantIriMapping g : configuration.getGraphs())
+                        translatedPattern = SqlUnion.union(translatedPattern,
+                                SqlBind.bind(varName, SqlIri.create((IRI) g.getValue(), request), innerPattern));
+                }
+                else
+                {
+                    SqlIntercode innerPattern = translatedPattern;
+                    translatedPattern = SqlNoSolution.get();
+
+                    for(ConstantIriMapping g : configuration.getGraphs())
+                    {
+                        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
+                        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
+
+                        Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
+                        typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
+
+                        valueClasses.add(g.getIriClass());
+
+                        ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
+                        list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
+                        typedValuesList.add(list);
+
+                        translatedPattern = SqlUnion.union(translatedPattern,
+                                SqlJoin.join(schema, innerPattern, SqlValues.create(typedVariables, typedValuesList)));
+                    }
+                }
             }
         }
 
