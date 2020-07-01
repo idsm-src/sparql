@@ -188,7 +188,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         exactsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "strictStereo")));
         exactsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(sachem + "aromaticityDetectIfMissing")));
+                new IRI(sachem + "aromaticityDetect")));
         exactsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         exactsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
@@ -220,7 +220,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "ignoreStereo")));
         subsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(sachem + "aromaticityDetectIfMissing")));
+                new IRI(sachem + "aromaticityDetect")));
         subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
@@ -251,7 +251,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", getIriClass("stereo_mode"),
                 new IRI(sachem + "ignoreStereo")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
-                getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetectIfMissing")));
+                getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
@@ -277,7 +277,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         simsearch.addParameter(
                 new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerIri)));
         simsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(sachem + "aromaticityDetectIfMissing")));
+                new IRI(sachem + "aromaticityDetect")));
         simsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
@@ -301,7 +301,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         simcmpsearch.addParameter(
                 new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerIri)));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode", getIriClass("aromaticity_mode"),
-                new IRI(sachem + "aromaticityDetectIfMissing")));
+                new IRI(sachem + "aromaticityDetect")));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", getIriClass("tautomer_mode"),
                 new IRI(sachem + "ignoreTautomers")));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", getIriClass("query_format"),
