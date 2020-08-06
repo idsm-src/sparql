@@ -165,6 +165,8 @@ class Compound
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("xlogp3_aa", "compound"), "xlogp3_aa is not null");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
+                    config.createIriMapping("xlogp3", "compound"), "xlogp3 is not null");
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("exact_mass", "compound"), "exact_mass is not null");
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("molecular_weight", "compound"), "molecular_weight is not null");

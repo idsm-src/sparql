@@ -36,6 +36,9 @@ class Measuregroup
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("source", "source"));
+
+            config.addQuadMapping(schema, table, graph, config.createIriMapping("bioassay", "bioassay"),
+                    config.createIriMapping("bao:BAO_0000209"), subject);
         }
 
         {

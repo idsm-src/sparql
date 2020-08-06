@@ -38,6 +38,7 @@ class CompoundDescriptor
         config.addIriClass(new IntegerUserIriClass("structure_complexity", "integer", prefix, "Structure_Complexity"));
         config.addIriClass(new IntegerUserIriClass("mono_isotopic_weight", "integer", prefix, "Mono_Isotopic_Weight"));
         config.addIriClass(new IntegerUserIriClass("xlogp3_aa", "integer", prefix, "XLogP3-AA"));
+        config.addIriClass(new IntegerUserIriClass("xlogp3", "integer", prefix, "XLogP3"));
         config.addIriClass(new IntegerUserIriClass("exact_mass", "integer", prefix, "Exact_Mass"));
         config.addIriClass(new IntegerUserIriClass("molecular_weight", "integer", prefix, "Molecular_Weight"));
         config.addIriClass(new IntegerUserIriClass("tpsa", "integer", prefix, "TPSA"));
@@ -233,6 +234,18 @@ class CompoundDescriptor
             String table = "descriptor_compound_bases";
             String field = "xlogp3_aa";
             NodeMapping subject = config.createIriMapping("xlogp3_aa", "compound");
+
+            config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
+                    field + " is not null");
+            config.addQuadMapping(schema, table, graph, subject, template,
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+            config.addQuadMapping(schema, table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
+        }
+
+        {
+            String table = "descriptor_compound_bases";
+            String field = "xlogp3";
+            NodeMapping subject = config.createIriMapping("xlogp3", "compound");
 
             config.addQuadMapping(schema, table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
                     field + " is not null");

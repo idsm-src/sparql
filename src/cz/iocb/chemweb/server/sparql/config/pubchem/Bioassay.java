@@ -49,14 +49,6 @@ class Bioassay
         }
 
         {
-            String table = "bioassay_measuregroups";
-            NodeMapping subject = config.createIriMapping(bioassay, "bioassay");
-
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bao:BAO_0000209"),
-                    config.createIriMapping("measuregroup", "bioassay", "measuregroup"));
-        }
-
-        {
             String table = "bioassay_data";
             NodeMapping subject = config.createIriMapping("bioassay_description", "bioassay");
 

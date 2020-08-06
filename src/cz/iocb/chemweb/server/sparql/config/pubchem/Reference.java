@@ -56,5 +56,13 @@ class Reference
             config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("fabio:hasSubjectTerm"),
                     config.createIriMapping("dqmesh", "descriptor", "qualifier"));
         }
+
+        {
+            String table = "reference_primary_subject_descriptors";
+            NodeMapping subject = config.createIriMapping(reference, "reference");
+
+            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("fabio:hasPrimarySubjectTerm"),
+                    config.createIriMapping("dqmesh", "descriptor", "qualifier"));
+        }
     }
 }
