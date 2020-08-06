@@ -1,8 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,10 +16,7 @@ import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.IriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -80,40 +74,33 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public void addVariableClass(String variable, ResourceClass resourceClass)
+    public boolean addVariableClass(String variable, ResourceClass resourceClass)
     {
         UsedVariable other = variables.get(variable);
 
         if(other == null)
         {
             variables.add(new UsedVariable(variable, resourceClass, false));
+            return true;
         }
         else
         {
-            if(other.containsClass(resourceClass))
-                return;
+            ResourceClass otherClass = other.getClasses().iterator().next();
 
-            if(resourceClass == iri && other.getClasses().stream().anyMatch(r -> r instanceof IriClass))
-                return;
-
-            if(resourceClass == intBlankNode
-                    && other.getClasses().stream().anyMatch(r -> r instanceof IntBlankNodeClass))
-                return;
-
-            if(resourceClass == strBlankNode
-                    && other.getClasses().stream().anyMatch(r -> r instanceof StrBlankNodeClass))
-                return;
-
-            if(resourceClass instanceof IriClass)
-                other.getClasses().remove(iri);
-
-            if(resourceClass instanceof IntBlankNodeClass)
-                other.getClasses().remove(intBlankNode);
-
-            if(resourceClass instanceof StrBlankNodeClass)
-                other.getClasses().remove(strBlankNode);
-
-            other.addClass(resourceClass);
+            if(resourceClass == otherClass || resourceClass == otherClass.getGeneralClass())
+            {
+                return true;
+            }
+            else if(resourceClass.getGeneralClass() == otherClass)
+            {
+                other.getClasses().remove(otherClass);
+                other.addClass(resourceClass);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 

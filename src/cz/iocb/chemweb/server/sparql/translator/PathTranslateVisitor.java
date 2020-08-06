@@ -407,16 +407,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private void processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
+    private boolean processNodeMapping(SqlTableAccess translated, Node node, NodeMapping mapping)
     {
         if(node == null)
-            return;
+            return true;
 
         if(node instanceof VariableOrBlankNode)
         {
             String name = ((VariableOrBlankNode) node).getSqlName();
 
-            translated.addVariableClass(name, mapping.getResourceClass());
+            if(!translated.addVariableClass(name, mapping.getResourceClass()))
+                return false;
+
             translated.addMapping(name, mapping);
         }
 
@@ -425,6 +427,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(!(node instanceof VariableOrBlankNode) && mapping instanceof ParametrisedMapping)
             translated.addValueCondition(node, (ParametrisedMapping) mapping);
+
+        return true;
     }
 
 
@@ -475,10 +479,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             SqlTableAccess translated = new SqlTableAccess(schema, mapping.getTable(), mapping.getCondition());
 
-            processNodeMapping(translated, graph, mapping.getGraph());
-            processNodeMapping(translated, subject, mapping.getSubject());
-            processNodeMapping(translated, predicate, mapping.getPredicate());
-            processNodeMapping(translated, object, mapping.getObject());
+            if(!processNodeMapping(translated, graph, mapping.getGraph()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(translated, subject, mapping.getSubject()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(translated, predicate, mapping.getPredicate()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(translated, object, mapping.getObject()))
+                return SqlNoSolution.get();
 
             return translated;
         }
@@ -492,19 +503,34 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlTableAccess subjectAcess = new SqlTableAccess(schema, mapping.getSubjectTable(),
                     mapping.getSubjectCondition());
 
-            processNodeMapping(subjectAcess, graph, mapping.getGraph());
-            processNodeMapping(subjectAcess, subject, mapping.getSubject());
-            processNodeMapping(subjectAcess, predicate, mapping.getPredicate());
-            processNodeMapping(subjectAcess, joinvar, mapping.getSubjectJoinMapping());
+            if(!processNodeMapping(subjectAcess, graph, mapping.getGraph()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(subjectAcess, subject, mapping.getSubject()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(subjectAcess, predicate, mapping.getPredicate()))
+                return SqlNoSolution.get();
+
+            if(!processNodeMapping(subjectAcess, joinvar, mapping.getSubjectJoinMapping()))
+                return SqlNoSolution.get();
 
 
             SqlTableAccess objectAcess = new SqlTableAccess(schema, mapping.getObjectTable(),
                     mapping.getObjectCondition());
 
-            //processNodeMapping(objectAcess, graph, mapping.getGraph()); // useless for ConstantIriMapping
-            processNodeMapping(objectAcess, joinvar, mapping.getObjectJoinMapping());
-            //processNodeMapping(objectAcess, predicate, mapping.getPredicate()); // useless for ConstantIriMapping
-            processNodeMapping(objectAcess, object, mapping.getObject());
+            //if(!processNodeMapping(objectAcess, graph, mapping.getGraph())) // useless for ConstantIriMapping
+            //    return SqlNoSolution.get();
+
+            if(!processNodeMapping(objectAcess, joinvar, mapping.getObjectJoinMapping()))
+                return SqlNoSolution.get();
+
+            //if(!processNodeMapping(objectAcess, predicate, mapping.getPredicate())) // useless for ConstantIriMapping
+            //    return SqlNoSolution.get();
+
+            if(!processNodeMapping(objectAcess, object, mapping.getObject()))
+                return SqlNoSolution.get();
+
 
             return SqlJoin.join(schema, subjectAcess, objectAcess);
         }
