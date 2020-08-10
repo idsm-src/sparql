@@ -61,6 +61,7 @@
       (descriptor:CID${CID}_Mono_Isotopic_Weight         "mono isotopic weight")
       (descriptor:CID${CID}_Total_Formal_Charge          "total formal charge")
       (descriptor:CID${CID}_XLogP3-AA                    "XLogP3-AA")
+      (descriptor:CID${CID}_XLogP3                       "XLogP3")
       (descriptor:CID${CID}_TPSA                         "TPSA")
       (descriptor:CID${CID}_Structure_Complexity         "structure complexity")
       (descriptor:CID${CID}_Tautomer_Count               "tautomer count")
