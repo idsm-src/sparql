@@ -4,10 +4,13 @@ import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Element;
+import com.google.gwt.event.logical.shared.HasSelectionHandlers;
 import com.google.gwt.event.logical.shared.ResizeEvent;
 import com.google.gwt.event.logical.shared.ResizeHandler;
 import com.google.gwt.event.logical.shared.SelectionEvent;
 import com.google.gwt.event.logical.shared.SelectionHandler;
+import com.google.gwt.event.shared.HandlerManager;
+import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.DOM;
@@ -29,7 +32,7 @@ import cz.iocb.chemweb.shared.utils.Encode;
 
 
 
-public class MainPage extends ResizeComposite
+public class MainPage extends ResizeComposite implements HasSelectionHandlers<String>
 {
     interface MainPageUiBinder extends UiBinder<Widget, MainPage>
     {
@@ -50,12 +53,15 @@ public class MainPage extends ResizeComposite
     private final int minCentralWidth = 300;
     private final Element styleOfSelected;
 
+    private final HandlerManager handlerManager = new HandlerManager(this);
+    private final VisitingHistory history;
+
 
     public MainPage()
     {
         queryPart = new QueryPart(getDefultQuery());
 
-        VisitingHistory history = new VisitingHistory();
+        history = new VisitingHistory();
         detailsPart = new DetailsPart(history);
         propertiesPart = new PropertiesPart(history);
 
@@ -148,6 +154,7 @@ public class MainPage extends ResizeComposite
             }
         };
 
+        this.addSelectionHandler(selectionHandler);
         detailsPart.addSelectionHandler(selectionHandler);
         propertiesPart.addSelectionHandler(selectionHandler);
 
@@ -180,12 +187,28 @@ public class MainPage extends ResizeComposite
     }
 
 
+    @Override
+    public HandlerRegistration addSelectionHandler(SelectionHandler<String> handler)
+    {
+        return handlerManager.addHandler(SelectionEvent.getType(), handler);
+    }
+
+
     private void visitIri(String iri)
     {
+        if(iri.equals(history.getCurrent()))
+            return;
+
+        history.visit(iri);
+
+        handlerManager.fireEvent(new SelectionEvent<String>(iri)
+        {
+        });
+
         if(infoTabPanel.getWidget(infoTabPanel.getSelectedIndex()) == detailsPart)
-            detailsPart.visit(iri);
+            detailsPart.show();
         else if(infoTabPanel.getWidget(infoTabPanel.getSelectedIndex()) == propertiesPart)
-            propertiesPart.visit(iri);
+            propertiesPart.show();
     }
 
 
