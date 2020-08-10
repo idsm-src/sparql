@@ -2,43 +2,130 @@
 <ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder" xmlns:g="urn:import:com.google.gwt.user.client.ui">
   <ui:style>
     .about {
-      margin: 10px;
+      min-width: 500px;
+	}
+    
+    .page {
+      padding: 15px;
     }
 
+    .section {
+      margin-bottom: 15px;
+      border: 1px solid #81b0d4;
+      border-collapse: separate;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .section div {
+      padding: 5px;
+    }
+
+    .header {
+      font-weight: bold;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #81b0d4;
+      background: #e3eaef;
+    }
+    
     .about ul {
       margin-top: 0.5em;
+      padding-left: 25px;
+    }
+
+    .about ul li {
+      margin: 0 0 3px 0;
     }
   </ui:style>
 
-  <g:HTML ui:field="aboutHTML" addStyleNames="{style.about}">
+  <g:ScrollPanel>
+    <g:HTML ui:field="aboutHTML" height="100%" width="100%" addStyleNames="{style.about}">
+      <div class="{style.page}">
 
-    <b>Authors:</b>
-    <ul>
-      <li><a href="mailto:Jakub Galgonek &lt;jakub.galgonek@uochb.cas.cz&gt;?subject=IOCB RDF Platform">Jakub Galgonek</a></li>
-      <li>Tomáš Hurt</li>
-      <li>Vendula Michlíková</li>
-      <li>Petr Onderka</li>
-      <li>Jan Schwarz</li>
-    </ul>
+        <div class="{style.section}">
+          <div class="{style.header}">Authors</div>
+          <div>
+            <img height="80px" style="float: right; margin-top: 8px; margin-left:10px; margin-right:25px" src="images/uochb.png"/>
+            <img height="70px" style="float: right; margin-top: 10px" src="images/elixir.png"/>
+            <ul>
+              <li><a href="mailto:Jakub Galgonek &lt;jakub.galgonek@uochb.cas.cz&gt;?subject=IOCB RDF Platform">Jakub Galgonek</a></li>
+              <li>Tomáš Hurt</li>
+              <li>Vendula Michlíková</li>
+              <li>Petr Onderka</li>
+              <li>Jan Schwarz</li>
+            </ul>
+          </div>
+        </div>
 
-    <b>Technologies:</b>
-    <ul>
-      <li><a href="http://www.gwtproject.org/" target="_blank">Google Web Toolkit</a></li>
-      <li><a href="https://codemirror.net/" target="_blank">CodeMirror</a></li>
-      <li><a href="http://velocity.apache.org/" target="_blank">Apache Velocity</a></li>
-      <li><a href="http://www.antlr.org/" target="_blank">ANTLR</a></li>
-      <li><a href="https://code.google.com/p/sparkle-g/" target="_blank">Sparkle-g Lexer and Parser</a></li>
-      <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a></li>
-      <li><a href="https://jena.apache.org/" target="_blank">Apache Jena</a></li>
-      <li><a href="http://bioinfo.uochb.cas.cz/sachem/" target="_blank">Sachem</a></li>
-      <li><a href="http://tomcat.apache.org/" target="_blank">Apache Tomcat</a></li>
-    </ul>
+        <div class="{style.section}">
+          <div class="{style.header}">Technologies</div>
+          <div>
+            <ul>
+              <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a></li>
+              <li><a href="http://bioinfo.uochb.cas.cz/sachem/" target="_blank">Sachem</a></li>
+              <li><a href="https://codemirror.net/" target="_blank">CodeMirror</a></li>
+              <li><a href="http://velocity.apache.org/" target="_blank">Apache Velocity</a></li>
+              <li><a href="http://www.gwtproject.org/" target="_blank">Google Web Toolkit</a></li>
+              <li><a href="https://code.google.com/p/sparkle-g/" target="_blank">Sparkle-g Lexer and Parser</a></li>
+              <li><a href="http://www.antlr.org/" target="_blank">ANTLR</a></li>
+              <li><a href="http://tomcat.apache.org/" target="_blank">Apache Tomcat</a></li>
+              <li><a href="https://jena.apache.org/" target="_blank">Apache Jena</a></li>
+              <li><a href="http://www.kde.org/" target="_blank">KDE</a> <a href="https://techbase.kde.org/Projects/Oxygen" target="_blank">Oxygen Icons</a> <small>(licensed under the <a href="http://www.gnu.org/licenses/lgpl-3.0.html" target="_blank">LGPLv3</a>)</small></li>
+            </ul>
+          </div>
+        </div>
 
-    <b>Data:</b>
-    <ul>
-      <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a></li>
-      <li><a href="http://www.kde.org/" target="_blank">KDE</a> <a href="https://techbase.kde.org/Projects/Oxygen" target="_blank">Oxygen Icons</a> (licensed under the <a href="http://www.gnu.org/licenses/lgpl-3.0.html" target="_blank">LGPLv3</a>)</li>
-    </ul>
-
-  </g:HTML>
+        <div class="{style.section}">
+          <div class="{style.header}">Data Sources</div>
+          <div>
+            <ul>
+              <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a></li>
+              <li><a href="https://www.ebi.ac.uk/chebi/" target="_blank">ChEBI Ontology</a></li>
+              <li><a href="https://id.nlm.nih.gov/mesh/" target="_blank">Medical Subject Headings (MESH)</a></li>
+              <li><a href="http://bioassayontology.org/bioassayontology/" target="_blank">BioAssay Ontology (BAO)</a></li>
+              <li><a href="https://proconsortium.org/" target="_blank">Protein Ontology (PRO)</a></li>
+              <li><a href="http://geneontology.org/" target="_blank">Gene Ontology (GO)</a></li>
+              <li><a href="https://github.com/The-Sequence-Ontology/SO-Ontologies" target="_blank">Sequence Ontology</a></li>
+              <li><a href="http://www.biopax.org/" target="_blank">Biological Pathway Exchange (BioPAX)</a></li>
+              <li><a href="http://www.clo-ontology.org/" target="_blank">Cell Line Ontology (CLO)</a></li>
+              <li><a href="http://obofoundry.org/ontology/cl.html" target="_blank">Cell Ontology</a></li>
+              <li><a href="https://github.com/DiseaseOntology/HumanDiseaseOntology" target="_blank">Human Disease Ontology (DOID)</a></li>
+              <li><a href="https://disease-ontology.org/" target="_blank">Disease Ontology</a></li>
+              <li><a href="https://github.com/DiseaseOntology/SymptomOntology" target="_blank">Symptom Ontology</a></li>
+              <li><a href="https://github.com/DiseaseOntology/PathogenTransmissionOntology" target="_blank">Pathogen Transmission Ontology</a></li>
+              <li><a href="http://www.human-phenotype-ontology.org" target="_blank">The Human Phenotype Ontology</a></li>
+              <li><a href="http://obofoundry.org/ontology/pato.html" target="_blank">Phenotype And Trait Ontology (PATO)</a></li>
+              <li><a href="https://pdbj.org/" target="_blank">PDBx ontology</a></li>
+              <li><a href="https://github.com/bio-ontology-research-group/unit-ontology" target="_blank">Units of Measurement Ontology (UO)</a></li>
+              <li><a href="https://github.com/obi-ontology/obi" target="_blank">Ontology for Biomedical Investigations (OBI)</a></li>
+              <li><a href="https://github.com/semanticchemistry/semanticchemistry" target="_blank">Chemical Information Ontology (CHEMINF)</a></li>
+              <li><a href="https://github.com/MaastrichtU-IDS/semanticscience" target="_blank">Semanticscience integrated ontology (SIO)</a></li>
+              <li><a href="https://github.com/information-artifact-ontology/IAO/" target="_blank">Information Artifact Ontology (IAO)</a></li>
+              <li><a href="http://uberon.github.io/" target="_blank">Uber-anatomy Ontology (UBERON)</a></li>
+              <li><a href="https://www.ncbi.nlm.nih.gov/taxonomy" target="_blank">NCBI Organismal Classification</a></li>
+              <li><a href="http://ncit.nci.nih.gov/" target="_blank">National Center Institute Thesaurus (NCIt)</a></li>
+              <li><a href="https://github.com/oborel/obo-relations" target="_blank">OBO Relations Ontology</a></li>
+              <li><a href="https://basic-formal-ontology.org/" target="_blank">Basic Formal Ontology (BFO)</a></li>
+              <li><a href="https://www.ebi.ac.uk/efo/" target="_blank">Experimental Factor Ontology (EFO)</a></li>
+              <li><a href="https://www.eagle-i.net/" target="_blank">Eagle-i Resource Ontology (ERO)</a></li>
+              <li><a href="https://sparontologies.github.io/cito/current/cito.html" target="_blank">Citation Typing Ontology (CiTO)</a></li>
+              <li><a href="https://sparontologies.github.io/fabio/current/fabio.html" target="_blank">FRBR-aligned Bibliographic Ontology (FaBiO)</a></li>
+              <li><a href="https://dublincore.org/specifications/dublin-core/dcmi-terms/" target="_blank">Dublin Core Metadata Initiative Terms (DCMI)</a></li>
+              <li><a href="https://www.w3.org/2009/08/skos-reference/skos.html" target="_blank">Simple Knowledge Organization System (SKOS)</a></li>
+              <li><a href="http://foodon.org" target="_blank">Food Ontology</a></li>
+              <li><a href="http://evidenceontology.org/" target="_blank">Evidence &amp; Conclusion Ontology (ECO)</a></li>
+              <li><a href="https://sparontologies.github.io/frbr/current/frbr.html" target="_blank">Essential FRBR in OWL2 DL Ontology (FRBR)</a></li>
+              <li><a href="https://github.com/ewilderj/doap/wiki" target="_blank">Description of a Project (DOAP) vocabulary</a></li>
+              <li><a href="http://xmlns.com/foaf/spec/" target="_blank">FOAF Vocabulary</a></li>
+              <li><a href="http://pav-ontology.github.io/pav/" target="_blank">Provenance, Authoring and Versioning (PAV)</a></li>
+              <li><a href="https://www.w3.org/2003/06/sw-vocab-status/note.html" target="_blank">SemWeb Vocab Status Ontology</a></li>
+              <li><a href="http://vocab.deri.ie/void.html" target="_blank">Vocabulary of Interlinked Datasets (VoID)</a></li>
+              <li><a href="https://www.w3.org/TR/rdf-schema/" target="_blank">RDF Schema (RDFS)</a></li>
+              <li><a href="https://www.w3.org/TR/owl2-overview/" target="_blank">OWL 2 Schema (OWL 2)</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </g:HTML>
+  </g:ScrollPanel>
 </ui:UiBinder>
