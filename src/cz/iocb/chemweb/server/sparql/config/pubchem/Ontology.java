@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -37,7 +36,7 @@ class Ontology
             try(Statement statement = connection.createStatement())
             {
                 try(ResultSet result = statement
-                        .executeQuery("select pattern from " + schema + ".ontology_resource_categories__reftable"))
+                        .executeQuery("select pattern from ontology.resource_categories__reftable"))
                 {
                     boolean hasResult = false;
 
@@ -56,8 +55,8 @@ class Ontology
 
         String ontologyPattern = builder.toString();
 
-        config.addIriClass(new GeneralUserIriClass(schema, "ontology_resource", Arrays.asList("smallint", "integer"),
-                ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
+        config.addIriClass(new GeneralUserIriClass("ontology", "ontology_resource",
+                Arrays.asList("smallint", "integer"), ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
     }
 
 
@@ -67,137 +66,137 @@ class Ontology
         ConstantIriMapping graph = config.createIriMapping("pubchem:ontology");
 
         {
-            String table = "ontology_resource_classes";
+            String table = "classes";
             NodeMapping subject = config.createIriMapping(rdfResource, "class_unit", "class_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Class"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/Class.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("base/Class.vm"));
         }
 
         {
-            String table = "ontology_resource_properties";
+            String table = "properties";
             NodeMapping subject = config.createIriMapping(rdfResource, "property_unit", "property_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("rdf:Property"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/Property.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("base/Property.vm"));
         }
 
         {
-            String table = "ontology_resource_individuals";
+            String table = "individuals";
             NodeMapping subject = config.createIriMapping(rdfResource, "individual_unit", "individual_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:NamedIndividual"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/NamedIndividual.vm"));
         }
 
         {
-            String table = "ontology_resource_labels";
+            String table = "resource_labels";
             NodeMapping subject = config.createIriMapping(rdfResource, "resource_unit", "resource_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(rdfLangStringEn, "label"));
         }
 
         {
-            String table = "ontology_resource_superclasses";
+            String table = "superclasses";
             NodeMapping subject = config.createIriMapping(rdfResource, "class_unit", "class_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping(rdfResource, "superclass_unit", "superclass_id"));
         }
 
 
         {
-            String table = "ontology_resource_superproperties";
+            String table = "superproperties";
             NodeMapping subject = config.createIriMapping(rdfResource, "property_unit", "property_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:subPropertyOf"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdfs:subPropertyOf"),
                     config.createIriMapping(rdfResource, "superproperty_unit", "superproperty_id"));
         }
 
         {
-            String table = "ontology_resource_domains";
+            String table = "property_domains";
             NodeMapping subject = config.createIriMapping(rdfResource, "property_unit", "property_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:domain"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdfs:domain"),
                     config.createIriMapping(rdfResource, "domain_unit", "domain_id"));
         }
 
         {
-            String table = "ontology_resource_ranges";
+            String table = "property_ranges";
             NodeMapping subject = config.createIriMapping(rdfResource, "property_unit", "property_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:range"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdfs:range"),
                     config.createIriMapping(rdfResource, "range_unit", "range_id"));
         }
 
         {
-            String table = "ontology_resource_somevaluesfrom_restrictions";
+            String table = "somevaluesfrom_restrictions";
             NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Restriction"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:onProperty"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:onProperty"),
                     config.createIriMapping(rdfResource, "property_unit", "property_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:someValuesFrom"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:someValuesFrom"),
                     config.createIriMapping(rdfResource, "class_unit", "class_id"));
         }
 
         {
-            String table = "ontology_resource_allvaluesfrom_restrictions";
+            String table = "allvaluesfrom_restrictions";
             NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Restriction"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:onProperty"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:onProperty"),
                     config.createIriMapping(rdfResource, "property_unit", "property_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:allValuesFrom"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:allValuesFrom"),
                     config.createIriMapping(rdfResource, "class_unit", "class_id"));
         }
 
         {
-            String table = "ontology_resource_cardinality_restrictions";
+            String table = "cardinality_restrictions";
             NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Restriction"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:onProperty"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:onProperty"),
                     config.createIriMapping(rdfResource, "property_unit", "property_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:cardinality"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:cardinality"),
                     config.createLiteralMapping(xsdInt, "cardinality"));
         }
 
         {
-            String table = "ontology_resource_mincardinality_restrictions";
+            String table = "mincardinality_restrictions";
             NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Restriction"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:onProperty"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:onProperty"),
                     config.createIriMapping(rdfResource, "property_unit", "property_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:minCardinality"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:minCardinality"),
                     config.createLiteralMapping(xsdInt, "cardinality"));
         }
 
         {
-            String table = "ontology_resource_maxcardinality_restrictions";
+            String table = "maxcardinality_restrictions";
             NodeMapping subject = config.createIriMapping(rdfResource, unitBlank, "restriction_id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Restriction"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:onProperty"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:onProperty"),
                     config.createIriMapping(rdfResource, "property_unit", "property_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("owl:maxCardinality"),
+            config.addQuadMapping("ontology", table, graph, subject, config.createIriMapping("owl:maxCardinality"),
                     config.createLiteralMapping(xsdInt, "cardinality"));
         }
     }

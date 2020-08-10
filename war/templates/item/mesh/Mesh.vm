@@ -1,0 +1,29 @@
+#set($MESH = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+
+#sparql($mesh)
+  SELECT ?TYPE ?LABEL WHERE
+  {
+    $entity rdf:type / rdfs:label ?TYPE
+    
+    OPTIONAL
+    {
+      $entity rdfs:label ?LABEL
+    }
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td><b>$MESH</b></td>
+    </tr>
+    #if($mesh.LABEL && $MESH != $mesh.LABEL.getValue())
+    <tr>
+      <td>#escapeHTML($mesh.LABEL)</td>
+    </tr>
+    #end
+    <tr>
+      <td><small style="color:gray">#escapeHTML($mesh.TYPE)</small></td>
+    </tr>
+  </tbody>
+</table>

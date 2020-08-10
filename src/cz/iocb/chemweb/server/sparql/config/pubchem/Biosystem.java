@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
@@ -28,15 +27,15 @@ class Biosystem
             String table = "biosystem_bases";
             NodeMapping subject = config.createIriMapping(biosystem, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Pathway"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Biosystem.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:source"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("source", "source"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bp:organism"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("bp:organism"),
                     config.createIriMapping("ontology_resource", Ontology.unitTaxonomy, "organism_id"));
         }
 
@@ -44,7 +43,7 @@ class Biosystem
             String table = "biosystem_components";
             NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bp:pathwayComponent"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("bp:pathwayComponent"),
                     config.createIriMapping(biosystem, "component"));
         }
 
@@ -52,7 +51,7 @@ class Biosystem
             String table = "biosystem_references";
             NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
                     config.createIriMapping("reference", "reference"));
         }
 
@@ -60,7 +59,7 @@ class Biosystem
             String table = "biosystem_matches";
             NodeMapping subject = config.createIriMapping(biosystem, "biosystem");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("wikipathway", "wikipathway"));
         }
     }

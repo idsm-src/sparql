@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
@@ -27,13 +26,13 @@ class ConservedDomain
             String table = "conserveddomain_bases";
             NodeMapping subject = config.createIriMapping(conserveddomain, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:SO_0000417"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/ConservedDomain.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:abstract"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:abstract"),
                     config.createLiteralMapping(rdfLangStringEn, "abstract"));
         }
 
@@ -41,7 +40,7 @@ class ConservedDomain
             String table = "conserveddomain_references";
             NodeMapping subject = config.createIriMapping(conserveddomain, "domain");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
                     config.createIriMapping("reference", "reference"));
         }
     }

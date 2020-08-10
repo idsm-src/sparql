@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -28,11 +27,11 @@ class SubstanceDescriptor
             String table = "descriptor_substance_bases";
             NodeMapping subject = config.createIriMapping(descriptorSubstanceVersion, "substance");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:IAO_0000129"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/descriptor/version.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdInt, "version"));
         }
     }

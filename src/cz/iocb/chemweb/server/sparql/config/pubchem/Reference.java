@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -28,15 +27,15 @@ class Reference
             String table = "reference_bases";
             NodeMapping subject = config.createIriMapping(reference, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "type_id"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Reference.vm"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:date"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:date"),
                     config.createLiteralMapping(xsdDateM4, "dcdate"));
-            config.addQuadMapping(schema, table, graph, subject,
+            config.addQuadMapping("pubchem", table, graph, subject,
                     config.createIriMapping("dcterms:bibliographicCitation"),
                     config.createLiteralMapping(rdfLangStringEn, "citation"));
         }
@@ -45,24 +44,24 @@ class Reference
             String table = "reference_discusses";
             NodeMapping subject = config.createIriMapping(reference, "reference");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cito:discusses"),
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:discusses"),
                     config.createIriMapping("mesh", "statement"));
         }
 
         {
-            String table = "reference_subject_descriptors";
+            String table = "reference_subjects";
             NodeMapping subject = config.createIriMapping(reference, "reference");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("fabio:hasSubjectTerm"),
-                    config.createIriMapping("dqmesh", "descriptor", "qualifier"));
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("fabio:hasSubjectTerm"),
+                    config.createIriMapping("mesh", "subject"));
         }
 
         {
-            String table = "reference_primary_subject_descriptors";
+            String table = "reference_primary_subjects";
             NodeMapping subject = config.createIriMapping(reference, "reference");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("fabio:hasPrimarySubjectTerm"),
-                    config.createIriMapping("dqmesh", "descriptor", "qualifier"));
+            config.addQuadMapping("pubchem", table, graph, subject,
+                    config.createIriMapping("fabio:hasPrimarySubjectTerm"), config.createIriMapping("mesh", "subject"));
         }
     }
 }

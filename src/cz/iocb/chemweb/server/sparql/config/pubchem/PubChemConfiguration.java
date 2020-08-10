@@ -33,9 +33,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public class PubChemConfiguration extends SparqlDatabaseConfiguration
 {
-    static final String molecules = "molecules";
-    static final String schema = "pubchem";
-
     static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
     static final DateConstantZoneClass xsdDateM4 = DateConstantZoneClass.get(-4 * 60 * 60);
 
@@ -101,6 +98,9 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
         prefixes.put("template", "http://bioinfo.iocb.cz/0.9/template#");
 
+        prefixes.put("meshv", "http://id.nlm.nih.gov/mesh/vocab#");
+        prefixes.put("mesh", "http://id.nlm.nih.gov/mesh/");
+
         prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
         prefixes.put("fulltext", "http://bioinfo.uochb.cas.cz/rdf/v1.0/fulltext#");
     }
@@ -120,6 +120,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Gene.addIriClasses(this);
         InchiKey.addIriClasses(this);
         Measuregroup.addIriClasses(this);
+        Mesh.addIriClasses(this);
         Ontology.addIriClasses(this);
         Protein.addIriClasses(this);
         Reference.addIriClasses(this);
@@ -216,6 +217,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Gene.addQuadMapping(this);
         InchiKey.addQuadMapping(this);
         Measuregroup.addQuadMapping(this);
+        Mesh.addQuadMapping(this);
         Ontology.addQuadMapping(this);
         Protein.addQuadMapping(this);
         Reference.addQuadMapping(this);
@@ -378,7 +380,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch",
-                new Function(schema, "bioassay"));
+                new Function("pubchem", "bioassay"));
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         bioassay.addResult(new ResultDefinition(getIriClass("bioassay")));
         procedures.put(bioassay.getProcedureName(), bioassay);
@@ -386,7 +388,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
         /* fulltext:compoundSearch */
         ProcedureDefinition compoundSearch = new ProcedureDefinition(fulltext + "compoundSearch",
-                new Function(schema, "compound"));
+                new Function("pubchem", "compound"));
         compoundSearch.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
         compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
@@ -400,17 +402,17 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement
-                        .executeQuery("select parent_table, parent_columns, foreign_table, foreign_columns from "
-                                + schema + ".schema_foreign_keys"))
+                try(ResultSet result = statement.executeQuery(
+                        "select parent_schema, parent_table, parent_columns, foreign_schema, foreign_table, foreign_columns "
+                                + "from constraints.foreign_keys"))
                 {
                     while(result.next())
                     {
-                        Table parentTable = new Table(schema, result.getString(1));
-                        List<Column> parentColumns = getColumns((String[]) result.getArray(2).getArray());
+                        Table parentTable = new Table(result.getString(1), result.getString(2));
+                        List<Column> parentColumns = getColumns((String[]) result.getArray(3).getArray());
 
-                        Table foreignTable = new Table(schema, result.getString(3));
-                        List<Column> foreignColumns = getColumns((String[]) result.getArray(4).getArray());
+                        Table foreignTable = new Table(result.getString(4), result.getString(5));
+                        List<Column> foreignColumns = getColumns((String[]) result.getArray(6).getArray());
 
                         databaseSchema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
                     }
@@ -420,17 +422,17 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement
-                        .executeQuery("select left_table, left_columns, right_table, right_columns from " + schema
-                                + ".schema_unjoinable_columns"))
+                try(ResultSet result = statement.executeQuery(
+                        "select left_schema, left_table, left_columns, right_schema, right_table, right_columns "
+                                + "from constraints.unjoinable_columns"))
                 {
                     while(result.next())
                     {
-                        Table leftTable = new Table(schema, result.getString(1));
-                        List<Column> leftColumns = getColumns((String[]) result.getArray(2).getArray());
+                        Table leftTable = new Table(result.getString(1), result.getString(2));
+                        List<Column> leftColumns = getColumns((String[]) result.getArray(3).getArray());
 
-                        Table rightTable = new Table(schema, result.getString(3));
-                        List<Column> rightColumns = getColumns((String[]) result.getArray(4).getArray());
+                        Table rightTable = new Table(result.getString(4), result.getString(5));
+                        List<Column> rightColumns = getColumns((String[]) result.getArray(6).getArray());
 
                         databaseSchema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
                         databaseSchema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
