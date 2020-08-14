@@ -1,4 +1,4 @@
-#set($SID = $entity.toString().replaceAll(".*/SID", "").replaceAll(">",""))
+#set($SID = $entity.getValue().replaceAll(".*/SID", ""))
 
 
 <style scoped>
@@ -19,7 +19,7 @@
   #end
 
   #if($compound.count > 0)
-  #set($CID = $compound.COMPOUND.toString().replaceAll(".*/CID", "").replaceAll(">",""))
+  #set($CID = $compound.COMPOUND.getValue().replaceAll(".*/CID", ""))
 
   #sparql($iupac)
     SELECT ?NAME FROM descriptor:compound WHERE
@@ -29,9 +29,9 @@
   #end
 
   #if($iupac.count > 0)
-    <div class="VET-BoxedSection">
-      <div>#escapeHTML($iupac.NAME)</div>
-    </div>
+  <div class="VET-BoxedSection">
+    <div>#escapeHTML($iupac.NAME)</div>
+  </div>
   #end
 
 
@@ -45,13 +45,15 @@
   #end
 
   #if($structure.count > 0)
-    <div class="VET-BoxedSection">
-      <table style="width:100%;">
-        <tr>
-          <td align="center" style="text-align: center;"><img src="compound/image?w=800&id=$CID" alt="CID$CID" height="400" width="400"></td>
-        </tr>
-      </table>
-    </div>
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <img src="compound/image?w=800&id=$CID" alt="CID$CID" height="400" width="400">
+        </td>
+      </tr>
+    </table>
+  </div>
   #end
 
 
@@ -89,24 +91,24 @@
   #end
 
   #if($descriptors.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Descriptors</div>
-      <div>
-        <table class="VET-Table">
-          <colgroup>
-            <col style="width:220px"/>
-            <col/>
-          </colgroup>
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
 
-          #foreach($descriptor in $descriptors)
-            <tr>
-              <td>$descriptor.TITLE.getValue()</td>
-              <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)</span></td>
-            </tr>
-          #end
-        </table>
-      </div>
+        #foreach($descriptor in $descriptors)
+        <tr>
+          <td>$descriptor.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)</span></td>
+        </tr>
+        #end
+      </table>
     </div>
+  </div>
   #end
 
 
@@ -123,13 +125,11 @@
     <div class="VET-Header">Synonyms</div>
     <div>
       <table class="VET-Table">
-      #foreach($synonym in $synonyms)
+        #foreach($synonym in $synonyms)
         <tr>
-          <td>
-            #escapeHTML($synonym.NAME)
-          </td>
+          <td>#escapeHTML($synonym.NAME)</td>
         </tr>
-      #end
+        #end
       </table>
     </div>
   </div>

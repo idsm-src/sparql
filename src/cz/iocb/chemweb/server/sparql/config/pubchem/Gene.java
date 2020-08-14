@@ -31,6 +31,8 @@ class Gene
                     config.createIriMapping("bp:Gene"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Gene.vm"));
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/Gene.vm"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:description"),

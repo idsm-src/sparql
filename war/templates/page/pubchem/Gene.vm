@@ -1,0 +1,154 @@
+#set($GID = $entity.getValue().replaceAll(".*/GID",""))
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">gene:GI$GID</span>
+    (<a href="https://www.ncbi.nlm.nih.gov/gene/?term=$GID" target="_blank">open in pubchem</a>)
+  </div>
+
+  #sparql($title)
+    SELECT ?TITLE FROM pubchem:gene WHERE
+    {
+      $entity dcterms:title ?TITLE
+    }
+  #end
+
+  #sparql($description)
+    SELECT ?DESCRIPTION FROM pubchem:gene WHERE
+    {
+      $entity dcterms:description ?DESCRIPTION
+    }
+  #end
+
+  #if($title.TITLE)
+  <div class="VET-BoxedSection">
+    <div>
+      #escapeHTML($title.TITLE)#if($description.DESCRIPTION): #escapeHTML($description.DESCRIPTION)#end
+    </div>
+  </div>
+  #end
+
+
+  #sparql($alternatives)
+    SELECT ?TITLE FROM pubchem:gene WHERE
+    {
+      $entity dcterms:alternative $TITLE
+    }
+  #end
+
+  #if($alternatives.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Alternative Titles</div>
+    <div>
+      <table class="VET-Table">
+        #foreach($alternative in $alternatives)
+        <tr>
+          <td>
+            #escapeHTML($alternative.TITLE)
+          </td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+
+  #sparql($biosystems)
+    SELECT ?BIOSYSTEM ?TITLE ?ORGANISM FROM pubchem:gene FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    {
+      $entity obo:BFO_0000056 ?BIOSYSTEM.
+      ?BIOSYSTEM dcterms:title ?TITLE.
+
+      OPTIONAL
+      {
+        ?BIOSYSTEM bp:organism / rdfs:label ?ORGANISM
+      }
+    }
+    ORDER BY (?REFERENCE)
+  #end
+
+  #if($biosystems.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Biosystems</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:100px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($biosystem in $biosystems)
+        <tr>
+          <td>
+            #url($biosystem.BIOSYSTEM)$biosystem.BIOSYSTEM.getValue().replaceAll(".*/", "")#end
+          </td>
+          <td>
+            #escapeHTML($biosystem.TITLE)
+            #if($biosystem.ORGANISM)
+            <br/>
+            <small style="color:gray">#escapeHTML($biosystem.ORGANISM)</small>
+            #end
+          </td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+
+  #sparql($references)
+    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:gene FROM pubchem:reference WHERE
+    {
+      $entity cito:isDiscussedBy ?REFERENCE.
+
+      OPTIONAL
+      {
+        ?REFERENCE dcterms:title ?TITLE.
+      }
+
+      OPTIONAL
+      {
+        ?REFERENCE dcterms:bibliographicCitation ?CITATION.
+      }
+    }
+    ORDER BY (?REFERENCE)
+  #end
+
+  #if($references.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">References</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:100px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($reference in $references)
+        <tr>
+          <td>
+            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceAll(".*/", "")#end
+          </td>
+          <td>
+            #if($reference.TITLE)
+            <b>#escapeHTML($reference.TITLE)</b>
+            #end
+            #if($reference.CITATION)
+            #escapeHTML($reference.CITATION)
+            #end
+          </td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>

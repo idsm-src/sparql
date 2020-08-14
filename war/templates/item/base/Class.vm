@@ -1,7 +1,6 @@
 #parse("common/utils.vm")
 #parse("common/label.vm")
 
-
 <table style="width:100%">
   <tbody>
     <tr>

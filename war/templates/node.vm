@@ -11,7 +11,7 @@
         $entity template:itemTemplate ?TEMPLATE.
 	  }
     #end
-    
+
     #if($type.TEMPLATE)
       #parse("item/$type.TEMPLATE.value")
 	#else

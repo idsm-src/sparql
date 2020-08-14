@@ -1,0 +1,141 @@
+#set($BSID = $entity.getValue().replaceAll(".*/BSID",""))
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">biosystem:BSID$BSID</span>
+    (<a href="https://www.ncbi.nlm.nih.gov/biosystems/?term=$BSID" target="_blank">open in pubchem</a>)
+  </div>
+
+  #sparql($title)
+    SELECT ?TITLE FROM pubchem:biosystem WHERE
+    {
+      $entity dcterms:title ?TITLE
+    }
+  #end
+
+  #sparql($organism)
+    SELECT ?NAME FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    {
+      $entity bp:organism / rdfs:label ?NAME
+    }
+  #end
+
+  #if($title.TITLE || $organism.NAME)
+  <div class="VET-BoxedSection">
+    <div>
+      #if($title.TITLE)
+      #escapeHTML($title.TITLE)
+      #end
+      #if($organism.NAME)
+      <br/>
+      <small style="color:gray">#escapeHTML($organism.NAME)</small>
+      #end
+    </div>
+  </div>
+  #end
+
+
+  #sparql($components)
+    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    {
+      $entity bp:pathwayComponent ?COMPONENT.
+
+      OPTIONAL
+      {
+        ?COMPONENT dcterms:title ?TITLE.
+      }
+
+      OPTIONAL
+      {
+        ?COMPONENT bp:organism / rdfs:label ?ORGANISM
+      }
+    }
+    ORDER BY (?COMPONENT)
+  #end
+
+  #if($components.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Components</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:100px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($component in $components)
+        <tr>
+          <td>
+            #url($component.COMPONENT)$component.COMPONENT.getValue().replaceAll(".*/","")#end
+          </td>
+          <td>
+            #if($component.TITLE)
+            #escapeHTML($component.TITLE)
+            #end
+            #if($component.ORGANISM)
+            <br/>
+            <small style="color:gray">#escapeHTML($component.ORGANISM)</small>
+            #end
+          </td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end  
+
+
+  #sparql($references)
+    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:biosystem FROM pubchem:reference WHERE
+    {
+      $entity cito:isDiscussedBy ?REFERENCE.
+
+      OPTIONAL
+      {
+        ?REFERENCE dcterms:title ?TITLE.
+      }
+
+      OPTIONAL
+      {
+        ?REFERENCE dcterms:bibliographicCitation ?CITATION.
+      }
+    }
+    ORDER BY (?REFERENCE)
+  #end
+
+  #if($references.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">References</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:100px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($reference in $references)
+        <tr>
+          <td>
+            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceAll(".*/", "")#end
+          </td>
+          <td>
+            #if($reference.TITLE)
+            <b>#escapeHTML($reference.TITLE)</b>
+            #end
+            #if($reference.CITATION)
+            #escapeHTML($reference.CITATION)
+            #end
+          </td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>

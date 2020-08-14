@@ -1,4 +1,4 @@
-#set($ID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+#set($ID = $entity.getValue().replaceAll(".*/", ""))
 
 #sparql($title)
   SELECT ?TITLE FROM pubchem:protein WHERE
@@ -7,15 +7,27 @@
   }
 #end
 
+#sparql($organism)
+  SELECT ?NAME FROM pubchem:protein FROM pubchem:ontology WHERE
+  {
+    $entity bp:organism / rdfs:label ?NAME
+  }
+#end
+
 <table style="width:100%">
   <tbody>
-    <tr><td>
-      <b>$ID</b>
-    </td></tr>
+    <tr>
+      <td><b>$ID</b></td>
+    </tr>
     #if($title.TITLE)
-    <tr><td>
-      #escapeHTML($title.TITLE)
-    </td></tr>
+    <tr>
+      <td>#escapeHTML($title.TITLE)</td>
+    </tr>
+    #end
+    #if($organism.NAME)
+    <tr>
+      <td><small style="color:gray">#escapeHTML($organism.NAME)<small></td>
+    </tr>
     #end
   </tbody>
 </table>

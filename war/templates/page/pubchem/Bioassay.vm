@@ -1,34 +1,5 @@
-#set($uri = $entity.toString().replaceAll("[<>]",""))
+#set($uri = $entity.getValue())
 #set($AID = $uri.replaceAll(".*AID",""))
-
-#sparql($title)
-  SELECT ?TITLE FROM pubchem:bioassay WHERE
-  {
-    $entity dcterms:title ?TITLE
-  }
-#end
-
-#sparql($description)
-  SELECT ?VALUE FROM pubchem:bioassay WHERE
-  {
-    <${uri}_Description> sio:has-value ?VALUE
-  }
-#end
-
-#sparql($protocol)
-  SELECT ?VALUE FROM pubchem:bioassay WHERE
-  {
-    <${uri}_Protocol> sio:has-value ?VALUE
-  }
-#end
-
-#sparql($comment)
-  SELECT ?VALUE FROM pubchem:bioassay WHERE
-  {
-    <${uri}_Comment> sio:has-value ?VALUE
-  }
-#end
-
 
 
 <style scoped>
@@ -41,29 +12,60 @@
     (<a href="https://pubchem.ncbi.nlm.nih.gov/bioassay/$AID" target="_blank">open in pubchem</a>)
   </div>
 
+  #sparql($title)
+    SELECT ?TITLE FROM pubchem:bioassay WHERE
+    {
+      $entity dcterms:title ?TITLE
+    }
+  #end
+
   <div class="VET-BoxedSection">
     <div>#escapeHTML($title.TITLE)</div>
   </div>
 
-  #if($description.count > 0)
+
+  #sparql($description)
+    SELECT ?VALUE FROM pubchem:bioassay WHERE
+    {
+      <${uri}_Description> sio:has-value ?VALUE
+    }
+  #end
+
+  #if($description.VALUE)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Description</div>
     <div style="white-space: pre-wrap">$description.VALUE.value.trim()</div>
   </div>
   #end
 
-  #if($protocol.count > 0)
+
+  #sparql($protocol)
+    SELECT ?VALUE FROM pubchem:bioassay WHERE
+    {
+      <${uri}_Protocol> sio:has-value ?VALUE
+    }
+  #end
+
+  #if($protocol.VALUE)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Protocol</div>
     <div style="white-space: pre-wrap">$protocol.VALUE.value.trim()</div>
   </div>
   #end
 
-  #if($comment.count > 0)
+
+  #sparql($comment)
+    SELECT ?VALUE FROM pubchem:bioassay WHERE
+    {
+      <${uri}_Comment> sio:has-value ?VALUE
+    }
+  #end
+
+  #if($comment.VALUE > 0)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Comment</div>
     <div style="white-space: pre-wrap">$comment.VALUE.value.trim()</div>
   </div>
   #end
-  
+
 </div>

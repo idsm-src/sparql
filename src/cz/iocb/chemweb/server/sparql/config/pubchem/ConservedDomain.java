@@ -30,6 +30,8 @@ class ConservedDomain
                     config.createIriMapping("obo:SO_0000417"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/ConservedDomain.vm"));
+            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/ConservedDomain.vm"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:abstract"),

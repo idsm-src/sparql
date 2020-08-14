@@ -1,4 +1,4 @@
-#set($CID = $entity.toString().replaceAll(".*/CID", "").replaceAll(">",""))
+#set($CID = $entity.getValue().replaceAll(".*/CID", ""))
 
 #sparql($structure)
   SELECT (true as ?R) WHERE
@@ -9,38 +9,38 @@
   }
 #end
 
+#sparql($value)
+  SELECT ?VALUE FROM descriptor:compound WHERE
+  {
+    descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
+  }
+#end
+
 <table style="width:100%">
   <tr>
     #if($structure.count > 0)
-      <td style="width:90px">
-        <table style="width:80px">
-          <tr>
-            <td>
-              <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
-            </td>
-          </tr>
-        </table>
-      </td>
+    <td style="width:90px">
+      <table style="width:80px">
+        <tr>
+          <td>
+            <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
+          </td>
+        </tr>
+      </table>
+    </td>
     #end
     <td>
       <table>
         <tr>
-          <td >
-            <b>CID$CID</b>
+          <td><b>CID$CID</b></td>
+        </tr>
+        #if($value.VALUE > 0)
+        <tr>
+          <td>
+            <span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span>
           </td>
         </tr>
-          #sparql($value)
-            SELECT ?VALUE FROM descriptor:compound WHERE
-            {
-              descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
-            }
-          #end
-
-          #if($value.count > 0)
-            <tr>
-              <td><span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span></td>
-            </tr>
-          #end
+        #end
       </table>
     </td>
   </tr>

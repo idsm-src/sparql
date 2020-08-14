@@ -1,4 +1,4 @@
-#set($SID = $entity.toString().replaceAll(".*/SID", "").replaceAll(">",""))
+#set($SID = $entity.getValue().replaceAll(".*/SID", ""))
 
 #sparql($compound)
   SELECT ?COMPOUND FROM pubchem:substance WHERE
@@ -7,55 +7,50 @@
   }
 #end
 
-#if($compound.count > 0)
-#set($CID = $compound.COMPOUND.toString().replaceAll(".*/CID", "").replaceAll(">",""))
+#if($compound.COMPOUND)
+  #set($CID = $compound.COMPOUND.getValue().replaceAll(".*/CID", ""))
+
+  #sparql($value)
+    SELECT ?VALUE FROM descriptor:compound WHERE
+    {
+      descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
+    }
+  #end
+
+  #sparql($structure)
+    SELECT (true as ?R) WHERE
+    {
+      ?S rdf:type sio:SIO_011120.
+      ?S sio:is-attribute-of compound:CID$CID.
+      ?S sio:has-value ?V.
+    }
+  #end
 #end
 
 <table style="width:100%">
   <tr>
-    #if($CID)
-      #sparql($structure)
-        SELECT (true as ?R) WHERE
-        {
-          ?S rdf:type sio:SIO_011120.
-          ?S sio:is-attribute-of compound:CID$CID.
-          ?S sio:has-value ?V.
-        }
-      #end
-
-      #if($structure.count > 0)
-      <td style="width:90px">
-        <table style="width:80px">
-          <tr>
-            <td>
-              <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
-            </td>
-          </tr>
-        </table>
-      </td>
-      #end
+    #if($structure.count > 0)
+    <td style="width:90px">
+      <table style="width:80px">
+        <tr>
+          <td>
+            <img src="compound/image?w=160&id=$CID" alt="CID$CID" height="80" width="80">
+          </td>
+        </tr>
+      </table>
+    </td>
     #end
-
     <td>
       <table>
         <tr>
-          <td >
-            <b>SID$SID</b>
+          <td ><b>SID$SID</b></td>
+        </tr>
+        #if($value.VALUE)
+        <tr>
+          <td>
+            <span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span>
           </td>
         </tr>
-        #if($CID)
-          #sparql($value)
-            SELECT ?VALUE FROM descriptor:compound WHERE
-            {
-              descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
-            }
-          #end
-
-          #if($value.count > 0)
-            <tr>
-              <td><span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span></td>
-            </tr>
-          #end
         #end
       </table>
     </td>

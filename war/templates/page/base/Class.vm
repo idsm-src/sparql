@@ -45,7 +45,7 @@
       #set($depth = $depth + 1)
       <ul class="hierarchy">
         #foreach($superclass in $superclasses)
-          <li>#superlevelClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
+        <li>#superlevelClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
         #end
       </ul>
       #set($depth = $depth - 1)
@@ -63,23 +63,23 @@
   #end
 
   #if($superclasses.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Superclass Hierarchy</div>
-      <div>
-        <ul class="hierarchy">
-          <li>
-            &#9662;
-            #url($entity)#escapeIRI($entity)#end (#label($entity))
-            #set($count = $superclasses.count)
-            <ul class="hierarchy">
-              #foreach($superclass in $superclasses)
-                <li>#superlevelClasses($superclass.CLASS $superclass.LABEL 1 $count)</li>
-              #end
-            </ul>
-          </li>
-        </ul>
-      </div>
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Superclass Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#label($entity))
+          #set($count = $superclasses.count)
+          <ul class="hierarchy">
+            #foreach($superclass in $superclasses)
+            <li>#superlevelClasses($superclass.CLASS $superclass.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
     </div>
+  </div>
   #end
 
   <!-- ------------------------------------------------------------------------------------------- -->
@@ -106,14 +106,14 @@
     #url($class)#escapeIRI($class)#end (#escapeHTML($label))
 
     #if($count < 128 && $depth < 8)
-      #set($count = $count + $subclasses.count)
-      #set($depth = $depth + 1)
-      <ul class="hierarchy">
-        #foreach($subclass in $subclasses)
-          <li>#sublevelClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
-        #end
-      </ul>
-      #set($depth = $depth - 1)
+    #set($count = $count + $subclasses.count)
+    #set($depth = $depth + 1)
+    <ul class="hierarchy">
+      #foreach($subclass in $subclasses)
+      <li>#sublevelClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
+      #end
+    </ul>
+    #set($depth = $depth - 1)
     #end
   #end
 
@@ -129,23 +129,23 @@
   #end
 
   #if($subclasses.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Subclass Hierarchy</div>
-      <div>
-        <ul class="hierarchy">
-          <li>
-            &#9662;
-            #url($entity)#escapeIRI($entity)#end (#label($entity))
-            #set($count = $subclasses.count)
-            <ul class="hierarchy">
-              #foreach($subclass in $subclasses)
-                <li>#sublevelClasses($subclass.CLASS $subclass.LABEL 1 $count)</li>
-              #end
-            </ul>
-          </li>
-        </ul>
-      </div>
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Subclass Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#label($entity))
+          #set($count = $subclasses.count)
+          <ul class="hierarchy">
+            #foreach($subclass in $subclasses)
+            <li>#sublevelClasses($subclass.CLASS $subclass.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
     </div>
+  </div>
   #end
 
   <!-- ------------------------------------------------------------------------------------------- -->
@@ -159,45 +159,45 @@
   #end
 
   #if($properties.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Properties</div>
-      <div>
-        #foreach($property in $properties)
-          #if($velocityCount > 1)<br/>#end
-          #url($property.PROPERTY)#escapeIRI($property.PROPERTY)#end (#escapeHTML($property.LABEL))
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Properties</div>
+    <div>
+      #foreach($property in $properties)
+      #if($velocityCount > 1)<br/>#end
+      #url($property.PROPERTY)#escapeIRI($property.PROPERTY)#end (#escapeHTML($property.LABEL))
 
-          <table style="margin-left: 10px">
-            #sparql($domains)
-              SELECT ?CLASS FROM pubchem:ontology WHERE
-              {
-                $property.PROPERTY rdfs:domain ?CLASS .
-              }
-            #end
-
-            #foreach($domain in $domains)
-              <tr>
-                <td>domain:</td>
-                <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
-              </tr>
-            #end
-
-            #sparql($ranges)
-              SELECT ?CLASS FROM pubchem:ontology WHERE
-              {
-                $property.PROPERTY rdfs:range ?CLASS.
-              }
-            #end
-
-            #foreach($range in $ranges)
-              <tr>
-                <td>range:</td>
-                <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
-              </tr>
-            #end
-          </table>
+      <table style="margin-left: 10px">
+        #sparql($domains)
+          SELECT ?CLASS FROM pubchem:ontology WHERE
+          {
+            $property.PROPERTY rdfs:domain ?CLASS .
+          }
         #end
-      </div>
+
+        #foreach($domain in $domains)
+        <tr>
+          <td>domain:</td>
+          <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
+        </tr>
+        #end
+
+        #sparql($ranges)
+          SELECT ?CLASS FROM pubchem:ontology WHERE
+          {
+            $property.PROPERTY rdfs:range ?CLASS.
+          }
+        #end
+
+        #foreach($range in $ranges)
+        <tr>
+          <td>range:</td>
+          <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
+        </tr>
+        #end
+      </table>
+      #end
     </div>
+  </div>
   #end
 
 </div>

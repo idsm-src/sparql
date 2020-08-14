@@ -1,10 +1,10 @@
-#set($MESH = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+#set($MESH = $entity.getValue().replaceAll(".*/", ""))
 
 #sparql($mesh)
   SELECT ?TYPE ?LABEL WHERE
   {
     $entity rdf:type / rdfs:label ?TYPE
-    
+
     OPTIONAL
     {
       $entity rdfs:label ?LABEL

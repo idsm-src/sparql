@@ -20,11 +20,11 @@
     <div class="VET-Header">Property</div>
     <div>
       #if($info.LABEL)
-        <b>#escapeHTML($info.LABEL)</b>
-        <br/>
-        <small>#escapeIRI($entity)</small>
+      <b>#escapeHTML($info.LABEL)</b>
+      <br/>
+      <small>#escapeIRI($entity)</small>
       #else
-        <b>#escapeIRI($entity)</b>
+      <b>#escapeIRI($entity)</b>
       #end
 
       #sparql($domains)
@@ -42,22 +42,22 @@
       #end
 
       #if( $domains.count > 0 || $ranges.count > 0 )
-        <hr/>
-        <table>
-          #foreach($domain in $domains)
-            <tr>
-              <td>domain:</td>
-              <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
-            </tr>
-          #end
+      <hr/>
+      <table>
+        #foreach($domain in $domains)
+        <tr>
+          <td>domain:</td>
+          <td>#url($domain.CLASS)#escapeIRI($domain.CLASS)#end (#label($domain.CLASS))</td>
+        </tr>
+        #end
 
-          #foreach($range in $ranges)
-            <tr>
-              <td>range:</td>
-              <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
-            </tr>
-          #end
-        </table>
+        #foreach($range in $ranges)
+        <tr>
+          <td>range:</td>
+          <td>#url($range.CLASS)#escapeIRI($range.CLASS)#end (#label($range.CLASS))</td>
+        </tr>
+        #end
+      </table>
       #end
     </div>
   </div>
@@ -88,7 +88,7 @@
       #set($depth = $depth + 1)
       <ul class="hierarchy">
         #foreach($superproperty in $superproperties)
-          <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL $depth $count)</li>
+        <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL $depth $count)</li>
         #end
       </ul>
       #set($depth = $depth - 1)
@@ -105,23 +105,23 @@
   #end
 
   #if($superproperties.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Superproperty Hierarchy</div>
-      <div>
-        <ul class="hierarchy">
-          <li>
-            &#9662;
-            #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
-            #set($count = $superproperties.count)
-            <ul class="hierarchy">
-              #foreach($superproperty in $superproperties)
-                <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL 1 $count)</li>
-              #end
-            </ul>
-          </li>
-        </ul>
-      </div>
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Superproperty Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+          #set($count = $superproperties.count)
+          <ul class="hierarchy">
+            #foreach($superproperty in $superproperties)
+            <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
     </div>
+  </div>
   #end
 
   <!-- ------------------------------------------------------------------------------------------- -->
@@ -150,7 +150,7 @@
       #set($depth = $depth + 1)
       <ul class="hierarchy">
         #foreach($subproperty in $subproperties)
-          <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL $depth $count)</li>
+        <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL $depth $count)</li>
         #end
       </ul>
       #set($depth = $depth - 1)
@@ -167,23 +167,23 @@
   #end
 
   #if($subproperties.count > 0)
-    <div class="VET-BoxedSection">
-      <div class="VET-Header">Subproperty Hierarchy</div>
-      <div>
-        <ul class="hierarchy">
-          <li>
-            &#9662;
-            #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
-            #set($count = $subproperties.count)
-            <ul class="hierarchy">
-              #foreach($subproperty in $subproperties)
-                <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL 1 $count)</li>
-              #end
-            </ul>
-          </li>
-        </ul>
-      </div>
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Subproperty Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+          #set($count = $subproperties.count)
+          <ul class="hierarchy">
+            #foreach($subproperty in $subproperties)
+            <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
     </div>
+  </div>
   #end
 
   <!-- ------------------------------------------------------------------------------------------- -->

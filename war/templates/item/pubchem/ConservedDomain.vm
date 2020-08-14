@@ -1,4 +1,4 @@
-#set($PSSMID = $entity.toString().replaceAll(".*/", "").replaceAll(">",""))
+#set($PSSMID = $entity.getValue().replaceAll(".*/", ""))
 
 #sparql($title)
   SELECT ?TITLE FROM pubchem:conserveddomain WHERE
@@ -9,13 +9,13 @@
 
 <table style="width:100%">
   <tbody>
-    <tr><td>
-      <b>$PSSMID</b>
-    </td></tr>
+    <tr>
+      <td><b>$PSSMID</b></td>
+    </tr>
     #if($title.TITLE)
-    <tr><td>
-      #escapeHTML($title.TITLE)
-    </td></tr>
+    <tr>
+      <td>#escapeHTML($title.TITLE)</td>
+    </tr>
     #end
   </tbody>
 </table>

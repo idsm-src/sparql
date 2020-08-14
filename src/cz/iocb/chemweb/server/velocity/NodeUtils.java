@@ -25,7 +25,8 @@ public class NodeUtils
         if(node == null)
             return null;
 
-        return StringEscapeUtils.escapeHtml4(node.getValue());
+        return StringEscapeUtils.escapeHtml4(node.getValue()).replaceAll("\uFFFD",
+                "<span style=\"color: #a0a0a0\">\uFFFD</span>");
     }
 
 

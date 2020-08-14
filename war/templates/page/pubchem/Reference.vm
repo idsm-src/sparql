@@ -1,0 +1,41 @@
+#set($PMID = $entity.getValue().replaceAll(".*/PMID",""))
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">reference:PMID$PMID</span>
+    (<a href="https://pubmed.ncbi.nlm.nih.gov/$PMID" target="_blank">open in pubmed</a>)
+  </div>
+
+  #sparql($title)
+    SELECT ?TITLE FROM pubchem:reference WHERE
+    {
+      $entity dcterms:title ?TITLE
+    }
+  #end
+
+  #sparql($citation)
+    SELECT ?CITATION FROM pubchem:reference WHERE
+    {
+      $entity dcterms:bibliographicCitation ?CITATION
+    }
+  #end
+
+  #if($title.TITLE || $citation.CITATION)
+  <div class="VET-BoxedSection">
+    <div>
+      #if($title.TITLE)
+      <b>#escapeHTML($title.TITLE)</b>
+      #end
+      #if($citation.CITATION)
+      #escapeHTML($citation.CITATION)
+      #end
+    </div>
+  </div>
+  #end
+
+</div>

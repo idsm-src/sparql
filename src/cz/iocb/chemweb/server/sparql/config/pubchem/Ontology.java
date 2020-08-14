@@ -25,6 +25,7 @@ class Ontology
     public static final String unitPR = "6::smallint";
     public static final String unitCHEBI = "7::smallint";
     public static final String unitTaxonomy = "11::smallint";
+    public static final String unitNCBITaxon = "64::smallint";
 
 
     static void addIriClasses(PubChemConfiguration config) throws SQLException
