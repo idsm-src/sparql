@@ -867,7 +867,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 }
                 else if(argument.isBoxed())
                 {
-                    builder.append("rdfbox_extract_string_literal(");
+                    builder.append("sparql.rdfbox_extract_string_literal(");
                     builder.append(argument.translate());
                     builder.append(")");
                 }
