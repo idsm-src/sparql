@@ -2,13 +2,13 @@
 <examples>
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 1:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 1:</div>
       <p lang="en" class="exampleDescription">
         What protein targets does donepezil (CHEBI_53289) inhibit with an IC<sub>50</sub> less than 10 &micro;M?
       </p>
     ]]></description>
     <code><![CDATA[
-SELECT DISTINCT ?protein ?title
+SELECT DISTINCT ?protein
 FROM pubchem:protein
 FROM pubchem:measuregroup
 FROM pubchem:endpoint
@@ -19,8 +19,7 @@ WHERE
      obo:BFO_0000056 ?mg.
   ?mg obo:BFO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein;
-    dcterms:title ?title.
+  ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
     sio:has-value ?value.
@@ -32,13 +31,13 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 2:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 2:</div>
       <p lang="en" class="exampleDescription">
         What pharmacological roles of SID46505803 are defined by ChEBI?
       </p>
     ]]></description>
     <code><![CDATA[
-SELECT DISTINCT ?rolelabel
+SELECT DISTINCT ?role
 FROM pubchem:substance
 FROM pubchem:compound
 FROM pubchem:ontology
@@ -50,16 +49,15 @@ WHERE
     a owl:Restriction;
     owl:onProperty obo:RO_0000087;
     owl:someValuesFrom ?role ].
-  ?role rdfs:label ?rolelabel.
 }
     ]]></code>
   </example>
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 3:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 3:</div>
       <p lang="en" class="exampleDescription">
-        What compound have a pharmacological role of NSAID as defined by ChEBI and molecular weight less than 200 g/mol?
+        What compound have a pharmacological role of NSAID as defined by ChEBI and molecular weight less than 250 g/mol?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -78,14 +76,14 @@ WHERE
   ?MW rdf:type sio:CHEMINF_000334.
   ?MW sio:has-value ?MWValue.
 
-  filter (?MWValue < 200)
+  filter (?MWValue < 250)
 }
     ]]></code>
   </example>
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 4:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 4:</div>
       <p lang="en" class="exampleDescription">
         What substances have a pharmacological role of NSAID as defined by ChEBI and the depositor-provided chemical vendor information?
       </p>
@@ -110,13 +108,13 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 5:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 5:</div>
       <p lang="en" class="exampleDescription">
         What protein targets are inhibited by substances with an IC<sub>50</sub> less than 10 &micro;M and have a pharmacological role of cholinesterase inhibitors as defined by ChEBI?
       </p>
     ]]></description>
     <code><![CDATA[
-SELECT DISTINCT ?title
+SELECT DISTINCT ?protein
 FROM pubchem:substance
 FROM pubchem:measuregroup
 FROM pubchem:endpoint
@@ -132,8 +130,7 @@ WHERE
     obo:BFO_0000056 ?mg.
   ?mg obo:BFO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein;
-    dcterms:title ?title.
+  ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
     sio:has-value ?value.
@@ -145,7 +142,7 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 6:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 6:</div>
       <p lang="en" class="exampleDescription">
         Which substances inhibit protein targets similar to GI129900 and have the function domain PSSMID188648?
       </p>
@@ -173,13 +170,13 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 7:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 7:</div>
       <p lang="en" class="exampleDescription">
         What protein targets are inhibited by substances with IC<sub>50</sub> less than 10 &micro;M and have the same standardized chemical structure (CID3152)?
       </p>
     ]]></description>
     <code><![CDATA[
-SELECT DISTINCT ?sub ?protein ?title
+SELECT DISTINCT ?sub ?protein
 FROM pubchem:protein
 FROM pubchem:measuregroup
 FROM pubchem:endpoint
@@ -190,8 +187,7 @@ WHERE
     obo:BFO_0000056 ?mg.
   ?mg obo:BFO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein;
-    dcterms:title ?title.
+  ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
     sio:has-value ?value.
@@ -203,7 +199,7 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 8:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 8:</div>
       <p lang="en" class="exampleDescription">
          What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO_0001516), with an IC<sub>50</sub> less than 10 &micro;M?
       </p>
@@ -233,13 +229,13 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 9:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 9:</div>
       <p lang="en" class="exampleDescription">
         What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target GI17531135 with an IC<sub>50</sub> less than 10 &micro;M?
       </p>
     ]]></description>
     <code><![CDATA[
-SELECT DISTINCT ?rolelabel
+SELECT DISTINCT ?role
 FROM pubchem:measuregroup
 FROM pubchem:endpoint
 FROM pubchem:substance
@@ -254,7 +250,6 @@ WHERE
     a owl:Restriction;
     owl:onProperty obo:RO_0000087;
     owl:someValuesFrom ?role ].
-  ?role rdfs:label ?rolelabel.
   ?ep obo:IAO_0000136 ?sub;
     rdf:type bao:BAO_0000190;
     sio:has-value ?value.
@@ -266,7 +261,7 @@ WHERE
 
   <example>
     <description><![CDATA[
-      <div lang="en" class="exampleTitle">PubChem Case 10:</div>
+      <div lang="en" class="exampleTitle">PubChemRDF Case 10:</div>
       <p lang="en" class="exampleDescription">
         Summarize the statistics about the total number of substances tested in the PubChem database against each protein target.
       </p>
