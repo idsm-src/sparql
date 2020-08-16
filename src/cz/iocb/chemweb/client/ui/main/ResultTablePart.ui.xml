@@ -34,7 +34,7 @@
         <g:layer right="13px" width="150px" top="11px" height="30px">
           <g:ListBox ui:field="searchListBox" addStyleNames="{style.full-size}">
             <g:item value='1'>
-              any
+              in any column
             </g:item>
           </g:ListBox>
         </g:layer>

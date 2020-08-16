@@ -385,7 +385,7 @@ public class ResultTablePart extends ResizeComposite
                         for(int i = 0; i < result.getHeads().size(); i++)
                         {
                             addColumn(resultsDataGrid, i, result.getHeads().get(i));
-                            searchListBox.addItem(result.getHeads().get(i), Integer.toString(i));
+                            searchListBox.addItem("in " + result.getHeads().get(i), Integer.toString(i));
                         }
 
                         resultsDataGrid.setMinimumTableWidth(minimalColumnWidth * result.getHeads().size(), Unit.PX);
@@ -419,7 +419,7 @@ public class ResultTablePart extends ResizeComposite
                 }
             });
         }
-    };
+    }
 
 
     private static final int minimalColumnWidth = 250;
@@ -433,7 +433,7 @@ public class ResultTablePart extends ResizeComposite
     @UiField(provided = true) DataGrid<DataGridNode[]> resultsDataGrid;
     @UiField(provided = true) SimplePager resultsPager;
 
-    private final HandlerManager handlerManager = new HandlerManager(this);;
+    private final HandlerManager handlerManager = new HandlerManager(this);
     private final HasDataFilter hasDataFilter;
     private final AsyncResultsProvider resultsAsyncProvider = new AsyncResultsProvider();
 
@@ -521,7 +521,7 @@ public class ResultTablePart extends ResizeComposite
 
     private void resetFilter()
     {
-        final String value = searchTextBox.getValue();
+        final String value = searchTextBox.getValue().toLowerCase();
         final int index = Integer.parseInt(searchListBox.getSelectedValue());
 
 
@@ -531,10 +531,10 @@ public class ResultTablePart extends ResizeComposite
             public boolean isValid(DataGridNode[] row)
             {
                 if(index != -1)
-                    return row[index].html.replaceAll("<[^>]*>", " ").indexOf(value) >= 0;
+                    return row[index].html.replaceAll("<[^>]*>", " ").toLowerCase().indexOf(value) >= 0;
 
                 for(int i = 0; i < row.length; i++)
-                    if(row[i].html.replaceAll("<[^>]*>", " ").indexOf(value) >= 0)
+                    if(row[i].html.replaceAll("<[^>]*>", " ").toLowerCase().indexOf(value) >= 0)
                         return true;
 
                 return false;
@@ -572,7 +572,7 @@ public class ResultTablePart extends ResizeComposite
         //dataProvider.getList().clear();
 
         searchListBox.clear();
-        searchListBox.addItem("any", "-1");
+        searchListBox.addItem("in any column", "-1");
         searchTextBox.setValue("");
         resetFilter();
 
