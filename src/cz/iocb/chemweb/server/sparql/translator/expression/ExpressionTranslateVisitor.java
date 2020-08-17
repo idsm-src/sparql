@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -33,6 +35,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlCast;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionError;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlFunctionCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlInExpression;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
@@ -50,6 +53,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     private final Request request;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
+    private final LinkedHashMap<String, FunctionDefinition> functions;
 
 
     public ExpressionTranslateVisitor(VariableAccessor variableAccessor, TranslateVisitor parentTranslator)
@@ -59,6 +63,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         this.request = parentTranslator.getRequest();
         this.prologue = parentTranslator.getPrologue();
         this.messages = parentTranslator.getMessages();
+        this.functions = parentTranslator.getRequest().getConfiguration().getFunctions();
     }
 
 
@@ -176,32 +181,49 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(FunctionCallExpression functionCallExpression)
     {
-        IRI function = functionCallExpression.getFunction();
+        IRI iri = functionCallExpression.getFunction();
         List<SqlExpressionIntercode> arguemnts = new LinkedList<SqlExpressionIntercode>();
 
         for(Expression expression : functionCallExpression.getArguments())
             arguemnts.add(visitElement(expression));
 
+
         Optional<LiteralClass> resourceClass = BuiltinClasses.getLiteralClasses().stream()
-                .filter(r -> r.getTypeIri().equals(function)).findFirst();
+                .filter(r -> r.getTypeIri().equals(iri)).findFirst();
 
-        if(!resourceClass.isPresent())
+        if(resourceClass.isPresent())
         {
-            messages.add(new TranslateMessage(MessageType.unimplementedFunction, function.getRange(),
-                    function.toString(prologue)));
+            if(arguemnts.size() != 1)
+            {
+                messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
+                        iri.toString(prologue), 1));
+
+                return SqlNull.get();
+            }
+
+            return SqlCast.create(resourceClass.get(), arguemnts.get(0));
+        }
+
+
+        FunctionDefinition definition = functions.get(iri.getValue());
+
+        if(definition == null)
+        {
+            messages.add(
+                    new TranslateMessage(MessageType.unimplementedFunction, iri.getRange(), iri.toString(prologue)));
 
             return SqlNull.get();
         }
 
-        if(arguemnts.size() != 1)
+        if(arguemnts.size() != definition.getArgumentClasses().size())
         {
-            messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, function.getRange(),
-                    function.toString(prologue), 1));
+            messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
+                    iri.toString(prologue), definition.getArgumentClasses().size()));
 
             return SqlNull.get();
         }
 
-        return SqlCast.create(resourceClass.get(), arguemnts.get(0));
+        return SqlFunctionCall.create(definition, arguemnts);
     }
 
 

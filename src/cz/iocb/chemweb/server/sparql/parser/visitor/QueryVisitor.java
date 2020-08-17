@@ -65,7 +65,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarOrIRIContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
-import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;

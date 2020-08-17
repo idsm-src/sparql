@@ -30,7 +30,8 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -47,6 +48,7 @@ public abstract class SparqlDatabaseConfiguration
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
+    protected LinkedHashMap<String, FunctionDefinition> functions = new LinkedHashMap<String, FunctionDefinition>();
 
     protected boolean strictDefaultGraph = false;
 
@@ -290,6 +292,12 @@ public abstract class SparqlDatabaseConfiguration
     public LinkedHashMap<String, ProcedureDefinition> getProcedures()
     {
         return procedures;
+    }
+
+
+    public LinkedHashMap<String, FunctionDefinition> getFunctions()
+    {
+        return functions;
     }
 
 

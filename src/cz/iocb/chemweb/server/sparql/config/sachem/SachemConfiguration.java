@@ -17,9 +17,9 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.procedure.ParameterDefinition;
-import cz.iocb.chemweb.server.sparql.mapping.procedure.ProcedureDefinition;
-import cz.iocb.chemweb.server.sparql.mapping.procedure.ResultDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 

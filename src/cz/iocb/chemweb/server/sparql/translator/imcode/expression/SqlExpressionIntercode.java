@@ -606,4 +606,43 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         else
             return "sparql.rdfbox_extract_lang_string_string(" + operand.translate() + ")";
     }
+
+
+    protected static String translateAsStringLiteral(SqlExpressionIntercode operand)
+    {
+        if(operand instanceof SqlVariable)
+        {
+            StringBuilder builder = new StringBuilder();
+            SqlVariable variable = (SqlVariable) operand;
+
+            Set<ResourceClass> compatible = operand.getResourceClasses().stream().filter(r -> isStringLiteral(r))
+                    .collect(Collectors.toSet());
+
+            if(compatible.size() > 1)
+                builder.append("COALESCE(");
+
+            boolean hasVariant = false;
+
+            for(ResourceClass resClass : compatible)
+            {
+                appendComma(builder, hasVariant);
+                hasVariant = true;
+
+                builder.append(variable.getNodeAccess(resClass, 0));
+            }
+
+            if(compatible.size() > 1)
+                builder.append(")");
+
+            return builder.toString();
+        }
+        else if(!operand.isBoxed())
+        {
+            return operand.translate();
+        }
+        else
+        {
+            return "sparql.rdfbox_extract_string_literal(" + operand.translate() + ")";
+        }
+    }
 }

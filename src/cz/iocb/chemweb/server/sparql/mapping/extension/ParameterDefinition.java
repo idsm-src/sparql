@@ -1,4 +1,4 @@
-package cz.iocb.chemweb.server.sparql.mapping.procedure;
+package cz.iocb.chemweb.server.sparql.mapping.extension;
 
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
