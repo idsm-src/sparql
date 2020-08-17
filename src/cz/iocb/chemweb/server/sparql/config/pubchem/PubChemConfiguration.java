@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import javax.sql.DataSource;
@@ -23,6 +24,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
@@ -45,6 +47,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         loadClasses();
         loadQuadMapping();
         loadProcedures();
+        loadFunctions();
         loadConstraints();
     }
 
@@ -393,6 +396,17 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
         compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
         procedures.put(compoundSearch.getProcedureName(), compoundSearch);
+    }
+
+
+    private void loadFunctions()
+    {
+        String fulltext = prefixes.get("fulltext");
+
+        FunctionDefinition match = new FunctionDefinition(fulltext + "match", new Function("common", "fulltext_match"),
+                xsdBoolean, Arrays.asList(FunctionDefinition.stringLiteral, xsdString), false, true);
+
+        functions.put(match.getFunctionName(), match);
     }
 
 
