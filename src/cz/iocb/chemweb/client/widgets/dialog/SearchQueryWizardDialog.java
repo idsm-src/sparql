@@ -46,9 +46,9 @@ public class SearchQueryWizardDialog extends DialogBox
 
     @UiField CheckBox searchCompoundsCheckBox;
     @UiField CheckBox searchBioassaysCheckBox;
+    @UiField CheckBox searchParticipantsCheckBox;
 
     @UiField ListBox queryMethodListBox;
-    @UiField ListBox queryTypeListBox;
     @UiField TextArea queryTextArea;
     @UiField FileUpload queryFileUpload;
     @UiField TextBox resultLimitTextBox;
@@ -64,10 +64,15 @@ public class SearchQueryWizardDialog extends DialogBox
     @UiField CheckBox probeStatusCheckBox;
     @UiField CheckBox unspecifiedStatusCheckBox;
 
+    @UiField TextBox participantTextBox;
+    @UiField CheckBox proteinCheckBox;
+    @UiField CheckBox geneCheckBox;
+
     @UiField CheckBox compoundCheckBox;
     @UiField CheckBox scoreCheckBox;
     @UiField CheckBox bioassayCheckBox;
     @UiField CheckBox statusCheckBox;
+    @UiField CheckBox participantCheckBox;
 
     @UiField ListBox orderByListBox;
 
@@ -79,7 +84,6 @@ public class SearchQueryWizardDialog extends DialogBox
     void searchCompoundsCheckBoxValueChange(ValueChangeEvent<Boolean> event)
     {
         queryMethodListBox.setEnabled(event.getValue());
-        queryTypeListBox.setEnabled(event.getValue());
         queryTextArea.setEnabled(event.getValue());
         queryTextArea.setEnabled(event.getValue());
         resultLimitTextBox.setEnabled(event.getValue());
@@ -120,6 +124,17 @@ public class SearchQueryWizardDialog extends DialogBox
             probeStatusCheckBox.setEnabled(event.getValue());
             unspecifiedStatusCheckBox.setEnabled(event.getValue());
         }
+
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("searchParticipantsCheckBox")
+    void searchParticipantsCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        participantTextBox.setEnabled(event.getValue());
+        proteinCheckBox.setEnabled(event.getValue());
+        geneCheckBox.setEnabled(event.getValue());
+        participantCheckBox.setEnabled(event.getValue());
 
         finishButton.setEnabled(areValuesValid());
     }
@@ -215,6 +230,60 @@ public class SearchQueryWizardDialog extends DialogBox
         finishButton.setEnabled(areValuesValid());
     }
 
+    @UiHandler("activeStatusCheckBox")
+    void activeStatusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("inactiveStatusCheckBox")
+    void inactiveStatusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("inconclusiveStatusCheckBox")
+    void pinconclusiveStatusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("probeStatusCheckBox")
+    void probeStatusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("unspecifiedStatusCheckBox")
+    void unspecifiedStatusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("participantTextBox")
+    void participantTextBoxKeyUp(KeyUpEvent e)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("participantTextBox")
+    void participantTextBoxValueChange(ValueChangeEvent<String> e)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("proteinCheckBox")
+    void proteinCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("geneCheckBox")
+    void geneCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
     @UiHandler("compoundCheckBox")
     void compoundCheckBoxValueChange(ValueChangeEvent<Boolean> event)
     {
@@ -235,6 +304,12 @@ public class SearchQueryWizardDialog extends DialogBox
 
     @UiHandler("statusCheckBox")
     void statusCheckBoxValueChange(ValueChangeEvent<Boolean> event)
+    {
+        finishButton.setEnabled(areValuesValid());
+    }
+
+    @UiHandler("participantCheckBox")
+    void participantCheckBoxValueChange(ValueChangeEvent<Boolean> event)
     {
         finishButton.setEnabled(areValuesValid());
     }
@@ -265,18 +340,37 @@ public class SearchQueryWizardDialog extends DialogBox
 
     private boolean areValuesValid()
     {
-        if(!searchCompoundsCheckBox.getValue() && !searchBioassaysCheckBox.getValue())
+        boolean searchCompounds = searchCompoundsCheckBox.getValue();
+        boolean searchBioassays = searchBioassaysCheckBox.getValue();
+        boolean searchParticipants = searchParticipantsCheckBox.getValue();
+
+
+        // at least one search have to be enabled
+        if(!searchCompounds && !searchBioassays && !searchParticipants)
             return false;
 
-        if(searchCompoundsCheckBox.getValue() && queryTextArea.getValue().trim().isEmpty()
-                && !searchBioassaysCheckBox.getValue())
-            return false;
+        /*
+        // at least one search have to be restricted
+        {
+            int restricted = 0;
+        
+            if(searchCompounds && !queryTextArea.getValue().trim().isEmpty())
+                restricted++;
+        
+            if(searchBioassays && !keywordsTextArea.getValue().trim().isEmpty())
+                restricted++;
+        
+            if(searchParticipants && !participantTextBox.getValue().trim().isEmpty())
+                restricted++;
+        
+            if(restricted == 0)
+                return false;
+        }
+        */
 
-        if(searchBioassaysCheckBox.getValue() && keywordsTextArea.getValue().trim().isEmpty()
-                && !searchCompoundsCheckBox.getValue())
-            return false;
 
-        if(searchCompoundsCheckBox.getValue())
+        // compound search check
+        if(searchCompounds)
         {
             if(!isResultLimitTextBoxValid())
                 return false;
@@ -286,24 +380,58 @@ public class SearchQueryWizardDialog extends DialogBox
         }
 
 
+        // bioassay status check
+        if(searchBioassays && searchCompounds)
+        {
+            /*
+            // at least one assay status have to be selected
+            int selected = 0;
+            
+            for(CheckBox s : new CheckBox[] { activeStatusCheckBox, inactiveStatusCheckBox, inconclusiveStatusCheckBox,
+                    probeStatusCheckBox, unspecifiedStatusCheckBox })
+                if(s.getValue())
+                    selected++;
+            
+            if(selected == 0)
+                return false;
+            */
+        }
+
+
+        // participant search check
+        if(searchParticipants)
+        {
+            /*
+            // at least one search have to be enabled
+            if(!proteinCheckBox.getValue() && !geneCheckBox.getValue())
+                return false;
+            */
+        }
+
+
+        /*
+        // check selection
         int selections = 0;
-
-        if(compoundCheckBox.getValue() && searchCompoundsCheckBox.getValue())
+        
+        if(compoundCheckBox.getValue() && searchCompounds)
             selections++;
-
-        if(scoreCheckBox.getValue() && searchCompoundsCheckBox.getValue()
+        
+        if(scoreCheckBox.getValue() && searchCompounds
                 && Methods.valueOf(queryMethodListBox.getSelectedValue()) == Methods.SIMSEARCH)
             selections++;
-
-        if(bioassayCheckBox.getValue() && searchBioassaysCheckBox.getValue())
+        
+        if(bioassayCheckBox.getValue() && searchBioassays)
             selections++;
-
-        if(statusCheckBox.getValue() && searchCompoundsCheckBox.getValue() && searchBioassaysCheckBox.getValue())
+        
+        if(statusCheckBox.getValue() && searchCompounds && searchBioassays)
             selections++;
-
+        
+        if(participantCheckBox.getValue() && searchParticipants)
+            selections++;
+        
         if(selections == 0)
             return false;
-
+        */
 
         return true;
     }
@@ -358,11 +486,66 @@ public class SearchQueryWizardDialog extends DialogBox
         Methods method = Methods.valueOf(queryMethodListBox.getSelectedValue());
         boolean searchCompounds = searchCompoundsCheckBox.getValue();
         boolean searchBioassays = searchBioassaysCheckBox.getValue();
+        boolean searchParticipants = searchParticipantsCheckBox.getValue();
 
         StringBuilder query = new StringBuilder();
 
-        query.append("SELECT DISTINCT ");
 
+        int statusCount = 0;
+
+        if(activeStatusCheckBox.getValue())
+            statusCount++;
+
+        if(inactiveStatusCheckBox.getValue())
+            statusCount++;
+
+        if(inconclusiveStatusCheckBox.getValue())
+            statusCount++;
+
+        if(probeStatusCheckBox.getValue())
+            statusCount++;
+
+        if(unspecifiedStatusCheckBox.getValue())
+            statusCount++;
+
+
+        boolean useDistinct = false;
+
+        if(!compoundCheckBox.getValue() && searchCompounds)
+            useDistinct = true;
+
+        if(!bioassayCheckBox.getValue() && searchBioassays)
+            useDistinct = true;
+
+        if(!participantCheckBox.getValue() && searchParticipants)
+            useDistinct = true;
+
+        if(!statusCheckBox.getValue() && searchCompounds && searchBioassays && statusCount > 0 && statusCount < 5)
+            useDistinct = true;
+
+
+        boolean useStar = true;
+
+        if(compoundCheckBox.getValue() && searchCompounds)
+            useStar = false;
+
+        if(scoreCheckBox.getValue() && searchCompounds && method == Methods.SIMSEARCH)
+            useStar = false;
+
+        if(bioassayCheckBox.getValue() && searchBioassays)
+            useStar = false;
+
+        if(participantCheckBox.getValue() && searchParticipants)
+            useStar = false;
+
+        if(statusCheckBox.getValue() && searchCompounds && searchBioassays)
+            useStar = false;
+
+
+        query.append("SELECT ");
+
+        if(useDistinct && !useStar)
+            query.append("DISTINCT ");
 
         if(compoundCheckBox.getValue() && searchCompounds)
             query.append("?COMPOUND ");
@@ -373,93 +556,108 @@ public class SearchQueryWizardDialog extends DialogBox
         if(bioassayCheckBox.getValue() && searchBioassays)
             query.append("?BIOASSAY ");
 
+        if(participantCheckBox.getValue() && searchParticipants)
+            query.append("?PARTICIPANT ");
+
         if(statusCheckBox.getValue() && searchCompounds && searchBioassays)
             query.append("?STATUS ");
+
+        if(useStar)
+            query.append("* ");
 
 
         query.append("WHERE \n{");
 
 
-        String mol = queryTextArea.getValue();
-
-        if(searchCompounds && !mol.trim().isEmpty())
+        if(searchCompounds)
         {
-            if(method == Methods.SIMSEARCH)
-                query.append("\n  [ sachem:compound ?COMPOUND; sachem:score ?SCORE ]\n");
+            if(!queryTextArea.getValue().trim().isEmpty())
+            {
+                if(method == Methods.SIMSEARCH)
+                    query.append("\n  [ sachem:compound ?COMPOUND; sachem:score ?SCORE ]\n");
+                else
+                    query.append("\n  ?COMPOUND ");
+
+                if(method == Methods.EXACTSEARCH || method == Methods.SUBSEARCH)
+                    query.append("sachem:substructureSearch");
+                else if(method == Methods.SIMSEARCH)
+                    query.append("    sachem:similaritySearch");
+
+                query.append(" [\n      sachem:query '''");
+                query.append(queryTextArea.getValue());
+                query.append("'''");
+
+
+                String limit = resultLimitTextBox.getValue().trim();
+
+                if(!limit.isEmpty())
+                {
+                    query.append(";\n      sachem:topn \"");
+                    query.append(limit);
+                    query.append("\"^^xsd:integer");
+                }
+
+                if(method == Methods.EXACTSEARCH)
+                {
+                    query.append(";\n      sachem:searchMode sachem:exactSearch");
+                }
+
+                if(method == Methods.SUBSEARCH || method == Methods.EXACTSEARCH)
+                {
+                    query.append(";\n      sachem:tautomerMode ");
+                    query.append(useTautomersListBox.getSelectedValue());
+                }
+
+                String threshold = resultThresholdTextBox.getValue().trim();
+
+                if(method == Methods.SIMSEARCH && !threshold.isEmpty())
+                {
+                    query.append(";\n      sachem:cutoff \"");
+                    query.append(threshold);
+                    query.append("\"^^xsd:double");
+                }
+
+                query.append(" ].\n");
+            }
+
+            if(!searchBioassays && !searchParticipants)
+            {
+                query.append("\n  ?COMPOUND rdf:type sio:SIO_010004.");
+            }
             else
-                query.append("\n  ?COMPOUND ");
-
-            if(method == Methods.EXACTSEARCH || method == Methods.SUBSEARCH)
-                query.append("sachem:substructureSearch");
-            else if(method == Methods.SIMSEARCH)
-                query.append("    sachem:similaritySearch");
-
-            query.append(" [\n      sachem:query '''");
-            query.append(queryTextArea.getValue());
-            query.append("'''");
-
-
-            String limit = resultLimitTextBox.getValue().trim();
-
-            if(!limit.isEmpty())
             {
-                query.append(";\n      sachem:topn \"");
-                query.append(limit);
-                query.append("\"^^xsd:integer");
+                query.append("\n  ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND.");
+                query.append("\n  ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE.");
+                query.append("\n  ?MEASUREGROUP obo:OBI_0000299 ?ENDPOINT.");
             }
-
-            if(method == Methods.EXACTSEARCH)
-            {
-                query.append(";\n      sachem:searchMode sachem:exactSearch");
-            }
-
-            if(method == Methods.SUBSEARCH || method == Methods.EXACTSEARCH)
-            {
-                query.append(";\n      sachem:tautomerMode ");
-                query.append(useTautomersListBox.getSelectedValue());
-            }
-
-            String threshold = resultThresholdTextBox.getValue().trim();
-
-            if(method == Methods.SIMSEARCH && !threshold.isEmpty())
-            {
-                query.append(";\n      sachem:cutoff \"");
-                query.append(threshold);
-                query.append("\"^^xsd:double");
-            }
-
-            query.append(" ].\n");
         }
+
+
+        if(searchBioassays)
+        {
+            if(searchCompounds)
+                query.append("\n");
+
+            if(!keywordsTextArea.getValue().trim().isEmpty())
+            {
+                query.append("\n\n  ?BIOASSAY fulltext:bioassaySearch [fulltext:query '''");
+                query.append(keywordsTextArea.getValue().trim().replaceAll("'", "\\\\'"));
+                query.append("'''].\n");
+            }
+
+            if(!searchCompounds && !searchParticipants)
+                query.append("\n  ?BIOASSAY rdf:type bao:BAO_0000015.");
+            else
+                query.append("\n  ?BIOASSAY bao:BAO_0000209 ?MEASUREGROUP.");
+        }
+
+
 
         if(searchCompounds && searchBioassays)
         {
-            query.append("\n  ?SUBSTANCE sio:CHEMINF_000477 ?COMPOUND.");
-            query.append("\n  ?ENDPOINT obo:IAO_0000136 ?SUBSTANCE.");
-            query.append("\n  ?MEASUREGROUP obo:OBI_0000299 ?ENDPOINT.");
-            query.append("\n  ?BIOASSAY bao:BAO_0000209 ?MEASUREGROUP.");
-
-
-            int statusCount = 0;
-
-            if(activeStatusCheckBox.getValue())
-                statusCount++;
-
-            if(inactiveStatusCheckBox.getValue())
-                statusCount++;
-
-            if(inconclusiveStatusCheckBox.getValue())
-                statusCount++;
-
-            if(probeStatusCheckBox.getValue())
-                statusCount++;
-
-            if(unspecifiedStatusCheckBox.getValue())
-                statusCount++;
-
-
             if(statusCount == 1 && !statusCheckBox.getValue())
             {
-                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ");
+                query.append("\n\n  ?ENDPOINT vocab:PubChemAssayOutcome ");
 
                 if(activeStatusCheckBox.getValue())
                     query.append("vocab:active");
@@ -478,11 +676,11 @@ public class SearchQueryWizardDialog extends DialogBox
 
                 query.append(".");
             }
-            else if(statusCount > 0 || statusCheckBox.getValue())
+            else if(statusCount > 0 && statusCount < 5 || statusCheckBox.getValue())
             {
-                query.append("\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS.");
+                query.append("\n\n  ?ENDPOINT vocab:PubChemAssayOutcome ?STATUS.");
 
-                if(statusCount > 0)
+                if(statusCount > 0 && statusCount < 5)
                 {
                     query.append("\n  FILTER(?STATUS IN (");
 
@@ -525,21 +723,51 @@ public class SearchQueryWizardDialog extends DialogBox
 
                     query.append("))");
                 }
-
-                query.append("\n");
             }
         }
 
-        String keywords = keywordsTextArea.getValue().trim();
 
-        if(searchBioassays && !keywords.isEmpty())
+
+        if(searchParticipants)
         {
-            query.append("\n\n  ?BIOASSAY fulltext:bioassaySearch [fulltext:query '''");
-            query.append(keywords.replaceAll("'", "\\\\'"));
-            query.append("'''].\n");
+            if(searchCompounds || searchBioassays)
+                query.append("\n\n  ?MEASUREGROUP obo:BFO_0000057 ?PARTICIPANT.");
+
+            if(geneCheckBox.getValue() && !proteinCheckBox.getValue())
+            {
+                query.append("\n  ?PARTICIPANT rdf:type bp:Gene.");
+            }
+            else if(!geneCheckBox.getValue() && proteinCheckBox.getValue())
+            {
+                query.append("\n  ?PARTICIPANT rdf:type bp:Protein.");
+            }
+            else if(!searchCompounds && !searchBioassays)
+            {
+                query.append("\n  ?PARTICIPANT rdf:type ?PARTICIPANT_TYPE.");
+                query.append("\n  FILTER(?PARTICIPANT_TYPE in (bp:Gene, bp:Protein))");
+            }
+
+            if(!participantTextBox.getValue().trim().isEmpty())
+            {
+                String pattern = participantTextBox.getValue().trim().replaceAll("'", "\\\\'");
+                query.append("\n  ?PARTICIPANT dcterms:title ?PARTICIPANT_TITLE.");
+
+                if(geneCheckBox.getValue() && !proteinCheckBox.getValue())
+                    query.append("\n  ?PARTICIPANT dcterms:description  ?PARTICIPANT_DESCRIPTION.");
+                else if(geneCheckBox.getValue() || !proteinCheckBox.getValue())
+                    query.append("\n  OPTIONAL { ?PARTICIPANT dcterms:description  ?PARTICIPANT_DESCRIPTION }");
+
+                query.append("\n  FILTER(fulltext:match(?PARTICIPANT_TITLE, '''" + pattern + "''')");
+
+                if(geneCheckBox.getValue() || !proteinCheckBox.getValue())
+                    query.append(" || fulltext:match(?PARTICIPANT_DESCRIPTION, '''galectin:*''')");
+
+                query.append(")");
+            }
         }
 
-        query.append("}\n");
+
+        query.append("\n}\n");
 
 
         switch(orderByListBox.getSelectedValue())
@@ -550,6 +778,10 @@ public class SearchQueryWizardDialog extends DialogBox
 
             case "BIOASSAY":
                 query.append("ORDER BY xsd:int(substr(str(?BIOASSAY), 49))\n");
+                break;
+
+            case "PARTICIPANT":
+                query.append("ORDER BY ?PARTICIPANT\n");
                 break;
 
             case "SCORE":
@@ -566,8 +798,6 @@ public class SearchQueryWizardDialog extends DialogBox
     }
 
 
-
-
     public SearchQueryWizardDialog()
     {
         uiBinder.createAndBindUi(this);
@@ -576,19 +806,17 @@ public class SearchQueryWizardDialog extends DialogBox
         queryMethodListBox.addItem("Exact search", "EXACTSEARCH");
         queryMethodListBox.addItem("Similarity search", "SIMSEARCH");
 
-        queryTypeListBox.addItem("MOL/SDF file", "sachem:MolFile");
-        queryTypeListBox.addItem("SMILES", "sachem:SMILES");
         useTautomersListBox.addItem("yes", "sachem:inchiTautomers");
         useTautomersListBox.addItem("no", "sachem:ignoreTautomers");
 
         orderByListBox.addItem("(none)", "NONE");
         orderByListBox.addItem("Compound ID", "COMPOUND");
         orderByListBox.addItem("Bioassay ID", "BIOASSAY");
+        orderByListBox.addItem("Participant ID", "PARTICIPANT");
         orderByListBox.addItem("Score", "SCORE");
         orderByListBox.addItem("Status", "STATUS");
 
-        queryTextArea.setValue(
-                "\n  Marvin  12270700542D          \n  \n 13 13  0  0  0  0            999 V2000\n   -0.7145   -0.4125    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0000   -0.8250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7145    0.4125    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7145    0.4125    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0000    0.8250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7145   -0.4125    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4289    0.8250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1433    0.4126    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4289    1.6501    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0002    1.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7145    2.0625    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4290    1.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7145    2.8875    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n  2  1  1  0  0  0  0\n  3  1  2  0  0  0  0\n  4  7  1  0  0  0  0\n  5  3  1  0  0  0  0\n  4  5  2  0  0  0  0\n 10  5  1  0  0  0  0\n  6  4  1  0  0  0  0\n  2  6  2  0  0  0  0\n  8  7  1  0  0  0  0\n  9  7  2  0  0  0  0\n 11 10  1  0  0  0  0\n 12 11  1  0  0  0  0\n 13 11  2  0  0  0  0\nM  END\n");
+        queryTextArea.setValue("CC(=O)OC1=CC=CC=C1C(=O)O");
 
 
         queryFileUpload.addChangeHandler(new ChangeHandler()
@@ -604,22 +832,22 @@ public class SearchQueryWizardDialog extends DialogBox
     private native void handleFileSelect(@SuppressWarnings("deprecation") com.google.gwt.user.client.Element evt)
     /*-{
         var file = evt.files[0];
-
+    
         //if (!file.type.match('text.*'))
         //  return;
-
+    
         if (!$wnd.File || !$wnd.FileReader || !$wnd.FileList || !$wnd.Blob)
             $wnd.alert("The File APIs are not fully supported by your browser.");
-
+    
         var reader = new $wnd.FileReader();
         var that = this;
-
+    
         reader.onload = (function(theFile) {
             return function(e) {
                 that.@cz.iocb.chemweb.client.widgets.dialog.SearchQueryWizardDialog::handleLoadedFile(Ljava/lang/String;)(e.target.result);
             };
         })(file);
-
+    
         reader.readAsText(file);
     }-*/;
 

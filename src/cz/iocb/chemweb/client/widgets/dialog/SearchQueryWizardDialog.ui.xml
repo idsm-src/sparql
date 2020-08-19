@@ -3,7 +3,7 @@
   <ui:style>
     .main {
       width: 900px;
-      height: 515px;
+      height: 610px;
     }
 
     .full-size {
@@ -53,7 +53,7 @@
     </g:caption>
 
     <g:LayoutPanel addStyleNames="{style.main}">
-      <g:layer left="15px" width="415px" top="20px" height="435px">
+      <g:layer left="15px" width="415px" top="20px" height="525px">
         <g:LayoutPanel addStyleNames="{style.border},{style.full-size}">
           <g:layer left="15px" width="100px" top="25px" height="26px">
             <g:Label addStyleNames="{style.label}">Method:</g:Label>
@@ -63,47 +63,38 @@
           </g:layer>
 
           <g:layer left="15px" width="100px" top="65px" height="26px">
-            <g:Label addStyleNames="{style.label}">Query type:</g:Label>
-          </g:layer>
-          <g:layer left="100px" right="20px" top="65px" height="26px">
-            <g:ListBox ui:field="queryTypeListBox" addStyleNames="{style.full-size}"></g:ListBox>
-          </g:layer>
-
-          <g:layer left="15px" width="100px" top="105px" height="26px">
             <g:Label addStyleNames="{style.label}">Query:</g:Label>
           </g:layer>
-          <g:layer left="100px" right="20px" top="105px" height="186px">
+          <g:layer left="100px" right="20px" top="65px" height="321px">
             <g:TextArea ui:field="queryTextArea" addStyleNames="{style.textarea},{style.full-size},{style.nowrap}"></g:TextArea>
           </g:layer>
-          <g:layer left="280px" right="20px" top="300px" height="30px">
+          <g:layer left="280px" right="20px" top="395px" height="30px">
             <g:Button ui:field="queryUploadButton" addStyleNames="{style.full-size}">Upload file</g:Button>
           </g:layer>
-          <g:layer left="280px" right="20px" top="300px" height="30px">
+          <g:layer left="280px" right="20px" top="395px" height="30px">
             <g:FormPanel>
               <g:FileUpload ui:field="queryFileUpload" addStyleNames="{style.upload}" />
             </g:FormPanel>
           </g:layer>
 
-
-
-          <g:layer left="15px" width="100px" top="345px" height="26px">
+          <g:layer left="15px" width="100px" top="440px" height="26px">
             <g:Label addStyleNames="{style.label}">Result limit:</g:Label>
           </g:layer>
-          <g:layer left="100px" width="150px" top="345px" height="26px">
+          <g:layer left="100px" width="150px" top="440px" height="26px">
             <g:TextBox ui:field="resultLimitTextBox" addStyleNames="{style.full-size}"></g:TextBox>
           </g:layer>
 
-          <g:layer left="15px" width="100px" top="385px" height="26px">
+          <g:layer left="15px" width="100px" top="480px" height="26px">
             <g:Label ui:field="resultThresholdLabel" addStyleNames="{style.label}" visible="false">Threshold:</g:Label>
           </g:layer>
-          <g:layer left="100px" width="150px" top="385px" height="26px">
+          <g:layer left="100px" width="150px" top="480px" height="26px">
             <g:TextBox ui:field="resultThresholdTextBox" addStyleNames="{style.full-size}" visible="false"></g:TextBox>
           </g:layer>
 
-          <g:layer left="15px" width="100px" top="385px" height="26px">
+          <g:layer left="15px" width="100px" top="480px" height="26px">
             <g:Label ui:field="useTautomersLabel" addStyleNames="{style.label}">Tautomers:</g:Label>
           </g:layer>
-          <g:layer left="100px" width="150px" top="385px" height="26px">
+          <g:layer left="100px" width="150px" top="480px" height="26px">
             <g:ListBox ui:field="useTautomersListBox" addStyleNames="{style.full-size}"></g:ListBox>
           </g:layer>
 
@@ -116,22 +107,21 @@
 
 
 
-      <g:layer left="465px" width="415px" top="20px" height="225px">
+      <g:layer left="465px" width="415px" top="20px" height="190px">
         <g:LayoutPanel addStyleNames="{style.border},{style.full-size}">
           <g:layer left="15px" width="100px" top="25px" height="26px">
             <g:Label addStyleNames="{style.label}">Keywords:</g:Label>
           </g:layer>
 
-          <g:layer left="100px" right="20px" top="20px" height="90px">
+          <g:layer left="100px" right="20px" top="25px" height="60px">
             <g:TextArea ui:field="keywordsTextArea" addStyleNames="{style.textarea},{style.full-size}" enabled="false">cancer:* | carcino:* | tumor:*</g:TextArea>
           </g:layer>
 
-
-          <g:layer left="15px" width="100px" top="130px" height="26px">
+          <g:layer left="15px" width="100px" top="105px" height="26px">
             <g:Label addStyleNames="{style.label}">Statuses:</g:Label>
           </g:layer>
 
-          <g:layer left="100px" right="20px" top="130px" bottom="0px">
+          <g:layer left="100px" right="20px" top="105px" bottom="0px">
             <g:LayoutPanel addStyleNames="{style.full-size}">
               <g:layer left="0px" width="100px" top="0px" height="26px">
                 <g:CheckBox ui:field="activeStatusCheckBox" enabled="false" checked="true">active</g:CheckBox>
@@ -154,20 +144,62 @@
         </g:LayoutPanel>
       </g:layer>
 
-
       <g:layer left="475px" width="145px" top="10px" height="26px">
         <g:CheckBox ui:field="searchBioassaysCheckBox" addStyleNames="{style.checkbox}">Search bioassays</g:CheckBox>
       </g:layer>
 
 
-      <g:layer left="465px" width="415px" top="275px" height="180px">
+
+      <g:layer left="465px" width="415px" top="240px" height="125px">
         <g:LayoutPanel addStyleNames="{style.border},{style.full-size}">
 
           <g:layer left="15px" width="100px" top="25px" height="26px">
+            <g:Label addStyleNames="{style.label}">Name:</g:Label>
+          </g:layer>
+
+          <g:layer left="100px" right="20px" top="25px" height="26px">
+            <g:TextBox ui:field="participantTextBox" addStyleNames="{style.textarea},{style.full-size}" enabled="false">synthase:*</g:TextBox>
+          </g:layer>
+
+          <g:layer left="15px" width="100px" top="65px" height="26px">
+            <g:Label addStyleNames="{style.label}">Type:</g:Label>
+          </g:layer>
+
+          <g:layer left="100px" right="20px" top="65px" bottom="0px">
+            <g:LayoutPanel addStyleNames="{style.full-size}">
+              <g:layer left="0px" width="100px" top="0px" height="26px">
+                <g:CheckBox ui:field="proteinCheckBox" enabled="false" checked="true">protein</g:CheckBox>
+              </g:layer>
+              <g:layer left="0px" width="100px" top="25px" height="26px">
+                <g:CheckBox ui:field="geneCheckBox" enabled="false" checked="true">gene</g:CheckBox>
+              </g:layer>
+            </g:LayoutPanel>
+          </g:layer>
+
+        </g:LayoutPanel>
+      </g:layer>
+
+      <g:layer left="475px" width="150px" top="230px" height="26px">
+        <g:CheckBox ui:field="searchParticipantsCheckBox" addStyleNames="{style.checkbox}">Search participants</g:CheckBox>
+      </g:layer>
+
+
+
+      <g:layer left="465px" width="415px" top="395px" height="150px">
+        <g:LayoutPanel addStyleNames="{style.border},{style.full-size}">
+
+          <g:layer left="15px" width="100px" top="25px" height="26px">
+            <g:Label addStyleNames="{style.label}">Order by:</g:Label>
+          </g:layer>
+          <g:layer left="100px" width="150px" top="25px" height="26px">
+            <g:ListBox ui:field="orderByListBox" addStyleNames="{style.full-size}"></g:ListBox>
+          </g:layer>
+
+          <g:layer left="15px" width="100px" top="65px" height="26px">
             <g:Label addStyleNames="{style.label}">Selections:</g:Label>
           </g:layer>
 
-          <g:layer left="100px" right="20px" top="25px" bottom="0px">
+          <g:layer left="100px" right="20px" top="65px" bottom="0px">
             <g:LayoutPanel addStyleNames="{style.full-size}">
 
               <g:layer left="0px" width="100px" top="0px" height="26px">
@@ -183,22 +215,22 @@
               <g:layer left="150px" width="100px" top="25px" height="26px">
                 <g:CheckBox ui:field="statusCheckBox" enabled="false" checked="true">status</g:CheckBox>
               </g:layer>
-            </g:LayoutPanel>
-          </g:layer>
 
-          <g:layer left="15px" width="100px" top="95px" height="26px">
-            <g:Label addStyleNames="{style.label}">Order by:</g:Label>
-          </g:layer>
-          <g:layer left="100px" width="150px" top="95px" height="26px">
-            <g:ListBox ui:field="orderByListBox" addStyleNames="{style.full-size}"></g:ListBox>
+              <g:layer left="0px" width="100px" top="50px" height="26px">
+                <g:CheckBox ui:field="participantCheckBox" enabled="false" checked="true">participant</g:CheckBox>
+              </g:layer>
+
+            </g:LayoutPanel>
           </g:layer>
 
         </g:LayoutPanel>
       </g:layer>
 
-      <g:layer left="475px" width="60px" top="265px" height="26px">
+      <g:layer left="475px" width="60px" top="400px" height="26px">
         <g:Label addStyleNames="{style.checkbox},{style.label}"> Results</g:Label>
       </g:layer>
+
+
 
       <g:layer right="20px" width="100px" height="30px" bottom="10px">
         <g:Button ui:field="cancelButton" addStyleNames="{style.full-size}">Cancel</g:Button>
