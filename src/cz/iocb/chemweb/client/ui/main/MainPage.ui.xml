@@ -47,6 +47,13 @@
 
             <g:tab>
               <g:header size="7">
+                <b>Manual</b>
+              </g:header>
+              <p:ManualPart ui:field="manualPart"/>
+            </g:tab>
+
+            <g:tab>
+              <g:header size="7">
                 <b>About</b>
               </g:header>
               <p:AboutPart ui:field="aboutPart"/>
