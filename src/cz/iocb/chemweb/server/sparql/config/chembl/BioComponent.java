@@ -2,62 +2,54 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class BioComponent
+public class BioComponent
 {
-    static void addIriClasses(ChemblConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("biocomponent", "bigint",
+        config.addIriClass(new IntegerUserIriClass("chembl:biocomponent", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/biocomponent/CHEMBL_BC_"));
     }
 
 
-    static void addQuadMapping(ChemblConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass biocomponent = config.getIriClass("biocomponent");
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        String table = "bio_component_sequences";
-        NodeMapping subject = config.createIriMapping(biocomponent, "component_id");
+        Table table = new Table(schema, "bio_component_sequences");
+        NodeMapping subject = config.createIriMapping("chembl:biocomponent", "id");
 
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("cco:BioComponent"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:taxonomy"),
-                config.createIriMapping("taxonomy", "tax_id"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:taxonomy"),
-                config.createIriMapping("ncbi_taxonomy", "tax_id"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
-                config.createLiteralMapping(xsdString, "('CHEMBL_BC_' || component_id)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "('CHEMBL_BC_' || component_id)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:componentType"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "tax_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                config.createIriMapping("reference:ncbi-taxonomy", "tax_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+                config.createLiteralMapping(xsdString, "chembl_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                config.createLiteralMapping(xsdString, "chembl_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:componentType"),
                 config.createLiteralMapping(xsdString, "component_type"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:proteinSequence"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:proteinSequence"),
                 config.createLiteralMapping(xsdString, "sequence"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:description"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:description"),
                 config.createLiteralMapping(xsdString, "description"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:organismName"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:organismName"),
                 config.createLiteralMapping(xsdString, "organism"));
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("taxonomy", "tax_id"),
+        config.addQuadMapping(table, graph,
+                config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "tax_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(organism || ' (Identifiers.org)')"));
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("ncbi_taxonomy", "tax_id"),
+        config.addQuadMapping(table, graph, config.createIriMapping("reference:ncbi-taxonomy", "tax_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(organism || ' (NCBI Taxonomy)')"));
     }

@@ -1,67 +1,69 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Measuregroup
+public class Measuregroup
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new GeneralUserIriClass("pubchem", "measuregroup", Arrays.asList("integer", "integer"),
+        config.addIriClass(new GeneralUserIriClass("pubchem:measuregroup", "pubchem", "measuregroup",
+                Arrays.asList("integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/measuregroup/AID[0-9]+(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?"));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass measuregroup = config.getIriClass("measuregroup");
         ConstantIriMapping graph = config.createIriMapping("pubchem:measuregroup");
 
         {
-            String table = "measuregroup_bases";
-            NodeMapping subject = config.createIriMapping(measuregroup, "bioassay", "measuregroup");
+            Table table = new Table(schema, "measuregroup_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bao:BAO_0000040"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Measuregroup.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:source"),
-                    config.createIriMapping("source", "source"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
+                    config.createIriMapping("pubchem:source", "source"));
 
-            config.addQuadMapping("pubchem", table, graph, config.createIriMapping("bioassay", "bioassay"),
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
                     config.createIriMapping("bao:BAO_0000209"), subject);
         }
 
         {
-            String table = "endpoint_bases";
-            NodeMapping subject = config.createIriMapping(measuregroup, "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:OBI_0000299"),
-                    config.createIriMapping("endpoint", "substance", "bioassay", "measuregroup"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:OBI_0000299"),
+                    config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup"));
         }
 
         {
-            String table = "measuregroup_genes";
-            NodeMapping subject = config.createIriMapping(measuregroup, "bioassay", "measuregroup");
+            Table table = new Table(schema, "measuregroup_genes");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
-                    config.createIriMapping("gene", "gene"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
+                    config.createIriMapping("pubchem:gene", "gene"));
         }
 
         {
-            String table = "measuregroup_proteins";
-            NodeMapping subject = config.createIriMapping(measuregroup, "bioassay", "measuregroup");
+            Table table = new Table(schema, "measuregroup_proteins");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
-                    config.createIriMapping("protein", "protein"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
+                    config.createIriMapping("pubchem:protein", "protein"));
         }
     }
 }

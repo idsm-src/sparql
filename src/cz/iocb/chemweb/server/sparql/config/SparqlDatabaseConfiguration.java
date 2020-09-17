@@ -1,6 +1,9 @@
 package cz.iocb.chemweb.server.sparql.config;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,7 +32,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
@@ -40,11 +45,14 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public abstract class SparqlDatabaseConfiguration
 {
+    private int blankNodeSegment = 1;
+
     protected DatabaseSchema databaseSchema;
     protected DataSource connectionPool;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
     protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
+    protected LinkedHashMap<String, BlankNodeClass> blankNodeClasses = new LinkedHashMap<String, BlankNodeClass>();
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
     protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
@@ -60,9 +68,39 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public void addPrefix(String prefix, String iri)
+    {
+        String previous = prefixes.get(prefix);
+
+        if(previous == null)
+            prefixes.put(prefix, iri);
+        else if(!previous.equals(iri))
+            throw new IllegalArgumentException(
+                    "prefix definition conflict: " + prefix + ": " + iri + " != " + previous);
+    }
+
+
     public void addIriClass(UserIriClass iriClass)
     {
         iriClasses.put(iriClass.getName(), iriClass);
+    }
+
+
+    public void addBlankNodeClass(String name, UserIntBlankNodeClass blankNodeClass)
+    {
+        blankNodeClasses.put(name, blankNodeClass);
+    }
+
+
+    public void addBlankNodeClass(String name, UserStrBlankNodeClass blankNodeClass)
+    {
+        blankNodeClasses.put(name, blankNodeClass);
+    }
+
+
+    public UserIntBlankNodeClass getNewIntBlankNodeClass()
+    {
+        return new UserIntBlankNodeClass(blankNodeSegment++);
     }
 
 
@@ -89,7 +127,16 @@ public abstract class SparqlDatabaseConfiguration
         else
         {
             String[] parts = value.split(":");
-            iri = prefixes.get(parts[0]) + (parts.length > 1 ? parts[1] : "");
+
+            if(parts.length != 2 && !(parts.length == 1 && value.endsWith(":")))
+                throw new IllegalArgumentException("invalid iri value: '" + value + "'");
+
+            String prefix = prefixes.get(parts[0]);
+
+            if(prefix == null)
+                throw new IllegalArgumentException("unknown prefix '" + parts[0] + "'");
+
+            iri = prefix + (parts.length == 2 ? parts[1] : "");
         }
 
         IriClass iriClass = null;
@@ -117,6 +164,12 @@ public abstract class SparqlDatabaseConfiguration
     public NodeMapping createBlankNodeMapping(BlankNodeClass blankNodeClass, String... columns)
     {
         return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(columns));
+    }
+
+
+    public NodeMapping createBlankNodeMapping(String blankNodeClassName, String... columns)
+    {
+        return new ParametrisedBlankNodeMapping(getBlankNodeClass(blankNodeClassName), getColumns(columns));
     }
 
 
@@ -180,64 +233,62 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(String schema, String table, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object)
+    public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
     {
-        QuadMapping map = new SingleTableQuadMapping(getTable(schema, table), graph, subject, predicate, object);
-        mappings.add(map);
+        mappings.add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
 
         if(graph != null)
             graphs.add(graph);
     }
 
 
-    public void addQuadMapping(String schema, String table, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object, String condition)
+    public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object, String condition)
     {
-        QuadMapping map = new SingleTableQuadMapping(getTable(schema, table), graph, subject, predicate, object,
-                condition);
-        mappings.add(map);
+        mappings.add(new SingleTableQuadMapping(table, graph, subject, predicate, object, condition));
 
         if(graph != null)
             graphs.add(graph);
     }
 
 
-    public void addQuadMapping(String subjectSchema, String subjectTable, String objectSchema, String objectTable,
-            String subjectTableJoinColumn, String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object)
+    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
+            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
     {
-        QuadMapping map = new JoinTableQuadMapping(getTable(subjectSchema, subjectTable),
-                getTable(objectSchema, objectTable), Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object);
-        mappings.add(map);
+        mappings.add(new JoinTableQuadMapping(subjectTable, objectTable,
+                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object));
 
         if(graph != null)
             graphs.add(graph);
     }
 
 
-    public void addQuadMapping(String subjectSchema, String subjectTable, String objectSchema, String objectTable,
-            String subjectTableJoinColumn, String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object, String subjectCondition, String objectCondition)
+    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
+            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object, String subjectCondition, String objectCondition)
     {
-        QuadMapping map = new JoinTableQuadMapping(getTable(subjectSchema, subjectTable),
-                getTable(objectSchema, objectTable), Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+        mappings.add(new JoinTableQuadMapping(subjectTable, objectTable,
+                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
                 Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
-                subjectCondition, objectCondition);
-        mappings.add(map);
+                subjectCondition, objectCondition));
 
         if(graph != null)
             graphs.add(graph);
     }
 
 
-    private static Table getTable(String schema, String table)
+    public void addProcedure(ProcedureDefinition procedure)
     {
-        if(schema == null && table == null)
-            return null;
+        procedures.put(procedure.getProcedureName(), procedure);
+    }
 
-        return new Table(schema, table);
+
+    public void addFunction(FunctionDefinition function)
+    {
+        functions.put(function.getFunctionName(), function);
     }
 
 
@@ -261,7 +312,23 @@ public abstract class SparqlDatabaseConfiguration
 
     public UserIriClass getIriClass(String name)
     {
-        return iriClasses.get(name);
+        UserIriClass iriClass = iriClasses.get(name);
+
+        if(iriClass == null)
+            throw new IllegalArgumentException("unknown iri class: '" + name + "'");
+
+        return iriClass;
+    }
+
+
+    public BlankNodeClass getBlankNodeClass(String name)
+    {
+        BlankNodeClass blankNodeClass = blankNodeClasses.get(name);
+
+        if(blankNodeClass == null)
+            throw new IllegalArgumentException("unknown blank node class: '" + name + "'");
+
+        return blankNodeClass;
     }
 
 
@@ -322,5 +389,52 @@ public abstract class SparqlDatabaseConfiguration
     public void setStrictDefaultGraph(boolean strict)
     {
         strictDefaultGraph = strict;
+    }
+
+
+    protected void setConstraints() throws SQLException
+    {
+        try(Connection connection = getConnectionPool().getConnection())
+        {
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement.executeQuery(
+                        "select parent_schema, parent_table, parent_columns, foreign_schema, foreign_table, foreign_columns "
+                                + "from constraints.foreign_keys"))
+                {
+                    while(result.next())
+                    {
+                        Table parentTable = new Table(result.getString(1), result.getString(2));
+                        List<Column> parentColumns = getColumns((String[]) result.getArray(3).getArray());
+
+                        Table foreignTable = new Table(result.getString(4), result.getString(5));
+                        List<Column> foreignColumns = getColumns((String[]) result.getArray(6).getArray());
+
+                        databaseSchema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
+                    }
+                }
+            }
+
+
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement.executeQuery(
+                        "select left_schema, left_table, left_columns, right_schema, right_table, right_columns "
+                                + "from constraints.unjoinable_columns"))
+                {
+                    while(result.next())
+                    {
+                        Table leftTable = new Table(result.getString(1), result.getString(2));
+                        List<Column> leftColumns = getColumns((String[]) result.getArray(3).getArray());
+
+                        Table rightTable = new Table(result.getString(4), result.getString(5));
+                        List<Column> rightColumns = getColumns((String[]) result.getArray(6).getArray());
+
+                        databaseSchema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
+                        databaseSchema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
+                    }
+                }
+            }
+        }
     }
 }

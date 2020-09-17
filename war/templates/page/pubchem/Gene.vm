@@ -60,7 +60,7 @@
 
 
   #sparql($biosystems)
-    SELECT ?BIOSYSTEM ?TITLE ?ORGANISM FROM pubchem:gene FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    SELECT ?BIOSYSTEM ?TITLE ?ORGANISM FROM pubchem:gene FROM pubchem:biosystem FROM dataset:ontology WHERE
     {
       $entity obo:BFO_0000056 ?BIOSYSTEM.
       ?BIOSYSTEM dcterms:title ?TITLE.

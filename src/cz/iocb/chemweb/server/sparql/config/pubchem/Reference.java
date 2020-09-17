@@ -1,69 +1,70 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Reference
+public class Reference
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(
-                new IntegerUserIriClass("reference", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID"));
+        config.addIriClass(new IntegerUserIriClass("pubchem:reference", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/PMID"));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass reference = config.getIriClass("reference");
         ConstantIriMapping graph = config.createIriMapping("pubchem:reference");
 
         {
-            String table = "reference_bases";
-            NodeMapping subject = config.createIriMapping(reference, "id");
+            Table table = new Table(schema, "reference_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:reference", "id");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "type_id"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology:resource", Ontology.unitUncategorized, "type_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Reference.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Reference.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:date"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:date"),
                     config.createLiteralMapping(xsdDateM4, "dcdate"));
-            config.addQuadMapping("pubchem", table, graph, subject,
-                    config.createIriMapping("dcterms:bibliographicCitation"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:bibliographicCitation"),
                     config.createLiteralMapping(rdfLangStringEn, "citation"));
         }
 
         {
-            String table = "reference_discusses";
-            NodeMapping subject = config.createIriMapping(reference, "reference");
+            Table table = new Table(schema, "reference_discusses");
+            NodeMapping subject = config.createIriMapping("pubchem:reference", "reference");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:discusses"),
-                    config.createIriMapping("mesh", "statement"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:discusses"),
+                    config.createIriMapping("mesh:heading", "statement"));
         }
 
         {
-            String table = "reference_subjects";
-            NodeMapping subject = config.createIriMapping(reference, "reference");
+            Table table = new Table(schema, "reference_subjects");
+            NodeMapping subject = config.createIriMapping("pubchem:reference", "reference");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("fabio:hasSubjectTerm"),
-                    config.createIriMapping("mesh", "subject"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("fabio:hasSubjectTerm"),
+                    config.createIriMapping("mesh:heading", "subject"));
         }
 
         {
-            String table = "reference_primary_subjects";
-            NodeMapping subject = config.createIriMapping(reference, "reference");
+            Table table = new Table(schema, "reference_primary_subjects");
+            NodeMapping subject = config.createIriMapping("pubchem:reference", "reference");
 
-            config.addQuadMapping("pubchem", table, graph, subject,
-                    config.createIriMapping("fabio:hasPrimarySubjectTerm"), config.createIriMapping("mesh", "subject"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("fabio:hasPrimarySubjectTerm"),
+                    config.createIriMapping("mesh:heading", "subject"));
         }
     }
 }

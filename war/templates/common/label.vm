@@ -4,7 +4,7 @@
 #macro(label $classPar)
 #set($class = $classPar)
 #sparql($info)
-  SELECT ?LABEL FROM pubchem:ontology WHERE
+  SELECT ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
   {
     $class rdfs:label ?LABEL.
   }
@@ -13,7 +13,7 @@
 #escapeHTML($info.LABEL)## xxx
 ###else
 ###sparql($union)
-##  SELECT ?CLASS FROM pubchem:ontology WHERE
+##  SELECT ?CLASS FROM dataset:ontology WHERE
 ##  {
 ##    $class owl:unionOf / rdf:rest* / rdf:first ?CLASS.
 ##  }
@@ -22,7 +22,7 @@
 ###foreach($u in $union)#if($velocityCount > 1) | #end#label($u.CLASS)#end##
 ###else
 ###sparql($intersection)
-##  SELECT ?CLASS FROM pubchem:ontology WHERE
+##  SELECT ?CLASS FROM dataset:ontology WHERE
 ##  {
 ##    $class owl:intersectionOf / rdf:rest* / rdf:first ?CLASS.
 ##  }
@@ -31,7 +31,7 @@
 ###foreach($u in $intersection)#if($velocityCount > 1) & #end#label($u.CLASS)#end##
 #else
 #sparql($complement)
-  SELECT ?CLASS FROM pubchem:ontology WHERE
+  SELECT ?CLASS FROM dataset:ontology WHERE
   {
     $class owl:complementOf ?CLASS.
   }
@@ -42,7 +42,7 @@
 !{#foreach($c in $complement)#if($velocityCount > 1) & #end#label($c.CLASS)#end}##
 #else
 #sparql($restriction)
-  SELECT ?PROPERTY ?TYPE ?VALUE FROM pubchem:ontology WHERE
+  SELECT ?PROPERTY ?TYPE ?VALUE FROM dataset:ontology FROM ebi:chebi WHERE
   {
     $class owl:onProperty ?PROPERTY.
 
@@ -118,7 +118,7 @@
 #escapeIRI($restriction.PROPERTY): maximal cardinality $restriction.VALUE.value
 #else
 #sparql($qualified)
-  SELECT ?CLASS FROM pubchem:ontology WHERE
+  SELECT ?CLASS FROM dataset:ontology WHERE
   {
     {
       $class owl:onClass ?CLASS.
@@ -139,7 +139,7 @@
 #end
 ###else
 ###sparql($data)
-##  SELECT ?VALUE FROM pubchem:ontology WHERE
+##  SELECT ?VALUE FROM dataset:ontology WHERE
 ##  {
 ##    $class owl:oneOf / rdf:rest* / rdf:first ?VALUE.
 ##  }

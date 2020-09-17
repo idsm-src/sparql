@@ -1,7 +1,7 @@
 #parse("common/utils.vm")
 
 #sparql($info)
-  SELECT ?LABEL FROM pubchem:ontology WHERE
+  SELECT ?LABEL FROM dataset:ontology WHERE
   {
     $entity rdfs:label ?LABEL.
   }

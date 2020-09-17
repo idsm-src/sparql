@@ -1,148 +1,149 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Protein
+public class Protein
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("protein", "integer", new Table("pubchem", "protein_bases"),
+        config.addIriClass(new MapUserIriClass("pubchem:protein", "integer", new Table("pubchem", "protein_bases"),
                 new TableColumn("id"), new TableColumn("name"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/", 0));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass protein = config.getIriClass("protein");
         ConstantIriMapping graph = config.createIriMapping("pubchem:protein");
 
         {
-            String table = "protein_bases";
-            NodeMapping subject = config.createIriMapping(protein, "id");
+            Table table = new Table(schema, "protein_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "id");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Protein"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Protein.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Protein.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology_resource", Ontology.unitTaxonomy, "organism_id"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology_resource", Ontology.unitNCBITaxon, "organism_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
+                    config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "organism_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
         }
 
         {
-            String table = "protein_references";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_references");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
-                    config.createIriMapping("reference", "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("pubchem:reference", "reference"));
         }
 
         {
-            String table = "protein_pdblinks";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_pdblinks");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
-                    config.createIriMapping("pdblink", "pdblink"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
+                    config.createIriMapping("rdf:wwpdb", "pdblink"));
         }
 
         {
-            String table = "protein_similarproteins";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_similarproteins");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("vocab:hasSimilarProtein"),
-                    config.createIriMapping(protein, "simprotein"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:hasSimilarProtein"),
+                    config.createIriMapping("pubchem:protein", "simprotein"));
         }
 
         {
-            String table = "protein_genes";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_genes");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("vocab:encodedBy"),
-                    config.createIriMapping("gene", "gene"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:encodedBy"),
+                    config.createIriMapping("pubchem:gene", "gene"));
         }
 
         {
-            String table = "protein_closematches";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_closematches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("skos:closeMatch"),
-                    config.createIriMapping("uniprot", "match"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("purl:uniprot", "match"));
         }
 
         {
-            String table = "protein_conserveddomains";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_conserveddomains");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000110"),
-                    config.createIriMapping("conserveddomain", "domain"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000110"),
+                    config.createIriMapping("pubchem:conserveddomain", "domain"));
         }
 
         {
-            String table = "protein_continuantparts";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_continuantparts");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000178"),
-                    config.createIriMapping(protein, "part"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000178"),
+                    config.createIriMapping("pubchem:protein", "part"));
         }
 
         {
-            String table = "protein_processes";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_processes");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
-                    config.createIriMapping("ontology_resource", Ontology.unitGO, "process_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("ontology:resource", Ontology.unitGO, "process_id"));
         }
 
         {
-            String table = "protein_biosystems";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_biosystems");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
-                    config.createIriMapping("biosystem", "biosystem"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("pubchem:biosystem", "biosystem"));
         }
 
         {
-            String table = "protein_functions";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_functions");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000160"),
-                    config.createIriMapping("ontology_resource", Ontology.unitGO, "function_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000160"),
+                    config.createIriMapping("ontology:resource", Ontology.unitGO, "function_id"));
         }
 
         {
-            String table = "protein_locations";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_locations");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000171"),
-                    config.createIriMapping("ontology_resource", Ontology.unitGO, "location_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000171"),
+                    config.createIriMapping("ontology:resource", Ontology.unitGO, "location_id"));
         }
 
         {
-            String table = "protein_types";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_types");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", Ontology.unitPR, "type_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology:resource", Ontology.unitPR, "type_id"));
         }
 
         {
-            String table = "protein_complexes";
-            NodeMapping subject = config.createIriMapping(protein, "protein");
+            Table table = new Table(schema, "protein_complexes");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:GO_0043234"));
         }
     }

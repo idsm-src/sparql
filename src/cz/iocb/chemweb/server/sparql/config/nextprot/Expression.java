@@ -1,46 +1,46 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Expression
+public class Expression
 {
-    static void addIriClasses(NeXtProtConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
     }
 
 
-    static void addQuadMapping(NeXtProtConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass isoform = config.getIriClass("isoform");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "isoform_low_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_low_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":lowExpression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":lowExpression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_medium_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_medium_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":mediumExpression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":mediumExpression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_high_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_high_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":highExpression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":highExpression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
     }
 }

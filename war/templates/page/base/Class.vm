@@ -22,7 +22,7 @@
 
   #macro(superlevelClasses $class $label $depth $count)
     #sparql($superclasses)
-      SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+      SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
       {
         $class rdfs:subClassOf ?CLASS.
         ?CLASS rdfs:label ?LABEL.
@@ -54,7 +54,7 @@
 
 
   #sparql($superclasses)
-    SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
     {
       $entity rdfs:subClassOf ?CLASS.
       ?CLASS rdfs:label ?LABEL.
@@ -86,7 +86,7 @@
 
   #macro(sublevelClasses $class $label $depth $count)
     #sparql($subclasses)
-      SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+      SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
       {
         ?CLASS rdfs:subClassOf $class.
         ?CLASS rdfs:label ?LABEL.
@@ -119,7 +119,7 @@
 
 
   #sparql($subclasses)
-    SELECT ?CLASS ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
     {
       ?CLASS rdfs:subClassOf $entity.
       ?CLASS rdfs:label ?LABEL.
@@ -151,7 +151,7 @@
   <!-- ------------------------------------------------------------------------------------------- -->
 
   #sparql($properties)
-    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
     {
       ?PROPERTY rdfs:domain $entity.
       ?PROPERTY rdfs:label ?LABEL.
@@ -168,7 +168,7 @@
 
       <table style="margin-left: 10px">
         #sparql($domains)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM dataset:ontology WHERE
           {
             $property.PROPERTY rdfs:domain ?CLASS .
           }
@@ -182,7 +182,7 @@
         #end
 
         #sparql($ranges)
-          SELECT ?CLASS FROM pubchem:ontology WHERE
+          SELECT ?CLASS FROM dataset:ontology WHERE
           {
             $property.PROPERTY rdfs:range ?CLASS.
           }

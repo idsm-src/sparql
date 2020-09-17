@@ -4,705 +4,535 @@ import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.sc
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Molecule
+public class Molecule
 {
-    static void addIriClasses(ChemblConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("molecule", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*"));
-
-        config.addIriClass(new IntegerUserIriClass("chebi", "bigint", "http://purl.obolibrary.org/obo/CHEBI_"));
-
-        config.addIriClass(new StringUserIriClass("displayimage",
-                "https://www.ebi.ac.uk/chembl/compound/displayimage_large/", "CHEMBL[1-9][0-9]*"));
-
-        config.addIriClass(new MapUserIriClass("chembl_acd_most_apka", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_most_apka"));
-
-        config.addIriClass(new MapUserIriClass("chembl_acd_most_bpka", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_most_bpka"));
-
-        config.addIriClass(new MapUserIriClass("chembl_acd_logd", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_logd"));
-
-        config.addIriClass(new MapUserIriClass("chembl_acd_logp", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#acd_logp"));
-
-        config.addIriClass(new MapUserIriClass("chembl_alogp", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#alogp"));
-
-        config.addIriClass(new MapUserIriClass("chembl_aromatic_rings", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#aromatic_rings"));
-
-        config.addIriClass(new MapUserIriClass("chembl_hba", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#hba"));
-
-        config.addIriClass(new MapUserIriClass("chembl_hbd", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#hbd"));
-
-        config.addIriClass(new MapUserIriClass("chembl_heavy_atoms", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#heavy_atoms"));
-
-        config.addIriClass(new MapUserIriClass("chembl_num_ro5_violations", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#num_ro5_violations"));
-
-        config.addIriClass(new MapUserIriClass("chembl_psa", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#psa"));
-
-        config.addIriClass(new MapUserIriClass("chembl_qed_weighted", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#qed_weighted"));
-
-        config.addIriClass(new MapUserIriClass("chembl_rtb", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#rtb"));
-
-        config.addIriClass(new MapUserIriClass("chembl_mw_freebase", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#mw_freebase"));
-
-        config.addIriClass(new MapUserIriClass("chembl_mw_monoisotopic", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#mw_monoisotopic"));
-
-        config.addIriClass(new MapUserIriClass("chembl_full_mwt", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#full_mwt"));
-
-        config.addIriClass(new MapUserIriClass("chembl_molecular_species", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#molecular_species"));
-
-        config.addIriClass(new MapUserIriClass("chembl_ro3_pass", "bigint", new Table(schema, "molecule_dictionary"),
-                new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#ro3_pass"));
-
-        config.addIriClass(new MapUserIriClass("chembl_full_molformula", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#full_molformula"));
-
-        config.addIriClass(new MapUserIriClass("chembl_standard_inchi_key", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#standard_inchi_key"));
-
-        config.addIriClass(new MapUserIriClass("chembl_standard_inchi", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#standard_inchi"));
-
-        config.addIriClass(new MapUserIriClass("chembl_canonical_smiles", "bigint",
-                new Table(schema, "molecule_dictionary"), new TableColumn("molregno"), new TableColumn("chembl_id"),
-                "http://rdf.ebi.ac.uk/resource/chembl/molecule/", "CHEMBL[1-9][0-9]*", "#canonical_smiles"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL"));
+        config.addIriClass(new IntegerUserIriClass("chembl:displayimage", "integer",
+                "https://www.ebi.ac.uk/chembl/compound/displayimage_large/CHEMBL"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_most_apka", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#cx_most_apka"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_most_bpka", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#cx_most_bpka"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_logd", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#cx_logd"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_logp", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#cx_logp"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_alogp", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#alogp"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_aromatic_rings", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#aromatic_rings"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_hba", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#hba"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_hbd", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#hbd"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_heavy_atoms", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#heavy_atoms"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_num_ro5_violations", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#num_ro5_violations"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_psa", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#psa"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_qed_weighted", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#qed_weighted"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_rtb", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#rtb"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_mw_freebase", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#mw_freebase"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_mw_monoisotopic", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#mw_monoisotopic"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_full_mwt", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#full_mwt"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_molecular_species", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#molecular_species"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_ro3_pass", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#ro3_pass"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_full_molformula", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#full_molformula"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_standard_inchi_key", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#standard_inchi_key"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_standard_inchi", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#standard_inchi"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molecule_canonical_smiles", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#canonical_smiles"));
     }
 
 
-    static void addQuadMapping(ChemblConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass molecule = config.getIriClass("molecule");
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        String table = "molecule_dictionary";
-        NodeMapping subject = config.createIriMapping(molecule, "molregno");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:UnclassifiedSubstance"), "molecule_type = 'Unclassified'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:CellTherapy"), "molecule_type = 'Cell'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:Oligosaccharide"), "molecule_type = 'Oligosaccharide'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:Enzyme"), "molecule_type = 'Enzyme'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:Oligonucleotide"), "molecule_type = 'Oligonucleotide'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:Antibody"), "molecule_type = 'Antibody'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:UnknownSubstance"), "molecule_type = 'Unknown'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:ProteinMolecule"), "molecule_type = 'Protein'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:SmallMolecule"), "molecule_type = 'Small molecule'");
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("foaf:depiction"),
-                config.createIriMapping("displayimage", "chembl_id"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                config.createIriMapping("chebi", "chebi_par_id"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:highestDevelopmentPhase"),
-                config.createLiteralMapping(xsdInt, "(max_phase::int4)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
-                config.createLiteralMapping(xsdString, "chembl_id"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "(coalesce(pref_name, chembl_id))"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:prefLabel"),
-                config.createLiteralMapping(xsdString, "(coalesce(pref_name, chembl_id))"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:substanceType"),
-                config.createLiteralMapping(xsdString, "molecule_type"));
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("displayimage", "chembl_id"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("foaf:Image"));
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("displayimage", "chembl_id"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "('PNG Image Depiction of ' || chembl_id)"));
-
-
-        config.addQuadMapping(schema, "molecule_names", graph, subject, config.createIriMapping("skos:altLabel"),
-                config.createLiteralMapping(xsdString, "name"));
-
-
-        config.addQuadMapping(schema, "biotherapeutics", graph, subject,
-                config.createIriMapping("cco:isBiotherapeutic"), config.createLiteralMapping(true));
-
-        config.addQuadMapping(schema, "biotherapeutics", graph, subject, config.createIriMapping("cco:helmNotation"),
-                config.createLiteralMapping(xsdString, "helm_notation"));
-
-        config.addQuadMapping(schema, "biotherapeutics", graph, subject, config.createIriMapping("dcterms:description"),
-                config.createLiteralMapping(xsdString, "description"));
-
-
-        config.addQuadMapping(schema, "molecule_atc_classification", graph, subject,
-                config.createIriMapping("cco:atcClassification"), config.createLiteralMapping(xsdString, "level5"));
-
-
-        config.addQuadMapping(schema, "biotherapeutic_components", graph, subject,
-                config.createIriMapping("cco:hasBioComponent"),
-                config.createIriMapping("biocomponent", "component_id"));
-
-        config.addQuadMapping(schema, "biotherapeutic_components", graph,
-                config.createIriMapping("biocomponent", "component_id"), config.createIriMapping("cco:hasMolecule"),
-                subject);
-
-
-        config.addQuadMapping(schema, "molecule_hrac_classification", schema, "hrac_classification", "hrac_class_id",
-                "hrac_class_id", graph, subject, config.createIriMapping("cco:hracClassification"),
-                config.createLiteralMapping(xsdString, "hrac_code"));
-
-        config.addQuadMapping(schema, "molecule_irac_classification", schema, "irac_classification", "irac_class_id",
-                "irac_class_id", graph, subject, config.createIriMapping("cco:iracClassification"),
-                config.createLiteralMapping(xsdString, "level2"));
-
-        config.addQuadMapping(schema, "molecule_frac_classification", schema, "frac_classification", "frac_class_id",
-                "frac_class_id", graph, subject, config.createIriMapping("cco:fracClassification"),
-                config.createLiteralMapping(xsdString, "level2"));
-
-
-        config.addQuadMapping(schema, "molecule_docs", graph, subject, config.createIriMapping("cco:hasDocument"),
-                config.createIriMapping("document", "doc_id"));
-
-        config.addQuadMapping(schema, "molecule_docs", graph, config.createIriMapping("document", "doc_id"),
-                config.createIriMapping("cco:hasMolecule"), subject);
-
-
-        config.addQuadMapping(null, null, graph,
-                config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl/chembl_25.0_molecule_chebi_ls.ttl>"),
-                config.createIriMapping("void:inDataset"),
-                config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl/25.0/void.ttl#/molecule_chebi_linkset>"));
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_acd_most_apka", "molregno"), "acd_most_apka is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_apka", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000324"), "acd_most_apka is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_apka", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(acd_most_apka::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_apka", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' ACD Most Acidic pKa: ' || rtrim(rtrim(cast(acd_most_apka as text), '0'), '.'))"),
-                "acd_most_apka is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_acd_most_bpka", "molregno"), "acd_most_bpka is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_bpka", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000325"), "acd_most_bpka is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_bpka", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(acd_most_bpka::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_most_bpka", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' ACD Most Basic pKa: ' || rtrim(rtrim(cast(acd_most_bpka as text), '0'), '.'))"),
-                "acd_most_bpka is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_acd_logd", "molregno"),
-                "acd_logd is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logd", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000323"), "acd_logd is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logd", "molregno"), config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(acd_logd::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logd", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' ACD LogD: ' || rtrim(rtrim(cast(acd_logd as text), '0'), '.'))"),
-                "acd_logd is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_acd_logp", "molregno"),
-                "acd_logp is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logp", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000321"), "acd_logp is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logp", "molregno"), config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(acd_logp::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_acd_logp", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' ACD LogP: ' || rtrim(rtrim(cast(acd_logp as text), '0'), '.'))"),
-                "acd_logp is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_alogp", "molregno"),
-                "alogp is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_alogp", "molregno"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000305"),
-                "alogp is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_alogp", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(alogp::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_alogp", "molregno"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' ALogP: ' || rtrim(rtrim(cast(alogp as text), '0'), '.'))"),
-                "alogp is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_aromatic_rings", "molregno"), "aromatic_rings is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_aromatic_rings", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000381"), "aromatic_rings is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_aromatic_rings", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(aromatic_rings::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_aromatic_rings", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' Aromatic Rings: ' || aromatic_rings)"),
-                "aromatic_rings is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_hba", "molregno"),
-                "hba is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hba", "molregno"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000309"),
-                "hba is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hba", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "(hba::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hba", "molregno"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' Hydrogen Bond Acceptors: ' || hba)"),
-                "hba is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_hbd", "molregno"),
-                "hbd is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hbd", "molregno"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000310"),
-                "hbd is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hbd", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "(hbd::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_hbd", "molregno"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' Hydrogen Bond Donors: ' || hbd)"),
-                "hbd is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_heavy_atoms", "molregno"), "heavy_atoms is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_heavy_atoms", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000300"), "heavy_atoms is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_heavy_atoms", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(heavy_atoms::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_heavy_atoms", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' Heavy Atoms: ' || heavy_atoms)"),
-                "heavy_atoms is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_num_ro5_violations", "molregno"), "num_ro5_violations is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_num_ro5_violations", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000312"), "num_ro5_violations is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_num_ro5_violations", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(num_ro5_violations::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_num_ro5_violations", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' RO5 Violations: ' || num_ro5_violations)"),
-                "num_ro5_violations is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_psa", "molregno"),
-                "psa is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_psa", "molregno"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000308"),
-                "psa is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_psa", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "(psa::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_psa", "molregno"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' Polar Surface Area: ' || rtrim(rtrim(cast(psa as text), '0'), '.'))"),
-                "psa is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_qed_weighted", "molregno"), "qed_weighted is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_qed_weighted", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000431"), "qed_weighted is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_qed_weighted", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(qed_weighted::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_qed_weighted", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' QED Weighted Score: ' || rtrim(rtrim(cast(qed_weighted as text), '0'), '.'))"),
-                "qed_weighted is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_rtb", "molregno"),
-                "rtb is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_rtb", "molregno"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000311"),
-                "rtb is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_rtb", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "(rtb::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph, config.createIriMapping("chembl_rtb", "molregno"),
-                config.createIriMapping("rdfs:label"), config
-                        .createLiteralMapping(xsdString,
-                                "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                        + ".compound_properties.molregno) || ' Rotatable Bonds: ' || rtb)"),
-                "rtb is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_mw_freebase", "molregno"), "mw_freebase is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_freebase", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000350"), "mw_freebase is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_freebase", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(mw_freebase::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_freebase", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "((select chembl_id from " + schema
-                        + ".molecule_dictionary where molregno = " + schema + ".compound_properties.molregno) ||"
-                        + " ' Freebase Molecular Weight: ' || rtrim(rtrim(cast(mw_freebase as text), '0'), '.'))"),
-                "mw_freebase is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_mw_monoisotopic", "molregno"), "mw_monoisotopic is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_monoisotopic", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000218"), "mw_monoisotopic is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_monoisotopic", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(mw_monoisotopic::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_mw_monoisotopic", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' Monoisotopic Mass: ' || rtrim(rtrim(cast(mw_monoisotopic as text), '0'), '.'))"),
-                "mw_monoisotopic is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_full_mwt", "molregno"),
-                "full_mwt is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_mwt", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000198"), "full_mwt is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_mwt", "molregno"), config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdDouble, "(full_mwt::float8)"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_mwt", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' Full Molecular Weight: ' || rtrim(rtrim(cast(full_mwt as text), '0'), '.'))"),
-                "full_mwt is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_molecular_species", "molregno"), "molecular_species is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_molecular_species", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000326"), "molecular_species is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_molecular_species", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "molecular_species"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_molecular_species", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) ||"
-                                + " ' Molecular Species: ' || molecular_species)"),
-                "molecular_species is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"), config.createIriMapping("chembl_ro3_pass", "molregno"),
-                "ro3_pass is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_ro3_pass", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000317"), "ro3_pass is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_ro3_pass", "molregno"), config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "ro3_pass"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_ro3_pass", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' RO3 Pass: ' || ro3_pass)"),
-                "ro3_pass is not null");
-
-
-        config.addQuadMapping(schema, "compound_properties", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_full_molformula", "molregno"), "full_molformula is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_molformula", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000042"), "full_molformula is not null");
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_molformula", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "full_molformula"));
-
-        config.addQuadMapping(schema, "compound_properties", graph,
-                config.createIriMapping("chembl_full_molformula", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".compound_properties.molregno) || ' Molecular Formula: ' || full_molformula)"),
-                "full_molformula is not null");
-
-
-        config.addQuadMapping(schema, "compound_structures", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_standard_inchi_key", "molregno"), "standard_inchi_key is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi_key", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000059"), "standard_inchi_key is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi_key", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "standard_inchi_key"));
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi_key", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema
-                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
-                                + " ' Standard InChi Key: ' || standard_inchi_key)"),
-                "standard_inchi_key is not null");
-
-
-        config.addQuadMapping(schema, "compound_structures", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_standard_inchi", "molregno"), "standard_inchi is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000113"), "standard_inchi is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "standard_inchi"));
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_standard_inchi", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema
-                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
-                                + " ' Standard InChi')"),
-                "standard_inchi is not null");
-
-
-        config.addQuadMapping(schema, "compound_structures", graph, subject,
-                config.createIriMapping("cheminf:SIO_000008"),
-                config.createIriMapping("chembl_canonical_smiles", "molregno"), "canonical_smiles is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_canonical_smiles", "molregno"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cheminf:CHEMINF_000018"), "canonical_smiles is not null");
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_canonical_smiles", "molregno"),
-                config.createIriMapping("cheminf:SIO_000300"),
-                config.createLiteralMapping(xsdString, "canonical_smiles"));
-
-        config.addQuadMapping(schema, "compound_structures", graph,
-                config.createIriMapping("chembl_canonical_smiles", "molregno"), config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema
-                                + ".molecule_dictionary where molregno = compound_structures.molregno) ||"
-                                + " ' Canonical Smiles')"),
-                "canonical_smiles is not null");
-
-
-        config.addQuadMapping(schema, "molecule_hierarchy", graph, subject,
-                config.createIriMapping("cco:hasParentMolecule"),
-                config.createIriMapping("molecule", "parent_molregno"), "molregno != parent_molregno");
-
-        config.addQuadMapping(schema, "molecule_hierarchy", graph,
-                config.createIriMapping("molecule", "parent_molregno"), config.createIriMapping("cco:hasChildMolecule"),
-                subject, "molregno != parent_molregno");
+        {
+            Table table = new Table(schema, "molecule_dictionary");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnclassifiedSubstance"), "molecule_type = 'Unclassified'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:CellTherapy"), "molecule_type = 'Cell'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Oligosaccharide"), "molecule_type = 'Oligosaccharide'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Enzyme"), "molecule_type = 'Enzyme'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Oligonucleotide"), "molecule_type = 'Oligonucleotide'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Antibody"), "molecule_type = 'Antibody'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnknownSubstance"), "molecule_type = 'Unknown'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:ProteinMolecule"), "molecule_type = 'Protein'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:SmallMolecule"), "molecule_type = 'Small molecule'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("foaf:depiction"),
+                    config.createIriMapping("chembl:displayimage", "id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "chebi_par_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:highestDevelopmentPhase"),
+                    config.createLiteralMapping(xsdInt, "max_phase"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+                    config.createLiteralMapping(xsdString, "chembl_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "(coalesce(pref_name, chembl_id))"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
+                    config.createLiteralMapping(xsdString, "(coalesce(pref_name, chembl_id))"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:substanceType"),
+                    config.createLiteralMapping(xsdString, "molecule_type"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:displayimage", "id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("foaf:Image"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:displayimage", "id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "('PNG Image Depiction of ' || chembl_id)"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_names");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:altLabel"),
+                    config.createLiteralMapping(xsdString, "name"));
+        }
+
+        {
+            Table table = new Table(schema, "biotherapeutics");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:isBiotherapeutic"),
+                    config.createLiteralMapping(true));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:helmNotation"),
+                    config.createLiteralMapping(xsdString, "helm_notation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:description"),
+                    config.createLiteralMapping(xsdString, "description"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_atc_classification");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:atcClassification"),
+                    config.createLiteralMapping(xsdString, "level5"));
+        }
+
+        {
+            Table table = new Table(schema, "biotherapeutic_components");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasBioComponent"),
+                    config.createIriMapping("chembl:biocomponent", "component_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:biocomponent", "component_id"),
+                    config.createIriMapping("cco:hasMolecule"), subject);
+        }
+
+        {
+            Table table = new Table(schema, "molecule_hrac_classification");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, new Table(schema, "hrac_classification"), "hrac_class_id", "hrac_class_id",
+                    graph, subject, config.createIriMapping("cco:hracClassification"),
+                    config.createLiteralMapping(xsdString, "hrac_code"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_irac_classification");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, new Table(schema, "irac_classification"), "irac_class_id", "irac_class_id",
+                    graph, subject, config.createIriMapping("cco:iracClassification"),
+                    config.createLiteralMapping(xsdString, "level2"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_frac_classification");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, new Table(schema, "frac_classification"), "frac_class_id", "frac_class_id",
+                    graph, subject, config.createIriMapping("cco:fracClassification"),
+                    config.createLiteralMapping(xsdString, "level2"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_docs");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasDocument"),
+                    config.createIriMapping("chembl:document", "document_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:document", "document_id"),
+                    config.createIriMapping("cco:hasMolecule"), subject);
+        }
+
+        {
+            Table table = new Table(schema, "compound_properties");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_cx_most_apka", "molecule_id"), "cx_most_apka is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_apka", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000195"),
+                    "cx_most_apka is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_apka", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "cx_most_apka"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_apka", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChemAxon Most Acidic pKa: ' || rtrim(rtrim(cast(cx_most_apka as text), '0'), '.'))"),
+                    "cx_most_apka is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_cx_most_bpka", "molecule_id"), "cx_most_bpka is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_bpka", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000195"),
+                    "cx_most_bpka is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_bpka", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "cx_most_bpka"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_bpka", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChemAxon Most Basic pKa: ' || rtrim(rtrim(cast(cx_most_bpka as text), '0'), '.'))"),
+                    "cx_most_bpka is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_cx_logd", "molecule_id"), "cx_logd is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logd", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000322"),
+                    "cx_logd is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logd", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "cx_logd"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logd", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChemAxon LogD: ' || rtrim(rtrim(cast(cx_logd as text), '0'), '.'))"),
+                    "cx_logd is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_cx_logp", "molecule_id"), "cx_logp is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logp", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000251"),
+                    "cx_logp is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logp", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "cx_logp"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logp", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChemAxon LogP: ' || rtrim(rtrim(cast(cx_logp as text), '0'), '.'))"),
+                    "cx_logp is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_alogp", "molecule_id"), "alogp is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_alogp", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000251"),
+                    "alogp is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_alogp", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "alogp"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_alogp", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ALogP: ' || rtrim(rtrim(cast(alogp as text), '0'), '.'))"),
+                    "alogp is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_aromatic_rings", "molecule_id"),
+                    "aromatic_rings is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_aromatic_rings", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000381"),
+                    "aromatic_rings is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_aromatic_rings", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "aromatic_rings"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_aromatic_rings", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Aromatic Rings: ' || aromatic_rings)"),
+                    "aromatic_rings is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_hba", "molecule_id"), "hba is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hba", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000245"),
+                    "hba is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hba", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "hba"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hba", "molecule_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Hydrogen Bond Acceptors: ' || hba)"),
+                    "hba is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_hbd", "molecule_id"), "hbd is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hbd", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000244"),
+                    "hbd is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hbd", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "hbd"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hbd", "molecule_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Hydrogen Bond Donors: ' || hbd)"),
+                    "hbd is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_heavy_atoms", "molecule_id"), "heavy_atoms is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_heavy_atoms", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000300"),
+                    "heavy_atoms is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_heavy_atoms", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "heavy_atoms"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_heavy_atoms", "molecule_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Heavy Atoms: ' || heavy_atoms)"),
+                    "heavy_atoms is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_num_ro5_violations", "molecule_id"),
+                    "num_ro5_violations is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_num_ro5_violations", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000312"),
+                    "num_ro5_violations is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_num_ro5_violations", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "num_ro5_violations"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_num_ro5_violations", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' RO5 Violations: ' || num_ro5_violations)"),
+                    "num_ro5_violations is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_psa", "molecule_id"), "psa is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_psa", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000307"),
+                    "psa is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_psa", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "psa"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_psa", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Polar Surface Area: ' || rtrim(rtrim(cast(psa as text), '0'), '.'))"),
+                    "psa is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_qed_weighted", "molecule_id"), "qed_weighted is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_qed_weighted", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000431"),
+                    "qed_weighted is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_qed_weighted", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "qed_weighted"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_qed_weighted", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' QED Weighted Score: ' || rtrim(rtrim(cast(qed_weighted as text), '0'), '.'))"),
+                    "qed_weighted is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_rtb", "molecule_id"), "rtb is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_rtb", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000254"),
+                    "rtb is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_rtb", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "rtb"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_rtb", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "('CHEMBL' || molecule_id || ' Rotatable Bonds: ' || rtb)"),
+                    "rtb is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_mw_freebase", "molecule_id"), "mw_freebase is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_mw_freebase", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000350"),
+                    "mw_freebase is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_mw_freebase", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "mw_freebase"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_mw_freebase", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Freebase Molecular Weight: ' || rtrim(rtrim(cast(mw_freebase as text), '0'), '.'))"),
+                    "mw_freebase is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_mw_monoisotopic", "molecule_id"),
+                    "mw_monoisotopic is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_mw_monoisotopic", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000218"),
+                    "mw_monoisotopic is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_mw_monoisotopic", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdDouble, "mw_monoisotopic"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_mw_monoisotopic", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Monoisotopic Mass: ' || rtrim(rtrim(cast(mw_monoisotopic as text), '0'), '.'))"),
+                    "mw_monoisotopic is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_full_mwt", "molecule_id"), "full_mwt is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_full_mwt", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000216"),
+                    "full_mwt is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_full_mwt", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdDouble, "full_mwt"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_full_mwt", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Full Molecular Weight: ' || rtrim(rtrim(cast(full_mwt as text), '0'), '.'))"),
+                    "full_mwt is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_molecular_species", "molecule_id"),
+                    "molecular_species is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_molecular_species", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000326"),
+                    "molecular_species is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_molecular_species", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "molecular_species"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_molecular_species", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Molecular Species: ' || molecular_species)"),
+                    "molecular_species is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_ro3_pass", "molecule_id"), "ro3_pass is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_ro3_pass", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000315"),
+                    "ro3_pass is not null");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_ro3_pass", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"), config.createLiteralMapping(xsdString, "ro3_pass"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_ro3_pass", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "('CHEMBL' || molecule_id || ' RO3 Pass: ' || ro3_pass)"),
+                    "ro3_pass is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_full_molformula", "molecule_id"),
+                    "full_molformula is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_full_molformula", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000042"),
+                    "full_molformula is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_full_molformula", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "full_molformula"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_full_molformula", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Molecular Formula: ' || full_molformula)"),
+                    "full_molformula is not null");
+        }
+
+        {
+            Table table = new Table(schema, "compound_structures");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_standard_inchi_key", "molecule_id"),
+                    "standard_inchi_key is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi_key", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000059"),
+                    "standard_inchi_key is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi_key", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "standard_inchi_key"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi_key", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Standard InChi Key: ' || standard_inchi_key)"),
+                    "standard_inchi_key is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_standard_inchi", "molecule_id"),
+                    "standard_inchi is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000113"),
+                    "standard_inchi is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "standard_inchi"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "('CHEMBL' || molecule_id || ' Standard InChi')"),
+                    "standard_inchi is not null");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cheminf:SIO_000008"),
+                    config.createIriMapping("chembl:molecule_canonical_smiles", "molecule_id"),
+                    "canonical_smiles is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_canonical_smiles", "molecule_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cheminf:CHEMINF_000018"),
+                    "canonical_smiles is not null");
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_canonical_smiles", "molecule_id"),
+                    config.createIriMapping("cheminf:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "canonical_smiles"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_canonical_smiles", "molecule_id"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString, "('CHEMBL' || molecule_id || ' Canonical Smiles')"),
+                    "canonical_smiles is not null");
+        }
+
+        {
+            Table table = new Table(schema, "molecule_hierarchy");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasParentMolecule"),
+                    config.createIriMapping("chembl:molecule", "parent_molecule_id"),
+                    "molecule_id != parent_molecule_id");
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule", "parent_molecule_id"),
+                    config.createIriMapping("cco:hasChildMolecule"), subject, "molecule_id != parent_molecule_id");
+        }
     }
 }

@@ -5,46 +5,43 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBo
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Chromosome
+public class Chromosome
 {
-    static void addIriClasses(NeXtProtConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("isoform", "integer", new Table(schema, "isoform_bases"),
+        config.addIriClass(new MapUserIriClass("nextprot:isoform", "integer", new Table("nextprot", "isoform_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/isoform/", 0));
-        config.addIriClass(new MapUserIriClass("annotation", "integer", new Table(schema, "annotation_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/annotation/", 0));
-        config.addIriClass(new MapUserIriClass("evidence", "integer", new Table(schema, "evidence_bases"),
+        config.addIriClass(
+                new MapUserIriClass("nextprot:annotation", "integer", new Table("nextprot", "annotation_bases"),
+                        new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/annotation/", 0));
+        config.addIriClass(new MapUserIriClass("nextprot:evidence", "integer", new Table("nextprot", "evidence_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/evidence/", 0));
-        config.addIriClass(new MapUserIriClass("entry", "integer", new Table(schema, "entry_bases"),
+        config.addIriClass(new MapUserIriClass("nextprot:entry", "integer", new Table("nextprot", "entry_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/entry/", 0));
-        config.addIriClass(new MapUserIriClass("proteoform", "integer", new Table(schema, "proteoform_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
-        config.addIriClass(new MapUserIriClass("gene", "integer", new Table(schema, "gene_bases"),
+        config.addIriClass(
+                new MapUserIriClass("nextprot:proteoform", "integer", new Table("nextprot", "proteoform_bases"),
+                        new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
+        config.addIriClass(new MapUserIriClass("nextprot:gene", "integer", new Table("nextprot", "gene_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
-        config.addIriClass(new MapUserIriClass("purl_uniprot", "integer", new Table(schema, "purl_uniprot_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://purl.uniprot.org/uniprot/", 0));
-        config.addIriClass(new MapUserIriClass("uniprot", "integer", new Table(schema, "uniprot_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://www.uniprot.org/uniprot/", 0));
-        config.addIriClass(new IntegerUserIriClass("chebi", "integer", "http://purl.obolibrary.org/obo/CHEBI_"));
-        config.addIriClass(new IntegerUserIriClass("drugbank", "integer",
-                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB", 5));
+
+        config.addBlankNodeClass("name", config.getNewIntBlankNodeClass());
+        config.addBlankNodeClass("name_list", config.getNewIntBlankNodeClass());
     }
 
 
-    static void addQuadMapping(NeXtProtConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
         addIsomorfQuadMapping(config);
         addAnnotationQuadMapping(config);
@@ -66,1384 +63,1373 @@ class Chromosome
     }
 
 
-    private static void addIsomorfQuadMapping(NeXtProtConfiguration config)
+    private static void addIsomorfQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass isoform = config.getIriClass("isoform");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "isoform_bases";
-            NodeMapping subject = config.createIriMapping(isoform, "id");
+            Table table = new Table(schema, "isoform_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Isoform"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":canonicalIsoform"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":canonicalIsoform"),
                     config.createLiteralMapping(xsdBoolean, "canonical_isoform"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":swissprotDisplayed"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":swissprotDisplayed"),
                     config.createLiteralMapping(xsdBoolean, "swissprot_displayed"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":absorptionMax"),
-                    config.createIriMapping("annotation", "absorption_max"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":absorptionNote"),
-                    config.createIriMapping("annotation", "absorption_note"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":allergen"),
-                    config.createIriMapping("annotation", "allergen"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":initiatorMethionine"),
-                    config.createIriMapping("annotation", "initiator_methionine"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":kineticKM"),
-                    config.createIriMapping("annotation", "kinetic_k_m"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":kineticNote"),
-                    config.createIriMapping("annotation", "kinetic_note"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":kineticVmax"),
-                    config.createIriMapping("annotation", "kinetic_vmax"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":nonConsecutiveResidue"),
-                    config.createIriMapping("annotation", "non_consecutive_residue"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":peroxisomeTransitPeptide"),
-                    config.createIriMapping("annotation", "peroxisome_transit_peptide"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":pharmaceutical"),
-                    config.createIriMapping("annotation", "pharmaceutical"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":phDependence"),
-                    config.createIriMapping("annotation", "ph_dependence"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":redoxPotential"),
-                    config.createIriMapping("annotation", "redox_potential"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":signalPeptide"),
-                    config.createIriMapping("annotation", "signal_peptide"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":temperatureDependence"),
-                    config.createIriMapping("annotation", "temperature_dependence"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":absorptionMax"),
+                    config.createIriMapping("nextprot:annotation", "absorption_max"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":absorptionNote"),
+                    config.createIriMapping("nextprot:annotation", "absorption_note"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":allergen"),
+                    config.createIriMapping("nextprot:annotation", "allergen"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":initiatorMethionine"),
+                    config.createIriMapping("nextprot:annotation", "initiator_methionine"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":kineticKM"),
+                    config.createIriMapping("nextprot:annotation", "kinetic_k_m"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":kineticNote"),
+                    config.createIriMapping("nextprot:annotation", "kinetic_note"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":kineticVmax"),
+                    config.createIriMapping("nextprot:annotation", "kinetic_vmax"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":nonConsecutiveResidue"),
+                    config.createIriMapping("nextprot:annotation", "non_consecutive_residue"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":peroxisomeTransitPeptide"),
+                    config.createIriMapping("nextprot:annotation", "peroxisome_transit_peptide"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":pharmaceutical"),
+                    config.createIriMapping("nextprot:annotation", "pharmaceutical"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":phDependence"),
+                    config.createIriMapping("nextprot:annotation", "ph_dependence"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":redoxPotential"),
+                    config.createIriMapping("nextprot:annotation", "redox_potential"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":signalPeptide"),
+                    config.createIriMapping("nextprot:annotation", "signal_peptide"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":temperatureDependence"),
+                    config.createIriMapping("nextprot:annotation", "temperature_dependence"));
         }
 
         {
-            String table = "isoform_proteoforms";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_proteoforms");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":proteoform"),
-                    config.createIriMapping("proteoform", "proteoform"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":proteoform"),
+                    config.createIriMapping("nextprot:proteoform", "proteoform"));
         }
 
         {
-            String table = "isoform_active_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_active_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":activeSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":activeSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_activity_regulations";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_activity_regulations");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":activityRegulation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":activityRegulation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_antibody_mappings";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_antibody_mappings");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":antibodyMapping"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":antibodyMapping"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_beta_strands";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_beta_strands");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":betaStrand"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":betaStrand"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_binary_interactions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_binary_interactions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":binaryInteraction"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":binaryInteraction"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_binding_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_binding_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":bindingSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":bindingSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_biophysicochemical_properties";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_biophysicochemical_properties");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":biophysicochemicalProperty"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":biophysicochemicalProperty"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_calcium_binding_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_calcium_binding_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":calciumBindingRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":calciumBindingRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_catalytic_activities";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_catalytic_activities");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":catalyticActivity"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":catalyticActivity"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cautions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cautions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":caution"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":caution"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cellular_components";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cellular_components");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cellularComponent"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cellularComponent"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cleavage_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cleavage_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cleavageSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cleavageSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cofactors";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cofactors");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cofactor"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cofactor"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cofactor_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cofactor_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cofactorInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cofactorInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_coiled_coil_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_coiled_coil_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":coiledCoilRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":coiledCoilRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_compositionally_biased_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_compositionally_biased_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject,
-                    config.createIriMapping(":compositionallyBiasedRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":compositionallyBiasedRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_cross_links";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_cross_links");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":crossLink"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":crossLink"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_detected_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_detected_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":detectedExpression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":detectedExpression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_developmental_stage_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_developmental_stage_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":developmentalStageInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":developmentalStageInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_diseases";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_diseases");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":disease"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":disease"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_disulfide_bonds";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_disulfide_bonds");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":disulfideBond"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":disulfideBond"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_dna_binding_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_dna_binding_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":dnaBindingRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":dnaBindingRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_domains";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_domains");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":domain"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":domain"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_domain_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_domain_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":domainInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":domainInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_electrophysiological_parameters";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_electrophysiological_parameters");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject,
-                    config.createIriMapping(":electrophysiologicalParameter"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":electrophysiologicalParameter"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_enzyme_classifications";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_enzyme_classifications");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":enzymeClassification"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":enzymeClassification"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":expression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":expression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_expression_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_expression_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":expressionInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":expressionInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_expression_profiles";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_expression_profiles");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":expressionProfile"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":expressionProfile"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_functions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_functions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":function"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":function"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_function_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_function_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":functionInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":functionInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_general_annotations";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_general_annotations");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":generalAnnotation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":generalAnnotation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_glycosylation_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_glycosylation_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":glycosylationSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":glycosylationSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_go_biological_processs";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_go_biological_processs");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":goBiologicalProcess"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":goBiologicalProcess"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_go_cellular_components";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_go_cellular_components");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":goCellularComponent"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":goCellularComponent"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_go_molecular_functions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_go_molecular_functions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":goMolecularFunction"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":goMolecularFunction"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_helixs";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_helixs");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":helix"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":helix"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_inductions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_inductions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":induction"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":induction"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_interacting_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_interacting_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":interactingRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":interactingRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_interactions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_interactions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":interaction"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":interaction"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_interaction_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_interaction_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":interactionInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":interactionInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_intramembrane_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_intramembrane_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":intramembraneRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":intramembraneRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_keywords";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_keywords");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":keyword"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":keyword"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_lipidation_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_lipidation_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":lipidationSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":lipidationSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_mappings";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_mappings");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":mapping"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":mapping"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_mature_proteins";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_mature_proteins");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":matureProtein"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":matureProtein"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_medicals";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_medicals");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":medical"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":medical"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_metal_binding_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_metal_binding_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":metalBindingSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":metalBindingSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_miscellaneouss";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_miscellaneouss");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":miscellaneous"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":miscellaneous"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_miscellaneous_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_miscellaneous_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":miscellaneousRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":miscellaneousRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_miscellaneous_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_miscellaneous_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":miscellaneousSite"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":miscellaneousSite"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_mitochondrial_transit_peptides";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_mitochondrial_transit_peptides");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject,
-                    config.createIriMapping(":mitochondrialTransitPeptide"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":mitochondrialTransitPeptide"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_modified_residues";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_modified_residues");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":modifiedResidue"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":modifiedResidue"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_mutagenesiss";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_mutagenesiss");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":mutagenesis"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":mutagenesis"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_non_terminal_residues";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_non_terminal_residues");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":nonTerminalResidue"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":nonTerminalResidue"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_nucleotide_phosphate_binding_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_nucleotide_phosphate_binding_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject,
-                    config.createIriMapping(":nucleotidePhosphateBindingRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":nucleotidePhosphateBindingRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_pathways";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_pathways");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":pathway"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":pathway"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_pdb_mappings";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_pdb_mappings");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":pdbMapping"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":pdbMapping"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_peptide_mappings";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_peptide_mappings");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":peptideMapping"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":peptideMapping"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_positional_annotations";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_positional_annotations");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":positionalAnnotation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":positionalAnnotation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_processing_products";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_processing_products");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":processingProduct"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":processingProduct"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_propeptides";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_propeptides");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":propeptide"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":propeptide"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_ptms";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_ptms");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":ptm"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":ptm"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_ptm_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_ptm_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":ptmInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":ptmInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":region"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":region"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_repeats";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_repeats");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":repeat"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":repeat"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_secondary_structures";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_secondary_structures");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":secondaryStructure"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":secondaryStructure"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_selenocysteines";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_selenocysteines");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":selenocysteine"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":selenocysteine"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_sequence_cautions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_sequence_cautions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":sequenceCaution"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":sequenceCaution"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_sequence_conflicts";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_sequence_conflicts");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":sequenceConflict"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":sequenceConflict"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_short_sequence_motifs";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_short_sequence_motifs");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":shortSequenceMotif"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":shortSequenceMotif"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_sites";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_sites");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":site"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":site"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_small_molecule_interactions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_small_molecule_interactions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":smallMoleculeInteraction"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":smallMoleculeInteraction"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_srm_peptide_mappings";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_srm_peptide_mappings");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":srmPeptideMapping"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":srmPeptideMapping"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_subcellular_locations";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_subcellular_locations");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":subcellularLocation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":subcellularLocation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_subcellular_location_notes";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_subcellular_location_notes");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":subcellularLocationNote"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":subcellularLocationNote"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_topological_domains";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_topological_domains");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":topologicalDomain"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":topologicalDomain"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_topologies";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_topologies");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":topology"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":topology"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_transmembrane_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_transmembrane_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":transmembraneRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":transmembraneRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_transport_activities";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_transport_activities");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":transportActivity"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":transportActivity"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_turns";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_turns");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":turn"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":turn"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_undetected_expressions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_undetected_expressions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":undetectedExpression"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":undetectedExpression"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_uniprot_keywords";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_uniprot_keywords");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":uniprotKeyword"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":uniprotKeyword"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_variants";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_variants");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":variant"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":variant"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_variant_infos";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_variant_infos");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":variantInfo"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":variantInfo"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "isoform_zinc_finger_regions";
-            NodeMapping subject = config.createIriMapping(isoform, "isoform");
+            Table table = new Table(schema, "isoform_zinc_finger_regions");
+            NodeMapping subject = config.createIriMapping("nextprot:isoform", "isoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":zincFingerRegion"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":zincFingerRegion"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
     }
 
 
-    private static void addAnnotationQuadMapping(NeXtProtConfiguration config)
+    private static void addAnnotationQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass annotation = config.getIriClass("annotation");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "annotation_bases";
-            NodeMapping subject = config.createIriMapping(annotation, "id");
+            Table table = new Table(schema, "annotation_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("schema", "type"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":quality"),
-                    config.createIriMapping("schema", "quality"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":term"),
-                    config.createIriMapping("terminology", "term"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":impactedObject"),
-                    config.createIriMapping("annotation", "impacted_object"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":entryAnnotationId"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("nextprot:schema", "type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":quality"),
+                    config.createIriMapping("nextprot:schema", "quality"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":term"),
+                    config.createIriMapping("nextprot:terminology", "term"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":impactedObject"),
+                    config.createIriMapping("nextprot:annotation", "impacted_object"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":entryAnnotationId"),
                     config.createLiteralMapping(xsdString, "entry_annotation"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":variation"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":variation"),
                     config.createLiteralMapping(xsdString, "variation"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":original"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":original"),
                     config.createLiteralMapping(xsdString, "original"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":method"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":method"),
                     config.createLiteralMapping(xsdString, "method"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":peptideUnicity"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":peptideUnicity"),
                     config.createLiteralMapping(xsdString, "peptide_unicity"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":peptideName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":peptideName"),
                     config.createLiteralMapping(xsdString, "peptide_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":antibodyUnicity"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":antibodyUnicity"),
                     config.createLiteralMapping(xsdString, "antibody_unicity"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":antibodyName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":antibodyName"),
                     config.createLiteralMapping(xsdString, "antibody_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":start"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":start"),
                     config.createLiteralMapping(xsdInt, "position_start"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":end"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":end"),
                     config.createLiteralMapping(xsdInt, "position_end"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":resolution"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":resolution"),
                     config.createLiteralMapping(xsdDouble, "resolution"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":proteotypic"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":proteotypic"),
                     config.createLiteralMapping(xsdBoolean, "proteotypic"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":selfInteraction"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":selfInteraction"),
                     config.createLiteralMapping(xsdBoolean, "self_interaction"));
         }
 
 
 
         {
-            String table = "annotation_evidences";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_evidences");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":evidence"),
-                    config.createIriMapping("evidence", "evidence"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":evidence"),
+                    config.createIriMapping("nextprot:evidence", "evidence"));
         }
 
         {
-            String table = "annotation_negative_evidences";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_negative_evidences");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":negativeEvidence"),
-                    config.createIriMapping("evidence", "evidence"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":negativeEvidence"),
+                    config.createIriMapping("nextprot:evidence", "evidence"));
         }
 
         {
-            String table = "annotation_diseases";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_diseases");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":disease"),
-                    config.createIriMapping("terminology", "disease"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":disease"),
+                    config.createIriMapping("nextprot:terminology", "disease"));
         }
 
         {
-            String table = "annotation_comments";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_comments");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:comment"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:comment"),
                     config.createLiteralMapping(xsdString, "comment"));
         }
 
         {
-            String table = "annotation_isoform_specificities";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_isoform_specificities");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":isoformSpecificity"),
-                    config.createIriMapping("schema", "specificity"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoformSpecificity"),
+                    config.createIriMapping("nextprot:schema", "specificity"));
         }
 
         {
-            String table = "annotation_entry_interactants";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_entry_interactants");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":interactant"),
-                    config.createIriMapping("entry", "interactant"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":interactant"),
+                    config.createIriMapping("nextprot:entry", "interactant"));
         }
 
         {
-            String table = "annotation_isoform_interactants";
-            NodeMapping subject = config.createIriMapping(annotation, "annotation");
+            Table table = new Table(schema, "annotation_isoform_interactants");
+            NodeMapping subject = config.createIriMapping("nextprot:annotation", "annotation");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":interactant"),
-                    config.createIriMapping("isoform", "interactant"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":interactant"),
+                    config.createIriMapping("nextprot:isoform", "interactant"));
         }
     }
 
 
-    private static void addEvidenceQuadMapping(NeXtProtConfiguration config)
+    private static void addEvidenceQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass evidence = config.getIriClass("evidence");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "evidence_bases";
-            NodeMapping subject = config.createIriMapping(evidence, "id");
+            Table table = new Table(schema, "evidence_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:evidence", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Evidence"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":negative"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":negative"),
                     config.createLiteralMapping(xsdBoolean, "negative"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":numberOfExperiments"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":numberOfExperiments"),
                     config.createLiteralMapping(xsdInt, "number_of_experiments"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":evidenceCode"),
-                    config.createIriMapping("terminology", "evidence_code"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":experimentalContext"),
-                    config.createIriMapping("context", "experimental_context"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":assignedBy"),
-                    config.createIriMapping("source", "assigned_by"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":expressionLevel"),
-                    config.createIriMapping("schema", "expression_level"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":fromXref"),
-                    config.createIriMapping("database", "from_xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":integrationLevel"),
-                    config.createIriMapping("schema", "integration_level"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":quality"),
-                    config.createIriMapping("schema", "quality"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":isoformSpecificity"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":evidenceCode"),
+                    config.createIriMapping("nextprot:terminology", "evidence_code"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":experimentalContext"),
+                    config.createIriMapping("nextprot:context", "experimental_context"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":assignedBy"),
+                    config.createIriMapping("nextprot:source", "assigned_by"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":expressionLevel"),
+                    config.createIriMapping("nextprot:schema", "expression_level"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":fromXref"),
+                    config.createIriMapping("nextprot:database", "from_xref"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":integrationLevel"),
+                    config.createIriMapping("nextprot:schema", "integration_level"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":quality"),
+                    config.createIriMapping("nextprot:schema", "quality"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoformSpecificity"),
                     config.createLiteralMapping(xsdString, "isoform_specificity"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":antibodiesAcc"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":antibodiesAcc"),
                     config.createLiteralMapping(xsdString, "antibodies_acc"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":assocType"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":assocType"),
                     config.createLiteralMapping(xsdString, "assoc_type"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cellLine"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cellLine"),
                     config.createLiteralMapping(xsdString, "cell_line"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":goQualifier"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":goQualifier"),
                     config.createLiteralMapping(xsdString, "go_qualifier"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":intensity"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":intensity"),
                     config.createLiteralMapping(xsdString, "intensity"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":negativeIsoformSpecificity"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":negativeIsoformSpecificity"),
                     config.createLiteralMapping(xsdString, "negative_isoform_specificity"));
         }
 
         {
-            String table = "evidence_publication_references";
-            NodeMapping subject = config.createIriMapping(evidence, "evidence");
+            Table table = new Table(schema, "evidence_publication_references");
+            NodeMapping subject = config.createIriMapping("nextprot:evidence", "evidence");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":reference"),
-                    config.createIriMapping("publication", "publication"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":reference"),
+                    config.createIriMapping("nextprot:publication", "publication"));
         }
     }
 
 
-    private static void addEntryQuadMapping(NeXtProtConfiguration config)
+    private static void addEntryQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass entry = config.getIriClass("entry");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "entry_bases";
-            NodeMapping subject = config.createIriMapping(entry, "id");
+            Table table = new Table(schema, "entry_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Entry"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":isoformCount"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoformCount"),
                     config.createLiteralMapping(xsdInt, "isoform_count"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":existence"),
-                    config.createIriMapping("schema", "existence"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("purl_uniprot", "exact_match"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":swissprotPage"),
-                    config.createIriMapping("uniprot", "swissprot_page"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":existence"),
+                    config.createIriMapping("nextprot:schema", "existence"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("purl:uniprot", "uniprot"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":swissprotPage"),
+                    config.createIriMapping("reference:uniprot", "uniprot"));
         }
 
         {
-            String table = "entry_classifiers";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_classifiers");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":classifiedWith"),
-                    config.createIriMapping("terminology", "classifier"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":classifiedWith"),
+                    config.createIriMapping("nextprot:terminology", "classifier"));
         }
 
         {
-            String table = "entry_genes";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_genes");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":gene"),
-                    config.createIriMapping("gene", "gene"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":gene"),
+                    config.createIriMapping("nextprot:gene", "gene"));
         }
 
         {
-            String table = "isoform_bases";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "isoform_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":isoform"),
-                    config.createIriMapping("isoform", "id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoform"),
+                    config.createIriMapping("nextprot:isoform", "id"));
         }
 
         {
-            String table = "entry_publication_references";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_publication_references");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":reference"),
-                    config.createIriMapping("publication", "publication"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":reference"),
+                    config.createIriMapping("nextprot:publication", "publication"));
         }
 
         {
-            String table = "entry_recommended_names";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_recommended_names");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createBlankNodeMapping(config.nameClass, "name"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
+                    config.createBlankNodeMapping("name", "name"));
         }
 
         {
-            String table = "entry_alternative_names";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_alternative_names");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createBlankNodeMapping(config.nameClass, "name"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
+                    config.createBlankNodeMapping("name", "name"));
         }
 
         {
-            String table = "entry_additional_names";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_additional_names");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":additionalNames"),
-                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":additionalNames"),
+                    config.createBlankNodeMapping("name_list", "name_list"));
         }
 
         {
-            String table = "entry_cleaved_region_names";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_cleaved_region_names");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cleavedRegionNames"),
-                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cleavedRegionNames"),
+                    config.createBlankNodeMapping("name_list", "name_list"));
         }
 
         {
-            String table = "entry_functional_region_names";
-            NodeMapping subject = config.createIriMapping(entry, "entry");
+            Table table = new Table(schema, "entry_functional_region_names");
+            NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":fonctionalRegionNames"),
-                    config.createBlankNodeMapping(config.nameListClass, "name_list"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":fonctionalRegionNames"),
+                    config.createBlankNodeMapping("name_list", "name_list"));
         }
     }
 
 
-    private static void addProteoformQuadMapping(NeXtProtConfiguration config)
+    private static void addProteoformQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass proteoform = config.getIriClass("proteoform");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "proteoform_bases";
-            NodeMapping subject = config.createIriMapping(proteoform, "id");
+            Table table = new Table(schema, "proteoform_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:proteoform", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Proteoform"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
         }
 
         {
-            String table = "proteoform_general_annotations";
-            NodeMapping subject = config.createIriMapping(proteoform, "proteoform");
+            Table table = new Table(schema, "proteoform_general_annotations");
+            NodeMapping subject = config.createIriMapping("nextprot:proteoform", "proteoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":generalAnnotation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":generalAnnotation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "proteoform_generic_phenotypes";
-            NodeMapping subject = config.createIriMapping(proteoform, "proteoform");
+            Table table = new Table(schema, "proteoform_generic_phenotypes");
+            NodeMapping subject = config.createIriMapping("nextprot:proteoform", "proteoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":genericPhenotype"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":genericPhenotype"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "proteoform_modifications";
-            NodeMapping subject = config.createIriMapping(proteoform, "proteoform");
+            Table table = new Table(schema, "proteoform_modifications");
+            NodeMapping subject = config.createIriMapping("nextprot:proteoform", "proteoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":modification"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":modification"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
 
         {
-            String table = "proteoform_phenotypic_variations";
-            NodeMapping subject = config.createIriMapping(proteoform, "proteoform");
+            Table table = new Table(schema, "proteoform_phenotypic_variations");
+            NodeMapping subject = config.createIriMapping("nextprot:proteoform", "proteoform");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":phenotypicVariation"),
-                    config.createIriMapping("annotation", "annotation"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":phenotypicVariation"),
+                    config.createIriMapping("nextprot:annotation", "annotation"));
         }
     }
 
 
-    private static void addGeneQuadMapping(NeXtProtConfiguration config)
+    private static void addGeneQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass gene = config.getIriClass("gene");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "gene_bases";
-            NodeMapping subject = config.createIriMapping(gene, "id");
+            Table table = new Table(schema, "gene_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:gene", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Gene"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":begin"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":begin"),
                     config.createLiteralMapping(xsdInt, "gene_begin"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":end"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":end"),
                     config.createLiteralMapping(xsdInt, "gene_end"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":length"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":length"),
                     config.createLiteralMapping(xsdInt, "length"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":band"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":band"),
                     config.createLiteralMapping(xsdString, "band"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":chromosome"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":chromosome"),
                     config.createLiteralMapping(xsdString, "chromosome"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":strand"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":strand"),
                     config.createLiteralMapping(xsdString, "strand"));
         }
 
         {
-            String table = "gene_best_locations";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_best_locations");
+            NodeMapping subject = config.createIriMapping("nextprot:gene", "gene");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":bestGeneLocation"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":bestGeneLocation"),
                     config.createLiteralMapping(xsdBoolean, "best_location"));
         }
 
         {
-            String table = "gene_names";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_names");
+            NodeMapping subject = config.createIriMapping("nextprot:gene", "gene");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":name"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":name"),
                     config.createLiteralMapping(xsdString, "name"));
         }
     }
 
 
-    private static void addProteinSequenceQuadMapping(NeXtProtConfiguration config)
+    private static void addProteinSequenceQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass sequence = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass sequence = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "protein_sequence_bases";
+            Table table = new Table(schema, "protein_sequence_bases");
             NodeMapping subject = config.createBlankNodeMapping(sequence, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":ProteinSequence"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":length"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":length"),
                     config.createLiteralMapping(xsdInt, "length"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":molecularWeight"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":molecularWeight"),
                     config.createLiteralMapping(xsdDouble, "molecular_weight"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":isoelectricPoint"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoelectricPoint"),
                     config.createLiteralMapping(xsdDouble, "isoelectric_point"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":chain"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":chain"),
                     config.createLiteralMapping(xsdString, "chain"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("isoform", "isoform"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:isoform", "isoform"),
                     config.createIriMapping(":sequence"), subject);
         }
     }
 
 
-    private static void addProteinFamilyInfoQuadMapping(NeXtProtConfiguration config)
+    private static void addProteinFamilyInfoQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass family = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass family = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "family_info_bases";
+            Table table = new Table(schema, "family_info_bases");
             NodeMapping subject = config.createBlankNodeMapping(family, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":FamilyInfo"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":term"),
-                    config.createIriMapping("terminology", "term"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":region"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":term"),
+                    config.createIriMapping("nextprot:terminology", "term"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":region"),
                     config.createLiteralMapping(xsdString, "region"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":description"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":description"),
                     config.createLiteralMapping(xsdString, "description"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("entry", "entry"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:entry", "entry"),
                     config.createIriMapping(":family"), subject);
         }
     }
 
 
-    private static void addHistoryQuadMapping(NeXtProtConfiguration config)
+    private static void addHistoryQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass history = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass history = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             DateConstantZoneClass xsdDateNoZone = DateConstantZoneClass.get(Integer.MIN_VALUE);
 
-            String table = "history_bases";
+            Table table = new Table(schema, "history_bases");
             NodeMapping subject = config.createBlankNodeMapping(history, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":History"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":integrated"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":integrated"),
                     config.createLiteralMapping(xsdDateNoZone, "integrated"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":updated"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":updated"),
                     config.createLiteralMapping(xsdDateNoZone, "updated"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":lastSequenceUpdate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":lastSequenceUpdate"),
                     config.createLiteralMapping(xsdDateNoZone, "last_sequence_update"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":version"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":version"),
                     config.createLiteralMapping(xsdString, "version"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":sequenceVersion"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":sequenceVersion"),
                     config.createLiteralMapping(xsdString, "sequence_version"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":name"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":name"),
                     config.createLiteralMapping(xsdString, "name"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("entry", "entry"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:entry", "entry"),
                     config.createIriMapping(":history"), subject);
         }
     }
 
 
-    private static void addIdentifierQuadMapping(NeXtProtConfiguration config)
+    private static void addIdentifierQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass identifier = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass identifier = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "identifier_bases";
+            Table table = new Table(schema, "identifier_bases");
             NodeMapping subject = config.createBlankNodeMapping(identifier, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Identifier"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
-                    config.createIriMapping("database", "provenance"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
+                    config.createIriMapping("nextprot:database", "provenance"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("entry", "entry"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:entry", "entry"),
                     config.createIriMapping(":reference"), subject);
         }
     }
 
 
-    private static void addEntryXrefQuadMapping(NeXtProtConfiguration config)
+    private static void addEntryXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass xref = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "entry_xref_bases";
+            Table table = new Table(schema, "entry_xref_bases");
             NodeMapping subject = config.createBlankNodeMapping(xref, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
-                    config.createIriMapping("database", "provenance"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
+                    config.createIriMapping("nextprot:database", "provenance"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("entry", "entry"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:entry", "entry"),
                     config.createIriMapping(":reference"), subject);
         }
     }
 
 
-    private static void addEvidenceXrefQuadMapping(NeXtProtConfiguration config)
+    private static void addEvidenceXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass xref = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "evidence_xref_bases";
+            Table table = new Table(schema, "evidence_xref_bases");
             NodeMapping subject = config.createBlankNodeMapping(xref, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
-                    config.createIriMapping("database", "provenance"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
+                    config.createIriMapping("nextprot:database", "provenance"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("evidence", "evidence"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:evidence", "evidence"),
                     config.createIriMapping(":reference"), subject);
         }
     }
 
 
-    private static void addChebiXrefQuadMapping(NeXtProtConfiguration config)
+    private static void addChebiXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass xref = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "chebi_xref_bases";
+            Table table = new Table(schema, "chebi_xref_bases");
             NodeMapping subject = config.createBlankNodeMapping(xref, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
                     config.createIriMapping("db:ChEBI"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("chebi", "exact_match"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "chebi"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("annotation", "annotation"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:annotation", "annotation"),
                     config.createIriMapping(":interactant"), subject);
         }
     }
 
 
-    private static void addDrugBankXrefQuadMapping(NeXtProtConfiguration config)
+    private static void addDrugBankXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass xref = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "drugbank_xref_bases";
+            Table table = new Table(schema, "drugbank_xref_bases");
             NodeMapping subject = config.createBlankNodeMapping(xref, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
                     config.createIriMapping("db:DrugBank"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("drugbank", "exact_match"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("rdf:drugbank", "drugbank"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("annotation", "annotation"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:annotation", "annotation"),
                     config.createIriMapping(":interactant"), subject);
         }
     }
 
 
-    private static void addUniProtXrefQuadMapping(NeXtProtConfiguration config)
+    private static void addUniProtXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass(config.blankNodeSegment++);
+        BlankNodeClass xref = config.getNewIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "uniprot_xref_bases";
+            Table table = new Table(schema, "uniprot_xref_bases");
             NodeMapping subject = config.createBlankNodeMapping(xref, "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":provenance"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":provenance"),
                     config.createIriMapping("db:UniProt"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("purl_uniprot", "exact_match"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":accession"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("purl:uniprot", "uniprot"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
 
-            config.addQuadMapping(schema, table, graph, config.createIriMapping("annotation", "annotation"),
+            config.addQuadMapping(table, graph, config.createIriMapping("nextprot:annotation", "annotation"),
                     config.createIriMapping(":interactant"), subject);
         }
     }
 
 
-    private static void addNameQuadMapping(NeXtProtConfiguration config)
+    private static void addNameQuadMapping(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "name_bases";
-            NodeMapping subject = config.createBlankNodeMapping(new UserIntBlankNodeClass(config.blankNodeSegment++),
-                    "id");
+            Table table = new Table(schema, "name_bases");
+            NodeMapping subject = config.createBlankNodeMapping(config.getNewIntBlankNodeClass(), "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":fullName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":fullName"),
                     config.createLiteralMapping(xsdString, "full_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":shortName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":shortName"),
                     config.createLiteralMapping(xsdString, "short_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":fullRegionName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":fullRegionName"),
                     config.createLiteralMapping(xsdString, "full_region_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":shortRegionName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":shortRegionName"),
                     config.createLiteralMapping(xsdString, "short_region_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":ecEnzymeName"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":ecEnzymeName"),
                     config.createLiteralMapping(xsdString, "ec_enzyme_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cdAntigenCdAntigen"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cdAntigenCdAntigen"),
                     config.createLiteralMapping(xsdString, "cd_antigen"));
-            config.addQuadMapping(schema, table, graph, subject,
+            config.addQuadMapping(table, graph, subject,
                     config.createIriMapping(":innInternationalNonproprietaryNames"),
                     config.createLiteralMapping(xsdString, "inn_name"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":allergenAllergen"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":allergenAllergen"),
                     config.createLiteralMapping(xsdString, "allergen"));
         }
     }
 
 
-    private static void addNameListQuadMapping(NeXtProtConfiguration config)
+    private static void addNameListQuadMapping(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "name_list_bases";
-            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "id");
+            Table table = new Table(schema, "name_list_bases");
+            NodeMapping subject = config.createBlankNodeMapping("name_list", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":NameList"));
         }
 
         {
-            String table = "name_list_recommended_names";
-            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "list");
+            Table table = new Table(schema, "name_list_recommended_names");
+            NodeMapping subject = config.createBlankNodeMapping("name_list", "list");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createBlankNodeMapping(config.nameClass, "name"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
+                    config.createBlankNodeMapping("name", "name"));
         }
 
         {
-            String table = "name_list_alternative_names";
-            NodeMapping subject = config.createBlankNodeMapping(config.nameListClass, "list");
+            Table table = new Table(schema, "name_list_alternative_names");
+            NodeMapping subject = config.createBlankNodeMapping("name_list", "list");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createBlankNodeMapping(config.nameClass, "name"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
+                    config.createBlankNodeMapping("name", "name"));
         }
     }
 }

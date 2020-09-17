@@ -2,46 +2,41 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class BindingSite
+public class BindingSite
 {
-    static void addIriClasses(ChemblConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("binding_site", "bigint",
+        config.addIriClass(new IntegerUserIriClass("chembl:binding_site", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/binding_site/CHEMBL_BS_"));
     }
 
 
-    static void addQuadMapping(ChemblConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass site = config.getIriClass("binding_site");
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        String table = "binding_sites";
-        NodeMapping subject = config.createIriMapping(site, "site_id");
+        Table table = new Table(schema, "binding_sites");
+        NodeMapping subject = config.createIriMapping("chembl:binding_site", "id");
 
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("cco:BindingSite"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:hasTarget"),
-                config.createIriMapping("target", "tid"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
-                config.createLiteralMapping(xsdString, "('CHEMBL_BS_' || site_id)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "('CHEMBL_BS_' || site_id)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:bindingSiteName"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasTarget"),
+                config.createIriMapping("chembl:target", "target_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+                config.createLiteralMapping(xsdString, "chembl_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                config.createLiteralMapping(xsdString, "chembl_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:bindingSiteName"),
                 config.createLiteralMapping(xsdString, "site_name"));
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("target", "tid"),
+        config.addQuadMapping(table, graph, config.createIriMapping("chembl:target", "target_id"),
                 config.createIriMapping("cco:hasBindingSite"), subject);
     }
 }

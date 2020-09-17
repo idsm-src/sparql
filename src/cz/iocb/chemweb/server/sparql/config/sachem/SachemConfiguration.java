@@ -13,6 +13,7 @@ import java.util.HashMap;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
@@ -153,14 +154,13 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
     private void loadQuadMapping() throws SQLException
     {
-        UserIriClass compound = getIriClass("compound");
-
         NodeMapping subject = createIriMapping("compound_molfile", "id");
 
-        addQuadMapping(schema, table, null, subject, createIriMapping("rdf:type"), createIriMapping("sio:SIO_011120"));
-        addQuadMapping(schema, table, null, subject, createIriMapping("sio:is-attribute-of"),
-                createIriMapping(compound, "id"));
-        addQuadMapping(schema, table, null, subject, createIriMapping("sio:has-value"),
+        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("rdf:type"),
+                createIriMapping("sio:SIO_011120"));
+        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("sio:is-attribute-of"),
+                createIriMapping("compound", "id"));
+        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("sio:has-value"),
                 createLiteralMapping(xsdString, "molfile"));
     }
 

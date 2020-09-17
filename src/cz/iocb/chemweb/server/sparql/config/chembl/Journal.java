@@ -2,49 +2,43 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Journal
+public class Journal
 {
-    static void addIriClasses(ChemblConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("journal", "integer",
+        config.addIriClass(new IntegerUserIriClass("chembl:journal", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/journal/CHEMBL_JRN_"));
     }
 
 
-    static void addQuadMapping(ChemblConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass journal = config.getIriClass("journal");
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        String table = "journal_dictionary";
-        NodeMapping subject = config.createIriMapping(journal, "journal_id");
+        Table table = new Table(schema, "journal_dictionary");
+        NodeMapping subject = config.createIriMapping("chembl:journal", "id");
 
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("cco:Journal"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:chemblId"),
-                config.createLiteralMapping(xsdString, "('CHEMBL_JRN_' || journal_id)"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdfs:label"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
+                config.createLiteralMapping(xsdString, "chembl_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "label"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("dcterms:title"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                 config.createLiteralMapping(xsdString, "title"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bibo:shortTitle"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("bibo:shortTitle"),
                 config.createLiteralMapping(xsdString, "short_title"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bibo:issn"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("bibo:issn"),
                 config.createLiteralMapping(xsdString, "issn"));
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("bibo:eissn"),
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("bibo:eissn"),
                 config.createLiteralMapping(xsdString, "eissn"));
     }
 }

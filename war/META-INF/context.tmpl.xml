@@ -10,7 +10,7 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
-  <Resource name="jdbc:pubchem" auth="Container"
+  <Resource name="jdbc:idsm" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
       type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
       url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
@@ -19,14 +19,6 @@
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
   <Resource name="jdbc:nextprot" auth="Container"
-      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
-      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
-      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
-      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
-      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
-      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
-
-  <Resource name="jdbc:chembl_25" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
       type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
       url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
@@ -106,20 +98,15 @@
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:empty" singleton="true" />
 
-  <Resource name="sparql:pubchem" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration"
+  <Resource name="sparql:idsm" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.idsm.IdsmConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
-      datasource="jdbc:pubchem" singleton="true" />
+      datasource="jdbc:idsm" singleton="true" />
 
   <Resource name="sparql:nextprot" auth="Container"
       type="cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:nextprot" singleton="true" />
-
-  <Resource name="sparql:chembl" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration"
-      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
-      datasource="jdbc:chembl_25" singleton="true" />
 
 
   <Resource name="sparql:sachem-chebi" auth="Container"

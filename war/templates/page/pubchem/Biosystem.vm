@@ -19,7 +19,7 @@
   #end
 
   #sparql($organism)
-    SELECT ?NAME FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    SELECT ?NAME FROM pubchem:biosystem FROM dataset:ontology WHERE
     {
       $entity bp:organism / rdfs:label ?NAME
     }
@@ -41,7 +41,7 @@
 
 
   #sparql($components)
-    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:biosystem FROM pubchem:ontology WHERE
+    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:biosystem FROM dataset:ontology WHERE
     {
       $entity bp:pathwayComponent ?COMPONENT.
 

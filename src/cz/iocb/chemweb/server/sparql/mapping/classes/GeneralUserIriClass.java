@@ -40,24 +40,25 @@ public class GeneralUserIriClass extends UserIriClass
     private final List<Function> inverseFunction;
 
 
-    public GeneralUserIriClass(String schema, String name, List<String> sqlTypes, String pattern, SqlCheck sqlCheck)
+    public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern,
+            SqlCheck sqlCheck)
     {
         super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
         this.sqlCheck = sqlCheck;
         this.pattern = pattern;
-        this.function = new Function(schema, name);
+        this.function = new Function(schema, function);
 
 
         inverseFunction = new ArrayList<Function>(sqlTypes.size());
 
         if(sqlTypes.size() == 1)
         {
-            inverseFunction.add(new Function(schema, name + "_inverse"));
+            inverseFunction.add(new Function(schema, function + "_inverse"));
         }
         else
         {
             for(int i = 0; i < sqlTypes.size(); i++)
-                inverseFunction.add(new Function(schema, name + "_inv" + (i + 1)));
+                inverseFunction.add(new Function(schema, function + "_inv" + (i + 1)));
         }
 
 
@@ -98,9 +99,9 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    public GeneralUserIriClass(String schema, String name, List<String> sqlTypes, String pattern)
+    public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern)
     {
-        this(schema, name, sqlTypes, pattern, SqlCheck.NEVER);
+        this(name, schema, function, sqlTypes, pattern, SqlCheck.NEVER);
     }
 
 
@@ -232,6 +233,7 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
+    @Override
     public boolean match(String iri, Request request)
     {
         if(iri.matches(pattern))
@@ -251,6 +253,7 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
+    @Override
     public boolean match(String iri, DataSource connectionPool)
     {
         if(iri.matches(pattern))

@@ -1,44 +1,44 @@
 package cz.iocb.chemweb.server.sparql.config.nextprot;
 
 import static cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration.schema;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Context
+public class Context
 {
-    static void addIriClasses(NeXtProtConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("context", "integer", "http://nextprot.org/rdf/context/"));
+        config.addIriClass(new IntegerUserIriClass("nextprot:context", "integer", "http://nextprot.org/rdf/context/"));
     }
 
 
-    static void addQuadMapping(NeXtProtConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass context = config.getIriClass("context");
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            String table = "context_bases";
-            NodeMapping subject = config.createIriMapping(context, "id");
+            Table table = new Table(schema, "context_bases");
+            NodeMapping subject = config.createIriMapping("nextprot:context", "id");
 
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":ExperimentalContext"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":metadata"),
-                    config.createIriMapping("publication", "metadata"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":detectionMethod"),
-                    config.createIriMapping("terminology", "method"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":disease"),
-                    config.createIriMapping("terminology", "disease"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":tissue"),
-                    config.createIriMapping("terminology", "tissue"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":cellLine"),
-                    config.createIriMapping("terminology", "line"));
-            config.addQuadMapping(schema, table, graph, subject, config.createIriMapping(":developmentalStage"),
-                    config.createIriMapping("terminology", "stage"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":metadata"),
+                    config.createIriMapping("nextprot:publication", "metadata"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":detectionMethod"),
+                    config.createIriMapping("nextprot:terminology", "method"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":disease"),
+                    config.createIriMapping("nextprot:terminology", "disease"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":tissue"),
+                    config.createIriMapping("nextprot:terminology", "tissue"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":cellLine"),
+                    config.createIriMapping("nextprot:terminology", "line"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping(":developmentalStage"),
+                    config.createIriMapping("nextprot:terminology", "stage"));
         }
     }
 }

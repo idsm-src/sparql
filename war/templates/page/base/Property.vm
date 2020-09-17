@@ -10,7 +10,7 @@
 <div class="VET-Page">
 
   #sparql($info)
-    SELECT ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?LABEL FROM dataset:ontology WHERE
     {
       $entity rdfs:label ?LABEL.
     }
@@ -28,14 +28,14 @@
       #end
 
       #sparql($domains)
-        SELECT ?CLASS FROM pubchem:ontology WHERE
+        SELECT ?CLASS FROM dataset:ontology WHERE
         {
           $entity rdfs:domain ?CLASS .
         }
       #end
 
       #sparql($ranges)
-        SELECT ?CLASS FROM pubchem:ontology WHERE
+        SELECT ?CLASS FROM dataset:ontology WHERE
         {
           $entity rdfs:range ?CLASS .
         }
@@ -66,7 +66,7 @@
 
   #macro(superlevelProperties $property $label $depth $count)
     #sparql($superproperties)
-      SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+      SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
       {
         $property rdfs:subPropertyOf ?PROPERTY.
         ?PROPERTY rdfs:label ?LABEL.
@@ -97,7 +97,7 @@
 
 
   #sparql($superproperties)
-    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
     {
       $entity rdfs:subPropertyOf ?PROPERTY.
       ?PROPERTY rdfs:label ?LABEL.
@@ -128,7 +128,7 @@
 
   #macro(sublevelProperties $property $label $depth $count)
     #sparql($subproperties)
-      SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+      SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
       {
         ?PROPERTY rdfs:subPropertyOf $property.
         ?PROPERTY rdfs:label ?LABEL.
@@ -159,7 +159,7 @@
 
 
   #sparql($subproperties)
-    SELECT ?PROPERTY ?LABEL FROM pubchem:ontology WHERE
+    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
     {
       ?PROPERTY rdfs:subPropertyOf $entity.
       ?PROPERTY rdfs:label ?LABEL.

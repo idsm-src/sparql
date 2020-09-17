@@ -1,74 +1,74 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Gene
+public class Gene
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("gene", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID"));
-        config.addIriClass(new StringUserIriClass("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/"));
+        config.addIriClass(
+                new IntegerUserIriClass("pubchem:gene", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID"));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass gene = config.getIriClass("gene");
         ConstantIriMapping graph = config.createIriMapping("pubchem:gene");
 
         {
-            String table = "gene_bases";
-            NodeMapping subject = config.createIriMapping(gene, "id");
+            Table table = new Table(schema, "gene_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "id");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Gene"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Gene.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:pageTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Gene.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:title"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:description"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:description"),
                     config.createLiteralMapping(rdfLangStringEn, "description"));
         }
 
         {
-            String table = "gene_biosystems";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_biosystems");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
-                    config.createIriMapping("biosystem", "biosystem"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+                    config.createIriMapping("pubchem:biosystem", "biosystem"));
         }
 
         {
-            String table = "gene_alternatives";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_alternatives");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("dcterms:alternative"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
                     config.createLiteralMapping(rdfLangStringEn, "alternative"));
         }
 
         {
-            String table = "gene_references";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_references");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
-                    config.createIriMapping("reference", "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("pubchem:reference", "reference"));
         }
 
         {
-            String table = "gene_matches";
-            NodeMapping subject = config.createIriMapping(gene, "gene");
+            Table table = new Table(schema, "gene_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("skos:closeMatch"),
-                    config.createIriMapping("ensembl", "match"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("rdf:ensembl", "match"));
         }
     }
 }

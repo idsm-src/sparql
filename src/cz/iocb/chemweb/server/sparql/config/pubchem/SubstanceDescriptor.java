@@ -1,37 +1,39 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class SubstanceDescriptor
+public class SubstanceDescriptor
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/SID";
 
-        config.addIriClass(new IntegerUserIriClass("substance_version", "integer", prefix, "_Substance_Version"));
+        config.addIriClass(
+                new IntegerUserIriClass("pubchem:substance_version", "integer", prefix, "_Substance_Version"));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass descriptorSubstanceVersion = config.getIriClass("substance_version");
         ConstantIriMapping graph = config.createIriMapping("descriptor:substance");
 
         {
-            String table = "descriptor_substance_bases";
-            NodeMapping subject = config.createIriMapping(descriptorSubstanceVersion, "substance");
+            Table table = new Table(schema, "descriptor_substance_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:substance_version", "substance");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:IAO_0000129"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("template:itemTemplate"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/descriptor/version.vm"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdInt, "version"));
         }
     }

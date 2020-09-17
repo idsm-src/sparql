@@ -1,73 +1,74 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import java.util.Arrays;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class Endpoint
+public class Endpoint
 {
-    static void addIriClasses(PubChemConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new GeneralUserIriClass("pubchem", "endpoint",
+        config.addIriClass(new GeneralUserIriClass("pubchem:endpoint", "pubchem", "endpoint",
                 Arrays.asList("integer", "integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/endpoint/SID[1-9][0-9]*_AID[1-9][0-9]*(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?"));
     }
 
 
-    static void addQuadMapping(PubChemConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass endpoint = config.getIriClass("endpoint");
         ConstantIriMapping graph = config.createIriMapping("pubchem:endpoint");
 
         {
-            String table = "endpoint_bases";
-            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("obo:IAO_0000136"),
-                    config.createIriMapping("substance", "substance"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:IAO_0000136"),
+                    config.createIriMapping("pubchem:substance", "substance"));
         }
 
         {
-            String table = "endpoint_outcomes";
-            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_outcomes");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject,
-                    config.createIriMapping("vocab:PubChemAssayOutcome"),
-                    config.createIriMapping("ontology_resource", Ontology.unitUncategorized, "outcome_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("vocab:PubChemAssayOutcome"),
+                    config.createIriMapping("ontology:resource", Ontology.unitUncategorized, "outcome_id"));
         }
 
         {
-            String table = "endpoint_measurements";
-            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_measurements");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("sio:has-unit"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-unit"),
                     config.createIriMapping("obo:UO_0000064"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("ontology_resource", Ontology.unitBAO, "type_id"));
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("rdfs:label"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology:resource", Ontology.unitBAO, "type_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(rdfLangStringEn, "label"));
         }
 
         {
-            String table = "endpoint_measurement_values";
-            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_measurement_values");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("sio:has-value"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdFloat, "value"));
         }
 
         {
-            String table = "endpoint_references";
-            NodeMapping subject = config.createIriMapping(endpoint, "substance", "bioassay", "measuregroup");
+            Table table = new Table(schema, "endpoint_references");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
-            config.addQuadMapping("pubchem", table, graph, subject, config.createIriMapping("cito:citesAsDataSource"),
-                    config.createIriMapping("reference", "reference"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:citesAsDataSource"),
+                    config.createIriMapping("pubchem:reference", "reference"));
         }
     }
 }

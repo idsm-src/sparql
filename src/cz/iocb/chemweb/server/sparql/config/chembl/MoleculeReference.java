@@ -2,480 +2,315 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 
 
 
-class MoleculeReference
+public class MoleculeReference
 {
-    static void addIriClasses(ChemblConfiguration config)
+    public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new StringUserIriClass("pubchem_compound_reference",
-                "http://pubchem.ncbi.nlm.nih.gov/compound/", "[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("pubchem_substance_reference",
-                "http://pubchem.ncbi.nlm.nih.gov/substance/", "[1-9][0-9]*"));
-
-        config.addIriClass(
-                new StringUserIriClass("zinc_reference", "http://zinc15.docking.org/substances/", "ZINC[0-9]{12}"));
-
-        config.addIriClass(new StringUserIriClass("sure_chembl_reference", "https://www.surechembl.org/chemical/",
-                "SCHEMBL[0-9]+"));
-
-        config.addIriClass(new StringUserIriClass("molport_reference", "https://www.molport.com/shop/molecule-link/",
-                "MolPort(-[0-9]{3}){3}"));
-
-        config.addIriClass(new StringUserIriClass("emolecules_reference",
-                "https://www.emolecules.com/cgi-bin/more?vid=", "[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("mcule_reference", "https://mcule.com/", "MCULE-[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("ibm_patent_structure_reference",
-                "http://www-935.ibm.com/services/us/gbs/bao/siip/nih/?sid=", "[A-F0-9]+"));
-
-        config.addIriClass(new StringUserIriClass("nikkaji_reference",
-                "http://jglobal.jst.go.jp/en/redirect?Nikkaji_No=", "[A-Z0-9.]+"));
-
-        config.addIriClass(new StringUserIriClass("actor_reference", "http://actor.epa.gov/actor/chemical.xhtml?casrn=",
-                "[1-9][0-9]*-[0-9]{2}-[0-9]"));
-
-        config.addIriClass(new StringUserIriClass("chebi_reference",
-                "http://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI%3A", "[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("pdbe_reference",
-                "http://www.ebi.ac.uk/pdbe-srv/pdbechem/chemicalCompound/show/", "[A-Z0-9]{1,3}"));
-
-        config.addIriClass(
-                new StringUserIriClass("nmr_shift_db2_reference", "http://nmrshiftdb.org/molecule/", "[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("kegg_ligand_reference", "http://www.genome.jp/dbget-bin/www_bget?",
-                "C[0-9]{5}"));
-
-        config.addIriClass(new StringUserIriClass("drugbank_reference", "http://www.drugbank.ca/drugs/", "DB[0-9]{5}"));
-
-        config.addIriClass(new StringUserIriClass("hmdb_reference", "http://www.hmdb.ca/metabolites/", "HMDB[0-9]{7}"));
-
-        config.addIriClass(new StringUserIriClass("iuphar_reference",
-                "http://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=", "[1-9][0-9]*"));
-
-        config.addIriClass(
-                new StringUserIriClass("selleck_reference", "http://www.selleckchem.com/products/", "[^/]*", ".html"));
-
-        config.addIriClass(
-                new StringUserIriClass("pharm_gkb_reference", "http://www.pharmgkb.org/drug/", "PA[1-9][0-9]*"));
-
-        config.addIriClass(
-                new StringUserIriClass("atlas_reference", "http://www.ebi.ac.uk/gxa/query?conditionQuery=", ".+"));
-
-        config.addIriClass(new StringUserIriClass("recon_reference", "http://vmh.uni.lu/#metabolite/", "[^/]+"));
-
-        config.addIriClass(new StringUserIriClass("wikipedia_mol_reference", "http://en.wikipedia.org/wiki/", ".+"));
-
-        config.addIriClass(new StringUserIriClass("lincs_reference", "http://identifiers.org/lincs.smallmolecule/",
-                "LSM-[1-9][0-9]*"));
-
-        config.addIriClass(new StringUserIriClass("fda_srs_reference",
-                "http://fdasis.nlm.nih.gov/srs/ProxyServlet?mergeData=true&objectHandle=DBMaint&APPLICATION_NAME=fdasrs&actionHandle=default&nextPage=jsp/srs/ResultScreen.jsp&TXTSUPERLISTID=",
-                "[A-Z0-9]{10}"));
     }
 
 
-    static void addQuadMapping(ChemblConfiguration config)
+    public static void addQuadMapping(SparqlDatabaseConfiguration config)
     {
-        UserIriClass molecule = config.getIriClass("molecule");
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        String table = "molecule_references";
-        NodeMapping subject = config.createIriMapping(molecule, "molregno");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("pubchem_compound_reference", "reference"), "reference_type = 'PUBCHEM'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("pubchem_compound_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' PubChem Reference: ' || reference)"),
-                "reference_type = 'PUBCHEM'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("pubchem_compound_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:PubchemRef"), "reference_type = 'PUBCHEM'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("pubchem_substance_reference", "reference"),
-                "reference_type = 'PUBCHEM THOM PHARM'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("pubchem_substance_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' PubChem Thomson Pharma Subset Reference: ' || reference)"),
-                "reference_type = 'PUBCHEM THOM PHARM'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("pubchem_substance_reference", "reference"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemThomPharmRef"),
-                "reference_type = 'PUBCHEM THOM PHARM'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("pubchem_substance_reference", "reference"), "reference_type = 'PUBCHEM DOTF'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("pubchem_substance_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' PubChem Drugs of the Future Subset Reference: ' || reference)"),
-                "reference_type = 'PUBCHEM DOTF'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("pubchem_substance_reference", "reference"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemDotfRef"),
-                "reference_type = 'PUBCHEM DOTF'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("zinc_reference", "reference"), "reference_type = 'ZINC'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("zinc_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Zinc Reference: ' || reference)"),
-                "reference_type = 'ZINC'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("zinc_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:ZincRef"), "reference_type = 'ZINC'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("sure_chembl_reference", "reference"), "reference_type = 'SURE CHEMBL'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("sure_chembl_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' SureChEMBL Reference: ' || reference)"),
-                "reference_type = 'SURE CHEMBL'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("sure_chembl_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:SureChemblRef"), "reference_type = 'SURE CHEMBL'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("molport_reference", "reference"), "reference_type = 'MOLPORT'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("molport_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' MolPort Reference: ' || reference)"),
-                "reference_type = 'MOLPORT'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("molport_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:MolportRef"), "reference_type = 'MOLPORT'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("emolecules_reference", "reference"), "reference_type = 'EMOLECULES'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("emolecules_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' eMolecules Reference: ' || reference)"),
-                "reference_type = 'EMOLECULES'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("emolecules_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:EmoleculesRef"), "reference_type = 'EMOLECULES'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("mcule_reference", "reference"), "reference_type = 'MCULE'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("mcule_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Mcule Reference: ' || reference)"),
-                "reference_type = 'MCULE'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("mcule_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:MculeRef"), "reference_type = 'MCULE'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("ibm_patent_structure_reference", "reference"),
-                "reference_type = 'IBM PATENT STRUCTURE'");
-
-        config.addQuadMapping(schema, table, graph,
-                config.createIriMapping("ibm_patent_structure_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' IBM Patent Structure Reference: ' || reference)"),
-                "reference_type = 'IBM PATENT STRUCTURE'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("ibm_patent_structure_reference", "reference"),
-                config.createIriMapping("rdf:type"), config.createIriMapping("cco:IbmPatentStructureRef"),
-                "reference_type = 'IBM PATENT STRUCTURE'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("nikkaji_reference", "reference"), "reference_type = 'NIKKAJI'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("nikkaji_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Nikkaji Reference: ' || reference)"),
-                "reference_type = 'NIKKAJI'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("nikkaji_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:NikkajiRef"), "reference_type = 'NIKKAJI'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("actor_reference", "reference"), "reference_type = 'ACTOR'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("actor_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' ACToR Reference: ' || reference)"),
-                "reference_type = 'ACTOR'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("actor_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:ActorRef"), "reference_type = 'ACTOR'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("chebi_reference", "reference"), "reference_type = 'CHEBI'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("chebi_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' ChEBI Reference: ' || reference)"),
-                "reference_type = 'CHEBI'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("chebi_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:ChebiRef"), "reference_type = 'CHEBI'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("pdbe_reference", "reference"), "reference_type = 'PDBE'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("pdbe_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' PDBe Reference: ' || reference)"),
-                "reference_type = 'PDBE'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("pdbe_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:PdbeRef"), "reference_type = 'PDBE'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("nmr_shift_db2_reference", "reference"), "reference_type = 'NMR SHIFT DB2'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("nmr_shift_db2_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' NMRShiftDB Reference: ' || reference)"),
-                "reference_type = 'NMR SHIFT DB2'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("nmr_shift_db2_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:NmrShiftDb2Ref"), "reference_type = 'NMR SHIFT DB2'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("kegg_ligand_reference", "reference"), "reference_type = 'KEGG LIGAND'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("kegg_ligand_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Kegg Ligand Reference: ' || reference)"),
-                "reference_type = 'KEGG LIGAND'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("kegg_ligand_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:KeggLigandRef"), "reference_type = 'KEGG LIGAND'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("drugbank_reference", "reference"), "reference_type = 'DRUGBANK'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("drugbank_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' DrugBank Reference: ' || reference)"),
-                "reference_type = 'DRUGBANK'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("drugbank_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:DrugbankRef"), "reference_type = 'DRUGBANK'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("hmdb_reference", "reference"), "reference_type = 'HMDB'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("hmdb_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || "
-                                + "' The Human Metabolome Database Reference: ' || reference)"),
-                "reference_type = 'HMDB'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("hmdb_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:HmdbRef"), "reference_type = 'HMDB'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("iuphar_reference", "reference"), "reference_type = 'IUPHAR'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("iuphar_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' IUPHAR Reference: ' || reference)"),
-                "reference_type = 'IUPHAR'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("iuphar_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:IupharRef"), "reference_type = 'IUPHAR'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("selleck_reference", "reference"), "reference_type = 'SELLECK'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("selleck_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || " + "' Selleck Chemicals Reference: ' || " + schema
-                                + ".url_decode(reference))"),
-                "reference_type = 'SELLECK'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("selleck_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:SelleckRef"), "reference_type = 'SELLECK'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("pharm_gkb_reference", "reference"), "reference_type = 'PHARM GKB'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("pharm_gkb_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' PharmGKB Reference: ' || reference)"),
-                "reference_type = 'PHARM GKB'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("pharm_gkb_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:PharmGkbRef"), "reference_type = 'PHARM GKB'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("atlas_reference", "reference"), "reference_type = 'ATLAS'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("atlas_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || " + "' Gene Expression Atlas Reference: ' || "
-                                + schema + ".url_decode(reference))"),
-                "reference_type = 'ATLAS'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("atlas_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:AtlasRef"), "reference_type = 'ATLAS'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("recon_reference", "reference"), "reference_type = 'RECON'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("recon_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Recon Reference: ' || reference)"),
-                "reference_type = 'RECON'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("recon_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:ReconRef"), "reference_type = 'RECON'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("wikipedia_mol_reference", "reference"), "reference_type = 'WIKIPEDIA MOL'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("wikipedia_mol_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' Wikipedia Reference: ' || reference)"),
-                "reference_type = 'WIKIPEDIA MOL'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("wikipedia_mol_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:WikipediaMolRef"), "reference_type = 'WIKIPEDIA MOL'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("lincs_reference", "reference"), "reference_type = 'LINCS'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("lincs_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "((select chembl_id from " + schema
-                        + ".molecule_dictionary where molregno = " + schema + ".molecule_references.molregno) || "
-                        + "' Library of Integrated Network-based Cellular Signatures Reference: ' || reference)"),
-                "reference_type = 'LINCS'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("lincs_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:LincsRef"), "reference_type = 'LINCS'");
-
-
-        config.addQuadMapping(schema, table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                config.createIriMapping("fda_srs_reference", "reference"), "reference_type = 'FDA SRS'");
-
-        config.addQuadMapping(schema, table, graph, config.createIriMapping("fda_srs_reference", "reference"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString,
-                        "((select chembl_id from " + schema + ".molecule_dictionary where molregno = " + schema
-                                + ".molecule_references.molregno) || ' FDA/USP SRS Reference: ' || reference)"),
-                "reference_type = 'FDA SRS'");
-
-        config.addQuadMapping(schema, "molecule_reference_types", graph,
-                config.createIriMapping("fda_srs_reference", "reference"), config.createIriMapping("rdf:type"),
-                config.createIriMapping("cco:FdaSrsRef"), "reference_type = 'FDA SRS'");
+        {
+            Table table = new Table(schema, "molecule_pubchem_references");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("pubchem:compound", "compound_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' PubChem Reference: ' || compound_id)"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemRef"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_pubchem_thom_pharm_references");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("pubchem:substance", "substance_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' PubChem Thomson Pharma Subset Reference: ' || substance_id)"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemThomPharmRef"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_pubchem_dotf_references");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("pubchem:substance", "substance_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' PubChem Drugs of the Future Subset Reference: ' || substance_id)"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemDotfRef"));
+        }
+
+        {
+            Table table = new Table(schema, "molecule_references");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:zinc", "reference"), "reference_type = 'ZINC'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:zinc", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Zinc Reference: ' || reference)"),
+                    "reference_type = 'ZINC'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:surechembl", "reference"), "reference_type = 'SURE CHEMBL'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:surechembl", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' SureChEMBL Reference: ' || reference)"),
+                    "reference_type = 'SURE CHEMBL'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:molport", "reference"), "reference_type = 'MOLPORT'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:molport", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' MolPort Reference: ' || reference)"),
+                    "reference_type = 'MOLPORT'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:emolecules", "reference"), "reference_type = 'EMOLECULES'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:emolecules", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' eMolecules Reference: ' || reference)"),
+                    "reference_type = 'EMOLECULES'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:mcule", "reference"), "reference_type = 'MCULE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:mcule", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Mcule Reference: ' || reference)"),
+                    "reference_type = 'MCULE'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:ibm_patent_structure", "reference"),
+                    "reference_type = 'IBM PATENT STRUCTURE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:ibm_patent_structure", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' IBM Patent Structure Reference: ' || reference)"),
+                    "reference_type = 'IBM PATENT STRUCTURE'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:nikkaji", "reference"), "reference_type = 'NIKKAJI'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:nikkaji", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Nikkaji Reference: ' || reference)"),
+                    "reference_type = 'NIKKAJI'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:actor", "reference"), "reference_type = 'ACTOR'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:actor", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ACToR Reference: ' || reference)"),
+                    "reference_type = 'ACTOR'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:chebi", "reference"), "reference_type = 'CHEBI'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChEBI Reference: ' || reference)"),
+                    "reference_type = 'CHEBI'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:pdbe", "reference"), "reference_type = 'PDBE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:pdbe", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' PDBe Reference: ' || reference)"),
+                    "reference_type = 'PDBE'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:nmrshiftdb2", "reference"), "reference_type = 'NMR SHIFT DB2'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:nmrshiftdb2", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' NMRShiftDB Reference: ' || reference)"),
+                    "reference_type = 'NMR SHIFT DB2'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:kegg", "reference"), "reference_type = 'KEGG LIGAND'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:kegg", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Kegg Ligand Reference: ' || reference)"),
+                    "reference_type = 'KEGG LIGAND'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:drugbank", "reference"), "reference_type = 'DRUGBANK'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:drugbank", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' DrugBank Reference: ' || reference)"),
+                    "reference_type = 'DRUGBANK'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:hmdb", "reference"), "reference_type = 'HMDB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:hmdb", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' The Human Metabolome Database Reference: ' || reference)"),
+                    "reference_type = 'HMDB'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:iuphar", "reference"), "reference_type = 'IUPHAR'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:iuphar", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' IUPHAR Reference: ' || reference)"),
+                    "reference_type = 'IUPHAR'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:selleck", "reference"), "reference_type = 'SELLECK'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:selleck", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Selleck Chemicals Reference: ' || chembl.url_decode(reference))"),
+                    "reference_type = 'SELLECK'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:pharmgkb-drug", "reference"), "reference_type = 'PHARM GKB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:pharmgkb-drug", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' PharmGKB Reference: ' || reference)"),
+                    "reference_type = 'PHARM GKB'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:expression_atlas", "reference"), "reference_type = 'ATLAS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:expression_atlas", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Gene Expression Atlas Reference: ' || chembl.url_decode(reference))"),
+                    "reference_type = 'ATLAS'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:recon", "reference"), "reference_type = 'RECON'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:recon", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Recon Reference: ' || reference)"),
+                    "reference_type = 'RECON'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:wikipedia", "reference"), "reference_type = 'WIKIPEDIA MOL'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:wikipedia", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Wikipedia Reference: ' || reference)"),
+                    "reference_type = 'WIKIPEDIA MOL'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("identifiers:lincs.smallmolecule", "reference"),
+                    "reference_type = 'LINCS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:lincs.smallmolecule", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' Library of Integrated Network-based Cellular Signatures Reference: ' || reference)"),
+                    "reference_type = 'LINCS'");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:fda_srs", "reference"), "reference_type = 'FDA SRS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:fda_srs", "reference"),
+                    config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' FDA/USP SRS Reference: ' || reference)"),
+                    "reference_type = 'FDA SRS'");
+        }
+
+        {
+            Table table = new Table(schema, "molecule_reference_types");
+
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:zinc", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ZincRef"),
+                    "reference_type = 'ZINC'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:surechembl", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:SureChemblRef"),
+                    "reference_type = 'SURE CHEMBL'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:molport", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:MolportRef"),
+                    "reference_type = 'MOLPORT'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:emolecules", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:EmoleculesRef"),
+                    "reference_type = 'EMOLECULES'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:mcule", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:MculeRef"),
+                    "reference_type = 'MCULE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:ibm_patent_structure", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:IbmPatentStructureRef"),
+                    "reference_type = 'IBM PATENT STRUCTURE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:nikkaji", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:NikkajiRef"),
+                    "reference_type = 'NIKKAJI'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:actor", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ActorRef"),
+                    "reference_type = 'ACTOR'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ChebiRef"),
+                    "reference_type = 'CHEBI'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:pdbe", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PdbeRef"),
+                    "reference_type = 'PDBE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:nmrshiftdb2", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:NmrShiftDb2Ref"),
+                    "reference_type = 'NMR SHIFT DB2'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:kegg", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:KeggLigandRef"),
+                    "reference_type = 'KEGG LIGAND'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:drugbank", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:DrugbankRef"),
+                    "reference_type = 'DRUGBANK'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:hmdb", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:HmdbRef"),
+                    "reference_type = 'HMDB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:iuphar", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:IupharRef"),
+                    "reference_type = 'IUPHAR'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:selleck", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:SelleckRef"),
+                    "reference_type = 'SELLECK'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:pharmgkb-drug", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PharmGkbRef"),
+                    "reference_type = 'PHARM GKB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:expression_atlas", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:AtlasRef"),
+                    "reference_type = 'ATLAS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:recon", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ReconRef"),
+                    "reference_type = 'RECON'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:wikipedia", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:WikipediaMolRef"),
+                    "reference_type = 'WIKIPEDIA MOL'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:lincs.smallmolecule", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:LincsRef"),
+                    "reference_type = 'LINCS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:fda_srs", "reference"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:FdaSrsRef"),
+                    "reference_type = 'FDA SRS'");
+        }
     }
 }
