@@ -44,7 +44,9 @@
     <g:south size="34">
       <g:LayoutPanel addStyleNames="{style.Pager}">
         <g:layer left="7px" right="7px" top="2px" bottom="0px">
-          <c:SimplePager ui:field="resultsPager"></c:SimplePager>
+          <g:AbsolutePanel>
+            <c:SimplePager ui:field="resultsPager"></c:SimplePager>
+          </g:AbsolutePanel>
         </g:layer>
       </g:LayoutPanel>
     </g:south>
