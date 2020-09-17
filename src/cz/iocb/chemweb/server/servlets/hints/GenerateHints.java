@@ -110,7 +110,7 @@ public class GenerateHints extends HttpServlet
         for(QuadMapping mapping : sparqlConfig.getMappings())
         {
             if(mapping.getGraph() instanceof ConstantIriMapping)
-                iris.add(((IRI) (((ConstantIriMapping) mapping.getGraph()).getValue())).getValue());
+                iris.add(((IRI) (mapping.getGraph().getValue())).getValue());
 
             if(mapping.getSubject() instanceof ConstantIriMapping)
                 iris.add(((IRI) (((ConstantIriMapping) mapping.getSubject()).getValue())).getValue());
@@ -125,7 +125,7 @@ public class GenerateHints extends HttpServlet
 
         StringBuilder builder = new StringBuilder();
 
-        builder.append("select ?H ?T ?L where");
+        builder.append("select distinct ?H ?T ?L where");
         builder.append("{");
         builder.append("?H rdf:type ?T.");
         builder.append("optional {?H rdfs:label ?L}");
