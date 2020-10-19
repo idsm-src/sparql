@@ -74,7 +74,7 @@ public class Bioassay
             NodeMapping subject = config.createIriMapping("pubchem:bioassay_comment", "bioassay");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_001041"), "type_id = '1167'::smallint");
+                    config.createIriMapping("cheminf:SIO_001167"), "type_id = '1167'::smallint");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), "type_id = '1167'::smallint");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
