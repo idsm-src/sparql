@@ -60,6 +60,19 @@ public class MoleculeReference
         }
 
         {
+            Table table = new Table(schema, "molecule_chebi_references");
+            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
+                    config.createIriMapping("reference:chebi", "chebi_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "chebi_id"),
+                    config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
+                            "('CHEMBL' || molecule_id || ' ChEBI Reference: ' || chebi_id)"));
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "chebi_id"),
+                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ChebiRef"));
+        }
+
+        {
             Table table = new Table(schema, "molecule_references");
             NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
 
@@ -127,14 +140,6 @@ public class MoleculeReference
                     config.createLiteralMapping(xsdString,
                             "('CHEMBL' || molecule_id || ' ACToR Reference: ' || reference)"),
                     "reference_type = 'ACTOR'");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                    config.createIriMapping("reference:chebi", "reference"), "reference_type = 'CHEBI'");
-            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "reference"),
-                    config.createIriMapping("rdfs:label"),
-                    config.createLiteralMapping(xsdString,
-                            "('CHEMBL' || molecule_id || ' ChEBI Reference: ' || reference)"),
-                    "reference_type = 'CHEBI'");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("reference:pdbe", "reference"), "reference_type = 'PDBE'");
@@ -269,9 +274,6 @@ public class MoleculeReference
             config.addQuadMapping(table, graph, config.createIriMapping("reference:actor", "reference"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:ActorRef"),
                     "reference_type = 'ACTOR'");
-            config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "reference"),
-                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:ChebiRef"),
-                    "reference_type = 'CHEBI'");
             config.addQuadMapping(table, graph, config.createIriMapping("reference:pdbe", "reference"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:PdbeRef"),
                     "reference_type = 'PDBE'");

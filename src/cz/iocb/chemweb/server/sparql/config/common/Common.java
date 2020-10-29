@@ -89,8 +89,8 @@ public class Common
                 "http://jglobal.jst.go.jp/en/redirect?Nikkaji_No=", "[A-Z0-9.]+"));
         config.addIriClass(new StringUserIriClass("reference:actor", "http://actor.epa.gov/actor/chemical.xhtml?casrn=",
                 "[1-9][0-9]*-[0-9]{2}-[0-9]"));
-        config.addIriClass(new StringUserIriClass("reference:chebi",
-                "http://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI%3A", "[1-9][0-9]*"));
+        config.addIriClass(new IntegerUserIriClass("reference:chebi", "integer",
+                "http://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI%3A"));
         config.addIriClass(new StringUserIriClass("reference:pdbe",
                 "http://www.ebi.ac.uk/pdbe-srv/pdbechem/chemicalCompound/show/", "[A-Z0-9]{1,3}"));
         config.addIriClass(
