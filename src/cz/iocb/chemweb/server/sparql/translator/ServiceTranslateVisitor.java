@@ -469,9 +469,10 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
     @Override
     public HashSet<String> visit(Literal literal)
     {
-        builder.append('\'');
-        builder.append(literal.getStringValue());
-        builder.append('\'');
+        builder.append("'");
+        builder.append(literal.getStringValue().replaceAll("(['\\\\])", "\\\\$1").replaceAll("\n", "\\\\n")
+                .replaceAll("\r", "\\\\r"));
+        builder.append("'");
 
         if(literal.getLanguageTag() != null)
         {
