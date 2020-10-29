@@ -45,6 +45,25 @@ public class Bioassay
                     config.createIriMapping("pubchem:source", "source"));
         }
 
+
+        // extensions
+
+        {
+            Table table = new Table(schema, "bioassay_chembl_assays");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("chembl:assay", "chembl_assay"));
+        }
+
+        {
+            Table table = new Table(schema, "bioassay_chembl_mechanisms");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("chembl:mechanism", "chembl_mechanism"));
+        }
+
         {
             Table table = new Table(schema, "bioassay_data");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay_description", "bioassay");
