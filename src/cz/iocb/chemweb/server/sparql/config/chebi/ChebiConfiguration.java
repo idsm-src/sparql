@@ -37,6 +37,9 @@ public class ChebiConfiguration extends SparqlDatabaseConfiguration
         config.addPrefix("obo", "http://purl.obolibrary.org/obo/");
         config.addPrefix("chebi", "http://purl.obolibrary.org/obo/chebi/");
         config.addPrefix("oboInOwl", "http://www.geneontology.org/formats/oboInOwl#");
+
+        // extension
+        config.addPrefix("sio", "http://semanticscience.org/resource/");
     }
 
 

@@ -52,5 +52,9 @@ public class BioComponent
         config.addQuadMapping(table, graph, config.createIriMapping("reference:ncbi-taxonomy", "tax_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(organism || ' (NCBI Taxonomy)')"));
+
+        // extension
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "tax_id"));
     }
 }

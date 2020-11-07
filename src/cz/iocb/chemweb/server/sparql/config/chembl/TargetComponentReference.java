@@ -134,6 +134,10 @@ public class TargetComponentReference
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "('CHEMBL_TC_' || component_id || ' CGD: ' || reference)"),
                     "reference_type = 'CGD'");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
+                    config.createIriMapping("rdf:wwpdb", "reference"), "reference_type = 'PDB'");
         }
 
         {

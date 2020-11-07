@@ -33,7 +33,8 @@ public class Common
         config.addIriClass(new IntegerUserIriClass("linkedchemistry:chembl", "integer",
                 "http://linkedchemistry.info/chembl/chemblid/CHEMBL"));
 
-        config.addIriClass(new StringUserIriClass("rdf:wwpdb", "http://rdf.wwpdb.org/pdb/", 4));
+        config.addIriClass(new StringUserIriClass("rdf:wwpdb_old", "http://rdf.wwpdb.org/pdb/", 4));
+        config.addIriClass(new StringUserIriClass("rdf:wwpdb", "https://rdf.wwpdb.org/pdb/", 4));
         config.addIriClass(new StringUserIriClass("rdf:ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/"));
         config.addIriClass(new IntegerUserIriClass("rdf:drugbank", "integer",
                 "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB", 5));

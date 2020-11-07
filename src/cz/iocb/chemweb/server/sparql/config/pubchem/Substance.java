@@ -82,6 +82,10 @@ public class Substance
             Table table = new Table(schema, "substance_pdblinks");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo40:link_to_pdb"),
+                    config.createIriMapping("rdf:wwpdb_old", "pdblink"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
                     config.createIriMapping("rdf:wwpdb", "pdblink"));
         }

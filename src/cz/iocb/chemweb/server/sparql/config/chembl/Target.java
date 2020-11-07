@@ -95,6 +95,12 @@ public class Target
                     config.createLiteralMapping(xsdString, "organism"));
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:cell_line", "cell_line_id"),
                     config.createIriMapping("cco:isCellLineForTarget"), subject);
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Target"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "tax_id"));
         }
 
         {

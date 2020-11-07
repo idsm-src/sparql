@@ -19,6 +19,8 @@ public class Molecule
     {
         config.addIriClass(new IntegerUserIriClass("chembl:molecule", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL"));
+        config.addIriClass(new IntegerUserIriClass("chembl:molfile", "integer",
+                "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "_Molfile"));
         config.addIriClass(new IntegerUserIriClass("chembl:displayimage", "integer",
                 "https://www.ebi.ac.uk/chembl/compound/displayimage_large/CHEMBL"));
         config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_most_apka", "integer",
@@ -113,6 +115,10 @@ public class Molecule
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:displayimage", "id"),
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "('PNG Image Depiction of ' || chembl_id)"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:Substance"));
         }
 
         {
@@ -533,6 +539,19 @@ public class Molecule
                     "molecule_id != parent_molecule_id");
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule", "parent_molecule_id"),
                     config.createIriMapping("cco:hasChildMolecule"), subject, "molecule_id != parent_molecule_id");
+        }
+
+        // extension
+        {
+            Table table = new Table("molecules", "chembl");
+            NodeMapping subject = config.createIriMapping("chembl:molfile", "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("sio:SIO_011120"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping("chembl:molecule", "id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(xsdString, "molfile"));
         }
     }
 }

@@ -59,5 +59,9 @@ public class Document
                 config.createIriMapping("cco:hasDocument"), subject, "id != 1158643 and journal_id is null");
         config.addQuadMapping(table, graph, config.createIriMapping("chembl:journal", "journal_id"),
                 config.createIriMapping("cco:hasDocument"), subject, "id != 1158643 and journal_id is not null");
+
+        // extension
+        config.addQuadMapping(table, graph, config.createIriMapping("pubchem:reference", "pubmed_id"),
+                config.createIriMapping("skos:exactMatch"), subject);
     }
 }

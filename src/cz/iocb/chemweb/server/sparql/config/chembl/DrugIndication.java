@@ -47,5 +47,9 @@ public class DrugIndication
                 config.createLiteralMapping(xsdString, "efo_term"));
         config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule", "molecule_id"),
                 config.createIriMapping("cco:hasDrugIndication"), subject);
+
+        // extension
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMesh"),
+                config.createIriMapping("mesh:heading", "mesh_id"));
     }
 }

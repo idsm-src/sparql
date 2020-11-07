@@ -6,7 +6,9 @@ import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.mesh.Mesh;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.config.pubchem.Bioassay;
 import cz.iocb.chemweb.server.sparql.config.pubchem.Compound;
+import cz.iocb.chemweb.server.sparql.config.pubchem.Reference;
 import cz.iocb.chemweb.server.sparql.config.pubchem.Substance;
 
 
@@ -28,6 +30,8 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
         Mesh.addResourceClasses(this);
         Compound.addResourceClasses(this);
         Substance.addResourceClasses(this);
+        Bioassay.addResourceClasses(this);
+        Reference.addResourceClasses(this);
 
         addQuadMapping(this);
     }
@@ -76,6 +80,10 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
         config.addPrefix("voag", "http://voag.linkedmodel.org/voag#");
         config.addPrefix("void", "http://rdfs.org/ns/void#");
         config.addPrefix("uo", "http://purl.obolibrary.org/obo/");
+
+        // extension
+        config.addPrefix("pdbo", "https://rdf.wwpdb.org/schema/pdbx-v50.owl#");
+        config.addPrefix("sio", "http://semanticscience.org/resource/");
     }
 
 

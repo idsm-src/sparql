@@ -57,6 +57,10 @@ public class Protein
             Table table = new Table(schema, "protein_pdblinks");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo40:link_to_pdb"),
+                    config.createIriMapping("rdf:wwpdb_old", "pdblink"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("pdbo:link_to_pdb"),
                     config.createIriMapping("rdf:wwpdb", "pdblink"));
         }

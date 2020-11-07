@@ -94,6 +94,12 @@ public class Assay
                     config.createLiteralMapping(xsdString,
                             "(chembl_id || ' PubChem BioAssay Reference: ' || pubchem_assay_id)"),
                     "pubchem_assay_id is not null");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("pubchem:bioassay", "pubchem_assay_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "assay_tax_id"));
         }
 
         {

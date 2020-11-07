@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -31,6 +32,10 @@ public class MoleculeReference
                             "('CHEMBL' || molecule_id || ' PubChem Reference: ' || compound_id)"));
             config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound_id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemRef"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("pubchem:compound", "compound_id"));
         }
 
         {
@@ -70,6 +75,10 @@ public class MoleculeReference
                             "('CHEMBL' || molecule_id || ' ChEBI Reference: ' || chebi_id)"));
             config.addQuadMapping(table, graph, config.createIriMapping("reference:chebi", "chebi_id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:ChebiRef"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "chebi_id"));
         }
 
         {

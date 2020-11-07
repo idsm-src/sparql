@@ -18,6 +18,8 @@ public class Chebi
     {
         config.addIriClass(new IntegerUserIriClass("chebi:restriction", "integer", "http://blank/ID_R"));
         config.addIriClass(new IntegerUserIriClass("chebi:axiom", "integer", "http://blank/ID_A"));
+        config.addIriClass(new IntegerUserIriClass("chebi:molfile", "integer", "http://purl.obolibrary.org/obo/CHEBI_",
+                "_Molfile"));
     }
 
 
@@ -230,6 +232,19 @@ public class Chebi
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:deprecated"),
                     config.createLiteralMapping(xsdBoolean, "flag"));
+        }
+
+        // extension
+        {
+            Table table = new Table("molecules", "chebi");
+            NodeMapping subject = config.createIriMapping("chebi:molfile", "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("sio:SIO_011120"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
+                    config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
+                    config.createLiteralMapping(xsdString, "molfile"));
         }
     }
 }

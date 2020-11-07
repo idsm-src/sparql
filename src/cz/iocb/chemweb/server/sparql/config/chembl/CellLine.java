@@ -56,5 +56,9 @@ public class CellLine
         config.addQuadMapping(table, graph, config.createIriMapping("reference:life", "cl_lincs_id"),
                 config.createIriMapping("rdfs:label"),
                 config.createLiteralMapping(xsdString, "(chembl_id || ' LINCS Project Reference: ' || cl_lincs_id)"));
+
+        // extension
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
+                config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "cell_source_tax_id"));
     }
 }
