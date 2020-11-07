@@ -7,7 +7,6 @@ import cz.iocb.chemweb.server.sparql.config.chebi.ChebiConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.mesh.MeshConfiguration;
-import cz.iocb.chemweb.server.sparql.config.nextprot.NeXtProtConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration;
 import cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration;
 
@@ -23,7 +22,7 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         ChebiConfiguration.addPrefixes(this);
         ChemblConfiguration.addPrefixes(this);
         MeshConfiguration.addPrefixes(this);
-        NeXtProtConfiguration.addPrefixes(this);
+        //NeXtProtConfiguration.addPrefixes(this);
         OntologyConfiguration.addPrefixes(this);
         PubChemConfiguration.addPrefixes(this);
 
@@ -31,14 +30,14 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         ChebiConfiguration.addResourceClasses(this);
         ChemblConfiguration.addResourceClasses(this);
         MeshConfiguration.addResourceClasses(this);
-        NeXtProtConfiguration.addResourceClasses(this);
+        //NeXtProtConfiguration.addResourceClasses(this);
         OntologyConfiguration.addResourceClasses(this);
         PubChemConfiguration.addResourceClasses(this);
 
         ChebiConfiguration.addQuadMapping(this);
         ChemblConfiguration.addQuadMapping(this);
         MeshConfiguration.addQuadMapping(this);
-        NeXtProtConfiguration.addQuadMapping(this);
+        //NeXtProtConfiguration.addQuadMapping(this);
         OntologyConfiguration.addQuadMapping(this);
         PubChemConfiguration.addQuadMapping(this);
 

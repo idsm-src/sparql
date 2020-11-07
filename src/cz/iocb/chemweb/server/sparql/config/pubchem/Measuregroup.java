@@ -31,15 +31,16 @@ public class Measuregroup
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bao:BAO_0000040"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/Measuregroup.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("pubchem:source", "source"));
-
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
                     config.createIriMapping("bao:BAO_0000209"), subject);
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Measuregroup.vm"));
         }
 
         {
@@ -54,7 +55,7 @@ public class Measuregroup
             Table table = new Table(schema, "measuregroup_genes");
             NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
                     config.createIriMapping("pubchem:gene", "gene"));
         }
 
@@ -62,7 +63,7 @@ public class Measuregroup
             Table table = new Table(schema, "measuregroup_proteins");
             NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000057"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
                     config.createIriMapping("pubchem:protein", "protein"));
         }
     }

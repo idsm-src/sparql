@@ -1,14 +1,14 @@
-#set($BSID = $entity.getValue().replaceAll(".*/", ""))
+#set($PWID = $entity.getValue().replaceAll(".*/PWID", ""))
 
 #sparql($title)
-  SELECT ?TITLE FROM pubchem:biosystem WHERE
+  SELECT ?TITLE FROM pubchem:pathway WHERE
   {
     $entity dcterms:title ?TITLE
   }
 #end
 
 #sparql($organism)
-  SELECT ?NAME FROM pubchem:biosystem FROM dataset:ontology WHERE
+  SELECT ?NAME FROM pubchem:pathway FROM dataset:ontology WHERE
   {
     $entity bp:organism / rdfs:label ?NAME
   }
@@ -17,7 +17,7 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$BSID</b></td>
+      <td><b>PWID$PWID</b></td>
     </tr>
     #if($title.TITLE)
     <tr>

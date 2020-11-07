@@ -32,6 +32,8 @@ public class Compound
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_010004"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Compound.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
@@ -96,14 +98,6 @@ public class Compound
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:has-role"),
                     config.createIriMapping("ontology:resource", Ontology.unitUncategorized, "role_id"));
-        }
-
-        {
-            Table table = new Table(schema, "compound_biosystems");
-            NodeMapping subject = config.createIriMapping("pubchem:compound", "compound");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
-                    config.createIriMapping("pubchem:biosystem", "biosystem"));
         }
 
         {

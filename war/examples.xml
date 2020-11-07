@@ -16,8 +16,8 @@ FROM pubchem:substance
 WHERE
 {
   ?sub rdf:type obo:CHEBI_53289;
-     obo:BFO_0000056 ?mg.
-  ?mg obo:BFO_0000057 ?protein;
+     obo:RO_0000056 ?mg.
+  ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
   ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
@@ -127,8 +127,8 @@ WHERE
     owl:onProperty obo:RO_0000087;
     owl:someValuesFrom obo:CHEBI_37733 ].
   ?sub rdf:type ?chebi;
-    obo:BFO_0000056 ?mg.
-  ?mg obo:BFO_0000057 ?protein;
+    obo:RO_0000056 ?mg.
+  ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
   ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
@@ -144,7 +144,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 6:</div>
       <p lang="en" class="exampleDescription">
-        Which substances inhibit protein targets similar to GI129900 and have the function domain PSSMID188648?
+        Which substances inhibit protein targets similar to ACCP05979 and have the function domain PSSMID188648?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -156,10 +156,10 @@ FROM pubchem:protein
 FROM pubchem:conserveddomain
 WHERE
 {
-  ?substance obo:BFO_0000056 ?measuregroup.
-  ?measuregroup obo:BFO_0000057 ?protein.
-  protein:GI129900 vocab:hasSimilarProtein ?protein.
-  ?protein obo:BFO_0000110 conserveddomain:PSSMID188648.
+  ?substance obo:RO_0000056 ?measuregroup.
+  ?measuregroup obo:RO_0000057 ?protein.
+  protein:ACCP05979 vocab:hasSimilarProtein ?protein.
+  ?protein obo:RO_0002180 conserveddomain:PSSMID188648.
   ?measuregroup obo:OBI_0000299 ?endpoint.
   ?endpoint obo:IAO_0000136 ?substance.
   ?endpoint rdf:type bao:BAO_0000190.
@@ -184,8 +184,8 @@ FROM pubchem:substance
 WHERE
 {
   ?sub sio:CHEMINF_000477 compound:CID3152;
-    obo:BFO_0000056 ?mg.
-  ?mg obo:BFO_0000057 ?protein;
+    obo:RO_0000056 ?mg.
+  ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
   ?protein rdf:type bp:Protein.
   ?ep rdf:type bao:BAO_0000190;
@@ -201,7 +201,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 8:</div>
       <p lang="en" class="exampleDescription">
-         What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO_0001516), with an IC<sub>50</sub> less than 10 &micro;M?
+         What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO:0001516), with an IC<sub>50</sub> less than 10 &micro;M?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -210,13 +210,16 @@ FROM pubchem:substance
 FROM pubchem:measuregroup
 FROM pubchem:endpoint
 FROM pubchem:protein
-FROM pubchem:biosystem
+FROM pubchem:pathway
+FROM pubchem:gene
 WHERE
 {
-  ?substance obo:BFO_0000056 ?measuregroup.
-  ?measuregroup obo:BFO_0000057 ?protein.
+  ?substance obo:RO_0000056 ?measuregroup.
+  ?measuregroup obo:RO_0000057 ?protein.
   ?protein rdf:type bp:Protein.
-  ?protein obo:BFO_0000056 obo:GO_0001516.
+  ?protein up:encodedBy ?gene .
+  ?gene rdf:type bp:Gene .
+  ?gene obo:RO_0000056 obo:GO_0001516 .
   ?measuregroup obo:OBI_0000299 ?endpoint.
   ?endpoint obo:IAO_0000136 ?substance.
   ?endpoint rdf:type bao:BAO_0000190.
@@ -231,7 +234,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 9:</div>
       <p lang="en" class="exampleDescription">
-        What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target GI17531135 with an IC<sub>50</sub> less than 10 &micro;M?
+        What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target ACCQ12809 with an IC<sub>50</sub> less than 10 &micro;M?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -242,8 +245,8 @@ FROM pubchem:substance
 FROM ebi:chebi
 WHERE
 {
-  ?sub obo:BFO_0000056 ?mg.
-  ?mg obo:BFO_0000057 protein:GI7531135;
+  ?sub obo:RO_0000056 ?mg.
+  ?mg obo:RO_0000057 protein:ACCQ12809;
     obo:OBI_0000299 ?ep.
   ?sub rdf:type ?chebi.
   ?chebi rdfs:subClassOf [
@@ -274,8 +277,8 @@ FROM pubchem:endpoint
 FROM pubchem:protein
 WHERE
 {
-  ?sub obo:BFO_0000056 ?mg.
-  ?mg obo:BFO_0000057 ?protein.
+  ?sub obo:RO_0000056 ?mg.
+  ?mg obo:RO_0000057 ?protein.
   ?protein rdf:type bp:Protein.
   ?mg obo:OBI_0000299 ?ep.
   ?ep rdf:type bao:BAO_0000190;

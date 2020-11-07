@@ -1,4 +1,11 @@
-#set($GID = $entity.getValue().replaceAll(".*/", ""))
+#set($GID = $entity.getValue().replaceAll(".*/GID", ""))
+
+#sparql($symbol)
+  SELECT ?SYMBOL FROM pubchem:gene WHERE
+  {
+    $entity sio:gene-symbol ?SYMBOL
+  }
+#end
 
 #sparql($title)
   SELECT ?TITLE FROM pubchem:gene WHERE
@@ -7,23 +14,28 @@
   }
 #end
 
-#sparql($description)
-  SELECT ?DESCRIPTION FROM pubchem:gene WHERE
+#sparql($organism)
+  SELECT ?NAME FROM pubchem:gene FROM dataset:ontology WHERE
   {
-    $entity dcterms:description ?DESCRIPTION
+    $entity bp:organism / rdfs:label ?NAME
   }
 #end
 
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$GID</b></td>
+      <td><b>GID$GID</b></td>
     </tr>
-    #if($title.TITLE)
+    #if($title.TITLE || $symbol.SYMBOL)
     <tr>
       <td>
-        #escapeHTML($title.TITLE)#if($description.DESCRIPTION): #escapeHTML($description.DESCRIPTION)#end
+        #if($symbol.SYMBOL)#escapeHTML($symbol.SYMBOL): #end#if($title.TITLE)#escapeHTML($title.TITLE)#end
       </td>
+    </tr>
+    #end
+    #if($organism.NAME)
+    <tr>
+      <td><small style="color:gray">#escapeHTML($organism.NAME)<small></td>
     </tr>
     #end
   </tbody>

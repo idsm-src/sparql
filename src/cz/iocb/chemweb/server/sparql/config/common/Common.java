@@ -27,6 +27,7 @@ public class Common
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
+        config.addIriClass(new StringUserIriClass("ncbi:protein", "https://www.ncbi.nlm.nih.gov/protein/"));
         config.addIriClass(new StringUserIriClass("purl:uniprot", "http://purl.uniprot.org/uniprot/"));
 
         config.addIriClass(new IntegerUserIriClass("linkedchemistry:chembl", "integer",
@@ -38,8 +39,6 @@ public class Common
                 "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB", 5));
 
         config.addIriClass(new IntegerUserIriClass("identifiers:pubmed", "integer", "http://identifiers.org/pubmed/"));
-        config.addIriClass(new IntegerUserIriClass("identifiers:wikipathway", "integer",
-                "http://identifiers.org/wikipathways/WP"));
         config.addIriClass(new StringUserIriClass("identifiers:pfam", "http://identifiers.org/pfam/", "PF[0-9]{5}"));
         config.addIriClass(new StringUserIriClass("identifiers:intact", "http://identifiers.org/intact/", "[A-Z0-9]*"));
         config.addIriClass(
@@ -58,6 +57,8 @@ public class Common
                 "http://identifiers.org/lincs.smallmolecule/", "LSM-[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("identifiers:mesh", "http://identifiers.org/mesh/",
                 "[A-Z][0-9]+(\\.[0-9]+|[A-Z][0-9]+)*"));
+        config.addIriClass(new StringUserIriClass("identifiers:wikipathway", "http://identifiers.org/wikipathways/WP",
+                "[1-9][0-9]*"));
 
         config.addIriClass(new IntegerUserIriClass("reference:ncbi-taxonomy", "integer",
                 "http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id="));
@@ -112,6 +113,26 @@ public class Common
         config.addIriClass(new StringUserIriClass("reference:fda_srs",
                 "http://fdasis.nlm.nih.gov/srs/ProxyServlet?mergeData=true&objectHandle=DBMaint&APPLICATION_NAME=fdasrs&actionHandle=default&nextPage=jsp/srs/ResultScreen.jsp&TXTSUPERLISTID=",
                 "[A-Z0-9]{10}"));
+
+        config.addIriClass(
+                new StringUserIriClass("reference:pathbank-pathway", "http://pathbank.org/view/", "SMP[0-9]{5,7}"));
+        config.addIriClass(new StringUserIriClass("reference:biocyc-pathway", "https://biocyc.org/",
+                "[^/]*/NEW-IMAGE\\?object=.*"));
+        config.addIriClass(new StringUserIriClass("reference:plantcyc-pathway", "https://pmn.plantcyc.org/",
+                "[^/]*/new-image\\?object=.*"));
+        config.addIriClass(new StringUserIriClass("reference:pid-pathway",
+                "http://pid.nci.nih.gov/search/pathway_landing.shtml\\?pathway_id=", ".*"));
+        config.addIriClass(new StringUserIriClass("reference:inoh-pathway",
+                "http://www.inoh.org/inohviewer/inohclient.jnlp\\?id=", ".*"));
+        config.addIriClass(new StringUserIriClass("reference:plantreactome-pathway",
+                "http://plantreactome.gramene.org/content/detail/", "R-OSA-[0-9]{7}"));
+        config.addIriClass(new StringUserIriClass("reference:pharmgkb-pathway", "https://www.pharmgkb.org/pathway/",
+                "PA[1-9][0-9]*"));
+        config.addIriClass(
+                new StringUserIriClass("reference:fairdomhub-model", "https://fairdomhub.org/models/", "[0-9]+"));
+        config.addIriClass(new StringUserIriClass("reference:lipidmaps-pathway",
+                "http://www.lipidmaps.org/data/IntegratedPathwaysData/SetupIntegratedPathways.pl\\?imgsize=730&Mode=BMDMATPS11&DataType=",
+                ".*"));
     }
 
 

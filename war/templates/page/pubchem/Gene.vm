@@ -7,9 +7,16 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">gene:GI$GID</span>
+    <span class="VET-Title">gene:GID$GID</span>
     (<a href="https://www.ncbi.nlm.nih.gov/gene/?term=$GID" target="_blank">open in pubchem</a>)
   </div>
+
+  #sparql($symbol)
+    SELECT ?SYMBOL FROM pubchem:gene WHERE
+    {
+      $entity sio:gene-symbol ?SYMBOL
+    }
+  #end
 
   #sparql($title)
     SELECT ?TITLE FROM pubchem:gene WHERE
@@ -18,17 +25,21 @@
     }
   #end
 
-  #sparql($description)
-    SELECT ?DESCRIPTION FROM pubchem:gene WHERE
+  #sparql($organism)
+    SELECT ?NAME FROM pubchem:gene FROM dataset:ontology WHERE
     {
-      $entity dcterms:description ?DESCRIPTION
+      $entity bp:organism / rdfs:label ?NAME
     }
   #end
 
   #if($title.TITLE)
   <div class="VET-BoxedSection">
     <div>
-      #escapeHTML($title.TITLE)#if($description.DESCRIPTION): #escapeHTML($description.DESCRIPTION)#end
+      #if($symbol.SYMBOL)#escapeHTML($symbol.SYMBOL): #end#if($title.TITLE)#escapeHTML($title.TITLE)#end
+      #if($organism.NAME)
+      <br/>
+      <small style="color:gray">#escapeHTML($organism.NAME)</small>
+      #end
     </div>
   </div>
   #end
@@ -59,23 +70,23 @@
   #end
 
 
-  #sparql($biosystems)
-    SELECT ?BIOSYSTEM ?TITLE ?ORGANISM FROM pubchem:gene FROM pubchem:biosystem FROM dataset:ontology WHERE
+  #sparql($pathways)
+    SELECT ?PATHWAY ?TITLE ?ORGANISM FROM pubchem:gene FROM pubchem:pathway FROM dataset:ontology WHERE
     {
-      $entity obo:BFO_0000056 ?BIOSYSTEM.
-      ?BIOSYSTEM dcterms:title ?TITLE.
+      ?PATHWAY rdf:type bp:Pathway.
+      ?PATHWAY obo:RO_0000057 $entity.
+      ?PATHWAY dcterms:title ?TITLE.
 
       OPTIONAL
       {
-        ?BIOSYSTEM bp:organism / rdfs:label ?ORGANISM
+        ?PATHWAY bp:organism / rdfs:label ?ORGANISM
       }
     }
-    ORDER BY (?REFERENCE)
   #end
 
-  #if($biosystems.count > 0)
+  #if($pathways.count > 0)
   <div class="VET-BoxedSection">
-    <div class="VET-Header">Biosystems</div>
+    <div class="VET-Header">Pathways</div>
     <div>
       <table class="VET-Table">
         <colgroup>
@@ -83,16 +94,16 @@
           <col/>
         </colgroup>
 
-        #foreach($biosystem in $biosystems)
+        #foreach($pathway in $pathways)
         <tr>
           <td>
-            #url($biosystem.BIOSYSTEM)$biosystem.BIOSYSTEM.getValue().replaceAll(".*/", "")#end
+            #url($pathway.PATHWAY)$pathway.PATHWAY.getValue().replaceAll(".*/", "")#end
           </td>
           <td>
-            #escapeHTML($biosystem.TITLE)
-            #if($biosystem.ORGANISM)
+            #escapeHTML($pathway.TITLE)
+            #if($pathway.ORGANISM)
             <br/>
-            <small style="color:gray">#escapeHTML($biosystem.ORGANISM)</small>
+            <small style="color:gray">#escapeHTML($pathway.ORGANISM)</small>
             #end
           </td>
         </tr>

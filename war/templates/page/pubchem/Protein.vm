@@ -1,4 +1,4 @@
-#set($PID = $entity.getValue().replaceAll(".*/GI",""))
+#set($PID = $entity.getValue().replaceAll(".*/ACC",""))
 
 
 <style scoped>
@@ -7,8 +7,8 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">protein:GI$PID</span>
-    #if(!$PID.contains("GI"))
+    <span class="VET-Title">protein:ACC$PID</span>
+    #if(!$PID.contains("ACC"))
     (<a href="https://www.ncbi.nlm.nih.gov/protein/$PID" target="_blank">open in pubchem</a>)
     #end
   </div>
@@ -38,6 +38,50 @@
       <br/>
       <small style="color:gray">#escapeHTML($organism.NAME)</small>
       #end
+    </div>
+  </div>
+  #end
+
+
+  #sparql($pathways)
+    SELECT ?PATHWAY ?TITLE ?ORGANISM FROM pubchem:protein FROM pubchem:pathway FROM dataset:ontology WHERE
+    {
+      ?PATHWAY rdf:type bp:Pathway.
+      ?PATHWAY obo:RO_0000057 $entity.
+      ?PATHWAY dcterms:title ?TITLE.
+
+      OPTIONAL
+      {
+        ?PATHWAY bp:organism / rdfs:label ?ORGANISM
+      }
+    }
+  #end
+
+  #if($pathways.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Pathways</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:100px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($pathway in $pathways)
+        <tr>
+          <td>
+            #url($pathway.PATHWAY)$pathway.PATHWAY.getValue().replaceAll(".*/", "")#end
+          </td>
+          <td>
+            #escapeHTML($pathway.TITLE)
+            #if($pathway.ORGANISM)
+            <br/>
+            <small style="color:gray">#escapeHTML($pathway.ORGANISM)</small>
+            #end
+          </td>
+        </tr>
+        #end
+      </table>
     </div>
   </div>
   #end

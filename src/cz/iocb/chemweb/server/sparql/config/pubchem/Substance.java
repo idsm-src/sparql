@@ -28,10 +28,6 @@ public class Substance
             Table table = new Table(schema, "substance_bases");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/Substance.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
-                    config.createLiteralMapping("pubchem/Substance.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:available"),
                     config.createLiteralMapping(xsdDateM4, "available"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
@@ -40,6 +36,12 @@ public class Substance
                     config.createLiteralMapping(xsdDateM4, "modified"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:CHEMINF_000477"),
                     config.createIriMapping("pubchem:compound", "compound"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Substance.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/Substance.vm"));
         }
 
         {
@@ -54,7 +56,7 @@ public class Substance
             Table table = new Table(schema, "endpoint_bases");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:BFO_0000056"),
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000056"),
                     config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup"));
         }
 

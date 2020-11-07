@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -35,19 +36,51 @@ public class Bioassay
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bao:BAO_0000015"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/Bioassay.vm"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
-                    config.createLiteralMapping("pubchem/Bioassay.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("pubchem:source", "source"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Bioassay.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
+                    config.createLiteralMapping("pubchem/Bioassay.vm"));
         }
 
+        {
+            Table table = new Table(schema, "bioassay_stages");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0000210"),
+                    config.createIriMapping("ontology:resource", Ontology.unitBAO, "stage"));
+        }
+
+        {
+            Table table = new Table(schema, "bioassay_confirmatory_assays");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0000540"),
+                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "confirmatory_assay"));
+        }
+
+        {
+            Table table = new Table(schema, "bioassay_primary_assays");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0001067"),
+                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "primary_assay"));
+        }
+
+        {
+            Table table = new Table(schema, "bioassay_summary_assays");
+            NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0001094"),
+                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "summary_assay"));
+        }
 
         // extensions
-
         {
             Table table = new Table(schema, "bioassay_chembl_assays");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");

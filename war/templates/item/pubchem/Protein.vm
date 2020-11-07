@@ -1,4 +1,4 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
+#set($PID = $entity.getValue().replaceAll(".*/ACC", ""))
 
 #sparql($title)
   SELECT ?TITLE FROM pubchem:protein WHERE
@@ -17,7 +17,7 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$ID</b></td>
+      <td><b>ACC$PID</b></td>
     </tr>
     #if($title.TITLE)
     <tr>

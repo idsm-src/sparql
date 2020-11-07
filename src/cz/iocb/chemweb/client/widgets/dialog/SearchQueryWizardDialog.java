@@ -731,7 +731,7 @@ public class SearchQueryWizardDialog extends DialogBox
         if(searchParticipants)
         {
             if(searchCompounds || searchBioassays)
-                query.append("\n\n  ?MEASUREGROUP obo:BFO_0000057 ?PARTICIPANT.");
+                query.append("\n\n  ?MEASUREGROUP obo:RO_0000057 ?PARTICIPANT.");
 
             if(geneCheckBox.getValue() && !proteinCheckBox.getValue())
             {

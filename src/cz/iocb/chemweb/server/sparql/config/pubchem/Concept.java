@@ -36,8 +36,6 @@ public class Concept
             Table table = new Table(schema, "concept_bases");
             NodeMapping subject = config.createIriMapping("pubchem:concept", "id");
 
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/Concept.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
                     config.createLiteralMapping(rdfLangStringEn, "label"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:inScheme"),
@@ -52,6 +50,10 @@ public class Concept
                     config.createIriMapping("skos:Concept"),
                     "(iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/SubstanceCategorization'"
                             + " and iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC')");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Concept.vm"));
         }
     }
 }

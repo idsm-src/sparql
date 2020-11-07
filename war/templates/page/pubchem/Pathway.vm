@@ -1,4 +1,4 @@
-#set($BSID = $entity.getValue().replaceAll(".*/BSID",""))
+#set($PWID = $entity.getValue().replaceAll(".*/PWID",""))
 
 
 <style scoped>
@@ -6,20 +6,29 @@
 </style>
 
 <div class="VET-Page">
+  #sparql($match)
+    SELECT ?MATCH FROM pubchem:pathway WHERE
+    {
+      $entity skos:exactMatch ?MATCH
+    }
+  #end
+
   <div class="VET-TitleBox">
-    <span class="VET-Title">biosystem:BSID$BSID</span>
-    (<a href="https://www.ncbi.nlm.nih.gov/biosystems/?term=$BSID" target="_blank">open in pubchem</a>)
+    <span class="VET-Title">pathway:PWID$PWID</span>
+    #if($match.MATCH)
+      (<a href="$match.MATCH.getValue()" target="_blank">open in source</a>)
+    #end
   </div>
 
   #sparql($title)
-    SELECT ?TITLE FROM pubchem:biosystem WHERE
+    SELECT ?TITLE FROM pubchem:pathway WHERE
     {
       $entity dcterms:title ?TITLE
     }
   #end
 
   #sparql($organism)
-    SELECT ?NAME FROM pubchem:biosystem FROM dataset:ontology WHERE
+    SELECT ?NAME FROM pubchem:pathway FROM dataset:ontology WHERE
     {
       $entity bp:organism / rdfs:label ?NAME
     }
@@ -41,7 +50,7 @@
 
 
   #sparql($components)
-    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:biosystem FROM dataset:ontology WHERE
+    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:pathway FROM dataset:ontology WHERE
     {
       $entity bp:pathwayComponent ?COMPONENT.
 
@@ -91,7 +100,7 @@
 
 
   #sparql($references)
-    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:biosystem FROM pubchem:reference WHERE
+    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:pathway FROM pubchem:reference WHERE
     {
       $entity cito:isDiscussedBy ?REFERENCE.
 

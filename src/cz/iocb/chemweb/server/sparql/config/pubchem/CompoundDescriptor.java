@@ -76,9 +76,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -88,9 +90,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -100,9 +104,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -112,9 +118,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -124,9 +132,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -136,9 +146,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -148,9 +160,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -160,9 +174,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -172,9 +188,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -184,9 +202,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -196,9 +216,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -208,9 +230,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
         }
 
         {
@@ -220,9 +244,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
         {
@@ -232,11 +258,13 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"),
                     field + " is not null");
-            config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
                     field + " is not null");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, template,
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
         }
 
         {
@@ -246,9 +274,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
         {
@@ -258,9 +288,11 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
                     field + " is not null");
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
         }
 
         {
@@ -270,11 +302,13 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"),
                     field + " is not null");
-            config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
                     field + " is not null");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, template,
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
         }
 
         {
@@ -284,11 +318,13 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"),
                     field + " is not null");
-            config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
                     field + " is not null");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, template,
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
         }
 
         {
@@ -298,11 +334,13 @@ public class CompoundDescriptor
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"),
                     field + " is not null");
-            config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"),
                     field + " is not null");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, template,
+                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
         }
 
         {
@@ -311,9 +349,11 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:molecular_formula", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000335"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -322,9 +362,11 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:isomeric_smiles", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000379"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -333,9 +375,11 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:canonical_smiles", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000376"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -344,9 +388,11 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:iupac_inchi", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000396"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
 
         {
@@ -355,9 +401,11 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:preferred_iupac_name", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000382"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
             config.addQuadMapping(table, graph, subject, template,
                     config.createLiteralMapping(directory + field + ".vm"));
-            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
         }
     }
 }
