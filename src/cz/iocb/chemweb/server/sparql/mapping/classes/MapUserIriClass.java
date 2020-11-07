@@ -144,6 +144,13 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    @Override
+    public int getCheckCost()
+    {
+        return 1;
+    }
+
+
     private boolean check(String iri, Request request)
     {
         Boolean check = sqlCheckCache.get(iri);

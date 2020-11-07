@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import javax.sql.DataSource;
@@ -51,12 +50,13 @@ public abstract class SparqlDatabaseConfiguration
     protected DataSource connectionPool;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
-    protected LinkedHashMap<String, UserIriClass> iriClasses = new LinkedHashMap<String, UserIriClass>();
-    protected LinkedHashMap<String, BlankNodeClass> blankNodeClasses = new LinkedHashMap<String, BlankNodeClass>();
+    protected ArrayList<UserIriClass> iriClasses = new ArrayList<UserIriClass>();
+    protected HashMap<String, UserIriClass> iriClassMap = new HashMap<String, UserIriClass>();
+    protected HashMap<String, BlankNodeClass> blankNodeClassMap = new HashMap<String, BlankNodeClass>();
     protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
     protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
-    protected LinkedHashMap<String, ProcedureDefinition> procedures = new LinkedHashMap<String, ProcedureDefinition>();
-    protected LinkedHashMap<String, FunctionDefinition> functions = new LinkedHashMap<String, FunctionDefinition>();
+    protected HashMap<String, ProcedureDefinition> procedures = new HashMap<String, ProcedureDefinition>();
+    protected HashMap<String, FunctionDefinition> functions = new HashMap<String, FunctionDefinition>();
 
     protected boolean strictDefaultGraph = false;
 
@@ -82,19 +82,21 @@ public abstract class SparqlDatabaseConfiguration
 
     public void addIriClass(UserIriClass iriClass)
     {
-        iriClasses.put(iriClass.getName(), iriClass);
+        int possition = (int) iriClasses.stream().filter(c -> c.getCheckCost() <= iriClass.getCheckCost()).count();
+        iriClasses.add(possition, iriClass);
+        iriClassMap.put(iriClass.getName(), iriClass);
     }
 
 
     public void addBlankNodeClass(String name, UserIntBlankNodeClass blankNodeClass)
     {
-        blankNodeClasses.put(name, blankNodeClass);
+        blankNodeClassMap.put(name, blankNodeClass);
     }
 
 
     public void addBlankNodeClass(String name, UserStrBlankNodeClass blankNodeClass)
     {
-        blankNodeClasses.put(name, blankNodeClass);
+        blankNodeClassMap.put(name, blankNodeClass);
     }
 
 
@@ -141,7 +143,7 @@ public abstract class SparqlDatabaseConfiguration
 
         IriClass iriClass = null;
 
-        for(ResourceClass c : iriClasses.values())
+        for(ResourceClass c : iriClasses)
         {
             if(c instanceof UserIriClass && ((UserIriClass) c).match(iri, connectionPool))
             {
@@ -312,7 +314,7 @@ public abstract class SparqlDatabaseConfiguration
 
     public UserIriClass getIriClass(String name)
     {
-        UserIriClass iriClass = iriClasses.get(name);
+        UserIriClass iriClass = iriClassMap.get(name);
 
         if(iriClass == null)
             throw new IllegalArgumentException("unknown iri class: '" + name + "'");
@@ -323,7 +325,7 @@ public abstract class SparqlDatabaseConfiguration
 
     public BlankNodeClass getBlankNodeClass(String name)
     {
-        BlankNodeClass blankNodeClass = blankNodeClasses.get(name);
+        BlankNodeClass blankNodeClass = blankNodeClassMap.get(name);
 
         if(blankNodeClass == null)
             throw new IllegalArgumentException("unknown blank node class: '" + name + "'");
@@ -338,7 +340,7 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public LinkedHashMap<String, UserIriClass> getIriClasses()
+    public List<UserIriClass> getIriClasses()
     {
         return iriClasses;
     }
@@ -356,13 +358,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public LinkedHashMap<String, ProcedureDefinition> getProcedures()
+    public HashMap<String, ProcedureDefinition> getProcedures()
     {
         return procedures;
     }
 
 
-    public LinkedHashMap<String, FunctionDefinition> getFunctions()
+    public HashMap<String, FunctionDefinition> getFunctions()
     {
         return functions;
     }

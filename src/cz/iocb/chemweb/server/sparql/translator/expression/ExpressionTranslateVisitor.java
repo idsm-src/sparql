@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.expression;
 
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +53,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     private final Request request;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
-    private final LinkedHashMap<String, FunctionDefinition> functions;
+    private final HashMap<String, FunctionDefinition> functions;
 
 
     public ExpressionTranslateVisitor(VariableAccessor variableAccessor, TranslateVisitor parentTranslator)

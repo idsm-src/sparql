@@ -110,6 +110,13 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public int getCheckCost()
+    {
+        return 2;
+    }
+
+
+    @Override
     protected String generateFunction(String parameter)
     {
         return parameter;

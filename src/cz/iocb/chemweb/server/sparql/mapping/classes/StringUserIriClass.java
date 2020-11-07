@@ -83,6 +83,13 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public int getCheckCost()
+    {
+        return 0;
+    }
+
+
+    @Override
     protected String generateFunction(String parameter)
     {
         String code = parameter;

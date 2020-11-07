@@ -18,4 +18,7 @@ public abstract class UserIriClass extends IriClass
 
 
     public abstract boolean match(String iri, DataSource connectionPool);
+
+
+    public abstract int getCheckCost();
 }

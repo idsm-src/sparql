@@ -76,6 +76,13 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public int getCheckCost()
+    {
+        return 0;
+    }
+
+
+    @Override
     protected String generateFunction(String parameter)
     {
         String code = String.format("(%s)::varchar", parameter);

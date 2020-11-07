@@ -47,7 +47,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -141,9 +140,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final List<TranslateMessage> messages;
 
     private final SparqlDatabaseConfiguration configuration;
-    private final LinkedHashMap<String, UserIriClass> iriClasses;
+    private final List<UserIriClass> iriClasses;
     private final DatabaseSchema schema;
-    private final LinkedHashMap<String, ProcedureDefinition> procedures;
+    private final HashMap<String, ProcedureDefinition> procedures;
     private final Request request;
     private final boolean evalSeriveces;
 
@@ -757,10 +756,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     {
                         valueType = BuiltinClasses.unsupportedIri;
 
-                        for(ResourceClass resClass : iriClasses.values())
-                            if(resClass instanceof IriClass)
-                                if(resClass.match((Node) value, request))
-                                    valueType = resClass;
+                        for(UserIriClass resClass : iriClasses)
+                        {
+                            if(resClass.match((Node) value, request))
+                            {
+                                valueType = resClass;
+                                break;
+                            }
+                        }
                     }
                     else
                     {
@@ -1636,10 +1639,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             ResourceClass resourceClass = BuiltinClasses.unsupportedIri;
 
-            for(ResourceClass resClass : iriClasses.values())
-                if(resClass instanceof IriClass)
-                    if(resClass.match(node, request))
-                        resourceClass = resClass;
+            for(UserIriClass resClass : iriClasses)
+            {
+                if(resClass.match(node, request))
+                {
+                    resourceClass = resClass;
+                    break;
+                }
+            }
 
             return resourceClass;
         }
@@ -1666,7 +1673,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public final LinkedHashMap<String, UserIriClass> getIriClasses()
+    public final List<UserIriClass> getIriClasses()
     {
         return iriClasses;
     }

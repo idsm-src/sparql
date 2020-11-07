@@ -29,9 +29,14 @@ public class SqlIri extends SqlNodeValue
     {
         IriClass iriClass = unsupportedIri;
 
-        for(UserIriClass userClass : request.getConfiguration().getIriClasses().values())
+        for(UserIriClass userClass : request.getConfiguration().getIriClasses())
+        {
             if(userClass.match(iri, request))
+            {
                 iriClass = userClass;
+                break;
+            }
+        }
 
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.add(iriClass);

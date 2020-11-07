@@ -273,6 +273,25 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
+    @Override
+    public int getCheckCost()
+    {
+        switch(sqlCheck)
+        {
+            case IF_MATCH:
+                return 1;
+
+            case IF_NOT_MATCH:
+                return 2;
+
+            case NEVER:
+                return 0;
+        }
+
+        return 0;
+    }
+
+
     private boolean check(String iri, Request request)
     {
         Boolean check = sqlCheckCache.get(iri);
