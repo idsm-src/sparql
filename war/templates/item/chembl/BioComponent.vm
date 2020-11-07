@@ -1,0 +1,21 @@
+#set($ID = $entity.getValue().replaceAll(".*/", ""))
+
+#sparql($info)
+  SELECT ?DESCRIPTION WHERE
+  {
+    $entity dcterms:description ?DESCRIPTION
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td><b>biocomponent:$ID</b></td>
+    </tr>
+    #if($info.DESCRIPTION)
+    <tr>
+      <td>#escapeHTML($info.DESCRIPTION)</td>
+    </tr>
+    #end
+  </tbody>
+</table>

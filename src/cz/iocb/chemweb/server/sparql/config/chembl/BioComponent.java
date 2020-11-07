@@ -56,5 +56,7 @@ public class BioComponent
         // extension
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
                 config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "tax_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                config.createLiteralMapping("chembl/BioComponent.vm"));
     }
 }

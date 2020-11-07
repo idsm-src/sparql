@@ -1,0 +1,48 @@
+#set($ID = $entity.getValue().replaceAll(".*/CHEMBL", ""))
+
+#sparql($structure)
+  SELECT (true as ?R) WHERE
+  {
+    ?S rdf:type sio:SIO_011120.
+    ?S sio:is-attribute-of $entity.
+    ?S sio:has-value ?V.
+  }
+#end
+
+#sparql($value)
+  SELECT ?VALUE WHERE
+  {
+    $entity rdfs:label ?VALUE
+    filter (!strstarts(?VALUE, "CHEMBL"))
+  }
+#end
+
+<table style="width:100%">
+  <tr>
+    #if($structure.count > 0)
+    <td style="width:90px">
+      <table style="width:80px">
+        <tr>
+          <td>
+            <img src="chembl/compound/image?w=160&id=$ID" alt="CHEMBL$ID" height="80" width="80">
+          </td>
+        </tr>
+      </table>
+    </td>
+    #end
+    <td>
+      <table>
+        <tr>
+          <td><b>molecule:CHEMBL$ID</b></td>
+        </tr>
+        #if($value.VALUE > 0)
+        <tr>
+          <td>
+            <span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span>
+          </td>
+        </tr>
+        #end
+      </table>
+    </td>
+  </tr>
+</table>

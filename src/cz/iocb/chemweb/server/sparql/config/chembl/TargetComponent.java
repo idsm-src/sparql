@@ -59,6 +59,8 @@ public class TargetComponent
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
                     config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "tax_id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("chembl/TargetComponent.vm"));
         }
 
         {

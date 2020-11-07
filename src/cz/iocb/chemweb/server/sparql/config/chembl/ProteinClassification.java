@@ -43,6 +43,10 @@ public class ProteinClassification
                     config.createIriMapping("chembl:protclass", "parent_id"));
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:protclass", "parent_id"),
                     config.createIriMapping("skos:narrower"), subject);
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("chembl/ProteinClassification.vm"));
         }
 
         {

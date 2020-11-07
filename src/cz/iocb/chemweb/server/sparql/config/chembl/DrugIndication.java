@@ -51,5 +51,7 @@ public class DrugIndication
         // extension
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMesh"),
                 config.createIriMapping("mesh:heading", "mesh_id"));
+        config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                config.createLiteralMapping("chembl/DrugIndication.vm"));
     }
 }
