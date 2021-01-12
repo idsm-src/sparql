@@ -79,7 +79,7 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
         config.addPrefix("uniprot", "http://purl.uniprot.org/uniprot/");
         config.addPrefix("voag", "http://voag.linkedmodel.org/voag#");
         config.addPrefix("void", "http://rdfs.org/ns/void#");
-        config.addPrefix("uo", "http://purl.obolibrary.org/obo/");
+        //config.addPrefix("uo", "http://purl.obolibrary.org/obo/");
 
         // extension
         config.addPrefix("pdbo", "https://rdf.wwpdb.org/schema/pdbx-v50.owl#");

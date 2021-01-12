@@ -25,6 +25,7 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         //NeXtProtConfiguration.addPrefixes(this);
         OntologyConfiguration.addPrefixes(this);
         PubChemConfiguration.addPrefixes(this);
+        addExtraPrefixes(this);
 
         Common.addResourceClasses(this);
         ChebiConfiguration.addResourceClasses(this);
@@ -46,5 +47,17 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         Common.addFunctions(this);
 
         setConstraints();
+    }
+
+
+    public static void addExtraPrefixes(SparqlDatabaseConfiguration config)
+    {
+        // rhea
+        config.addPrefix("rh", "http://rdf.rhea-db.org/");
+        config.addPrefix("taxon", "http://purl.uniprot.org/taxonomy/");
+
+        // nextprot
+        config.addPrefix("nextprot", "http://nextprot.org/rdf#");
+        config.addPrefix("cv", "http://nextprot.org/rdf/terminology/");
     }
 }

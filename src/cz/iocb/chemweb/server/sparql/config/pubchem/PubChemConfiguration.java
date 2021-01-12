@@ -100,7 +100,8 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         config.addPrefix("cito", "http://purl.org/spar/cito/");
         config.addPrefix("fabio", "http://purl.org/spar/fabio/");
         config.addPrefix("uniprot", "http://purl.uniprot.org/uniprot/");
-        config.addPrefix("up", "https://www.uniprot.org/core/");
+        //config.addPrefix("up", "https://www.uniprot.org/core/");
+        config.addPrefix("up", "http://purl.uniprot.org/core/");
         config.addPrefix("pdbo40", "http://rdf.wwpdb.org/schema/pdbx-v40.owl#");
         config.addPrefix("pdbo", "https://rdf.wwpdb.org/schema/pdbx-v50.owl#");
         config.addPrefix("pdbr", "http://rdf.wwpdb.org/pdb/");
