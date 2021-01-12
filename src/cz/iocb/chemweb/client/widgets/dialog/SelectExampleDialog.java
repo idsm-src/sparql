@@ -34,7 +34,7 @@ import cz.iocb.chemweb.client.widgets.codemirror.CodeMirror;
 
 public class SelectExampleDialog extends DialogBox
 {
-    private static class Example extends JavaScriptObject
+    public static class Example extends JavaScriptObject
     {
         protected Example()
         {
@@ -49,6 +49,12 @@ public class SelectExampleDialog extends DialogBox
         /*-{
             return this.code;
         }-*/;
+
+        public final String getCommentedCode()
+        {
+            return "# " + getDescription().replaceAll("<[^>]+>", "").replaceAll("[\n ]+", " ") + "\n" + "\n"
+                    + getCode();
+        }
     }
 
     interface ExamplesPageUiBinder extends UiBinder<Widget, SelectExampleDialog>
@@ -195,7 +201,7 @@ public class SelectExampleDialog extends DialogBox
         hide();
 
         Example select = selectionModel.getSelectedObject();
-        callback.onSelection(select.getCode());
+        callback.onSelection(select.getCommentedCode());
     }
 
 
@@ -238,7 +244,7 @@ public class SelectExampleDialog extends DialogBox
     }
 
 
-    public final native JsArray<Example> getData()
+    public static final native JsArray<Example> getData()
     /*-{
         return $wnd.examples;
     }-*/;

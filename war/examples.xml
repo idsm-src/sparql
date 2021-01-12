@@ -4,7 +4,7 @@
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 1:</div>
       <p lang="en" class="exampleDescription">
-        What protein targets does donepezil (CHEBI_53289) inhibit with an IC<sub>50</sub> less than 10 &micro;M?
+        What protein targets does donepezil (CHEBI_53289) inhibit with an IC<sub>50</sub> less than 10 \u00b5M?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -110,7 +110,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 5:</div>
       <p lang="en" class="exampleDescription">
-        What protein targets are inhibited by substances with an IC<sub>50</sub> less than 10 &micro;M and have a pharmacological role of cholinesterase inhibitors as defined by ChEBI?
+        What protein targets are inhibited by substances with an IC<sub>50</sub> less than 10 \u00b5M and have a pharmacological role of cholinesterase inhibitors as defined by ChEBI?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -172,7 +172,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 7:</div>
       <p lang="en" class="exampleDescription">
-        What protein targets are inhibited by substances with IC<sub>50</sub> less than 10 &micro;M and have the same standardized chemical structure (CID3152)?
+        What protein targets are inhibited by substances with IC<sub>50</sub> less than 10 \u00b5M and have the same standardized chemical structure (CID3152)?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -201,7 +201,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 8:</div>
       <p lang="en" class="exampleDescription">
-         What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO:0001516), with an IC<sub>50</sub> less than 10 &micro;M?
+         What substances inhibit the proteins involved in the same biological pathway: prostaglandin biosynthetic process (GO:0001516), with an IC<sub>50</sub> less than 10 \u00b5M?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -234,7 +234,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 9:</div>
       <p lang="en" class="exampleDescription">
-        What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target ACCQ12809 with an IC<sub>50</sub> less than 10 &micro;M?
+        What the pharmacological roles defined by ChEBI are for the substances that inhibit protein target ACCQ12809 with an IC<sub>50</sub> less than 10 \u00b5M?
       </p>
     ]]></description>
     <code><![CDATA[

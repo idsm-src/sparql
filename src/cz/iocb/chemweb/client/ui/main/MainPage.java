@@ -28,6 +28,7 @@ import cz.iocb.chemweb.client.ui.main.ResultTablePart.StatusChangeEvent;
 import cz.iocb.chemweb.client.ui.main.ResultTablePart.StatusChangeEventHandler;
 import cz.iocb.chemweb.client.ui.main.ResultTablePart.VisitItemEvent;
 import cz.iocb.chemweb.client.ui.main.ResultTablePart.VisitItemEventHandler;
+import cz.iocb.chemweb.client.widgets.dialog.SelectExampleDialog;
 import cz.iocb.chemweb.shared.utils.Encode;
 
 
@@ -264,8 +265,8 @@ public class MainPage extends ResizeComposite implements HasSelectionHandlers<St
     }-*/;
 
 
-    public final native static String getDefultQuery()
-    /*-{
-        return $wnd.examples[0].code;
-    }-*/;
+    public final static String getDefultQuery()
+    {
+        return SelectExampleDialog.getData().get(0).getCommentedCode();
+    }
 }
