@@ -130,8 +130,8 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     private static final int serviceRedirectLimit = 3;
-    private static final int serviceContextLimit = 200;
-    private static final int serviceResultLimit = 10000;
+    private static final int serviceContextLimit = 1000;
+    private static final int serviceResultLimit = 100000;
     private static final String variablePrefix = "@additionalvar";
     private int variableId = 0;
     private int serviceId = 0;
