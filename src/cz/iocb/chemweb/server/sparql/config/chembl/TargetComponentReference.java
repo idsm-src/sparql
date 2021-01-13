@@ -185,6 +185,50 @@ public class TargetComponentReference
             config.addQuadMapping(table, graph, config.createIriMapping("reference:cgd", "reference"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:CGDRef"),
                     "reference_type = 'CGD'");
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:obo.go", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'GO PROCESS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:obo.go", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'GO FUNCTION'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:obo.go", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'GO COMPONENT'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:pdb", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'PDB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:interpro", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'INTERPRO'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:reactome", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'REACTOME'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:pfam", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'PFAM'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:ec-code", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'ENZYME CLASS'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:intact", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'INTACT'");
+            config.addQuadMapping(table, graph, config.createIriMapping("identifiers:ensembl", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'ENSEMBL GENE'");
+            config.addQuadMapping(table, graph, config.createIriMapping("purl:uniprot", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'UNIPROT'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:pharmgkb-gene", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'PHARMGKB'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:timbal", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'TIMBAL'");
+            config.addQuadMapping(table, graph, config.createIriMapping("reference:cgd", "reference"),
+                    config.createIriMapping("dc:identifier"), config.createLiteralMapping(xsdString, "reference"),
+                    "reference_type = 'CGD'");
         }
     }
 }
