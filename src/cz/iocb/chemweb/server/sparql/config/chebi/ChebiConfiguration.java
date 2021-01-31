@@ -4,6 +4,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 
 
 
@@ -12,9 +13,9 @@ public class ChebiConfiguration extends SparqlDatabaseConfiguration
     static final String schema = "chebi";
 
 
-    public ChebiConfiguration(DataSource connectionPool) throws SQLException
+    public ChebiConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(connectionPool);
+        super(service, connectionPool, schema);
 
         addPrefixes(this);
 

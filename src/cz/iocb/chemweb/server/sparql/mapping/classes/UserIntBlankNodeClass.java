@@ -11,13 +11,25 @@ import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 public class UserIntBlankNodeClass extends IntBlankNodeClass
 {
+    static private int counter;
+
     private final int segment;
+
+
+    public UserIntBlankNodeClass()
+    {
+        super("sparql.int_blanknode_" + Integer.toHexString(counter), Arrays.asList("int4"));
+        this.segment = counter++;
+    }
 
 
     public UserIntBlankNodeClass(int segment)
     {
-        super("sparql.int_blanknode_" + Integer.toHexString(segment), Arrays.asList("int4"));
+        super("sparql.int_blanknode_" + Integer.toHexString(counter), Arrays.asList("int4"));
         this.segment = segment;
+
+        if(segment >= 0)
+            throw new IllegalArgumentException();
     }
 
 
@@ -98,5 +110,23 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     public int getSegment()
     {
         return segment;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        UserIntBlankNodeClass other = (UserIntBlankNodeClass) object;
+
+        if(segment != other.segment)
+            return false;
+
+        return true;
     }
 }

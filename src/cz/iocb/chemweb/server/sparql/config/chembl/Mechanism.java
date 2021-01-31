@@ -31,7 +31,7 @@ public class Mechanism
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasBindingSite"),
                 config.createIriMapping("chembl:binding_site", "site_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMolecule"),
-                config.createIriMapping("chembl:molecule", "molecule_id"));
+                config.createIriMapping("chembl:compound", "molecule_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasTarget"),
                 config.createIriMapping("chembl:target", "target_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
@@ -44,7 +44,7 @@ public class Mechanism
                 config.createLiteralMapping(xsdString, "action_type"));
         config.addQuadMapping(table, graph, config.createIriMapping("chembl:binding_site", "site_id"),
                 config.createIriMapping("cco:isBindingSiteForMechanism"), subject);
-        config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule", "molecule_id"),
+        config.addQuadMapping(table, graph, config.createIriMapping("chembl:compound", "molecule_id"),
                 config.createIriMapping("cco:hasMechanism"), subject);
         config.addQuadMapping(table, graph, config.createIriMapping("chembl:target", "target_id"),
                 config.createIriMapping("cco:isTargetForMechanism"), subject);

@@ -188,4 +188,31 @@ public abstract class ResourceClass
      * @return true if values from this class can match the given SPARQL node
      */
     public abstract boolean match(Node node, Request request);
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(object == null)
+            return false;
+
+        if(getClass() != object.getClass())
+            return false;
+
+        ResourceClass other = (ResourceClass) object;
+
+        if(!name.equals(other.name))
+            return false;
+
+        if(!sqlTypes.equals(other.sqlTypes))
+            return false;
+
+        if(!resultTags.equals(other.resultTags))
+            return false;
+
+        return true;
+    }
 }

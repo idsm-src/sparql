@@ -88,4 +88,22 @@ public abstract class LiteralClass extends ResourceClass
     {
         return typeIri;
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        LiteralClass other = (LiteralClass) object;
+
+        if(!typeIri.equals(other.typeIri))
+            return false;
+
+        return true;
+    }
 }

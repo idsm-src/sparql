@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.ontology;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 
 
@@ -14,9 +15,9 @@ public class OntologyConfiguration extends SparqlDatabaseConfiguration
     public static final LangStringConstantTagClass rdfLangStringEn = LangStringConstantTagClass.get("en");
 
 
-    public OntologyConfiguration(DataSource connectionPool) throws SQLException
+    public OntologyConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(connectionPool);
+        super(service, connectionPool, schema);
 
         addPrefixes(this);
 

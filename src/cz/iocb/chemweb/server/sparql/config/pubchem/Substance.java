@@ -67,7 +67,7 @@ public class Substance
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("linkedchemistry:chembl", "match"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("chembl:molecule", "match"));
+                    config.createIriMapping("chembl:compound", "match"));
         }
 
         {

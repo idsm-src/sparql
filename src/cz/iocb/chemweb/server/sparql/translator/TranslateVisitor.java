@@ -139,6 +139,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private int variableId = 0;
     private int serviceId = 0;
 
+    private final Stack<IRI> serviceRestrictions = new Stack<>();
     private final Stack<VarOrIri> graphRestrictions = new Stack<>();
     private final List<TranslateMessage> messages;
 
@@ -161,6 +162,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         this.request = request;
         this.messages = messages;
         this.evalSeriveces = evalSeriveces;
+
+        serviceRestrictions.add(configuration.getServiceIri());
+        graphRestrictions.add(null);
     }
 
 
@@ -516,9 +520,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        if(select.isSubSelect() && graphRestrictions.size() > 0 && graphRestrictions.peek() instanceof Variable)
+        if(select.isSubSelect() && getGraph() instanceof Variable)
         {
-            String graphVariableName = ((Variable) graphRestrictions.peek()).getSqlName();
+            String graphVariableName = ((Variable) getGraph()).getSqlName();
 
             UsedVariable variable = translatedWhereClause.getVariables().get(graphVariableName);
 
@@ -613,7 +617,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
                     typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
 
-                    for(ConstantIriMapping g : configuration.getGraphs())
+                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
                     {
                         valueClasses.add(g.getIriClass());
 
@@ -630,7 +634,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     SqlIntercode innerPattern = translatedPattern;
                     translatedPattern = SqlNoSolution.get();
 
-                    for(ConstantIriMapping g : configuration.getGraphs())
+                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
                         translatedPattern = SqlUnion.union(translatedPattern,
                                 SqlBind.bind(varName, SqlIri.create((IRI) g.getValue(), request), innerPattern));
                 }
@@ -639,7 +643,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     SqlIntercode innerPattern = translatedPattern;
                     translatedPattern = SqlNoSolution.get();
 
-                    for(ConstantIriMapping g : configuration.getGraphs())
+                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
                     {
                         ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
                         ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
@@ -787,15 +791,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Triple triple)
     {
-        Node graph = null;
+        Node graph = getGraph();
         Node subject = triple.getSubject();
         Verb predicate = triple.getPredicate();
         Node object = triple.getObject();
-
-
-        if(!graphRestrictions.isEmpty())
-            graph = graphRestrictions.peek();
-
 
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, datasets);
         SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
@@ -985,7 +984,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(predicate instanceof IRI)
             {
                 IRI procedureName = (IRI) predicate;
-                ProcedureDefinition definition = configuration.getProcedures().get(procedureName.getValue());
+                ProcedureDefinition definition = configuration.getProcedures(getService())
+                        .get(procedureName.getValue());
 
                 if(definition != null)
                 {
@@ -1042,7 +1042,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     public Void visit(IRI iri)
                     {
                         //TODO: could be supported in a future version
-                        if(configuration.getProcedures().get(iri.getValue()) != null)
+                        if(configuration.getProcedures(getService()).get(iri.getValue()) != null)
                             messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
                                     iri.getRange()));
 
@@ -1162,7 +1162,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             Triple triple = (Triple) pattern;
 
             IRI name = (IRI) triple.getPredicate();
-            ProcedureDefinition definition = configuration.getProcedures().get(name.getValue());
+            ProcedureDefinition definition = configuration.getProcedures(getService()).get(name.getValue());
 
             List<Parameter> parameters = parameterNodeMap.get(triple.getObject());
 
@@ -1381,13 +1381,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
-        ProcedureDefinition procedureDefinition = configuration.getProcedures().get(procedureName.getValue());
+        ProcedureDefinition procedureDefinition = configuration.getProcedures(getService())
+                .get(procedureName.getValue());
         UsedVariables contextVariables = context.getVariables();
 
 
         /* check graph */
 
-        if(!graphRestrictions.isEmpty())
+        if(getGraph() != null)
         {
             messages.add(new TranslateMessage(MessageType.procedureCallInsideGraph,
                     procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
@@ -1524,11 +1525,25 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private SqlIntercode translateService(Service service, SqlIntercode context)
     {
+        VarOrIri name = service.getName();
+
+        if(configuration.getServices().contains(name))
+        {
+            serviceRestrictions.add((IRI) name);
+            graphRestrictions.add(null);
+
+            SqlIntercode result = SqlJoin.join(schema, context, visitElement(service.getPattern()));
+
+            graphRestrictions.pop();
+            serviceRestrictions.pop();
+
+            return result;
+        }
+
+
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
         HashSet<String> serviceInScopeVars = visitor.visitElement(service.getPattern());
         String serviceCode = visitor.getResultCode();
-
-        VarOrIri name = service.getName();
 
         if(context == SqlNoSolution.get())
             return SqlNoSolution.get();
@@ -1922,6 +1937,18 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             throw(SQLException) e.getCause();
         }
+    }
+
+
+    public final IRI getService()
+    {
+        return serviceRestrictions.peek();
+    }
+
+
+    public final VarOrIri getGraph()
+    {
+        return graphRestrictions.peek();
     }
 
 

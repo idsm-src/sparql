@@ -5,46 +5,51 @@ import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chebi.ChebiConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration;
-import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.mesh.MeshConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration;
 import cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.ChebiOntologySachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.ChemblSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.DrugbankSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.PubChemSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 
 
 
 public class IdsmConfiguration extends SparqlDatabaseConfiguration
 {
-    public IdsmConfiguration(DataSource connectionPool) throws SQLException
+    public IdsmConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(connectionPool);
-
-        Common.addPrefixes(this);
-        ChebiConfiguration.addPrefixes(this);
-        ChemblConfiguration.addPrefixes(this);
-        MeshConfiguration.addPrefixes(this);
-        //NeXtProtConfiguration.addPrefixes(this);
-        OntologyConfiguration.addPrefixes(this);
-        PubChemConfiguration.addPrefixes(this);
+        super(service, connectionPool, schema);
         addExtraPrefixes(this);
 
-        Common.addResourceClasses(this);
-        ChebiConfiguration.addResourceClasses(this);
-        ChemblConfiguration.addResourceClasses(this);
-        MeshConfiguration.addResourceClasses(this);
-        //NeXtProtConfiguration.addResourceClasses(this);
-        OntologyConfiguration.addResourceClasses(this);
-        PubChemConfiguration.addResourceClasses(this);
+        addService(new ChebiConfiguration(null, connectionPool, schema), true);
+        addService(new ChemblConfiguration(null, connectionPool, schema), true);
+        addService(new MeshConfiguration(null, connectionPool, schema), true);
+        addService(new OntologyConfiguration(null, connectionPool, schema), true);
+        addService(new PubChemConfiguration(null, connectionPool, schema), true);
+        addService(new PubChemSachemConfiguration(null, connectionPool, schema), true);
 
-        ChebiConfiguration.addQuadMapping(this);
-        ChemblConfiguration.addQuadMapping(this);
-        MeshConfiguration.addQuadMapping(this);
-        //NeXtProtConfiguration.addQuadMapping(this);
-        OntologyConfiguration.addQuadMapping(this);
-        PubChemConfiguration.addQuadMapping(this);
 
-        PubChemConfiguration.addProcedures(this);
+        addService(new DrugbankSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/drugbank",
+                connectionPool, schema), false);
+        addService(new DrugbankSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/drugbank",
+                connectionPool, schema), false);
 
-        Common.addFunctions(this);
+        addService(new ChebiOntologySachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/chebi",
+                connectionPool, schema), false);
+        addService(new ChebiOntologySachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/chebi",
+                connectionPool, schema), false);
+
+        addService(new ChemblSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/chembl", connectionPool,
+                schema), false);
+        addService(new ChemblSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/chembl", connectionPool,
+                schema), false);
+
+        addService(new PubChemSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/pubchem",
+                connectionPool, schema), false);
+        addService(new PubChemSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/pubchem",
+                connectionPool, schema), false);
 
         setConstraints();
     }

@@ -5,6 +5,7 @@ import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 
 
 
@@ -13,9 +14,9 @@ public class NeXtProtConfiguration extends SparqlDatabaseConfiguration
     static final String schema = "nextprot";
 
 
-    public NeXtProtConfiguration(DataSource connectionPool) throws SQLException
+    public NeXtProtConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(connectionPool);
+        super(service, connectionPool, schema);
 
         addPrefixes(this);
 

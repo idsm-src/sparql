@@ -110,22 +110,22 @@
 
 
   <Resource name="sparql:sachem-chebi" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.sachem.ChebiConfiguration"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.ChebiSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chebi" singleton="true" />
 
   <Resource name="sparql:sachem-chembl" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.sachem.ChemblConfiguration"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.ChemblSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-chembl" singleton="true" />
 
   <Resource name="sparql:sachem-drugbank" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.sachem.DrugbankConfiguration"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.DrugbankSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-drugbank" singleton="true" />
 
   <Resource name="sparql:sachem-pubchem" auth="Container"
-      type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemConfiguration"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-pubchem" singleton="true" />
 

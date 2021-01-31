@@ -4,8 +4,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
@@ -244,7 +248,7 @@ public class SqlProcedureCall extends SqlIntercode
             usedInSelect.add(name);
 
 
-            String[] fields = definition.getSqlTypeFields();
+            List<Column> fields = definition.getSqlTypeFields();
 
             for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
             {
@@ -302,7 +306,7 @@ public class SqlProcedureCall extends SqlIntercode
 
 
             ResultDefinition definition = entry.getKey();
-            String[] fields = definition.getSqlTypeFields();
+            List<Column> fields = definition.getSqlTypeFields();
             ResourceClass resultClass = definition.getResultClass();
 
             if(node instanceof VariableOrBlankNode)
@@ -525,11 +529,15 @@ public class SqlProcedureCall extends SqlIntercode
     }
 
 
-    private static String getSqlResultColumn(String[] fields, int i)
+    private static String getSqlResultColumn(List<Column> fields, int i)
     {
         if(fields == null)
             return "\"" + resultName + "\"";
+        else if(fields.get(i) instanceof TableColumn)
+            return "(\"" + resultName + "\")." + fields.get(i).getCode();
+        else if(fields.get(i) instanceof ConstantColumn)
+            return fields.get(i).getCode();
         else
-            return "(\"" + resultName + "\").\"" + fields[i] + "\"";
+            throw new IllegalArgumentException();
     }
 }

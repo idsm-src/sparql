@@ -49,8 +49,8 @@ public class BuiltinClasses
     public static final CommonIriClass iri = new CommonIriClass();
     public static final CommonIriClass unsupportedIri = new CommonIriClass();
 
-    public static final IntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass(0);
-    public static final StrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass(0);
+    public static final IntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass();
+    public static final StrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass();
 
 
     private static final List<LiteralClass> literalClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong,

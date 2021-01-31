@@ -19,7 +19,7 @@ public class DateConstantZoneClass extends LiteralClass
     private final int zone;
 
 
-    DateConstantZoneClass(int zone)
+    private DateConstantZoneClass(int zone)
     {
         super("date$" + zone, Arrays.asList("date"), Arrays.asList(DATE), xsdDateIri);
         this.zone = zone;
@@ -182,5 +182,23 @@ public class DateConstantZoneClass extends LiteralClass
             zone = Integer.parseInt(parts[0]) * (Integer.parseInt(parts[1]) * 3600 + Integer.parseInt(parts[2]) * 60);
 
         return zone;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        DateConstantZoneClass other = (DateConstantZoneClass) object;
+
+        if(zone != other.zone)
+            return false;
+
+        return true;
     }
 }

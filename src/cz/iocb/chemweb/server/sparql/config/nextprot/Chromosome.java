@@ -14,11 +14,16 @@ import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 
 
 
 public class Chromosome
 {
+    private static final BlankNodeClass nameBlankNode = new UserIntBlankNodeClass();
+    private static final BlankNodeClass nameListBlankNode = new UserIntBlankNodeClass();
+
+
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("nextprot:isoform", "integer", new Table("nextprot", "isoform_bases"),
@@ -35,9 +40,6 @@ public class Chromosome
                         new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
         config.addIriClass(new MapUserIriClass("nextprot:gene", "integer", new Table("nextprot", "gene_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
-
-        config.addBlankNodeClass("name", config.getNewIntBlankNodeClass());
-        config.addBlankNodeClass("name_list", config.getNewIntBlankNodeClass());
     }
 
 
@@ -1020,7 +1022,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createBlankNodeMapping("name", "name"));
+                    config.createBlankNodeMapping(nameBlankNode, "name"));
         }
 
         {
@@ -1028,7 +1030,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createBlankNodeMapping("name", "name"));
+                    config.createBlankNodeMapping(nameBlankNode, "name"));
         }
 
         {
@@ -1036,7 +1038,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":additionalNames"),
-                    config.createBlankNodeMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
 
         {
@@ -1044,7 +1046,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":cleavedRegionNames"),
-                    config.createBlankNodeMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
 
         {
@@ -1052,7 +1054,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("nextprot:entry", "entry");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":fonctionalRegionNames"),
-                    config.createBlankNodeMapping("name_list", "name_list"));
+                    config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
     }
 
@@ -1149,7 +1151,7 @@ public class Chromosome
 
     private static void addProteinSequenceQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass sequence = config.getNewIntBlankNodeClass();
+        BlankNodeClass sequence = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1175,7 +1177,7 @@ public class Chromosome
 
     private static void addProteinFamilyInfoQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass family = config.getNewIntBlankNodeClass();
+        BlankNodeClass family = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1199,7 +1201,7 @@ public class Chromosome
 
     private static void addHistoryQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass history = config.getNewIntBlankNodeClass();
+        BlankNodeClass history = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1231,7 +1233,7 @@ public class Chromosome
 
     private static void addIdentifierQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass identifier = config.getNewIntBlankNodeClass();
+        BlankNodeClass identifier = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1253,7 +1255,7 @@ public class Chromosome
 
     private static void addEntryXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = config.getNewIntBlankNodeClass();
+        BlankNodeClass xref = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1275,7 +1277,7 @@ public class Chromosome
 
     private static void addEvidenceXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = config.getNewIntBlankNodeClass();
+        BlankNodeClass xref = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1297,7 +1299,7 @@ public class Chromosome
 
     private static void addChebiXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = config.getNewIntBlankNodeClass();
+        BlankNodeClass xref = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1323,7 +1325,7 @@ public class Chromosome
 
     private static void addDrugBankXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = config.getNewIntBlankNodeClass();
+        BlankNodeClass xref = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1349,7 +1351,7 @@ public class Chromosome
 
     private static void addUniProtXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = config.getNewIntBlankNodeClass();
+        BlankNodeClass xref = new UserIntBlankNodeClass();
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1379,7 +1381,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_bases");
-            NodeMapping subject = config.createBlankNodeMapping(config.getNewIntBlankNodeClass(), "id");
+            NodeMapping subject = config.createBlankNodeMapping(new UserIntBlankNodeClass(), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Name"));
@@ -1410,7 +1412,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_list_bases");
-            NodeMapping subject = config.createBlankNodeMapping("name_list", "id");
+            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":NameList"));
@@ -1418,18 +1420,18 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_list_recommended_names");
-            NodeMapping subject = config.createBlankNodeMapping("name_list", "list");
+            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
-                    config.createBlankNodeMapping("name", "name"));
+                    config.createBlankNodeMapping(nameBlankNode, "name"));
         }
 
         {
             Table table = new Table(schema, "name_list_alternative_names");
-            NodeMapping subject = config.createBlankNodeMapping("name_list", "list");
+            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
-                    config.createBlankNodeMapping("name", "name"));
+                    config.createBlankNodeMapping(nameBlankNode, "name"));
         }
     }
 }

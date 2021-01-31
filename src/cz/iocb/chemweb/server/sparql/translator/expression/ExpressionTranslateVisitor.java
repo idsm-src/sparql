@@ -63,7 +63,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         this.request = parentTranslator.getRequest();
         this.prologue = parentTranslator.getPrologue();
         this.messages = parentTranslator.getMessages();
-        this.functions = parentTranslator.getRequest().getConfiguration().getFunctions();
+        this.functions = parentTranslator.getRequest().getConfiguration().getFunctions(parentTranslator.getService());
     }
 
 

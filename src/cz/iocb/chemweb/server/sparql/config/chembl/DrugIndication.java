@@ -34,7 +34,7 @@ public class DrugIndication
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasEFO"),
                 config.createIriMapping("ontology:resource", "efo_resource_unit", "efo_resource_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMolecule"),
-                config.createIriMapping("chembl:molecule", "molecule_id"));
+                config.createIriMapping("chembl:compound", "molecule_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:highestDevelopmentPhase"),
                 config.createLiteralMapping(xsdInt, "max_phase_for_ind"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
@@ -45,7 +45,7 @@ public class DrugIndication
                 config.createLiteralMapping(xsdString, "mesh_heading"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasEFOName"),
                 config.createLiteralMapping(xsdString, "efo_term"));
-        config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule", "molecule_id"),
+        config.addQuadMapping(table, graph, config.createIriMapping("chembl:compound", "molecule_id"),
                 config.createIriMapping("cco:hasDrugIndication"), subject);
 
         // extension

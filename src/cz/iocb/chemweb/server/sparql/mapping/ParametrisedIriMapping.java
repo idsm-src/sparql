@@ -82,4 +82,10 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     {
         return getIriClass().getIriValueCode(columns);
     }
+
+
+    public List<Column> getColumns()
+    {
+        return columns;
+    }
 }

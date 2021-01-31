@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -31,11 +32,11 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
+import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -44,7 +45,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public abstract class SparqlDatabaseConfiguration
 {
-    private int blankNodeSegment = 1;
+    private final IRI serviceIri;
 
     protected DatabaseSchema databaseSchema;
     protected DataSource connectionPool;
@@ -52,19 +53,26 @@ public abstract class SparqlDatabaseConfiguration
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
     protected ArrayList<UserIriClass> iriClasses = new ArrayList<UserIriClass>();
     protected HashMap<String, UserIriClass> iriClassMap = new HashMap<String, UserIriClass>();
-    protected HashMap<String, BlankNodeClass> blankNodeClassMap = new HashMap<String, BlankNodeClass>();
-    protected List<QuadMapping> mappings = new ArrayList<QuadMapping>();
-    protected Set<ConstantIriMapping> graphs = new HashSet<ConstantIriMapping>();
-    protected HashMap<String, ProcedureDefinition> procedures = new HashMap<String, ProcedureDefinition>();
-    protected HashMap<String, FunctionDefinition> functions = new HashMap<String, FunctionDefinition>();
+
+    private final List<IRI> services = new ArrayList<IRI>();
+    protected HashMap<IRI, List<QuadMapping>> mappings = new HashMap<IRI, List<QuadMapping>>();
+    protected HashMap<IRI, HashSet<ConstantIriMapping>> graphs = new HashMap<IRI, HashSet<ConstantIriMapping>>();
+    protected HashMap<IRI, HashMap<String, ProcedureDefinition>> procedures = new HashMap<IRI, HashMap<String, ProcedureDefinition>>();
+    protected HashMap<IRI, HashMap<String, FunctionDefinition>> functions = new HashMap<IRI, HashMap<String, FunctionDefinition>>();
 
     protected boolean strictDefaultGraph = false;
 
 
-    protected SparqlDatabaseConfiguration(DataSource connectionPool) throws SQLException
+    protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
+            throws SQLException
     {
+        IRI serviceIri = service == null ? null : new IRI(service);
+
+        this.serviceIri = serviceIri;
         this.connectionPool = connectionPool;
-        databaseSchema = new DatabaseSchema(connectionPool);
+        this.databaseSchema = schema;
+
+        addEmptyService(serviceIri);
     }
 
 
@@ -82,33 +90,31 @@ public abstract class SparqlDatabaseConfiguration
 
     public void addIriClass(UserIriClass iriClass)
     {
-        int possition = (int) iriClasses.stream().filter(c -> c.getCheckCost() <= iriClass.getCheckCost()).count();
-        iriClasses.add(possition, iriClass);
-        iriClassMap.put(iriClass.getName(), iriClass);
-    }
+        UserIriClass previous = iriClassMap.get(iriClass.getName());
 
-
-    public void addBlankNodeClass(String name, UserIntBlankNodeClass blankNodeClass)
-    {
-        blankNodeClassMap.put(name, blankNodeClass);
-    }
-
-
-    public void addBlankNodeClass(String name, UserStrBlankNodeClass blankNodeClass)
-    {
-        blankNodeClassMap.put(name, blankNodeClass);
-    }
-
-
-    public UserIntBlankNodeClass getNewIntBlankNodeClass()
-    {
-        return new UserIntBlankNodeClass(blankNodeSegment++);
+        if(previous == null)
+        {
+            int possition = (int) iriClasses.stream().filter(c -> c.getCheckCost() <= iriClass.getCheckCost()).count();
+            iriClasses.add(possition, iriClass);
+            iriClassMap.put(iriClass.getName(), iriClass);
+        }
+        else if(!previous.equals(iriClass))
+        {
+            throw new IllegalArgumentException(
+                    "resource class definition conflict for iri class '" + iriClass.getName() + "'");
+        }
     }
 
 
     public NodeMapping createIriMapping(IriClass iriClass, String... columns)
     {
         return new ParametrisedIriMapping(iriClass, getColumns(columns));
+    }
+
+
+    public NodeMapping createIriMapping(IriClass iriClass, List<Column> columns)
+    {
+        return new ParametrisedIriMapping(iriClass, columns);
     }
 
 
@@ -166,12 +172,6 @@ public abstract class SparqlDatabaseConfiguration
     public NodeMapping createBlankNodeMapping(BlankNodeClass blankNodeClass, String... columns)
     {
         return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(columns));
-    }
-
-
-    public NodeMapping createBlankNodeMapping(String blankNodeClassName, String... columns)
-    {
-        return new ParametrisedBlankNodeMapping(getBlankNodeClass(blankNodeClassName), getColumns(columns));
     }
 
 
@@ -235,23 +235,63 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    protected void addEmptyService(IRI service)
+    {
+        services.add(service);
+        mappings.put(service, new ArrayList<QuadMapping>());
+        graphs.put(service, new HashSet<ConstantIriMapping>());
+        procedures.put(service, new HashMap<String, ProcedureDefinition>());
+        functions.put(service, new HashMap<String, FunctionDefinition>());
+    }
+
+
+    public void addQuadMapping(IRI service, QuadMapping mapping)
+    {
+        if(!services.contains(service))
+            addEmptyService(service);
+
+        mappings.get(service).add(mapping);
+
+        if(mapping.getGraph() != null)
+            graphs.get(service).add(mapping.getGraph());
+    }
+
+
+    private void addProcedure(IRI service, ProcedureDefinition procedure)
+    {
+        if(!services.contains(service))
+            addEmptyService(service);
+
+        procedures.get(service).put(procedure.getProcedureName(), procedure);
+    }
+
+
+    private void addFunction(IRI service, FunctionDefinition function)
+    {
+        if(!services.contains(service))
+            addEmptyService(service);
+
+        functions.get(service).put(function.getFunctionName(), function);
+    }
+
+
     public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        mappings.add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
+        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
 
         if(graph != null)
-            graphs.add(graph);
+            graphs.get(serviceIri).add(graph);
     }
 
 
     public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String condition)
     {
-        mappings.add(new SingleTableQuadMapping(table, graph, subject, predicate, object, condition));
+        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, condition));
 
         if(graph != null)
-            graphs.add(graph);
+            graphs.get(serviceIri).add(graph);
     }
 
 
@@ -259,12 +299,13 @@ public abstract class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        mappings.add(new JoinTableQuadMapping(subjectTable, objectTable,
-                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object));
+        mappings.get(serviceIri)
+                .add(new JoinTableQuadMapping(subjectTable, objectTable,
+                        Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                        Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object));
 
         if(graph != null)
-            graphs.add(graph);
+            graphs.get(serviceIri).add(graph);
     }
 
 
@@ -272,25 +313,105 @@ public abstract class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String subjectCondition, String objectCondition)
     {
-        mappings.add(new JoinTableQuadMapping(subjectTable, objectTable,
-                Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
-                subjectCondition, objectCondition));
+        mappings.get(serviceIri)
+                .add(new JoinTableQuadMapping(subjectTable, objectTable,
+                        Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                        Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
+                        subjectCondition, objectCondition));
 
         if(graph != null)
-            graphs.add(graph);
+            graphs.get(serviceIri).add(graph);
     }
 
 
     public void addProcedure(ProcedureDefinition procedure)
     {
-        procedures.put(procedure.getProcedureName(), procedure);
+        procedures.get(serviceIri).put(procedure.getProcedureName(), procedure);
     }
 
 
     public void addFunction(FunctionDefinition function)
     {
-        functions.put(function.getFunctionName(), function);
+        functions.get(serviceIri).put(function.getFunctionName(), function);
+    }
+
+
+    public void addService(SparqlDatabaseConfiguration other, boolean merge)
+    {
+        if(merge)
+            for(Entry<String, String> entry : other.getPrefixes().entrySet())
+                addPrefix(entry.getKey(), entry.getValue());
+
+        for(UserIriClass iriClass : other.getIriClasses())
+            addIriClass(iriClass);
+
+        for(IRI service : other.getServices())
+        {
+            IRI target = service == other.getServiceIri() && merge ? getServiceIri() : service;
+
+            for(QuadMapping original : other.getMappings(service))
+            {
+                if(original instanceof SingleTableQuadMapping)
+                {
+                    SingleTableQuadMapping map = (SingleTableQuadMapping) original;
+
+                    SingleTableQuadMapping mapping = new SingleTableQuadMapping(map.getTable(),
+                            (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
+                            (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()), map.getCondition());
+
+                    addQuadMapping(target, mapping);
+                }
+                else if(original instanceof JoinTableQuadMapping)
+                {
+                    JoinTableQuadMapping map = (JoinTableQuadMapping) original;
+
+                    JoinTableQuadMapping mapping = new JoinTableQuadMapping(map.getSubjectTable(), map.getObjectTable(),
+                            map.getSubjectJoinColumns(), map.getObjectJoinColumns(),
+                            (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
+                            (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()),
+                            map.getSubjectCondition(), map.getObjectCondition());
+
+                    addQuadMapping(target, mapping);
+                }
+                else
+                {
+                    throw new IllegalArgumentException();
+                }
+            }
+
+            for(Entry<String, ProcedureDefinition> entry : other.getProcedures(service).entrySet())
+            {
+                ProcedureDefinition original = entry.getValue();
+                ProcedureDefinition definition = new ProcedureDefinition(original.getProcedureName(),
+                        original.getSqlProcedure());
+
+                for(ParameterDefinition parameter : original.getParameters())
+                    definition.addParameter(new ParameterDefinition(parameter.getParamName(),
+                            remap(parameter.getParameterClass()), parameter.getDefaultValue()));
+
+                for(ResultDefinition result : original.getResults())
+                    definition.addResult(new ResultDefinition(result.getResultName(), remap(result.getResultClass()),
+                            result.getSqlTypeFields()));
+
+                addProcedure(target, definition);
+            }
+
+            for(Entry<String, FunctionDefinition> entry : other.getFunctions(service).entrySet())
+            {
+                FunctionDefinition original = entry.getValue();
+
+                List<ResourceClass> arguments = new ArrayList<ResourceClass>(original.getArgumentClasses().size());
+
+                for(ResourceClass argument : original.getArgumentClasses())
+                    arguments.add(remap(argument));
+
+                FunctionDefinition definition = new FunctionDefinition(original.getFunctionName(),
+                        original.getSqlFunction(), remap(original.getResultClass()), arguments, original.canBeNull(),
+                        original.isDeterministic());
+
+                addFunction(target, definition);
+            }
+        }
     }
 
 
@@ -312,6 +433,18 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public IRI getServiceIri()
+    {
+        return serviceIri;
+    }
+
+
+    public List<IRI> getServices()
+    {
+        return services;
+    }
+
+
     public UserIriClass getIriClass(String name)
     {
         UserIriClass iriClass = iriClassMap.get(name);
@@ -320,17 +453,6 @@ public abstract class SparqlDatabaseConfiguration
             throw new IllegalArgumentException("unknown iri class: '" + name + "'");
 
         return iriClass;
-    }
-
-
-    public BlankNodeClass getBlankNodeClass(String name)
-    {
-        BlankNodeClass blankNodeClass = blankNodeClassMap.get(name);
-
-        if(blankNodeClass == null)
-            throw new IllegalArgumentException("unknown blank node class: '" + name + "'");
-
-        return blankNodeClass;
     }
 
 
@@ -346,27 +468,27 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public List<QuadMapping> getMappings()
+    public List<QuadMapping> getMappings(IRI iri)
     {
-        return mappings;
+        return mappings.get(iri);
     }
 
 
-    public Set<ConstantIriMapping> getGraphs()
+    public Set<ConstantIriMapping> getGraphs(IRI iri)
     {
-        return graphs;
+        return graphs.get(iri);
     }
 
 
-    public HashMap<String, ProcedureDefinition> getProcedures()
+    public HashMap<String, ProcedureDefinition> getProcedures(IRI iri)
     {
-        return procedures;
+        return procedures.get(iri);
     }
 
 
-    public HashMap<String, FunctionDefinition> getFunctions()
+    public HashMap<String, FunctionDefinition> getFunctions(IRI iri)
     {
-        return functions;
+        return functions.get(iri);
     }
 
 
@@ -438,5 +560,32 @@ public abstract class SparqlDatabaseConfiguration
                 }
             }
         }
+    }
+
+
+    private ResourceClass remap(ResourceClass resourceClass)
+    {
+        if(resourceClass instanceof UserIriClass)
+            return getIriClass(resourceClass.getName());
+
+        return resourceClass;
+    }
+
+
+    private NodeMapping remap(NodeMapping mapping)
+    {
+        if(mapping instanceof ConstantIriMapping)
+        {
+            ConstantIriMapping original = (ConstantIriMapping) mapping;
+            return new ConstantIriMapping((IriClass) remap(original.getIriClass()), (IRI) original.getValue());
+        }
+
+        if(mapping instanceof ParametrisedIriMapping)
+        {
+            ParametrisedIriMapping original = (ParametrisedIriMapping) mapping;
+            return new ParametrisedIriMapping((IriClass) remap(original.getIriClass()), original.getColumns());
+        }
+
+        return mapping;
     }
 }

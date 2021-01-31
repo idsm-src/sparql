@@ -122,4 +122,31 @@ public class StringUserIriClass extends SimpleUserIriClass
         else
             return String.format("left(right(%s, -%d), -%d)::varchar", parameter, prefix.length(), suffix.length());
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        StringUserIriClass other = (StringUserIriClass) object;
+
+        if(!pattern.equals(other.pattern))
+            return false;
+
+        if(!prefix.equals(other.prefix))
+            return false;
+
+        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
+            return false;
+
+        if(length != other.length)
+            return false;
+
+        return true;
+    }
 }

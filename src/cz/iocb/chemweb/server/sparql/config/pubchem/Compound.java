@@ -18,7 +18,7 @@ public class Compound
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID";
 
         config.addIriClass(new IntegerUserIriClass("pubchem:compound", "integer", prefix));
-        config.addIriClass(new IntegerUserIriClass("pubchem:compound_molfile", "integer", prefix, "_Molfile"));
+        config.addIriClass(new IntegerUserIriClass("pubchem:molfile", "integer", prefix, "_Molfile"));
     }
 
 
@@ -42,7 +42,7 @@ public class Compound
 
         {
             Table table = new Table("molecules", "pubchem");
-            NodeMapping subject = config.createIriMapping("pubchem:compound_molfile", "id");
+            NodeMapping subject = config.createIriMapping("pubchem:molfile", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_011120"));

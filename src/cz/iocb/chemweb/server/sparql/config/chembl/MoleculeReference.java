@@ -23,7 +23,7 @@ public class MoleculeReference
 
         {
             Table table = new Table(schema, "molecule_pubchem_references");
-            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+            NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("pubchem:compound", "compound_id"));
@@ -40,7 +40,7 @@ public class MoleculeReference
 
         {
             Table table = new Table(schema, "molecule_pubchem_thom_pharm_references");
-            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+            NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("pubchem:substance", "substance_id"));
@@ -53,7 +53,7 @@ public class MoleculeReference
 
         {
             Table table = new Table(schema, "molecule_pubchem_dotf_references");
-            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+            NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("pubchem:substance", "substance_id"));
@@ -66,7 +66,7 @@ public class MoleculeReference
 
         {
             Table table = new Table(schema, "molecule_chebi_references");
-            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+            NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("reference:chebi", "chebi_id"));
@@ -83,7 +83,7 @@ public class MoleculeReference
 
         {
             Table table = new Table(schema, "molecule_references");
-            NodeMapping subject = config.createIriMapping("chembl:molecule", "molecule_id");
+            NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("reference:zinc", "reference"), "reference_type = 'ZINC'");

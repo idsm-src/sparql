@@ -1,5 +1,9 @@
 package cz.iocb.chemweb.server.sparql.mapping.extension;
 
+import java.util.Arrays;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -8,10 +12,10 @@ public class ResultDefinition
 {
     private final String resultName;
     private final ResourceClass resultClass;
-    private final String[] sqlTypeFields;
+    private final List<Column> sqlTypeFields;
 
 
-    public ResultDefinition(String resultName, ResourceClass resultClass, String[] sqlTypeFields)
+    public ResultDefinition(String resultName, ResourceClass resultClass, List<Column> sqlTypeFields)
     {
         this.resultName = resultName;
         this.resultClass = resultClass;
@@ -21,7 +25,7 @@ public class ResultDefinition
 
     public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
-        String[] sqlTypeFields = { sqlTypeField };
+        List<Column> sqlTypeFields = Arrays.asList(new TableColumn(sqlTypeField));
 
         this.resultName = resultName;
         this.resultClass = resultClass;
@@ -49,7 +53,7 @@ public class ResultDefinition
     }
 
 
-    public final String[] getSqlTypeFields()
+    public final List<Column> getSqlTypeFields()
     {
         return sqlTypeFields;
     }

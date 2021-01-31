@@ -20,7 +20,7 @@ public class LangStringConstantTagClass extends LiteralClass
     private final String lang;
 
 
-    LangStringConstantTagClass(String lang)
+    private LangStringConstantTagClass(String lang)
     {
         super("lang-" + lang, Arrays.asList("varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
         this.lang = lang;
@@ -178,5 +178,23 @@ public class LangStringConstantTagClass extends LiteralClass
     public String getTag()
     {
         return lang;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        LangStringConstantTagClass other = (LangStringConstantTagClass) object;
+
+        if(!lang.equals(other.lang))
+            return false;
+
+        return true;
     }
 }

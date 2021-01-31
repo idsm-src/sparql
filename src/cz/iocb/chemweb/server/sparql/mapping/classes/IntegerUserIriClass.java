@@ -131,4 +131,31 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         return buffer.toString();
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        IntegerUserIriClass other = (IntegerUserIriClass) object;
+
+        if(!pattern.equals(other.pattern))
+            return false;
+
+        if(!prefix.equals(other.prefix))
+            return false;
+
+        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
+            return false;
+
+        if(length != other.length)
+            return false;
+
+        return true;
+    }
 }

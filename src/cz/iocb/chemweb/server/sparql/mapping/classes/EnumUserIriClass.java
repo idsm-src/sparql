@@ -86,4 +86,25 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
         return buffer.toString();
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        EnumUserIriClass other = (EnumUserIriClass) object;
+
+        if(!pattern.equals(other.pattern))
+            return false;
+
+        if(!values.equals(other.values))
+            return false;
+
+        return true;
+    }
 }

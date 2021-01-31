@@ -10,6 +10,7 @@ import cz.iocb.chemweb.server.sparql.config.pubchem.Bioassay;
 import cz.iocb.chemweb.server.sparql.config.pubchem.Compound;
 import cz.iocb.chemweb.server.sparql.config.pubchem.Reference;
 import cz.iocb.chemweb.server.sparql.config.pubchem.Substance;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 
 
 
@@ -18,9 +19,9 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
     static final String schema = "chembl";
 
 
-    public ChemblConfiguration(DataSource connectionPool) throws SQLException
+    public ChemblConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(connectionPool);
+        super(service, connectionPool, schema);
 
         addPrefixes(this);
 

@@ -107,7 +107,7 @@ public class GenerateHints extends HttpServlet
     {
         Set<String> iris = new HashSet<String>();
 
-        for(QuadMapping mapping : sparqlConfig.getMappings())
+        for(QuadMapping mapping : sparqlConfig.getMappings(sparqlConfig.getServiceIri()))
         {
             if(mapping.getGraph() instanceof ConstantIriMapping)
                 iris.add(((IRI) (mapping.getGraph().getValue())).getValue());

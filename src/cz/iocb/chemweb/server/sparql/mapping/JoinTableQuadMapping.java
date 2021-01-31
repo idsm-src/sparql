@@ -138,6 +138,8 @@ public class JoinTableQuadMapping extends QuadMapping
 
     private final Table subjectTable;
     private final Table objectTable;
+    private final List<Column> subjectJoinColumns;
+    private final List<Column> objectJoinColumns;
     private final NodeMapping subjectJoinMapping;
     private final NodeMapping objectJoinMapping;
     private final String subjectCondition;
@@ -162,6 +164,9 @@ public class JoinTableQuadMapping extends QuadMapping
         this.subjectTable = subjectTable;
         this.objectTable = objectTable;
 
+        this.subjectJoinColumns = subjectJoinColumns;
+        this.objectJoinColumns = objectJoinColumns;
+
         assert subjectJoinColumns.size() == objectJoinColumns.size();
         ResourceClass resourceClass = new InternalResourceClass(subjectJoinColumns.size());
 
@@ -182,6 +187,18 @@ public class JoinTableQuadMapping extends QuadMapping
     public final Table getObjectTable()
     {
         return objectTable;
+    }
+
+
+    public final List<Column> getSubjectJoinColumns()
+    {
+        return subjectJoinColumns;
+    }
+
+
+    public final List<Column> getObjectJoinColumns()
+    {
+        return objectJoinColumns;
     }
 
 

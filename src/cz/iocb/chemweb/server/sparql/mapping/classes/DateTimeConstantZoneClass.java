@@ -20,7 +20,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     private final int zone;
 
 
-    DateTimeConstantZoneClass(int zone)
+    private DateTimeConstantZoneClass(int zone)
     {
         super("datetime$" + zone, Arrays.asList("timestamptz"), Arrays.asList(DATETIME), xsdDateTimeIri);
         this.zone = zone;
@@ -181,5 +181,23 @@ public class DateTimeConstantZoneClass extends LiteralClass
             return ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds();
 
         return Integer.MIN_VALUE;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        DateTimeConstantZoneClass other = (DateTimeConstantZoneClass) object;
+
+        if(zone != other.zone)
+            return false;
+
+        return true;
     }
 }

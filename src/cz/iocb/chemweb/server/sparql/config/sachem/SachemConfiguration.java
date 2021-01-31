@@ -9,11 +9,16 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
@@ -28,36 +33,31 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 {
-    private final String index;
-    private final String schema;
-    private final String table;
-
-    private final String iriPrefix;
-    private final String idPrefix;
-    private final int idNumberLength;
-
-
-    protected SachemConfiguration(DataSource connectionPool, String index, String schema, String table,
-            String iriPrefix, String idPrefix, int idNumberLength) throws SQLException
+    protected SachemConfiguration(String service, DataSource connectionPool, DatabaseSchema schema, String index,
+            Table table, String iriPrefix, UserIriClass compound, UserIriClass molfile, List<Column> resultFields,
+            List<Column> molfileFields) throws SQLException
     {
-        super(connectionPool);
+        super(service, connectionPool, schema);
 
-        this.index = index;
-        this.schema = schema;
-        this.table = table;
-
-        this.iriPrefix = iriPrefix;
-        this.idPrefix = idPrefix;
-        this.idNumberLength = idNumberLength;
-
-        loadPrefixes();
-        loadClasses();
-        loadQuadMapping();
-        loadProcedures();
+        loadPrefixes(iriPrefix);
+        loadClasses(compound, molfile);
+        loadQuadMapping(index, table, molfileFields, compound, molfile);
+        loadProcedures(index, resultFields, compound);
     }
 
 
-    private void loadPrefixes()
+    protected SachemConfiguration(String service, DataSource connectionPool, DatabaseSchema schema, String index,
+            Table table, String iriPrefix, String idPrefix, int idNumberLength) throws SQLException
+    {
+        this(service, connectionPool, schema, index, table, iriPrefix,
+                new IntegerUserIriClass(index + ":compound", "integer", iriPrefix + idPrefix, idNumberLength),
+                new IntegerUserIriClass(index + ":molfile", "integer", iriPrefix + idPrefix, idNumberLength,
+                        "_Molfile"),
+                Arrays.asList(new TableColumn("compound")), Arrays.asList(new TableColumn("id")));
+    }
+
+
+    private void loadPrefixes(String iriPrefix)
     {
         prefixes.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
         prefixes.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
@@ -71,7 +71,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
 
 
     @SuppressWarnings("serial")
-    private void loadClasses()
+    private void loadClasses(UserIriClass compound, UserIriClass molfile)
     {
         String sachem = prefixes.get("sachem");
 
@@ -146,29 +146,27 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         }));
 
 
-        addIriClass(new IntegerUserIriClass("compound", "integer", iriPrefix + idPrefix, idNumberLength));
-        addIriClass(new IntegerUserIriClass("compound_molfile", "integer", iriPrefix + idPrefix, idNumberLength,
-                "_Molfile"));
+        addIriClass(compound);
+        addIriClass(molfile);
     }
 
 
-    private void loadQuadMapping() throws SQLException
+    private void loadQuadMapping(String index, Table table, List<Column> molfileFields, UserIriClass compound,
+            UserIriClass molfile) throws SQLException
     {
-        NodeMapping subject = createIriMapping("compound_molfile", "id");
+        NodeMapping subject = createIriMapping(molfile, "id");
 
-        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("rdf:type"),
-                createIriMapping("sio:SIO_011120"));
-        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("sio:is-attribute-of"),
-                createIriMapping("compound", "id"));
-        addQuadMapping(new Table(schema, table), null, subject, createIriMapping("sio:has-value"),
+        addQuadMapping(table, null, subject, createIriMapping("rdf:type"), createIriMapping("sio:SIO_011120"));
+        addQuadMapping(table, null, subject, createIriMapping("sio:is-attribute-of"),
+                createIriMapping(compound, molfileFields));
+        addQuadMapping(table, null, subject, createIriMapping("sio:has-value"),
                 createLiteralMapping(xsdString, "molfile"));
     }
 
 
-    private void loadProcedures()
+    private void loadProcedures(String index, List<Column> resultFields, UserIriClass compound)
     {
         String sachem = prefixes.get("sachem");
-        UserIriClass compound = getIriClass("compound");
 
 
         /* sachem:exactSearch */
@@ -199,8 +197,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         exactsearch.addParameter(
                 new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
 
-        exactsearch.addResult(new ResultDefinition(null, compound, "compound"));
-        procedures.put(exactsearch.getProcedureName(), exactsearch);
+        exactsearch.addResult(new ResultDefinition(null, compound, resultFields));
+        addProcedure(exactsearch);
 
 
         /* sachem:substructureSearch */
@@ -230,8 +228,8 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         subsearch.addParameter(
                 new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
 
-        subsearch.addResult(new ResultDefinition(null, compound, "compound"));
-        procedures.put(subsearch.getProcedureName(), subsearch);
+        subsearch.addResult(new ResultDefinition(null, compound, resultFields));
+        addProcedure(subsearch);
 
 
         /* sachem:scoredSubstructureSearch */
@@ -262,9 +260,9 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         scoredsubsearch.addParameter(
                 new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger, new Literal("0", xsdIntegerIri)));
 
-        scoredsubsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
+        scoredsubsearch.addResult(new ResultDefinition(sachem + "compound", compound, resultFields));
         scoredsubsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
-        procedures.put(scoredsubsearch.getProcedureName(), scoredsubsearch);
+        addProcedure(scoredsubsearch);
 
 
         /* sachem:similaritySearch */
@@ -285,9 +283,9 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
         simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
         simsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
 
-        simsearch.addResult(new ResultDefinition(sachem + "compound", compound, "compound"));
+        simsearch.addResult(new ResultDefinition(sachem + "compound", compound, resultFields));
         simsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
-        procedures.put(simsearch.getProcedureName(), simsearch);
+        addProcedure(simsearch);
 
 
         /* sachem:similarCompoundSearch */
@@ -310,7 +308,7 @@ public abstract class SachemConfiguration extends SparqlDatabaseConfiguration
                 .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerIri)));
         simcmpsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanIri)));
 
-        simcmpsearch.addResult(new ResultDefinition(null, compound, "compound"));
-        procedures.put(simcmpsearch.getProcedureName(), simcmpsearch);
+        simcmpsearch.addResult(new ResultDefinition(null, compound, resultFields));
+        addProcedure(simcmpsearch);
     }
 }

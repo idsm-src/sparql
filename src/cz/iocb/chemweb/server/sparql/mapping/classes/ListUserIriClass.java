@@ -18,6 +18,8 @@ import cz.iocb.chemweb.server.sparql.engine.Request;
 public class ListUserIriClass extends SimpleUserIriClass
 {
     private static final int cacheSize = 10000;
+    private final Table table;
+    private final TableColumn column;
     private final Map<String, Boolean> sqlCheckCache;
     private final String sqlCheckQuery;
 
@@ -25,6 +27,9 @@ public class ListUserIriClass extends SimpleUserIriClass
     public ListUserIriClass(String name, Table table, TableColumn column)
     {
         super(name, "varchar");
+
+        this.table = table;
+        this.column = column;
 
         this.sqlCheckCache = Collections.synchronizedMap(new LinkedHashMap<String, Boolean>(cacheSize, 0.75f, true)
         {
@@ -127,5 +132,26 @@ public class ListUserIriClass extends SimpleUserIriClass
     protected String generateInverseFunction(String parameter)
     {
         return parameter;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        ListUserIriClass other = (ListUserIriClass) object;
+
+        if(!table.equals(other.table))
+            return false;
+
+        if(!column.equals(other.column))
+            return false;
+
+        return true;
     }
 }

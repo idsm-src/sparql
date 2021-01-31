@@ -7,6 +7,7 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 
 
 
@@ -63,7 +64,7 @@ public class Publication
 
         {
             Table table = new Table(schema, "publication_authors");
-            NodeMapping subject = config.createBlankNodeMapping(config.getNewIntBlankNodeClass(), "id");
+            NodeMapping subject = config.createBlankNodeMapping(new UserIntBlankNodeClass(), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Person"), "person");
@@ -80,7 +81,7 @@ public class Publication
 
         {
             Table table = new Table(schema, "publication_editors");
-            NodeMapping subject = config.createBlankNodeMapping(config.getNewIntBlankNodeClass(), "id");
+            NodeMapping subject = config.createBlankNodeMapping(new UserIntBlankNodeClass(), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Person"));

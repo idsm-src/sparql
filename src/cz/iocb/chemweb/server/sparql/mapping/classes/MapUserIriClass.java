@@ -240,4 +240,40 @@ public class MapUserIriClass extends SimpleUserIriClass
         return String.format("(select (%s)::%s from %s where %s = %s)", from.getCode(), sqlTypes.get(0),
                 table.getCode(), to.getCode(), code);
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        MapUserIriClass other = (MapUserIriClass) object;
+
+        if(!table.equals(other.table))
+            return false;
+
+        if(!from.equals(other.from))
+            return false;
+
+        if(!to.equals(other.to))
+            return false;
+
+        if(!pattern.equals(other.pattern))
+            return false;
+
+        if(prefix == null ? other.prefix != null : !prefix.equals(other.prefix))
+            return false;
+
+        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
+            return false;
+
+        if(length != other.length)
+            return false;
+
+        return true;
+    }
 }

@@ -369,4 +369,31 @@ public class GeneralUserIriClass extends UserIriClass
 
         return strBuf.toString();
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        GeneralUserIriClass other = (GeneralUserIriClass) object;
+
+        if(!sqlCheck.equals(other.sqlCheck))
+            return false;
+
+        if(!pattern.equals(other.pattern))
+            return false;
+
+        if(!function.equals(other.function))
+            return false;
+
+        if(!inverseFunction.equals(other.inverseFunction))
+            return false;
+
+        return true;
+    }
 }
