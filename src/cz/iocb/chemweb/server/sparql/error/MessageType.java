@@ -31,9 +31,13 @@ public enum MessageType
 
     reuseOfResultNode(ERROR, "Result node of the procedure '%s' is already used."),
 
-    invalidUseOfParameterNode(ERROR, "Node is already used as a procedure parameter node."),
+    invalidParameterVariableOccurence(ERROR, "Variable '%s' is already used as a procedure parameter node."),
 
-    invalidUseOfResultNode(ERROR, "Node is already used as a procedure result node."),
+    invalidResultVariableOccurence(ERROR, "Variable '%s' is already used as a procedure result node."),
+
+    invalidParameterBlankNodeOccurence(ERROR, "Blank node '_:%s' is already used as a procedure parameter node."),
+
+    invalidResultBlankNodeOccurence(ERROR, "Blank node '_:%s' is already used as a procedure result node."),
 
     invalidBaseIri(ERROR, "Base IRI must be absolute."),
 

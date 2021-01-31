@@ -6,12 +6,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -65,9 +62,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarOrIRIContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.WhereClauseContext;
-import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.parser.ComplexElementVisitor;
-import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.Rdf;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
@@ -86,7 +81,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BracketedExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -96,11 +90,8 @@ import cz.iocb.chemweb.server.sparql.parser.model.pattern.Graph;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.GraphPattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.GroupGraph;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Minus;
-import cz.iocb.chemweb.server.sparql.parser.model.pattern.MultiProcedureCall;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Optional;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Pattern;
-import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCall;
-import cz.iocb.chemweb.server.sparql.parser.model.pattern.ProcedureCallBase.Parameter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Service;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Union;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Values;
@@ -122,8 +113,6 @@ public class QueryVisitor extends BaseVisitor<Query>
     private final SparqlDatabaseConfiguration config;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
-    private final HashSet<Node> usedParameterNodes;
-    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
     private Prologue prologue;
 
@@ -133,22 +122,17 @@ public class QueryVisitor extends BaseVisitor<Query>
         this.config = config;
         this.services = new Stack<VarOrIri>();
         this.usedBlankNodes = new HashSet<String>();
-        this.usedParameterNodes = new HashSet<Node>();
-        this.usedResultNodes = new HashSet<Node>();
         this.messages = messages;
     }
 
 
     public QueryVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
-        this.usedParameterNodes = usedParameterNodes;
-        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -231,8 +215,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
         else if(ctx.askQuery() != null)
         {
-            GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes,
-                    usedParameterNodes, usedResultNodes, messages).visit(ctx.askQuery().whereClause());
+            GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                    .visit(ctx.askQuery().whereClause());
             Values values = parseValues(ctx.valuesClause());
 
             Select select = withRange(new Select(new LinkedList<Projection>(), pattern, values, true), ctx);
@@ -257,8 +241,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
             GraphPattern pattern = ctx.describeQuery().whereClause() != null ?
-                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                            usedResultNodes, messages).visit(ctx.describeQuery().whereClause()) :
+                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                            .visit(ctx.describeQuery().whereClause()) :
                     new GroupGraph(new ArrayList<Pattern>(0));
 
             Values values = parseValues(ctx.valuesClause());
@@ -353,12 +337,9 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
             GraphPattern pattern = ctx.constructQuery().whereClause() != null ?
-                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                            usedResultNodes, messages).visit(ctx.constructQuery().whereClause()) :
-                    withRange(
-                            new GroupGraph(new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes,
-                                    usedParameterNodes, usedResultNodes, messages).assembleProcedureCalls(templates)),
-                            ctx.constructQuery().constructTemplate());
+                    new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                            .visit(ctx.constructQuery().whereClause()) :
+                    withRange(new GroupGraph(templates), ctx.constructQuery().constructTemplate());
 
             Values values = parseValues(ctx.valuesClause());
 
@@ -385,68 +366,6 @@ public class QueryVisitor extends BaseVisitor<Query>
                     new TranslateMessage(MessageType.unsupportedUpdateCommand, Range.compute(ctx.updateCommand())));
         }
 
-
-        //TODO: the check could be less strict in a future version
-        new ElementVisitor<Void>()
-        {
-            @Override
-            public Void visit(ConstructQuery constructQuery)
-            {
-                visitElement(constructQuery.getPrologue());
-                visitElement(constructQuery.getSelect());
-                return defaultResult();
-            }
-
-            @Override
-            public Void visit(Select select)
-            {
-                for(Projection projection : select.getProjections())
-                    visitElement(projection.getExpression());
-
-                visitElements(select.getDataSets());
-                visitElement(select.getPattern());
-
-                for(GroupCondition condition : select.getGroupByConditions())
-                    if(!(condition.getExpression() instanceof Variable) || condition.getVariable() != null)
-                        visitElement(condition);
-
-                visitElements(select.getHavingConditions());
-
-                for(OrderCondition condition : select.getOrderByConditions())
-                    if(!(condition.getExpression() instanceof Variable))
-                        visitElement(condition);
-
-                visitElement(select.getValues());
-
-                return defaultResult();
-            }
-
-            @Override
-            public Void visit(Variable variable)
-            {
-                if(usedParameterNodes.contains(variable))
-                    messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, variable.getRange()));
-
-                if(usedResultNodes.contains(variable))
-                    messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, variable.getRange()));
-
-                return defaultResult();
-            }
-
-            @Override
-            public Void visit(BlankNode blankNode)
-            {
-                if(usedParameterNodes.contains(blankNode))
-                    messages.add(new TranslateMessage(MessageType.invalidUseOfParameterNode, blankNode.getRange()));
-
-                if(usedResultNodes.contains(blankNode))
-                    messages.add(new TranslateMessage(MessageType.invalidUseOfResultNode, blankNode.getRange()));
-
-                return defaultResult();
-            }
-        }.visitElement(result);
-
-
         prologue = null;
         return result;
     }
@@ -464,8 +383,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(dataBlockCtx == null)
             return null;
 
-        return (Values) new PatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                usedResultNodes, messages).visit(dataBlockCtx);
+        return (Values) new PatternVisitor(config, prologue, services, usedBlankNodes, messages).visit(dataBlockCtx);
     }
 
 
@@ -537,6 +455,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         else if(!isInAggregateMode(selectClauseCtx, solutionModifierCtx))
         {
             HashSet<String> variables = new HashSet<String>();
+            Range range = Range.compute(selectClauseCtx.star, selectClauseCtx.star);
 
             BaseVisitor<Void> variableVisitor = new BaseVisitor<Void>()
             {
@@ -592,7 +511,11 @@ public class QueryVisitor extends BaseVisitor<Query>
                     if(!variables.contains(variable))
                     {
                         variables.add(variable);
-                        projections.add(new Projection(new Variable(variable)));
+
+                        Variable selectVariable = new Variable(variable);
+                        selectVariable.setRange(range);
+
+                        projections.add(new Projection(selectVariable));
                     }
 
                     return null;
@@ -610,8 +533,8 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
 
 
-        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                usedResultNodes, messages).visit(whereClauseCtx);
+        GraphPattern pattern = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                .visit(whereClauseCtx);
         Values values = parseValues(valuesClauseContext);
 
         Select result = new Select(projections, pattern, values, isSubSelect);
@@ -642,8 +565,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
         if(variableCtx.expression() != null)
         {
-            Expression expression = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                    usedParameterNodes, usedResultNodes, messages).visit(variableCtx.expression());
+            Expression expression = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
+                    .visit(variableCtx.expression());
 
             return new Projection(expression, variable);
         }
@@ -673,7 +596,7 @@ public class QueryVisitor extends BaseVisitor<Query>
     private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages);
+                messages);
 
         if(ctx.expression() != null)
         {
@@ -699,7 +622,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             return new ArrayList<Expression>();
 
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages);
+                messages);
 
         return mapList(ctx.havingCondition(), expressionVisitor::visit);
     }
@@ -721,12 +644,13 @@ public class QueryVisitor extends BaseVisitor<Query>
             OrderCondition.Direction direction = ctx.ASC() != null ? OrderCondition.Direction.Ascending :
                     OrderCondition.Direction.Descending;
 
-            return new OrderCondition(direction, new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                    usedParameterNodes, usedResultNodes, messages).visit(ctx.expression()));
+            return new OrderCondition(direction,
+                    new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)
+                            .visit(ctx.expression()));
         }
 
-        return withRange(new OrderCondition(new ExpressionVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages).visit(ctx)), ctx);
+        return withRange(new OrderCondition(
+                new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages).visit(ctx)), ctx);
     }
 
 
@@ -811,21 +735,16 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
-    private final HashSet<Node> usedParameterNodes;
-    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
 
 
     public GraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
-        this.usedParameterNodes = usedParameterNodes;
-        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -850,8 +769,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
-        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages).visit(ctx).collect(Collectors.toList());
+        List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
+                .visit(ctx).collect(Collectors.toList());
 
         return new GroupGraph(patterns);
     }
@@ -860,10 +779,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     @Override
     public GraphPattern visitSubSelect(SubSelectContext ctx)
     {
-        return withRange(new QueryVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                usedResultNodes, messages).parseSelect(ctx.selectClause(), null, ctx.whereClause(),
-                        ctx.solutionModifier(), ctx.valuesClause(), true),
-                ctx);
+        return withRange(new QueryVisitor(config, prologue, services, usedBlankNodes, messages).parseSelect(
+                ctx.selectClause(), null, ctx.whereClause(), ctx.solutionModifier(), ctx.valuesClause(), true), ctx);
     }
 }
 
@@ -1028,21 +945,16 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
     private final HashSet<String> usedBlankNodes;
-    private final HashSet<Node> usedParameterNodes;
-    private final HashSet<Node> usedResultNodes;
     private final List<TranslateMessage> messages;
 
 
     public GroupGraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.usedBlankNodes = usedBlankNodes;
-        this.usedParameterNodes = usedParameterNodes;
-        this.usedResultNodes = usedResultNodes;
         this.messages = messages;
     }
 
@@ -1096,201 +1008,20 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
         for(ComplexTriple triple : triples)
             tripleExpander.visit(triple);
 
-        return assembleProcedureCalls(tripleExpander.getResults()).stream();
+        return tripleExpander.getResults().stream();
     }
 
 
     @Override
     public Stream<Pattern> visitGroupGraphPatternSubList(GroupGraphPatternSubListContext ctx)
     {
-        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages);
+        PatternVisitor patternVisitor = new PatternVisitor(config, prologue, services, usedBlankNodes, messages);
 
         Pattern graphPattern = patternVisitor.visit(ctx.graphPatternNotTriples());
 
         Stream<Pattern> triplesPatterns = visitIfNotNull(ctx.triplesBlock());
 
         return Stream.concat(Stream.of(graphPattern), triplesPatterns);
-    }
-
-
-
-    public List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
-    {
-        if(!services.empty())
-            return patterns;
-
-
-        HashSet<Pattern> callPatterns = new HashSet<Pattern>();
-        HashMap<Node, List<Parameter>> parameterNodeMap = new HashMap<Node, List<Parameter>>();
-        HashMap<Node, List<Parameter>> resultNodeMap = new HashMap<Node, List<Parameter>>();
-
-
-        for(Pattern pattern : patterns)
-        {
-            Triple triple = (Triple) pattern;
-            Verb predicate = triple.getPredicate();
-
-            if(predicate instanceof IRI)
-            {
-                IRI procedureName = (IRI) predicate;
-                ProcedureDefinition definition = config.getProcedures().get(procedureName.getValue());
-
-                if(definition != null)
-                {
-                    callPatterns.add(triple);
-
-                    Node parameterNode = triple.getObject();
-
-                    if(parameterNode instanceof VariableOrBlankNode)
-                    {
-                        parameterNodeMap.put(parameterNode, new ArrayList<Parameter>());
-
-                        if(!usedParameterNodes.contains(parameterNode) && !usedResultNodes.contains(parameterNode))
-                            usedParameterNodes.add(parameterNode);
-                        else
-                            messages.add(new TranslateMessage(MessageType.reuseOfParameterNode,
-                                    parameterNode.getRange(), procedureName.toString(prologue)));
-                    }
-                    else
-                    {
-                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject,
-                                parameterNode.getRange(), procedureName.toString(prologue)));
-                    }
-
-
-                    if(!definition.isSimple())
-                    {
-                        Node resultNode = triple.getSubject();
-
-                        if(resultNode instanceof VariableOrBlankNode)
-                        {
-                            resultNodeMap.put(resultNode, new ArrayList<Parameter>());
-
-                            if(!usedParameterNodes.contains(resultNode) && !usedResultNodes.contains(resultNode))
-                                usedResultNodes.add(resultNode);
-                            else
-                                messages.add(new TranslateMessage(MessageType.reuseOfResultNode, resultNode.getRange(),
-                                        procedureName.toString(prologue)));
-                        }
-                        else
-                        {
-                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
-                                    resultNode.getRange(), procedureName.toString(prologue)));
-                        }
-                    }
-                }
-            }
-            else
-            {
-                new ElementVisitor<Void>()
-                {
-                    @Override
-                    public Void visit(IRI iri)
-                    {
-                        //TODO: could be supported in a future version
-                        if(config.getProcedures().get(iri.getValue()) != null)
-                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange()));
-
-                        return null;
-                    }
-                }.visitElement(predicate);
-            }
-        }
-
-
-
-        List<Pattern> resultPatterns = new ArrayList<Pattern>(patterns);
-
-        Iterator<Pattern> iterator = resultPatterns.iterator();
-
-        while(iterator.hasNext())
-        {
-            Triple triple = (Triple) iterator.next();
-
-            if(callPatterns.contains(triple))
-                continue;
-
-
-            List<Parameter> parameters = parameterNodeMap.get(triple.getSubject());
-
-            if(parameters != null)
-            {
-                iterator.remove();
-
-                if(triple.getPredicate() instanceof IRI)
-                {
-                    IRI name = (IRI) triple.getPredicate();
-                    parameters.add(new Parameter(name, triple.getObject()));
-                }
-                else
-                {
-                    //TODO: could be supported in a future version
-                    messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
-                            triple.getPredicate().getRange()));
-                }
-            }
-
-
-            List<Parameter> results = resultNodeMap.get(triple.getSubject());
-
-            if(results != null)
-            {
-                iterator.remove();
-
-                if(triple.getPredicate() instanceof IRI)
-                {
-                    IRI name = (IRI) triple.getPredicate();
-                    results.add(new Parameter(name, triple.getObject()));
-                }
-                else
-                {
-                    //TODO: could be supported in a future version
-                    messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
-                            triple.getPredicate().getRange()));
-                }
-            }
-        }
-
-
-        ListIterator<Pattern> listIterator = resultPatterns.listIterator();
-
-        while(listIterator.hasNext())
-        {
-            Triple triple = (Triple) listIterator.next();
-
-            if(!callPatterns.contains(triple))
-                continue;
-
-            IRI name = (IRI) triple.getPredicate();
-            ProcedureDefinition definition = config.getProcedures().get(name.getValue());
-
-            List<Parameter> parameters = parameterNodeMap.get(triple.getObject());
-
-            if(parameters == null)
-                parameters = new ArrayList<Parameter>();
-
-
-            if(definition.isSimple())
-            {
-                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters);
-                listIterator.set(call);
-            }
-            else
-            {
-                List<Parameter> results = resultNodeMap.get(triple.getSubject());
-
-                if(results == null)
-                    results = new ArrayList<Parameter>();
-
-                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters);
-                listIterator.set(call);
-            }
-        }
-
-
-        return resultPatterns;
     }
 }
 
@@ -1305,16 +1036,13 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
 
     public PatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, HashSet<Node> usedParameterNodes, HashSet<Node> usedResultNodes,
-            List<TranslateMessage> messages)
+            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
         this.services = services;
         this.messages = messages;
-        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, usedBlankNodes,
-                usedParameterNodes, usedResultNodes, messages);
-        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes, usedParameterNodes,
-                usedResultNodes, messages);
+        this.graphPatternVisitor = new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages);
+        this.expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages);
     }
 
 

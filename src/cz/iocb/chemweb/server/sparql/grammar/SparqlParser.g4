@@ -55,7 +55,7 @@ subSelect
     ;
     	
 selectClause
-    : SELECT (DISTINCT | REDUCED)? (selectVariable+ | '*')
+    : SELECT (DISTINCT | REDUCED)? (selectVariable+ | star='*')
     ;
 
 selectVariable

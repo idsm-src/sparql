@@ -14,10 +14,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
@@ -57,6 +59,7 @@ import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
+import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.ConstructQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -142,10 +145,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private final SparqlDatabaseConfiguration configuration;
     private final List<UserIriClass> iriClasses;
     private final DatabaseSchema schema;
-    private final HashMap<String, ProcedureDefinition> procedures;
     private final Request request;
     private final boolean evalSeriveces;
 
+    private HashMap<String, List<Range>> variableOccurrences;
     private List<DataSet> datasets;
     private Prologue prologue;
 
@@ -155,7 +158,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         this.configuration = request.getConfiguration();
         this.iriClasses = configuration.getIriClasses();
         this.schema = configuration.getDatabaseSchema();
-        this.procedures = configuration.getProcedures();
         this.request = request;
         this.messages = messages;
         this.evalSeriveces = evalSeriveces;
@@ -962,6 +964,234 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    public List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
+    {
+        HashSet<Pattern> callPatterns = new HashSet<Pattern>();
+        HashMap<Node, List<Parameter>> parameterNodeMap = new HashMap<Node, List<Parameter>>();
+        HashMap<Node, List<Parameter>> resultNodeMap = new HashMap<Node, List<Parameter>>();
+
+        HashMap<Node, HashSet<Range>> parameterNodeOccurences = new HashMap<Node, HashSet<Range>>();
+        HashMap<Node, HashSet<Range>> resultNodeOccurences = new HashMap<Node, HashSet<Range>>();
+
+
+        for(Pattern pattern : patterns)
+        {
+            if(!(pattern instanceof Triple))
+                continue;
+
+            Triple triple = (Triple) pattern;
+            Verb predicate = triple.getPredicate();
+
+            if(predicate instanceof IRI)
+            {
+                IRI procedureName = (IRI) predicate;
+                ProcedureDefinition definition = configuration.getProcedures().get(procedureName.getValue());
+
+                if(definition != null)
+                {
+                    callPatterns.add(triple);
+
+                    Node parameterNode = triple.getObject();
+
+                    if(parameterNode instanceof VariableOrBlankNode)
+                    {
+                        parameterNodeMap.put(parameterNode, new ArrayList<Parameter>());
+
+                        if(!parameterNodeOccurences.containsKey(parameterNode)
+                                && !resultNodeOccurences.containsKey(parameterNode))
+                            parameterNodeOccurences.put(parameterNode, new LinkedHashSet<Range>());
+                        else
+                            messages.add(new TranslateMessage(MessageType.reuseOfParameterNode,
+                                    parameterNode.getRange(), procedureName.toString(prologue)));
+                    }
+                    else
+                    {
+                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject,
+                                parameterNode.getRange(), procedureName.toString(prologue)));
+                    }
+
+
+                    if(!definition.isSimple())
+                    {
+                        Node resultNode = triple.getSubject();
+
+                        if(resultNode instanceof VariableOrBlankNode)
+                        {
+                            resultNodeMap.put(resultNode, new ArrayList<Parameter>());
+
+                            if(!parameterNodeOccurences.containsKey(resultNode)
+                                    && !resultNodeOccurences.containsKey(resultNode))
+                                resultNodeOccurences.put(resultNode, new LinkedHashSet<Range>());
+                            else
+                                messages.add(new TranslateMessage(MessageType.reuseOfResultNode, resultNode.getRange(),
+                                        procedureName.toString(prologue)));
+                        }
+                        else
+                        {
+                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
+                                    resultNode.getRange(), procedureName.toString(prologue)));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                new ElementVisitor<Void>()
+                {
+                    @Override
+                    public Void visit(IRI iri)
+                    {
+                        //TODO: could be supported in a future version
+                        if(configuration.getProcedures().get(iri.getValue()) != null)
+                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
+                                    iri.getRange()));
+
+                        return null;
+                    }
+                }.visitElement(predicate);
+            }
+        }
+
+
+
+        List<Pattern> resultPatterns = new ArrayList<Pattern>(patterns);
+
+        Iterator<Pattern> iterator = resultPatterns.iterator();
+
+        while(iterator.hasNext())
+        {
+            Pattern pattern = iterator.next();
+
+            if(!(pattern instanceof Triple))
+                continue;
+
+            Triple triple = (Triple) pattern;
+
+            if(callPatterns.contains(triple))
+                continue;
+
+
+            List<Parameter> parameters = parameterNodeMap.get(triple.getSubject());
+
+            if(parameters != null)
+            {
+                iterator.remove();
+                parameterNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
+
+                if(triple.getPredicate() instanceof IRI)
+                    parameters.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
+                else
+                    messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
+                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
+            }
+
+
+            List<Parameter> results = resultNodeMap.get(triple.getSubject());
+
+            if(results != null)
+            {
+                iterator.remove();
+                resultNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
+
+                if(triple.getPredicate() instanceof IRI)
+                    results.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
+                else
+                    messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
+                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
+            }
+        }
+
+
+        for(Pattern pattern : resultPatterns)
+        {
+            if(pattern instanceof Triple && !callPatterns.contains(pattern))
+            {
+                Node object = ((Triple) pattern).getObject();
+
+                if(object instanceof BlankNode)
+                {
+                    if(parameterNodeOccurences.containsKey(object))
+                        messages.add(new TranslateMessage(MessageType.invalidParameterBlankNodeOccurence,
+                                object.getRange(), ((BlankNode) object).getName()));
+
+                    if(resultNodeOccurences.containsKey(object))
+                        messages.add(new TranslateMessage(MessageType.invalidResultBlankNodeOccurence,
+                                object.getRange(), ((BlankNode) object).getName()));
+                }
+            }
+        }
+
+
+        for(Entry<Node, HashSet<Range>> entry : parameterNodeOccurences.entrySet())
+        {
+            if(entry.getKey() instanceof Variable)
+            {
+                String variable = ((Variable) entry.getKey()).getName();
+
+                for(Range occurrence : variableOccurrences.get(variable))
+                    if(occurrence != entry.getKey().getRange() && !entry.getValue().contains(occurrence))
+                        messages.add(new TranslateMessage(MessageType.invalidParameterVariableOccurence, occurrence,
+                                variable));
+            }
+        }
+
+
+        for(Entry<Node, HashSet<Range>> entry : resultNodeOccurences.entrySet())
+        {
+            if(entry.getKey() instanceof Variable)
+            {
+                String variable = ((Variable) entry.getKey()).getName();
+
+                for(Range occurrence : variableOccurrences.get(variable))
+                    if(occurrence != entry.getKey().getRange() && !entry.getValue().contains(occurrence))
+                        messages.add(
+                                new TranslateMessage(MessageType.invalidResultVariableOccurence, occurrence, variable));
+            }
+        }
+
+
+        ListIterator<Pattern> listIterator = resultPatterns.listIterator();
+
+        while(listIterator.hasNext())
+        {
+            Pattern pattern = listIterator.next();
+
+            if(!callPatterns.contains(pattern))
+                continue;
+
+            Triple triple = (Triple) pattern;
+
+            IRI name = (IRI) triple.getPredicate();
+            ProcedureDefinition definition = configuration.getProcedures().get(name.getValue());
+
+            List<Parameter> parameters = parameterNodeMap.get(triple.getObject());
+
+            if(parameters == null)
+                parameters = new ArrayList<Parameter>();
+
+
+            if(definition.isSimple())
+            {
+                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters);
+                listIterator.set(call);
+            }
+            else
+            {
+                List<Parameter> results = resultNodeMap.get(triple.getSubject());
+
+                if(results == null)
+                    results = new ArrayList<Parameter>();
+
+                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters);
+                listIterator.set(call);
+            }
+        }
+
+
+        return resultPatterns;
+    }
+
+
     private SqlIntercode translatePatternList(List<Pattern> patterns)
     {
         SqlIntercode translatedGroupPattern = SqlEmptySolution.get();
@@ -969,7 +1199,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         LinkedList<Filter> filters = new LinkedList<>();
         LinkedList<String> inScopeVariables = new LinkedList<String>();
 
-        for(Pattern pattern : patterns)
+        for(Pattern pattern : assembleProcedureCalls(patterns))
         {
             if(pattern instanceof Optional)
             {
@@ -1151,7 +1381,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
-        ProcedureDefinition procedureDefinition = procedures.get(procedureName.getValue());
+        ProcedureDefinition procedureDefinition = configuration.getProcedures().get(procedureName.getValue());
         UsedVariables contextVariables = context.getVariables();
 
 
@@ -1661,6 +1891,28 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public SqlQuery translate(Query sparqlQuery) throws SQLException
     {
+        variableOccurrences = new HashMap<String, List<Range>>();
+
+        new ElementVisitor<Void>()
+        {
+            @Override
+            public Void visit(Variable variable)
+            {
+                List<Range> occurrences = variableOccurrences.get(variable.getName());
+
+                if(occurrences == null)
+                {
+                    occurrences = new LinkedList<Range>();
+                    variableOccurrences.put(variable.getName(), occurrences);
+                }
+
+                occurrences.add(variable.getRange());
+
+                return defaultResult();
+            }
+        }.visitElement(sparqlQuery);
+
+
         try
         {
             SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);

@@ -584,6 +584,7 @@ public class SparqlParser extends Parser {
 	}
 
 	public static class SelectClauseContext extends ParserRuleContext {
+		public Token star;
 		public TerminalNode SELECT() { return getToken(SparqlParser.SELECT, 0); }
 		public TerminalNode DISTINCT() { return getToken(SparqlParser.DISTINCT, 0); }
 		public TerminalNode REDUCED() { return getToken(SparqlParser.REDUCED, 0); }
@@ -652,7 +653,7 @@ public class SparqlParser extends Parser {
 			case ASTERISK:
 				{
 				setState(320);
-				match(ASTERISK);
+				((SelectClauseContext)_localctx).star = match(ASTERISK);
 				}
 				break;
 			default:
