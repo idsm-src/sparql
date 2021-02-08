@@ -1,0 +1,130 @@
+#set($ID = $entity.getValue().replaceAll(".*/CHEMBL", ""))
+
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">chembl_molecule:CHEMBL$ID</span>
+    (<a href="https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL$ID" target="_blank">open in ChEMBL</a>)
+  </div>
+
+  #sparql($name)
+    SELECT ?NAME WHERE
+    {
+      $entity skos:prefLabel ?NAME
+    }
+  #end
+
+  #if($name.NAME)
+  <div class="VET-BoxedSection">
+    <div>
+      #escapeHTML($name.NAME)
+    </div>
+  </div>
+  #end
+
+
+  #sparql($structure)
+    SELECT (true as ?R) WHERE
+    {
+      ?S rdf:type sio:SIO_011120.
+      ?S sio:is-attribute-of $entity.
+      ?S sio:has-value ?V.
+    }
+  #end
+
+  #if($structure.count > 0)
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <img src="chembl/compound/image?w=800&id=$ID" alt="CHEMBL$ID" height="400" width="400">
+        </td>
+      </tr>
+    </table>
+  </div>
+  #end
+
+
+  #sparql($descriptors)
+    PREFIX descriptor: <http://rdf.ebi.ac.uk/resource/chembl/molecule/>
+  
+    SELECT ?TITLE ?VALUE WHERE
+    {
+      ?NODE cheminf:SIO_000300 ?VALUE
+    }
+    VALUES (?NODE ?TITLE)
+    {
+      (descriptor:CHEMBL${ID}\#cx_most_apka         "ChemAxon most acidic pKa")
+      (descriptor:CHEMBL${ID}\#cx_most_bpka         "ChemAxon most basic pKa")
+      (descriptor:CHEMBL${ID}\#cx_logd              "ChemAxon LogD")
+      (descriptor:CHEMBL${ID}\#cx_logp              "ChemAxon LogP")
+      (descriptor:CHEMBL${ID}\#alogp                "ALogP")
+      (descriptor:CHEMBL${ID}\#hba                  "hydrogen bond acceptors")
+      (descriptor:CHEMBL${ID}\#hbd                  "hydrogen bond donors")
+      (descriptor:CHEMBL${ID}\#heavy_atoms          "heavy atoms")
+      (descriptor:CHEMBL${ID}\#rtb                  "rotatable bonds")
+      (descriptor:CHEMBL${ID}\#aromatic_rings       "aromatic rings")
+      (descriptor:CHEMBL${ID}\#mw_freebase          "freebase molecular weight")
+      (descriptor:CHEMBL${ID}\#full_mwt             "full molecular weight")
+      (descriptor:CHEMBL${ID}\#mw_monoisotopic      "monoisotopic mass")
+      (descriptor:CHEMBL${ID}\#psa                  "polar surface area")
+      (descriptor:CHEMBL${ID}\#num_ro5_violations   "RO5 violations")
+      (descriptor:CHEMBL${ID}\#ro3_pass             "RO3 pass")
+      (descriptor:CHEMBL${ID}\#qed_weighted         "QED weighted score")
+      (descriptor:CHEMBL${ID}\#molecular_species    "molecular species")
+      (descriptor:CHEMBL${ID}\#full_molformula      "molecular formula")
+      (descriptor:CHEMBL${ID}\#standard_inchi_key   "standard InChi Key")
+      (descriptor:CHEMBL${ID}\#standard_inchi       "standard InChi")
+      (descriptor:CHEMBL${ID}\#canonical_smiles     "canonical smiles")
+    }
+  #end
+
+  #if($descriptors.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($descriptor in $descriptors)
+        <tr>
+          <td>$descriptor.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+
+  #sparql($synonyms)
+    SELECT ?NAME WHERE
+    {
+      $entity skos:altLabel ?NAME.
+    }
+  #end
+
+  #if($synonyms.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Synonyms</div>
+    <div>
+      <table class="VET-Table">
+        #foreach($synonym in $synonyms)
+        <tr>
+          <td>#escapeHTML($synonym.NAME)</td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>
