@@ -554,7 +554,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(GroupGraph groupGraph)
     {
-        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns());
+        SqlIntercode translatedGroupGraphPattern = translatePatternList(groupGraph.getPatterns(),
+                SqlEmptySolution.get());
 
         return translatedGroupGraphPattern;
     }
@@ -1192,9 +1193,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translatePatternList(List<Pattern> patterns)
+    private SqlIntercode translatePatternList(List<Pattern> patterns, SqlIntercode base)
     {
-        SqlIntercode translatedGroupPattern = SqlEmptySolution.get();
+        SqlIntercode translatedGroupPattern = base;
 
         LinkedList<Filter> filters = new LinkedList<>();
         LinkedList<String> inScopeVariables = new LinkedList<String>();
@@ -1221,7 +1222,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                             optionalPatterns.add(subpattern);
                     }
 
-                    translatedPattern = translatePatternList(optionalPatterns);
+                    translatedPattern = translatePatternList(optionalPatterns, SqlEmptySolution.get());
                 }
                 else
                 {
@@ -1532,7 +1533,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             serviceRestrictions.add((IRI) name);
             graphRestrictions.add(null);
 
-            SqlIntercode result = SqlJoin.join(schema, context, visitElement(service.getPattern()));
+            SqlIntercode result = translatePatternList(((GroupGraph) service.getPattern()).getPatterns(), context);
 
             graphRestrictions.pop();
             serviceRestrictions.pop();
@@ -1921,7 +1922,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     variableOccurrences.put(variable.getName(), occurrences);
                 }
 
-                occurrences.add(variable.getRange());
+                // implicit projection variables are added with null range by parser,
+                // they are ignored here due to engines that replace blank nodes by variables
+                if(variable.getRange() != null)
+                    occurrences.add(variable.getRange());
 
                 return defaultResult();
             }

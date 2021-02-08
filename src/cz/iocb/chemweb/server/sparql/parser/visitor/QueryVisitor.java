@@ -455,7 +455,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         else if(!isInAggregateMode(selectClauseCtx, solutionModifierCtx))
         {
             HashSet<String> variables = new HashSet<String>();
-            Range range = Range.compute(selectClauseCtx.star, selectClauseCtx.star);
+            Range range = null; //Range.compute(selectClauseCtx.star, selectClauseCtx.star);
 
             BaseVisitor<Void> variableVisitor = new BaseVisitor<Void>()
             {
