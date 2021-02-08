@@ -167,6 +167,17 @@
     <url-pattern>/endpoint/sparql/pubchem</url-pattern>
   </servlet-mapping>
 
+  <servlet>
+    <servlet-name>WikidataSachemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-wikidata</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>WikidataSachemEndpointServlet</servlet-name>
+    <url-pattern>/endpoint/sachem/wikidata</url-pattern>
+    <url-pattern>/endpoint/sparql/wikidata</url-pattern>
+  </servlet-mapping>
+
 
   <!-- Sachem Image Servlets -->
   <servlet>

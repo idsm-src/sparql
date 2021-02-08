@@ -59,6 +59,14 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
+  <Resource name="jdbc:sachem-wikidata" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
 
   <Resource name="jdbc:images-chebi" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
@@ -128,5 +136,10 @@
       type="cz.iocb.chemweb.server.sparql.config.sachem.PubChemSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-pubchem" singleton="true" />
+
+  <Resource name="sparql:sachem-wikidata" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.WikidataSachemConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
+      datasource="jdbc:sachem-wikidata" singleton="true" />
 
 </Context>
