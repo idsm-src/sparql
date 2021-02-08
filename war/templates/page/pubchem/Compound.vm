@@ -8,7 +8,7 @@
 <div class="VET-Page">
   <div class="VET-TitleBox">
     <span class="VET-Title">compound:CID$CID</span>
-    (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/CID$CID" target="_blank">open in pubchem</a>)
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/compound/$CID" target="_blank">open in pubchem</a>)
   </div>
 
   #sparql($iupac)
