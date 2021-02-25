@@ -77,11 +77,6 @@ public class Protein
             Table table = new Table(schema, "protein_genes");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
-            config.addQuadMapping(table, graph, subject,
-                    config.createIriMapping("<https://www.uniprot.org/core/encodedBy>"),
-                    config.createIriMapping("pubchem:gene", "gene"));
-
-            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:encodedBy"),
                     config.createIriMapping("pubchem:gene", "gene"));
         }

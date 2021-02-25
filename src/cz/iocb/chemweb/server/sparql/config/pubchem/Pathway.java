@@ -8,6 +8,7 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.StringUserIriClass;
 
 
 
@@ -17,6 +18,7 @@ public class Pathway
     {
         config.addIriClass(new IntegerUserIriClass("pubchem:pathway", "integer",
                 "http://rdf.ncbi.nlm.nih.gov/pubchem/pathway/PWID"));
+        config.addIriClass(new StringUserIriClass("pubchem:reaction", "http://rdf.ncbi.nlm.nih.gov/pubchem/reaction/"));
     }
 
 
@@ -39,11 +41,14 @@ public class Pathway
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:pathbank-pathway", "reference"), "reference_type = 'PATHBANK'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:biocyc-pathway", "reference"), "reference_type = 'BIOCYC'");
+                    config.createIriMapping("reference:biocyc-image-pathway", "reference"),
+                    "reference_type = 'BIOCYC_IMAGE'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("identifiers:reactome", "reference"), "reference_type = 'REACTOME'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("identifiers:wikipathway", "reference"), "reference_type = 'WIKIPATHWAY'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("reference:biocyc-pathway", "reference"), "reference_type = 'BIOCYC'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:plantcyc-pathway", "reference"), "reference_type = 'PLANTCYC'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
@@ -101,6 +106,14 @@ public class Pathway
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:pathwayComponent"),
                     config.createIriMapping("pubchem:pathway", "component"));
+        }
+
+        {
+            Table table = new Table(schema, "pathway_reactions");
+            NodeMapping subject = config.createIriMapping("pubchem:pathway", "pathway");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:pathwayComponent"),
+                    config.createIriMapping("pubchem:reaction", "reaction"));
         }
 
         {

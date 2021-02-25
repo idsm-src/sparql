@@ -117,7 +117,9 @@ public class Common
 
         config.addIriClass(
                 new StringUserIriClass("reference:pathbank-pathway", "http://pathbank.org/view/", "SMP[0-9]{5,7}"));
-        config.addIriClass(new StringUserIriClass("reference:biocyc-pathway", "https://biocyc.org/",
+        config.addIriClass(
+                new StringUserIriClass("reference:biocyc-pathway", "http://identifiers.org/biocyc/", "[^:]*:[^:]*"));
+        config.addIriClass(new StringUserIriClass("reference:biocyc-image-pathway", "https://biocyc.org/",
                 "[^/]*/NEW-IMAGE\\?object=.*"));
         config.addIriClass(new StringUserIriClass("reference:plantcyc-pathway", "https://pmn.plantcyc.org/",
                 "[^/]*/new-image\\?object=.*"));
