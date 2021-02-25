@@ -135,11 +135,21 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
 
     private void loadQuadMapping()
     {
-        Table table = new Table("molecules", "wikidata");
-        NodeMapping subject = createIriMapping("wikidata:entity", "id");
+        {
+            Table table = new Table("wikidata", "canonical_smiles");
+            NodeMapping subject = createIriMapping("wikidata:entity", "id");
 
-        addQuadMapping(table, null, subject, createIriMapping("<http://www.wikidata.org/prop/direct/P233>"),
-                createLiteralMapping(xsdString, "smiles"));
+            addQuadMapping(table, null, subject, createIriMapping("<http://www.wikidata.org/prop/direct/P233>"),
+                    createLiteralMapping(xsdString, "smiles"));
+        }
+
+        {
+            Table table = new Table("wikidata", "isomeric_smiles");
+            NodeMapping subject = createIriMapping("wikidata:entity", "id");
+
+            addQuadMapping(table, null, subject, createIriMapping("<http://www.wikidata.org/prop/direct/P2017>"),
+                    createLiteralMapping(xsdString, "smiles"));
+        }
     }
 
 
