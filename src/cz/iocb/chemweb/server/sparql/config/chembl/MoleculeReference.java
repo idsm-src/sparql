@@ -203,7 +203,8 @@ public class MoleculeReference
             config.addQuadMapping(table, graph, config.createIriMapping("reference:selleck", "reference"),
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString,
-                            "('CHEMBL' || molecule_id || ' Selleck Chemicals Reference: ' || chembl.url_decode(reference))"),
+                            "('CHEMBL' || molecule_id || ' Selleck Chemicals Reference: ' || " + schema
+                                    + ".url_decode(reference))"),
                     "reference_type = 'SELLECK'");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
@@ -219,7 +220,8 @@ public class MoleculeReference
             config.addQuadMapping(table, graph, config.createIriMapping("reference:expression_atlas", "reference"),
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString,
-                            "('CHEMBL' || molecule_id || ' Gene Expression Atlas Reference: ' || chembl.url_decode(reference))"),
+                            "('CHEMBL' || molecule_id || ' Gene Expression Atlas Reference: ' ||  " + schema
+                                    + ".url_decode(reference))"),
                     "reference_type = 'ATLAS'");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),

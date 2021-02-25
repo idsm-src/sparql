@@ -96,6 +96,8 @@ public class Molecule
                     config.createIriMapping("cco:ProteinMolecule"), "molecule_type = 'Protein'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("cco:SmallMolecule"), "molecule_type = 'Small molecule'");
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnclassifiedMolecule"), "molecule_type = 'Gene'");
             config.addQuadMapping(table, graph, subject, config.createIriMapping("foaf:depiction"),
                     config.createIriMapping("chembl:displayimage", "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
