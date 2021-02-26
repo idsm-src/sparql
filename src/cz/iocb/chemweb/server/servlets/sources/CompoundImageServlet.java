@@ -6,7 +6,6 @@ import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -31,6 +30,7 @@ import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.aromaticity.ElectronDonation;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
+import org.openscience.cdk.exception.InvalidSmilesException;
 import org.openscience.cdk.geometry.cip.CIPTool;
 import org.openscience.cdk.graph.CycleFinder;
 import org.openscience.cdk.graph.Cycles;
@@ -46,6 +46,7 @@ import org.openscience.cdk.interfaces.ITetrahedralChirality;
 import org.openscience.cdk.io.DefaultChemObjectReader;
 import org.openscience.cdk.io.MDLV2000Reader;
 import org.openscience.cdk.io.MDLV3000Reader;
+import org.openscience.cdk.layout.StructureDiagramGenerator;
 import org.openscience.cdk.renderer.AtomContainerRenderer;
 import org.openscience.cdk.renderer.RendererModel;
 import org.openscience.cdk.renderer.SymbolVisibility;
@@ -56,6 +57,8 @@ import org.openscience.cdk.renderer.generators.IGenerator;
 import org.openscience.cdk.renderer.generators.standard.StandardGenerator;
 import org.openscience.cdk.renderer.visitor.AWTDrawVisitor;
 import org.openscience.cdk.silent.AtomContainer;
+import org.openscience.cdk.silent.SilentChemObjectBuilder;
+import org.openscience.cdk.smiles.SmilesParser;
 import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
@@ -66,34 +69,32 @@ import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 @SuppressWarnings("serial")
 public class CompoundImageServlet extends HttpServlet
 {
+    private static final String V30_HEADER = "M  V30 BEGIN CTAB";
+
     private DataSource connectionPool;
-    private String queryPattern;
+    private String query;
 
 
     @Override
     public void init(ServletConfig config) throws ServletException
     {
         String resourceName = config.getInitParameter("resource");
+        String schema = config.getInitParameter("schema");
+        String table = config.getInitParameter("table");
+        String id = config.getInitParameter("id");
+        String structure = config.getInitParameter("structure");
 
         if(resourceName == null || resourceName.isEmpty())
             throw new ServletException("Resource name is not set");
 
-
-        String schema = config.getInitParameter("schema");
-        String table = config.getInitParameter("table");
-        String id = config.getInitParameter("id");
-        String molfile = config.getInitParameter("molfile");
-
         if(id == null)
             id = "id";
 
-        if(molfile == null)
-            molfile = "molfile";
+        if(structure == null)
+            structure = "molfile";
 
-
-        queryPattern = "select \"" + molfile.replace("\"", "\"\"") + "\" from \""
-                + (schema != null ? schema.replace("\"", "\"\"") + "\".\"" : "") + table.replace("\"", "\"\"")
-                + "\" where \"" + id.replace("\"", "\"\"") + "\" = ?";
+        query = "select \"" + structure.replace("\"", "\"\"") + "\" from \"" + schema.replace("\"", "\"\"") + "\".\""
+                + table.replace("\"", "\"\"") + "\" where \"" + id.replace("\"", "\"\"") + "\" = ?";
 
         try
         {
@@ -110,83 +111,72 @@ public class CompoundImageServlet extends HttpServlet
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        try
-        {
-            processRequest(req, res);
-        }
-        catch(SQLException e)
-        {
-            throw new IOException(e);
-        }
+        processRequest(req, res);
     }
 
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
     {
-        try
-        {
-            processRequest(req, res);
-        }
-        catch(SQLException e)
-        {
-            throw new IOException(e);
-        }
+        processRequest(req, res);
     }
 
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res)
-            throws ServletException, IOException, SQLException
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
-        int id;
-        int size;
-        Color background = null;
-
-
         try
         {
-            id = Integer.parseInt(req.getParameter("id"));
-        }
-        catch(NullPointerException | NumberFormatException e)
-        {
-            throw new ServletException("an invalid value of the 'id' argument");
-        }
+            int id;
+            int size;
+            Color background = null;
 
 
-        try
-        {
-            size = Integer.parseInt(req.getParameter("w"));
-        }
-        catch(NullPointerException | NumberFormatException e)
-        {
-            throw new ServletException("an invalid value of the 'w' argument");
-        }
-
-        if(size < 40 || size > 1600)
-            throw new ServletException("an invalid value of the 'w' argument");
-
-
-        String backgroundParameter = req.getParameter("background");
-
-        if(backgroundParameter != null)
-        {
             try
             {
-                background = new Color(Integer.parseInt(backgroundParameter, 16));
+                id = Integer.parseInt(req.getParameter("id"));
+            }
+            catch(NullPointerException | NumberFormatException e)
+            {
+                throw new IllegalArgumentException("an invalid value of the 'id' argument");
+            }
+
+
+            try
+            {
+                size = Integer.parseInt(req.getParameter("w"));
+            }
+            catch(NullPointerException | NumberFormatException e)
+            {
+                throw new IllegalArgumentException("an invalid value of the 'w' argument");
+            }
+
+            if(size < 40 || size > 1600)
+                throw new IllegalArgumentException("an invalid value of the 'w' argument");
+
+
+            try
+            {
+                String backgroundParameter = req.getParameter("background");
+
+                if(backgroundParameter != null)
+                    background = new Color(Integer.parseInt(backgroundParameter, 16));
+                else
+                    background = new Color(0, 0, 0, 0);
             }
             catch(NumberFormatException e)
             {
-                throw new ServletException("an invalid value of the 'background' argument");
+                throw new IllegalArgumentException("an invalid value of the 'background' argument");
             }
-        }
 
 
-        try
-        {
             IAtomContainer molecule = getMolecule(id);
 
             if(molecule == null)
-                throw new ServletException("an invalid value of the 'id' argument");
+                throw new IllegalArgumentException("invalid structure id");
+
+
+            BufferedImage bufferedImage = generateImage(molecule, size, size, background);
+
 
             res.setContentType("image/png");
 
@@ -197,12 +187,20 @@ public class CompoundImageServlet extends HttpServlet
 
             try(ServletOutputStream out = res.getOutputStream())
             {
-                generateImage(out, molecule, size, size, background != null ? background : new Color(0, 0, 0, 0));
+                ImageIO.write(bufferedImage, "png", out);
             }
         }
-        catch(CDKException e)
+        catch(IllegalArgumentException e)
         {
-            throw new ServletException("cannot generate image output", e);
+            res.sendError(400, e.getMessage());
+        }
+        catch(SQLException e)
+        {
+            res.sendError(503, e.getMessage());
+        }
+        catch(Throwable e)
+        {
+            res.sendError(500, e.getMessage());
         }
     }
 
@@ -214,14 +212,7 @@ public class CompoundImageServlet extends HttpServlet
     }
 
 
-    public static void generateImage(OutputStream baos, IAtomContainer molecule, int hsize, int vsize)
-            throws IOException, CDKException
-    {
-        generateImage(baos, molecule, hsize, vsize, new Color(0, 0, 0, 0));
-    }
-
-
-    public static void generateImage(OutputStream baos, IAtomContainer molecule, int hsize, int vsize, Color background)
+    public static BufferedImage generateImage(IAtomContainer molecule, int hsize, int vsize, Color background)
             throws IOException, CDKException
     {
         List<IGenerator<IAtomContainer>> generators;
@@ -248,7 +239,7 @@ public class CompoundImageServlet extends HttpServlet
         renderer.paint(molecule, new AWTDrawVisitor(graphics), bounds, true);
         bufferedImage.flush();
 
-        ImageIO.write(bufferedImage, "png", baos);
+        return bufferedImage;
     }
 
 
@@ -256,16 +247,13 @@ public class CompoundImageServlet extends HttpServlet
     {
         try(Connection connection = connectionPool.getConnection())
         {
-            try(PreparedStatement statement = connection.prepareStatement(queryPattern))
+            try(PreparedStatement statement = connection.prepareStatement(query))
             {
                 statement.setInt(1, id);
                 ResultSet result = statement.executeQuery();
 
                 if(result.next())
-                {
-                    IAtomContainer atomContainer = crateAtomContainer(result.getString(1));
-                    return atomContainer;
-                }
+                    return crateAtomContainer(result.getString(1));
             }
 
             return null;
@@ -273,67 +261,89 @@ public class CompoundImageServlet extends HttpServlet
     }
 
 
-    private static IAtomContainer crateAtomContainer(String molfile) throws CDKException, IOException
+    private static IAtomContainer crateAtomContainer(String mol) throws CDKException, IOException
     {
-        boolean isV3000 = molfile.contains("M  V30 BEGIN CTAB");
+        IAtomContainer molecule = null;
 
-        try(DefaultChemObjectReader mdlReader = isV3000 ? new MDLV3000Reader() : new MDLV2000Reader())
+        if(!mol.contains("\n"))
         {
-            IAtomContainer molecule = new AtomContainer();
-            mdlReader.setReader(new StringReader(molfile));
-            molecule = mdlReader.read(molecule);
+            SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
 
-            AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
-
-
-            CDKAtomTypeMatcher matcher = CDKAtomTypeMatcher.getInstance(molecule.getBuilder());
-
-            for(IAtom atom : molecule.atoms())
+            try
             {
-                if(atom.getImplicitHydrogenCount() == null)
-                {
-                    IAtomType type = matcher.findMatchingAtomType(molecule, atom);
-                    AtomTypeManipulator.configure(atom, type);
-                    CDKHydrogenAdder adder = CDKHydrogenAdder.getInstance(molecule.getBuilder());
-                    adder.addImplicitHydrogens(molecule, atom);
-                }
+                molecule = sp.parseSmiles(mol);
+            }
+            catch(InvalidSmilesException e)
+            {
+                sp.kekulise(false);
+                molecule = sp.parseSmiles(mol);
             }
 
-
-            ElectronDonation model = ElectronDonation.cdkAllowingExocyclic();
-            CycleFinder cycles = Cycles.cdkAromaticSet();
-            Aromaticity aromaticity = new Aromaticity(model, cycles);
-            aromaticity.apply(molecule);
-
-
-            CIPTool.label(molecule);
-            removeNonChiralHydrogens(molecule);
-
-
-            for(IAtom a : molecule.atoms())
-            {
-                if(a.getPoint2d() == null)
-                {
-                    for(IAtom atom : molecule.atoms())
-                        atom.setPoint2d(new Point2d(atom.getPoint3d().x, atom.getPoint3d().y));
-
-                    break;
-                }
-            }
-
-
-            for(IAtom atom : molecule.atoms())
-                atom.setProperty(StandardGenerator.ANNOTATION_LABEL, getCipLabel(atom));
-            for(IBond bond : molecule.bonds())
-                bond.setProperty(StandardGenerator.ANNOTATION_LABEL, getCipLabel(bond));
-
-
-            return molecule;
+            StructureDiagramGenerator sdg = new StructureDiagramGenerator();
+            sdg.setMolecule(molecule);
+            sdg.generateCoordinates();
+            molecule = sdg.getMolecule();
         }
+        else
+        {
+            try(DefaultChemObjectReader reader = mol.contains(V30_HEADER) ? new MDLV3000Reader() : new MDLV2000Reader())
+            {
+                reader.setReader(new StringReader(mol));
+                molecule = reader.read(new AtomContainer());
+            }
+        }
+
+
+        AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
+
+
+        CDKAtomTypeMatcher matcher = CDKAtomTypeMatcher.getInstance(molecule.getBuilder());
+
+        for(IAtom atom : molecule.atoms())
+        {
+            if(atom.getImplicitHydrogenCount() == null)
+            {
+                IAtomType type = matcher.findMatchingAtomType(molecule, atom);
+                AtomTypeManipulator.configure(atom, type);
+                CDKHydrogenAdder adder = CDKHydrogenAdder.getInstance(molecule.getBuilder());
+                adder.addImplicitHydrogens(molecule, atom);
+            }
+        }
+
+
+        ElectronDonation model = ElectronDonation.cdkAllowingExocyclic();
+        CycleFinder cycles = Cycles.cdkAromaticSet();
+        Aromaticity aromaticity = new Aromaticity(model, cycles);
+        aromaticity.apply(molecule);
+
+
+        CIPTool.label(molecule);
+        removeNonChiralHydrogens(molecule);
+
+
+        for(IAtom a : molecule.atoms())
+        {
+            if(a.getPoint2d() == null)
+            {
+                for(IAtom atom : molecule.atoms())
+                    atom.setPoint2d(new Point2d(atom.getPoint3d().x, atom.getPoint3d().y));
+
+                break;
+            }
+        }
+
+
+        for(IAtom atom : molecule.atoms())
+            atom.setProperty(StandardGenerator.ANNOTATION_LABEL, getCipLabel(atom));
+        for(IBond bond : molecule.bonds())
+            bond.setProperty(StandardGenerator.ANNOTATION_LABEL, getCipLabel(bond));
+
+
+        return molecule;
     }
 
 
-    static private String getCipLabel(IChemObject chemObj)
+    private static String getCipLabel(IChemObject chemObj)
     {
         String label = chemObj.getProperty(CDKConstants.CIP_DESCRIPTOR);
 
@@ -344,7 +354,7 @@ public class CompoundImageServlet extends HttpServlet
     }
 
 
-    public static void removeNonChiralHydrogens(IAtomContainer molecule)
+    private static void removeNonChiralHydrogens(IAtomContainer molecule)
     {
         List<IAtom> remove = new ArrayList<IAtom>();
 

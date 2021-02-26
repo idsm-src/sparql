@@ -228,6 +228,20 @@
     <url-pattern>/pubchem/compound/image</url-pattern>
   </servlet-mapping>
 
+  <servlet>
+    <servlet-name>WikidataCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-wikidata</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>molecules</param-value></init-param>
+    <init-param><param-name>table</param-name><param-value>wikidata</param-value></init-param>
+    <init-param><param-name>structure</param-name><param-value>smiles</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>WikidataCompoundImage</servlet-name>
+    <url-pattern>/wikidata/compound/image</url-pattern>
+  </servlet-mapping>
+
+
 
   <!-- Sachem Statistics Servlet -->
   <servlet>
