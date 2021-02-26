@@ -171,6 +171,7 @@ public class Request implements AutoCloseable
         catch(Throwable e)
         {
             statement.close();
+            e.printStackTrace();
             throw e;
         }
     }
