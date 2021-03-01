@@ -24,7 +24,7 @@
       <table style="width:80px">
         <tr>
           <td>
-            <img src="chembl/compound/image?w=160&id=$ID" alt="CHEMBL$ID" height="80" width="80">
+            <img loading='lazy' src="chembl/compound/image?w=160&id=$ID" alt="CHEMBL$ID" height="80" width="80">
           </td>
         </tr>
       </table>
