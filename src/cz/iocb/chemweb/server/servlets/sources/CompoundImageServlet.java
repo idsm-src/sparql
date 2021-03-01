@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import javax.imageio.ImageIO;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -172,7 +173,7 @@ public class CompoundImageServlet extends HttpServlet
             IAtomContainer molecule = getMolecule(id);
 
             if(molecule == null)
-                throw new IllegalArgumentException("invalid structure id");
+                throw new NoSuchElementException("invalid structure id");
 
 
             BufferedImage bufferedImage = generateImage(molecule, size, size, background);
@@ -189,6 +190,10 @@ public class CompoundImageServlet extends HttpServlet
             {
                 ImageIO.write(bufferedImage, "png", out);
             }
+        }
+        catch(NoSuchElementException e)
+        {
+            res.sendError(404, e.getMessage());
         }
         catch(IllegalArgumentException e)
         {
