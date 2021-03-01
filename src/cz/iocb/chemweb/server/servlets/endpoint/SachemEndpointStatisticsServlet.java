@@ -24,17 +24,22 @@ import javax.sql.DataSource;
 public class SachemEndpointStatisticsServlet extends HttpServlet
 {
     static private final SimpleDateFormat dateFormatGmt;
+    static private final SimpleDateFormat versionFormatGmt;
 
     private DataSource chebiPool;
     private DataSource chemblPool;
     private DataSource drugbankPool;
     private DataSource pubchemPool;
+    private DataSource wikidataPool;
 
 
     static
     {
         dateFormatGmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
         dateFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+        versionFormatGmt = new SimpleDateFormat("yyyy-MM-dd");
+        versionFormatGmt.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
 
@@ -65,6 +70,12 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             throw new ServletException("PubChem resource name is not set");
 
 
+        String wikidataResourceName = config.getInitParameter("resource-wikidata");
+
+        if(wikidataResourceName == null || wikidataResourceName.isEmpty())
+            throw new ServletException("Wikidata resource name is not set");
+
+
         try
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
@@ -73,6 +84,7 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             chemblPool = ((DataSource) context.lookup(chemblResourceName));
             drugbankPool = ((DataSource) context.lookup(drugbankResourceName));
             pubchemPool = ((DataSource) context.lookup(pubchemResourceName));
+            wikidataPool = ((DataSource) context.lookup(wikidataResourceName));
         }
         catch(NamingException e)
         {
@@ -97,6 +109,8 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
             writeChebi(out);
             out.println(",");
             writeDrugbank(out);
+            out.println(",");
+            writeWikidata(out);
             out.println("]}");
         }
         catch(SQLException e)
@@ -201,6 +215,30 @@ public class SachemEndpointStatisticsServlet extends HttpServlet
                     out.println("  \"version\": \"" + versionFormatGmt.format(result.getTimestamp(1)) + "\",");
                     out.println("  \"size\":" + result.getInt(2) + ",");
                     out.println("  \"checked\": \"" + dateFormatGmt.format(result.getTimestamp(3)) + "\"");
+                    out.println("}");
+                }
+            }
+        }
+    }
+
+
+    private void writeWikidata(ServletOutputStream out) throws IOException, SQLException
+    {
+        try(Connection connection = wikidataPool.getConnection())
+        {
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet result = statement.executeQuery("select sachem.index_size('wikidata'), s.checkdate "
+                        + "from sachem.compound_stats s, sachem.configuration c "
+                        + "where s.index = c.id and c.index_name = 'wikidata'"))
+                {
+                    result.next();
+
+                    out.println("{");
+                    out.println("  \"name\": \"Wikidata\",");
+                    out.println("  \"version\": \"" + versionFormatGmt.format(result.getTimestamp(2)) + "\",");
+                    out.println("  \"size\":" + result.getInt(1) + ",");
+                    out.println("  \"checked\": \"" + dateFormatGmt.format(result.getTimestamp(2)) + "\"");
                     out.println("}");
                 }
             }

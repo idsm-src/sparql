@@ -251,6 +251,7 @@
     <init-param><param-name>resource-chembl</param-name><param-value>jdbc:sachem-chembl</param-value></init-param>
     <init-param><param-name>resource-drugbank</param-name><param-value>jdbc:sachem-drugbank</param-value></init-param>
     <init-param><param-name>resource-pubchem</param-name><param-value>jdbc:sachem-pubchem</param-value></init-param>
+    <init-param><param-name>resource-wikidata</param-name><param-value>jdbc:sachem-wikidata</param-value></init-param>
   </servlet>
   <servlet-mapping>
     <servlet-name>SachemEndpointStatisticsServlet</servlet-name>
