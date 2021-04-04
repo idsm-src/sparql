@@ -25,11 +25,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(length > 0)
             buffer.append(String.format("[0-9]{%d}", length));
         else if(sqlType.equals("smallint"))
-            buffer.append(generateMaxNumberPattern("32767"));
+            buffer.append(generateMaxNumberPattern("32767", -length));
         else if(sqlType.equals("integer"))
-            buffer.append(generateMaxNumberPattern("2147483647"));
+            buffer.append(generateMaxNumberPattern("2147483647", -length));
         else if(sqlType.equals("bigint"))
-            buffer.append(generateMaxNumberPattern("9223372036854775807"));
+            buffer.append(generateMaxNumberPattern("9223372036854775807", -length));
         else
             throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);
 
@@ -89,6 +89,9 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         if(length > 0)
             code = String.format("lpad(%s, %d, '0')", code, length);
+        else if(length < 0)
+            code = String.format("(case when 1%0" + (-1 - length) + "d <= (%s) THEN %s else lpad(%s, %d, '0') end)", 0,
+                    parameter, code, code, -length);
 
         code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
 
@@ -113,12 +116,22 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
-    private static String generateMaxNumberPattern(String max)
+    private static String generateMaxNumberPattern(String max, int minLength)
     {
+        if(max.length() - minLength < 1)
+            throw new IllegalArgumentException("minimal length is to hight");
+
         StringBuffer buffer = new StringBuffer();
 
-        buffer.append("(0|");
-        buffer.append(String.format("[1-9][0-9]{0,%d}|", max.length() - 2));
+        if(minLength == 0)
+            buffer.append(String.format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
+        else if(max.length() - minLength == 1)
+            buffer.append(String.format("([0-9]{%d}|", minLength));
+        else if(max.length() - minLength == 2)
+            buffer.append(String.format("([1-9]?[0-9]{%d}|", minLength));
+        else
+            buffer.append(String.format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
+
         buffer.append(String.format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
 
         for(int i = 1; i < max.length() - 1; i++)
