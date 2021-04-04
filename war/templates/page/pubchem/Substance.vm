@@ -8,7 +8,7 @@
 <div class="VET-Page">
   <div class="VET-TitleBox">
     <span class="VET-Title">substance:SID$SID</span>
-    (<a href="https://pubchem.ncbi.nlm.nih.gov/substance/SID$SID" target="_blank">open in pubchem</a>)
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/substance/$SID" target="_blank">open in pubchem</a>)
   </div>
 
   #sparql($compound)
