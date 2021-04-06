@@ -61,7 +61,7 @@ public class Bioassay
             NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0000540"),
-                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "confirmatory_assay"));
+                    config.createIriMapping("pubchem:bioassay", "confirmatory_assay"));
         }
 
         {
@@ -69,7 +69,7 @@ public class Bioassay
             NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0001067"),
-                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "primary_assay"));
+                    config.createIriMapping("pubchem:bioassay", "primary_assay"));
         }
 
         {
@@ -77,7 +77,7 @@ public class Bioassay
             NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0001094"),
-                    config.createIriMapping("pubchem:bioassay", Ontology.unitBAO, "summary_assay"));
+                    config.createIriMapping("pubchem:bioassay", "summary_assay"));
         }
 
         // extensions
