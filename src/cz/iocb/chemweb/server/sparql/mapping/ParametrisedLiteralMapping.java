@@ -19,6 +19,10 @@ public class ParametrisedLiteralMapping extends LiteralMapping implements Parame
     {
         super(literalClass);
         this.columns = columns;
+
+        if(literalClass.getPatternPartsCount() != columns.size())
+            throw new IllegalArgumentException(
+                    "wrong number of columns for literal class '" + literalClass.getName() + "'");
     }
 
 

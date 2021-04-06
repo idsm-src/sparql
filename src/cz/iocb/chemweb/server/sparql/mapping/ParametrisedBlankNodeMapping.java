@@ -19,6 +19,10 @@ public class ParametrisedBlankNodeMapping extends BlankNodeMapping implements Pa
     {
         super(blankNodeClass);
         this.columns = columns;
+
+        if(blankNodeClass.getPatternPartsCount() != columns.size())
+            throw new IllegalArgumentException(
+                    "wrong number of columns for blank node class '" + blankNodeClass.getName() + "'");
     }
 
 

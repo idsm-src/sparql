@@ -19,6 +19,9 @@ public class ParametrisedIriMapping extends IriMapping implements ParametrisedMa
     {
         super(iriClass);
         this.columns = columns;
+
+        if(iriClass.getPatternPartsCount() != columns.size())
+            throw new IllegalArgumentException("wrong number of columns for iri class '" + iriClass.getName() + "'");
     }
 
 
