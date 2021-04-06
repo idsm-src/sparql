@@ -423,7 +423,7 @@ public abstract class SparqlDatabaseConfiguration
         {
             if(value.startsWith("("))
                 columns.add(new ExpressionColumn(value));
-            if(value.matches(".*::[_a-zA-Z0-9]+"))
+            else if(value.matches(".*::[_a-zA-Z0-9]+"))
                 columns.add(new ConstantColumn(value));
             else
                 columns.add(new TableColumn(value));
