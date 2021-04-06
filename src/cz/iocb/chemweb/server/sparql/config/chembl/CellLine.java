@@ -31,8 +31,6 @@ public class CellLine
                 config.createIriMapping("cco:CellLine"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasCLO"),
                 config.createIriMapping("ontology:resource", Ontology.unitCLO, "clo_resource_id"));
-        config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasCLO"),
-                config.createIriMapping("ontology:resource", Ontology.unitCL, "cl_resource_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasEFO"),
                 config.createIriMapping("ontology:resource", Ontology.unitEFO, "efo_resource_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:cellXref"),
