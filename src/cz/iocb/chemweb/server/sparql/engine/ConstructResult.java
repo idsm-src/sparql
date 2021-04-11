@@ -44,7 +44,7 @@ public class ConstructResult extends Result
         loop:
         while(true)
         {
-            if(count >= offset + limit)
+            if(limit >= 0 && count >= offset + limit)
                 return false;
 
             if(templates.size() == 0)
