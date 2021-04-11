@@ -36,6 +36,32 @@
     .about ul li {
       margin: 0 0 3px 0;
     }
+    
+    .statistics {
+      border-spacing: 0;
+      border-collapse: collapse;
+      margin: 5px 15px;
+    }
+    
+    .statistics th {
+	  text-align: left;
+	  padding: 4px 8px;
+	  border-bottom: 1px solid #81b0d4 !important;
+	}
+	
+	.statistics td {
+      border-top: 1px solid #eee;
+      padding: 4px 8px;
+    }
+    
+    .statistics td:first-child {
+      padding-right: 50px;
+    }
+    
+    .statistics td:last-child {
+      text-align: right;
+    }
+	
   </ui:style>
 
   <g:ScrollPanel>
@@ -58,20 +84,20 @@
         </div>
 
         <div class="{style.section}">
-          <div class="{style.header}">Technologies</div>
+          <div class="{style.header}">Statistics</div>
           <div>
-            <ul>
-              <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a></li>
-              <li><a href="http://bioinfo.uochb.cas.cz/sachem/" target="_blank">Sachem</a></li>
-              <li><a href="https://codemirror.net/" target="_blank">CodeMirror</a></li>
-              <li><a href="http://velocity.apache.org/" target="_blank">Apache Velocity</a></li>
-              <li><a href="http://www.gwtproject.org/" target="_blank">Google Web Toolkit</a></li>
-              <li><a href="https://code.google.com/p/sparkle-g/" target="_blank">Sparkle-g Lexer and Parser</a></li>
-              <li><a href="http://www.antlr.org/" target="_blank">ANTLR</a></li>
-              <li><a href="http://tomcat.apache.org/" target="_blank">Apache Tomcat</a></li>
-              <li><a href="https://jena.apache.org/" target="_blank">Apache Jena</a></li>
-              <li><a href="http://www.kde.org/" target="_blank">KDE</a> <a href="https://techbase.kde.org/Projects/Oxygen" target="_blank">Oxygen Icons</a>: <small>(licensed under the <a href="http://www.gnu.org/licenses/lgpl-3.0.html" target="_blank">LGPLv3</a>)</small></li>
-            </ul>
+            <table class="{style.statistics}">
+              <tr><th>Data Collection</th><th>Count</th></tr>
+            
+              <tr><td>PubChem Substances</td><td>281,671,760</td></tr>
+              <tr><td>PubChem Compounds</td><td>109,570,647</td></tr>
+              <tr><td>PubChem BioAssays</td><td>1,229,068</td></tr>
+
+              <tr><td>ChEMBL Substances</td><td>2,086,898</td></tr>
+              <tr><td>ChEMBL Assays</td><td>1,358,549</td></tr>
+
+              <tr><td>ChEBI Entities</td><td>156,098</td></tr>
+            </table>
           </div>
         </div>
 
@@ -128,6 +154,24 @@
               <li><a href="http://vocab.deri.ie/void.html" target="_blank">Vocabulary of Interlinked Datasets (VoID)</a>: 2011-03-06</li>
               <li><a href="https://www.w3.org/TR/rdf-schema/" target="_blank">RDF Schema (RDFS)</a>: 1.1</li>
               <li><a href="https://www.w3.org/TR/owl2-overview/" target="_blank">OWL 2 Schema (OWL 2)</a>: 2009-10-16</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="{style.section}">
+          <div class="{style.header}">Technologies</div>
+          <div>
+            <ul>
+              <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a></li>
+              <li><a href="http://bioinfo.uochb.cas.cz/sachem/" target="_blank">Sachem</a></li>
+              <li><a href="https://codemirror.net/" target="_blank">CodeMirror</a></li>
+              <li><a href="http://velocity.apache.org/" target="_blank">Apache Velocity</a></li>
+              <li><a href="http://www.gwtproject.org/" target="_blank">Google Web Toolkit</a></li>
+              <li><a href="https://code.google.com/p/sparkle-g/" target="_blank">Sparkle-g Lexer and Parser</a></li>
+              <li><a href="http://www.antlr.org/" target="_blank">ANTLR</a></li>
+              <li><a href="http://tomcat.apache.org/" target="_blank">Apache Tomcat</a></li>
+              <li><a href="https://jena.apache.org/" target="_blank">Apache Jena</a></li>
+              <li><a href="http://www.kde.org/" target="_blank">KDE</a> <a href="https://techbase.kde.org/Projects/Oxygen" target="_blank">Oxygen Icons</a>: <small>(licensed under the <a href="http://www.gnu.org/licenses/lgpl-3.0.html" target="_blank">LGPLv3</a>)</small></li>
             </ul>
           </div>
         </div>
