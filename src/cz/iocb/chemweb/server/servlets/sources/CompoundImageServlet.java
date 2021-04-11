@@ -193,19 +193,19 @@ public class CompoundImageServlet extends HttpServlet
         }
         catch(NoSuchElementException e)
         {
-            res.sendError(404, e.getMessage());
+            res.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
         }
         catch(IllegalArgumentException e)
         {
-            res.sendError(400, e.getMessage());
+            res.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         }
         catch(SQLException e)
         {
-            res.sendError(503, e.getMessage());
+            res.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, e.getMessage());
         }
         catch(Throwable e)
         {
-            res.sendError(500, e.getMessage());
+            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 
