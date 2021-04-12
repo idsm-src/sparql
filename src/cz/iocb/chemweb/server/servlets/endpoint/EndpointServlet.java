@@ -81,8 +81,12 @@ public class EndpointServlet extends HttpServlet
         }
     }
 
+    static class Graph extends LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>>
+    {
+    }
 
-    private static int processLimit = 1000000;
+
+    private static int processLimit = 100000000;
 
     private Engine engine;
 
@@ -262,27 +266,35 @@ public class EndpointServlet extends HttpServlet
 
                         case DESCRIBE:
                         case CONSTRUCT:
+                            Graph data = processResult(result);
+
+                            if(data == null)
+                            {
+                                res.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+                                return;
+                            }
+
                             switch(detectOutputType(req, ResultType.CONSTRUCT))
                             {
                                 case RDF_XML:
-                                    writeGraphXml(res.getWriter(), result);
+                                    writeGraphXml(res.getWriter(), data);
                                     break;
                                 case RDF_JSON:
-                                    writeGraphJson(res.getWriter(), result);
+                                    writeGraphJson(res.getWriter(), data);
                                     break;
                                 case TURTLE:
                                 case TRIG:
-                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes());
+                                    writeGraphTurtle(res.getWriter(), data, engine.getConfig().getPrefixes());
                                     break;
                                 case NTRIPLES:
                                 case NQUADS:
-                                    writeGraphTriples(res.getWriter(), result);
+                                    writeGraphTriples(res.getWriter(), data);
                                     break;
                                 case TSV:
-                                    writeSelectTsv(res.getWriter(), result);
+                                    writeGraphTsv(res.getWriter(), data);
                                     break;
                                 case CSV:
-                                    writeSelectCsv(res.getWriter(), result);
+                                    writeGraphCsv(res.getWriter(), data);
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
@@ -291,11 +303,6 @@ public class EndpointServlet extends HttpServlet
                     }
                 }
             }
-        }
-        catch(OverLimitException e)
-        {
-            res.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
-            return;
         }
         catch(TranslateExceptions e)
         {
@@ -804,12 +811,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphXml(PrintWriter out, Result result)
-            throws IOException, SQLException, OverLimitException
+    private static void writeGraphXml(PrintWriter out, Graph data) throws IOException, SQLException
     {
-        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
-
-
         HashMap<String, String> prefixes = new HashMap<String, String>();
         prefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
 
@@ -915,11 +918,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphJson(PrintWriter out, Result result)
-            throws IOException, SQLException, OverLimitException
+    private static void writeGraphJson(PrintWriter out, Graph data) throws IOException, SQLException
     {
-        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
-
         out.println("{");
 
         boolean hasResult = false;
@@ -971,10 +971,9 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphTurtle(PrintWriter out, Result result, HashMap<String, String> systemPrefixes)
-            throws IOException, SQLException, OverLimitException
+    private static void writeGraphTurtle(PrintWriter out, Graph data, HashMap<String, String> systemPrefixes)
+            throws IOException, SQLException
     {
-        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = processResult(result);
         HashMap<String, String> prefixes = new HashMap<String, String>();
 
         for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
@@ -988,6 +987,9 @@ public class EndpointServlet extends HttpServlet
                 for(RdfNode value : predicates.getValue())
                 {
                     selectPrefix(value, systemPrefixes, prefixes);
+
+                    if(value instanceof TypedLiteral)
+                        selectPrefix(((TypedLiteral) value).getDatatype(), systemPrefixes, prefixes);
                 }
             }
         }
@@ -1041,17 +1043,78 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
+    private static void writeGraphTriples(PrintWriter out, Graph data) throws IOException, SQLException
     {
-        while(result.next())
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
         {
-            for(int i = 0; i < 3; i++)
-            {
-                writeTripleNode(out, result.get(i));
-                out.print(' ');
-            }
+            RdfNode subject = subjects.getKey();
 
-            out.println('.');
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                RdfNode predicate = predicates.getKey();
+
+                for(RdfNode object : predicates.getValue())
+                {
+                    writeTripleNode(out, subject);
+                    out.print(' ');
+                    writeTripleNode(out, predicate);
+                    out.print(' ');
+                    writeTripleNode(out, object);
+                    out.println('.');
+                }
+            }
+        }
+    }
+
+
+    private static void writeGraphTsv(PrintWriter out, Graph data) throws IOException, SQLException
+    {
+        out.print("subject\tpredicate\tobject\r\n");
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            RdfNode subject = subjects.getKey();
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                RdfNode predicate = predicates.getKey();
+
+                for(RdfNode object : predicates.getValue())
+                {
+                    writeTripleNode(out, subject);
+                    out.print('\t');
+                    writeTripleNode(out, predicate);
+                    out.print('\t');
+                    writeTripleNode(out, object);
+                    out.print("\r\n");
+                }
+            }
+        }
+    }
+
+
+    private static void writeGraphCsv(PrintWriter out, Graph data) throws IOException, SQLException
+    {
+        out.print("subject,predicate,object\r\n");
+
+        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        {
+            RdfNode subject = subjects.getKey();
+
+            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            {
+                RdfNode predicate = predicates.getKey();
+
+                for(RdfNode object : predicates.getValue())
+                {
+                    writeCsvValue(out, subject.getValue());
+                    out.print(',');
+                    writeCsvValue(out, predicate.getValue());
+                    out.print(',');
+                    writeCsvValue(out, object.getValue());
+                    out.print("\r\n");
+                }
+            }
         }
     }
 
@@ -1136,21 +1199,39 @@ public class EndpointServlet extends HttpServlet
     {
         if(node instanceof IriNode)
         {
-            String iri = node.getValue();
+            writeTripleIri(out, (IriNode) node, prefixes);
+        }
+        else if(node instanceof TypedLiteral)
+        {
+            out.print('"');
+            writeTsvLiteralValue(out, node.getValue());
+            out.print("\"^^");
+            writeTripleIri(out, ((TypedLiteral) node).getDatatype(), prefixes);
+        }
+        else
+        {
+            writeTripleNode(out, node);
+        }
+    }
 
-            for(Entry<String, String> prefix : prefixes.entrySet())
+
+    private static void writeTripleIri(PrintWriter out, IriNode node, HashMap<String, String> prefixes)
+            throws IOException
+    {
+        String iri = node.getValue();
+
+        for(Entry<String, String> prefix : prefixes.entrySet())
+        {
+            if(iri.startsWith(prefix.getValue()))
             {
-                if(iri.startsWith(prefix.getValue()))
-                {
-                    String name = iri.substring(prefix.getValue().length());
+                String name = iri.substring(prefix.getValue().length());
 
-                    if(name.matches("[_a-zA-Z][_a-zA-Z0-9]*"))
-                    {
-                        out.print(prefix.getKey());
-                        out.print(':');
-                        out.print(name);
-                        return;
-                    }
+                if(name.matches("[_a-zA-Z][_a-zA-Z0-9]*"))
+                {
+                    out.print(prefix.getKey());
+                    out.print(':');
+                    out.print(name);
+                    return;
                 }
             }
         }
@@ -1291,18 +1372,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> processResult(Result result)
-            throws SQLException, OverLimitException
+    private static Graph processResult(Result result) throws SQLException
     {
-        LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> data = new LinkedHashMap<>();
+        Graph data = new Graph();
 
         int count = 0;
 
         while(result.next())
         {
-            if(count++ > processLimit)
-                throw new OverLimitException();
-
             RdfNode subject = result.get(0);
             RdfNode predicate = result.get(1);
             RdfNode object = result.get(2);
@@ -1324,7 +1401,11 @@ public class EndpointServlet extends HttpServlet
                 properties.put(predicate, values);
             }
 
-            values.add(object);
+            if(values.add(object))
+                count++;
+
+            if(count > processLimit)
+                return null;
         }
 
         return data;
@@ -1354,11 +1435,4 @@ public class EndpointServlet extends HttpServlet
             }
         }
     }
-}
-
-
-@SuppressWarnings("serial")
-class OverLimitException extends Exception
-{
-
 }
