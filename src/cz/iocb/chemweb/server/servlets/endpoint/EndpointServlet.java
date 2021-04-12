@@ -86,6 +86,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static final int timeout = 10 * 60 * 1000; // 10 minutes
     private static int processLimit = 100000000;
 
     private Engine engine;
@@ -214,7 +215,7 @@ public class EndpointServlet extends HttpServlet
 
             try(Request request = engine.getRequest())
             {
-                try(Result result = request.execute(query, dataSets, -1, limit, 0))
+                try(Result result = request.execute(query, dataSets, -1, limit, timeout))
                 {
                     OutputType format = detectOutputType(req, result.getResultType());
                     res.setHeader("content-type", format.getMime());
