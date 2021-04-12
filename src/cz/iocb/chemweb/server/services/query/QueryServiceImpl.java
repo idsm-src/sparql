@@ -164,7 +164,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
             @Override
             public void run()
             {
-                try(Result result = queryState.request.execute(query, offset, limit, timeout))
+                try(Result result = queryState.request.execute(query, offset, limit + 1, timeout))
                 {
                     Template template = ve.getTemplate("node.vm");
                     Vector<Future<DataGridNode[]>> futures = new Vector<Future<DataGridNode[]>>(limit + 1);

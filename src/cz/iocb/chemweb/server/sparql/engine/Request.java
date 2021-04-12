@@ -134,7 +134,7 @@ public class Request implements AutoCloseable
             imcode.setOffset(offset);
 
             if(limit >= 0)
-                imcode.setLimit(limit + 1);
+                imcode.setLimit(limit);
         }
 
         String code = imcode.translate();
@@ -161,7 +161,7 @@ public class Request implements AutoCloseable
                     template[2] = convertNodeToTemplate(triple.getObject());
                 }
 
-                return new ConstructResult(templates, statement.executeQuery(code), limit < 0 ? -1 : limit + 1, offset);
+                return new ConstructResult(templates, statement.executeQuery(code), limit, offset);
             }
             else
             {
@@ -179,13 +179,13 @@ public class Request implements AutoCloseable
 
     public Result execute(String query) throws TranslateExceptions, SQLException
     {
-        return execute(query, null, -1, -1, 0);
+        return execute(query, null, 0, -1, 0);
     }
 
 
     public Result execute(String query, List<DataSet> dataSets) throws TranslateExceptions, SQLException
     {
-        return execute(query, dataSets, -1, -1, 0);
+        return execute(query, dataSets, 0, -1, 0);
     }
 
 

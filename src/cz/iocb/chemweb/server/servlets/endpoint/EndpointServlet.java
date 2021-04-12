@@ -215,7 +215,7 @@ public class EndpointServlet extends HttpServlet
 
             try(Request request = engine.getRequest())
             {
-                try(Result result = request.execute(query, dataSets, -1, limit, timeout))
+                try(Result result = request.execute(query, dataSets, 0, limit, timeout))
                 {
                     OutputType format = detectOutputType(req, result.getResultType());
                     res.setHeader("content-type", format.getMime());
