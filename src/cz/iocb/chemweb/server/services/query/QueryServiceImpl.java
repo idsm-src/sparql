@@ -56,7 +56,7 @@ public class QueryServiceImpl extends RemoteServiceServlet implements QueryServi
 
 
     private static final long serialVersionUID = 1L;
-    private static final int timeout = 20 * 60 * 1000; // 20 minutes
+    private static final long timeout = 15 * 60 * 1000000000l; // 15 minutes
     private static final SessionData<QueryState> sessionData = new SessionData<QueryState>("QuerySessionStorage");
     private static final Logger logger = Logger.getLogger(QueryServiceImpl.class);
     private static final int cacheSize = 1000000;

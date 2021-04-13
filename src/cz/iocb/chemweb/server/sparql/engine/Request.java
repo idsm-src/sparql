@@ -37,6 +37,8 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 
 public class Request implements AutoCloseable
 {
+    private static int fetchSize = 1000;
+
     private final SparqlDatabaseConfiguration config;
 
     private Connection connection;
@@ -93,7 +95,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int timeout)
+    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, long timeout)
             throws TranslateExceptions, SQLException
     {
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
@@ -112,7 +114,10 @@ public class Request implements AutoCloseable
             syntaxTree.getSelect().setDataSets(dataSets);
 
 
-        setTimeout(timeout);
+        getConnection(); // time is measured after a connection is established
+        this.timeout = timeout;
+        this.begin = System.nanoTime();
+
 
         ResultType type = null;
 
@@ -161,11 +166,11 @@ public class Request implements AutoCloseable
                     template[2] = convertNodeToTemplate(triple.getObject());
                 }
 
-                return new ConstructResult(templates, statement.executeQuery(code), limit, offset);
+                return new ConstructResult(templates, statement.executeQuery(code), limit, offset, begin, timeout);
             }
             else
             {
-                return new SelectResult(type, statement.executeQuery(code));
+                return new SelectResult(type, statement.executeQuery(code), begin, timeout);
             }
         }
         catch(Throwable e)
@@ -189,7 +194,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public Result execute(String query, int offset, int limit, int timeout) throws TranslateExceptions, SQLException
+    public Result execute(String query, int offset, int limit, long timeout) throws TranslateExceptions, SQLException
     {
         return execute(query, null, offset, limit, timeout);
     }
@@ -245,26 +250,17 @@ public class Request implements AutoCloseable
     }
 
 
-    private int getTimeout()
+    private int getStatementTimeout()
     {
         if(timeout == 0)
             return 0;
 
-        int restTime = (int) (timeout - ((System.nanoTime() - begin) / 1000000));
+        int restTime = (int) ((timeout - (System.nanoTime() - begin)) / 1000000000);
 
         if(restTime <= 0)
             return 1; //FIXME: throw exception?
 
         return restTime;
-    }
-
-
-    private void setTimeout(long timeout) throws SQLException
-    {
-        getConnection(); // time is measured after a connection is established
-
-        this.timeout = timeout;
-        this.begin = System.nanoTime();
     }
 
 
@@ -277,8 +273,8 @@ public class Request implements AutoCloseable
             throw new SQLException("query was canceled");
 
         Statement statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-        statement.setQueryTimeout(getTimeout());
-        statement.setFetchSize(1000);
+        statement.setQueryTimeout(getStatementTimeout());
+        statement.setFetchSize(fetchSize);
 
         this.statement = statement;
         return statement;
@@ -294,8 +290,8 @@ public class Request implements AutoCloseable
             throw new SQLException("query was canceled");
 
         PreparedStatement statement = getConnection().prepareStatement(query);
-        statement.setQueryTimeout(getTimeout());
-        statement.setFetchSize(1000);
+        statement.setQueryTimeout(getStatementTimeout());
+        statement.setFetchSize(fetchSize);
 
         this.statement = statement;
         return statement;
@@ -322,5 +318,17 @@ public class Request implements AutoCloseable
             return new TypedLiteral(((Literal) node).getStringValue(), ((Literal) node).getTypeIri());
         else
             return new LiteralNode(((Literal) node).getStringValue());
+    }
+
+
+    public long getBegin()
+    {
+        return begin;
+    }
+
+
+    public long getTimeout()
+    {
+        return timeout;
     }
 }

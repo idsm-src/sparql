@@ -18,8 +18,8 @@ public class ConstructResult extends Result
     private int count;
 
 
-    public ConstructResult(ArrayList<RdfNode[]> templates, ResultSet executeQuery, int limit, int offset)
-            throws SQLException
+    public ConstructResult(ArrayList<RdfNode[]> templates, ResultSet executeQuery, int limit, int offset, long begin,
+            long timeout) throws SQLException
     {
         super(ResultType.CONSTRUCT);
 
@@ -30,7 +30,7 @@ public class ConstructResult extends Result
         }
 
         this.templates = templates;
-        this.subresult = new SelectResult(ResultType.SELECT, executeQuery);
+        this.subresult = new SelectResult(ResultType.SELECT, executeQuery, begin, timeout);
         this.limit = limit;
         this.offset = offset;
         this.rowData = new RdfNode[heads.size()];
@@ -76,7 +76,7 @@ public class ConstructResult extends Result
                     continue loop;
             }
 
-            
+
             if(count++ < offset)
                 continue loop;
 

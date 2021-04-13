@@ -1581,7 +1581,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             String code = query.optimize(request).translate();
 
-            try(Result result = new SelectResult(ResultType.SELECT, request.getStatement().executeQuery(code)))
+            try(Result result = new SelectResult(ResultType.SELECT, request.getStatement().executeQuery(code),
+                    request.getBegin(), request.getTimeout()))
             {
                 varIndexes = result.getVariableIndexes();
 

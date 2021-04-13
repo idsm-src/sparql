@@ -86,7 +86,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static final int timeout = 10 * 60 * 1000; // 10 minutes
+    private static final long timeout = 15 * 60 * 1000000000l; // 15 minutes
     private static int processLimit = 100000000;
 
     private Engine engine;
@@ -242,6 +242,7 @@ public class EndpointServlet extends HttpServlet
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                    break;
                             }
                             break;
 
@@ -262,6 +263,7 @@ public class EndpointServlet extends HttpServlet
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                    break;
                             }
                             break;
 
@@ -299,6 +301,7 @@ public class EndpointServlet extends HttpServlet
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                                    break;
                             }
                             break;
                     }
@@ -307,6 +310,9 @@ public class EndpointServlet extends HttpServlet
         }
         catch(TranslateExceptions e)
         {
+            res.reset();
+
+            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             res.setHeader("content-type", "text/plain");
             res.setCharacterEncoding("UTF-8");
 
@@ -314,9 +320,25 @@ public class EndpointServlet extends HttpServlet
 
             for(TranslateMessage message : e.getMessages())
                 out.println(message.getCategory().getText() + ": " + message.getRange() + " " + message.getMessage());
+        }
+        catch(SQLException e)
+        {
+            res.reset();
 
-            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            return;
+            if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
+            {
+                res.setStatus(HttpServletResponse.SC_REQUEST_TIMEOUT);
+                res.setHeader("content-type", "text/plain");
+                res.setCharacterEncoding("UTF-8");
+                res.getWriter().println("request timeout");
+            }
+            else
+            {
+                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                res.setHeader("content-type", "text/plain");
+                res.setCharacterEncoding("UTF-8");
+                res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+            }
         }
         catch(Throwable e)
         {
@@ -335,13 +357,12 @@ public class EndpointServlet extends HttpServlet
             System.err.println("EndpointServlet: log end");
 
 
-            res.setHeader("content-type", "text/plain");
-            res.setCharacterEncoding("UTF-8");
-
-            res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+            res.reset();
 
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            return;
+            res.setHeader("content-type", "text/plain");
+            res.setCharacterEncoding("UTF-8");
+            res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
         }
     }
 

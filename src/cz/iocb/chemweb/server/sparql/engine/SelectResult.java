@@ -42,6 +42,11 @@ public class SelectResult extends Result
     private final ResultSet rs;
     private final ResultSetMetaData metadata;
 
+    private final long begin;
+    private final long timeout;
+    private final int checkSize;
+    private int count = 0;
+
 
     static
     {
@@ -54,7 +59,7 @@ public class SelectResult extends Result
     }
 
 
-    public SelectResult(ResultType type, ResultSet rs) throws SQLException
+    public SelectResult(ResultType type, ResultSet rs, long begin, long timeout) throws SQLException
     {
         super(type);
 
@@ -79,12 +84,19 @@ public class SelectResult extends Result
         }
 
         this.rowData = new RdfNode[heads.size()];
+
+        this.begin = begin;
+        this.timeout = timeout;
+        this.checkSize = Math.max(100, rs.getFetchSize());
     }
 
 
     @Override
     public boolean next() throws SQLException
     {
+        if(count++ % checkSize == 0 && timeout > 0 && timeout < System.nanoTime() - begin)
+            throw new SQLException("fetch timeout");
+
         if(!rs.next())
             return false;
 
