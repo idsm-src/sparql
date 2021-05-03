@@ -51,9 +51,6 @@ public class SqlLeftJoin extends SqlIntercode
         if(right == SqlNoSolution.get())
             return left;
 
-        if(left == SqlEmptySolution.get())
-            return right;
-
         if(right == SqlEmptySolution.get())
             return left;
 
