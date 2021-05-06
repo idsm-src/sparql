@@ -24,10 +24,9 @@ import org.piwik.java.tracking.PiwikRequest;
 public class PiwikFilter implements Filter
 {
     private int siteId = -1;
-    private String hostUrl = null;
+    private String address = null;
     private String authToken = null;
     private String actionName = null;
-    String[] replaceUrl = null;
     private boolean rpc = false;
 
     private String cookieName = null;
@@ -52,45 +51,31 @@ public class PiwikFilter implements Filter
     @Override
     public void init(FilterConfig config) throws ServletException
     {
-        /* obtain the value of parameter siteId */
-        String siteIdString = config.getInitParameter("siteId");
+        /* obtain the value of init parameter piwikAddress */
+        address = config.getServletContext().getInitParameter("piwikAddress");
+
+        if(address == null || address.isEmpty())
+            throw new ServletException("Parameter piwikAddress is not specified");
+
+
+        /* obtain the value of init parameter authToken */
+        authToken = config.getServletContext().getInitParameter("piwikAuthToken");
+
+        if(authToken == null || authToken.isEmpty())
+            throw new ServletException("Parameter piwikAuthToken is not specified");
+
+
+        /* obtain the value of init parameter piwikSiteId */
+        String siteIdString = config.getServletContext().getInitParameter("piwikSiteId");
 
         if(siteIdString == null || siteIdString.isEmpty())
-            throw new ServletException("Site ID not set, please set init-param 'siteId' in web.xml");
+            throw new ServletException("Parameter piwikSiteId is not specified");
 
         siteId = Integer.parseInt(siteIdString);
 
 
-        /* obtain the value of parameter hostUrl */
-        hostUrl = config.getInitParameter("hostUrl");
-
-        if(hostUrl == null || hostUrl.isEmpty())
-            throw new ServletException("Host URL not set, please set init-param 'hostUrl' in web.xml");
-
-
         /* obtain the value of parameter filterName */
         actionName = config.getInitParameter("actionName");
-
-
-        /* obtain the value of parameter replaceUrl */
-        String replace = config.getInitParameter("replaceUrl");
-
-        if(replace != null)
-        {
-            if(replace.length() < 4)
-                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
-
-            if(replace.charAt(0) != replace.charAt(replace.length() - 1))
-                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
-
-            int delimiter = replace.indexOf(replace.charAt(0), 1);
-
-            if(delimiter == -1 || replace.indexOf(replace.charAt(0), delimiter + 1) != replace.length() - 1)
-                throw new ServletException("Invalid value of init-param 'replaceUrl' in web.xml");
-
-            replaceUrl = new String[] { replace.substring(1, delimiter),
-                    replace.substring(delimiter + 1, replace.length() - 1) };
-        }
 
 
         /* obtain the value of parameter rpc */
@@ -99,22 +84,9 @@ public class PiwikFilter implements Filter
         if(rpcString != null && !rpcString.isEmpty())
             rpc = Boolean.parseBoolean(rpcString);
 
-
-        /* obtain the value of parameter authToken */
-        String authTokenParameter = config.getInitParameter("authToken");
-
-        if(authTokenParameter == null || authTokenParameter.isEmpty())
-            throw new ServletException("AuthToken property not set, please set init-param 'authToken' in web.xml");
-
-        authToken = config.getServletContext().getInitParameter(authTokenParameter);
-
-        if(authToken == null || authToken.isEmpty())
-            throw new ServletException("AuthToken property " + authTokenParameter + " is not valid");
-
-
         cookieName = "_pk_id." + siteId + ".";
 
-        tracker = new PiwikAsyncTracker(hostUrl, 20000);
+        tracker = new PiwikAsyncTracker(address, 20000);
     }
 
 
@@ -156,9 +128,10 @@ public class PiwikFilter implements Filter
                 actionUrl = actionUrl + "/" + args[6];
             }
         }
-
-        if(replaceUrl != null)
-            actionUrl = actionUrl.replaceFirst(replaceUrl[0], replaceUrl[1]);
+        else
+        {
+            actionUrl = actionUrl.replaceFirst(((HttpServletRequest) request).getContextPath(), "");
+        }
 
         if(this.actionName != null)
             actionName = this.actionName;
@@ -248,9 +221,17 @@ public class PiwikFilter implements Filter
         }
         catch(Throwable e)
         {
-            System.err.println("PiwikFilter: log begin");
             e.printStackTrace();
-            System.err.println("PiwikFilter: log end");
+
+            try
+            {
+                tracker.close();
+            }
+            catch(Throwable error)
+            {
+            }
+
+            tracker = new PiwikAsyncTracker(address, 20000);
         }
     }
 }
