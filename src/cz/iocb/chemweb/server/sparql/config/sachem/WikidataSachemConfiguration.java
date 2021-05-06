@@ -50,6 +50,26 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
         prefixes.put("sio", "http://semanticscience.org/resource/");
 
         prefixes.put("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
+
+        prefixes.put("wikibase", "http://wikiba.se/ontology#");
+        prefixes.put("wd", "http://www.wikidata.org/entity/");
+        prefixes.put("wdt", "http://www.wikidata.org/prop/direct/");
+        prefixes.put("wdtn", "http://www.wikidata.org/prop/direct-normalized/");
+        prefixes.put("wds", "http://www.wikidata.org/entity/statement/");
+        prefixes.put("p", "http://www.wikidata.org/prop/");
+        prefixes.put("wdref", "http://www.wikidata.org/reference/");
+        prefixes.put("wdv", "http://www.wikidata.org/value/");
+        prefixes.put("ps", "http://www.wikidata.org/prop/statement/");
+        prefixes.put("psv", "http://www.wikidata.org/prop/statement/value/");
+        prefixes.put("psn", "http://www.wikidata.org/prop/statement/value-normalized/");
+        prefixes.put("pq", "http://www.wikidata.org/prop/qualifier/");
+        prefixes.put("pqv", "http://www.wikidata.org/prop/qualifier/value/");
+        prefixes.put("pqn", "http://www.wikidata.org/prop/qualifier/value-normalized/");
+        prefixes.put("pr", "http://www.wikidata.org/prop/reference/");
+        prefixes.put("prv", "http://www.wikidata.org/prop/reference/value/");
+        prefixes.put("prn", "http://www.wikidata.org/prop/reference/value-normalized/");
+        prefixes.put("wdno", "http://www.wikidata.org/prop/novalue/");
+        prefixes.put("wdata", "http://www.wikidata.org/wiki/Special:EntityData/");
     }
 
 
@@ -139,7 +159,7 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
             Table table = new Table("wikidata", "canonical_smiles");
             NodeMapping subject = createIriMapping("wikidata:entity", "id");
 
-            addQuadMapping(table, null, subject, createIriMapping("<http://www.wikidata.org/prop/direct/P233>"),
+            addQuadMapping(table, null, subject, createIriMapping("wdt:P233"),
                     createLiteralMapping(xsdString, "smiles"));
         }
 
@@ -147,7 +167,7 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
             Table table = new Table("wikidata", "isomeric_smiles");
             NodeMapping subject = createIriMapping("wikidata:entity", "id");
 
-            addQuadMapping(table, null, subject, createIriMapping("<http://www.wikidata.org/prop/direct/P2017>"),
+            addQuadMapping(table, null, subject, createIriMapping("wdt:P2017"),
                     createLiteralMapping(xsdString, "smiles"));
         }
     }
