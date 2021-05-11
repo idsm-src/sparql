@@ -17,7 +17,7 @@
     <g:center>
       <g:SplitLayoutPanel addStyleNames="{style.main}" ui:field="mainSplitLayoutPanel">
 
-        <g:west size="400">
+        <g:west size="500">
           <g:TabLayoutPanel ui:field="queryTabPanel" barUnit="PX" barHeight="32">
             <g:tab>
               <g:header size="7">
