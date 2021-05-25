@@ -44,6 +44,7 @@ import cz.iocb.chemweb.server.sparql.engine.SelectResult;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
+import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
@@ -1650,7 +1651,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     else if(term instanceof TypedLiteral)
                         node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
                     else if(term instanceof ReferenceNode)
-                        node = new BlankNode(term.getValue());
+                        node = new BlankNodeLiteral(term.getValue());
                 }
 
                 if(node != null)
@@ -1776,7 +1777,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         if(qName.equalsIgnoreCase("uri"))
                             node = new IRI(data.toString());
                         else if(qName.equalsIgnoreCase("bnode"))
-                            node = new BlankNode(data.toString());
+                            node = new BlankNodeLiteral(data.toString());
                         else if(!qName.equalsIgnoreCase("literal"))
                             return;
                         else if(lang != null)
@@ -1897,7 +1898,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             return resourceClass;
         }
-        else if(node instanceof BlankNode)
+        else if(node instanceof BlankNodeLiteral)
         {
             return blankNodeClass;
         }
