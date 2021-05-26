@@ -2034,7 +2034,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 StringBuilder builder = new StringBuilder();
 
                 for(int i = 1; i < arguments.size(); i++)
-                    builder.append(isBoxed() ? "concat_rdfbox_rdfbox(" : "concat_string_string(");
+                    builder.append(isBoxed() ? "sparql.concat_rdfbox_rdfbox(" : "sparql.concat_string_string(");
 
                 for(int i = 0; i < arguments.size(); i++)
                 {
