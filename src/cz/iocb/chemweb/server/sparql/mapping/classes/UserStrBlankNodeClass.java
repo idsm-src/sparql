@@ -25,7 +25,7 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
 
     public UserStrBlankNodeClass(int segment)
     {
-        super("sparql.str_blanknode_" + Integer.toHexString(counter), Arrays.asList("varchar"));
+        super("sparql.str_blanknode_" + Integer.toHexString(segment), Arrays.asList("varchar"));
         this.segment = segment;
 
         if(segment >= 0)

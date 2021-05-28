@@ -25,7 +25,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
 
     public UserIntBlankNodeClass(int segment)
     {
-        super("sparql.int_blanknode_" + Integer.toHexString(counter), Arrays.asList("int4"));
+        super("sparql.int_blanknode_" + Integer.toHexString(segment), Arrays.asList("int4"));
         this.segment = segment;
 
         if(segment >= 0)
