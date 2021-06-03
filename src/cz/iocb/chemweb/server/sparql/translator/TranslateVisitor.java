@@ -80,6 +80,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.VarOrIri;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BuiltInCallExpression;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.ExistsExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Expression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
@@ -895,21 +896,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         new ElementVisitor<Void>()
         {
+            private boolean inAggregateFunction = false;
+
             @Override
             public Void visit(BuiltInCallExpression func)
             {
-                if(!func.isAggregateFunction() || func.getArguments().isEmpty())
-                    return null;
-
-                Expression arg = func.getArguments().get(0);
-
-                if(!(arg instanceof Variable))
-                    return null;
-
-                String name = ((Variable) arg).getName();
-
-                if(groupByVars.contains(name))
-                    messages.add(new TranslateMessage(MessageType.invalidVariableInAggregate, arg.getRange(), name));
+                boolean state = inAggregateFunction;
+                inAggregateFunction |= func.isAggregateFunction();
+                super.visit(func);
+                inAggregateFunction = state;
 
                 return null;
             }
@@ -917,21 +912,20 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             @Override
             public Void visit(Variable var)
             {
-                if(!groupByVars.contains(var.getName()))
-                    messages.add(new TranslateMessage(MessageType.invalidVariableOutsideAggregate, var.getRange(),
-                            var.getName()));
+                String name = var.getName();
+
+                if(!inAggregateFunction && !groupByVars.contains(name))
+                    messages.add(
+                            new TranslateMessage(MessageType.invalidVariableOutsideAggregate, var.getRange(), name));
+
+                if(inAggregateFunction && groupByVars.contains(name))
+                    messages.add(new TranslateMessage(MessageType.invalidVariableInAggregate, var.getRange(), name));
 
                 return null;
             }
 
             @Override
-            public Void visit(GroupGraph expr)
-            {
-                return null;
-            }
-
-            @Override
-            public Void visit(Select expr)
+            public Void visit(ExistsExpression expr)
             {
                 return null;
             }
