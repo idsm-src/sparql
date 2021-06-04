@@ -118,7 +118,7 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException
     {
-        setCrossOriginResourceSharingHeaders(res);
+        setBasicHttpHeaders(req, res);
         super.doOptions(req, res);
     }
 
@@ -126,7 +126,7 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
-        setCrossOriginResourceSharingHeaders(res);
+        setBasicHttpHeaders(req, res);
 
         String query = req.getParameter("query");
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
@@ -142,7 +142,7 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
-        setCrossOriginResourceSharingHeaders(res);
+        setBasicHttpHeaders(req, res);
 
         String query = null;
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
@@ -154,6 +154,21 @@ public class EndpointServlet extends HttpServlet
             query = IOUtils.toString(req.getInputStream());
 
         process(req, res, query, defaultGraphs, namedGraphs);
+    }
+
+
+    private static void setBasicHttpHeaders(HttpServletRequest req, HttpServletResponse res)
+    {
+        res.setCharacterEncoding("UTF-8");
+
+        res.setHeader("Access-Control-Allow-Headers",
+                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+
+        String filename = req.getParameter("filename");
+
+        if(filename != null)
+            res.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
     }
 
 
@@ -188,10 +203,6 @@ public class EndpointServlet extends HttpServlet
 
         // IOCB SPARQL protocol extension
         String warnings = req.getParameter("warnings");
-        String filename = req.getParameter("filename");
-
-        if(filename != null)
-            res.setHeader("content-disposition", "attachment; filename=\"" + filename + "\"");
 
 
         int limit = -1;
@@ -218,8 +229,7 @@ public class EndpointServlet extends HttpServlet
                 try(Result result = request.execute(query, dataSets, 0, limit, timeout))
                 {
                     OutputType format = detectOutputType(req, result.getResultType());
-                    res.setHeader("content-type", format.getMime());
-                    res.setCharacterEncoding("UTF-8");
+                    res.setContentType(format.getMime());
 
                     switch(result.getResultType())
                     {
@@ -310,11 +320,10 @@ public class EndpointServlet extends HttpServlet
         }
         catch(TranslateExceptions e)
         {
-            res.reset();
+            res.resetBuffer();
 
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            res.setHeader("content-type", "text/plain");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType("text/plain");
 
             PrintWriter out = res.getWriter();
 
@@ -323,20 +332,18 @@ public class EndpointServlet extends HttpServlet
         }
         catch(SQLException e)
         {
-            res.reset();
+            res.resetBuffer();
 
             if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
             {
                 res.setStatus(HttpServletResponse.SC_REQUEST_TIMEOUT);
-                res.setHeader("content-type", "text/plain");
-                res.setCharacterEncoding("UTF-8");
+                res.setContentType("text/plain");
                 res.getWriter().println("request timeout");
             }
             else
             {
                 res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                res.setHeader("content-type", "text/plain");
-                res.setCharacterEncoding("UTF-8");
+                res.setContentType("text/plain");
                 res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
             }
         }
@@ -356,12 +363,10 @@ public class EndpointServlet extends HttpServlet
             e.printStackTrace(System.err);
             System.err.println("EndpointServlet: log end");
 
-
-            res.reset();
+            res.resetBuffer();
 
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            res.setHeader("content-type", "text/plain");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType("text/plain");
             res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
         }
     }
@@ -369,8 +374,7 @@ public class EndpointServlet extends HttpServlet
 
     private void processHtmlRequest(HttpServletResponse res) throws IOException
     {
-        res.setCharacterEncoding("UTF-8");
-        res.setHeader("content-type", "text/html");
+        res.setContentType("text/html");
 
         // @formatter:off
         res.getWriter().append("<!DOCTYPE html>\n" +
@@ -525,14 +529,6 @@ public class EndpointServlet extends HttpServlet
         }
 
         return type;
-    }
-
-
-    private static void setCrossOriginResourceSharingHeaders(HttpServletResponse res)
-    {
-        res.setHeader("access-control-allow-headers",
-                "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
-        res.setHeader("access-control-allow-origin", "*");
     }
 
 
