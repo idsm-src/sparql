@@ -69,7 +69,7 @@ public class Ontology
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("dataset:ontology");
 
@@ -79,6 +79,8 @@ public class Ontology
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Class"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/Class.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
@@ -91,6 +93,8 @@ public class Ontology
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("rdf:Property"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/Property.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
@@ -103,6 +107,8 @@ public class Ontology
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:NamedIndividual"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/NamedIndividual.vm"));
         }

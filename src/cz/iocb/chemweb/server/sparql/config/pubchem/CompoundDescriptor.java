@@ -60,7 +60,7 @@ public class CompoundDescriptor
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("descriptor:compound");
         ConstantIriMapping type = config.createIriMapping("rdf:type");

@@ -20,7 +20,7 @@ public class Substance
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("pubchem:substance");
 

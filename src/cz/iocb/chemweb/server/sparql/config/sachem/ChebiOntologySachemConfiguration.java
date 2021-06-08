@@ -1,62 +1,60 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Arrays;
 import javax.sql.DataSource;
+import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 
 
 
-public class ChebiOntologySachemConfiguration extends SachemConfiguration
+public class ChebiOntologySachemConfiguration extends SparqlDatabaseConfiguration
 {
     public ChebiOntologySachemConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
             throws SQLException
     {
-        super(service, connectionPool, schema, "chebi", new Table("molecules", "chebi"),
-                "http://purl.obolibrary.org/obo/CHEBI_",
-                new GeneralUserIriClass("ontology:resource", "ontology", "ontology_resource",
-                        Arrays.asList("smallint", "integer"), getOntologyPattern(connectionPool),
-                        GeneralUserIriClass.SqlCheck.IF_NOT_MATCH),
-                new IntegerUserIriClass("chebi:molfile", "integer", "http://purl.obolibrary.org/obo/CHEBI_",
-                        "_Molfile"),
-                getColumns(new String[] { Ontology.unitCHEBI, "compound" }),
+        super(service, connectionPool, schema);
+
+        addPrefixes();
+        addResourceClasses();
+        addQuadMappings();
+        addProcedures();
+    }
+
+
+    private void addPrefixes()
+    {
+        Common.addPrefixes(this);
+        Sachem.addPrefixes(this);
+        MolFiles.addPrefixes(this);
+
+        addPrefix("obo", "http://purl.obolibrary.org/obo/");
+    }
+
+
+    private void addResourceClasses() throws SQLException
+    {
+        Sachem.addResourceClasses(this);
+        Ontology.addResourceClasses(this);
+
+        addIriClass(new IntegerUserIriClass("chebi:molfile", "integer", "http://purl.obolibrary.org/obo/CHEBI_",
+                "_Molfile"));
+    }
+
+
+    private void addQuadMappings()
+    {
+        MolFiles.addQuadMappings(this, "ontology:resource", "chebi:molfile", new Table("molecules", "chebi"),
                 getColumns(new String[] { Ontology.unitCHEBI, "id" }));
     }
 
 
-    private static String getOntologyPattern(DataSource connectionPool) throws SQLException
+    private void addProcedures()
     {
-        StringBuilder builder = new StringBuilder();
-
-        try(Connection connection = connectionPool.getConnection())
-        {
-            try(Statement statement = connection.createStatement())
-            {
-                try(ResultSet result = statement
-                        .executeQuery("select pattern from ontology.resource_categories__reftable"))
-                {
-                    boolean hasResult = false;
-
-                    while(result.next())
-                    {
-                        if(hasResult)
-                            builder.append("|");
-
-                        hasResult = true;
-
-                        builder.append("(" + result.getString(1) + ")");
-                    }
-                }
-            }
-        }
-
-        return builder.toString();
+        Sachem.addProcedures(this, "chebi", "ontology:resource",
+                getColumns(new String[] { Ontology.unitCHEBI, "compound" }));
     }
 }

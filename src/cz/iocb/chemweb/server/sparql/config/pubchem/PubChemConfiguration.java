@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.sql.SQLException;
-import java.util.HashMap;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chebi.Chebi;
@@ -12,10 +11,10 @@ import cz.iocb.chemweb.server.sparql.config.chembl.Molecule;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.mesh.Mesh;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
+import cz.iocb.chemweb.server.sparql.config.sachem.Sachem;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
@@ -36,9 +35,72 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
     {
         super(service, connectionPool, schema);
 
-        addPrefixes(this);
+        addPrefixes();
+        addResourceClasses();
+        addQuadMappings();
+        addFunctions();
+        addProcedures();
+    }
 
-        addResourceClasses(this);
+
+    private void addPrefixes()
+    {
+        Common.addPrefixes(this);
+
+        addPrefix("compound", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/");
+        addPrefix("substance", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/");
+        addPrefix("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
+        addPrefix("synonym", "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/");
+        addPrefix("inchikey", "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/");
+        addPrefix("bioassay", "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/");
+        addPrefix("measuregroup", "http://rdf.ncbi.nlm.nih.gov/pubchem/measuregroup/");
+        addPrefix("endpoint", "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/");
+        addPrefix("reference", "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/");
+        addPrefix("protein", "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/");
+        addPrefix("conserveddomain", "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/");
+        addPrefix("gene", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/");
+        addPrefix("pathway", "http://rdf.ncbi.nlm.nih.gov/pubchem/pathway/");
+        addPrefix("source", "http://rdf.ncbi.nlm.nih.gov/pubchem/source/");
+        addPrefix("concept", "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/");
+        addPrefix("vocab", "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#");
+        addPrefix("obo", "http://purl.obolibrary.org/obo/");
+        addPrefix("sio", "http://semanticscience.org/resource/");
+        addPrefix("skos", "http://www.w3.org/2004/02/skos/core#");
+        addPrefix("bao", "http://www.bioassayontology.org/bao#");
+        addPrefix("bp", "http://www.biopax.org/release/biopax-level3.owl#");
+        addPrefix("ndfrt", "http://evs.nci.nih.gov/ftp1/NDF-RT/NDF-RT.owl#");
+        addPrefix("ncit", "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#");
+        addPrefix("wikidata", "http://www.wikidata.org/entity/");
+        addPrefix("ops", "http://www.openphacts.org/units/");
+        addPrefix("cito", "http://purl.org/spar/cito/");
+        addPrefix("fabio", "http://purl.org/spar/fabio/");
+        addPrefix("uniprot", "http://purl.uniprot.org/uniprot/");
+        addPrefix("up", "http://purl.uniprot.org/core/");
+        addPrefix("pdbo40", "http://rdf.wwpdb.org/schema/pdbx-v40.owl#");
+        addPrefix("pdbo", "https://rdf.wwpdb.org/schema/pdbx-v50.owl#");
+        addPrefix("pdbr", "http://rdf.wwpdb.org/pdb/");
+        addPrefix("taxonomy", "http://identifiers.org/taxonomy/");
+        addPrefix("reactome", "http://identifiers.org/reactome/");
+        //addPrefix("chembl", "http://rdf.ebi.ac.uk/resource/chembl/molecule/");
+        addPrefix("chemblchembl", "http://linkedchemistry.info/chembl/chemblid/");
+        addPrefix("foaf", "http://xmlns.com/foaf/0.1/");
+        addPrefix("void", "http://rdfs.org/ns/void#");
+        addPrefix("dcterms", "http://purl.org/dc/terms/");
+        addPrefix("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/");
+        addPrefix("cheminf", "http://semanticscience.org/resource/");
+        addPrefix("mesh", "http://id.nlm.nih.gov/mesh/");
+
+        // extension
+        addPrefix("pubchem", "http://rdf.ncbi.nlm.nih.gov/pubchem/");
+        addPrefix("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
+        addPrefix("template", "http://bioinfo.iocb.cz/0.9/template#");
+        addPrefix("meshv", "http://id.nlm.nih.gov/mesh/vocab#");
+        addPrefix("fulltext", "http://bioinfo.uochb.cas.cz/rdf/v1.0/fulltext#");
+    }
+
+
+    private void addResourceClasses() throws SQLException
+    {
         Common.addResourceClasses(this);
         Chebi.addResourceClasses(this);
         Molecule.addResourceClasses(this);
@@ -47,208 +109,66 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Assay.addResourceClasses(this);
         Mechanism.addResourceClasses(this);
 
-        addQuadMapping(this);
+        Bioassay.addResourceClasses(this);
+        Compound.addResourceClasses(this);
+        Concept.addResourceClasses(this);
+        ConservedDomain.addResourceClasses(this);
+        CompoundDescriptor.addResourceClasses(this);
+        SubstanceDescriptor.addResourceClasses(this);
+        Endpoint.addResourceClasses(this);
+        Gene.addResourceClasses(this);
+        InchiKey.addResourceClasses(this);
+        Measuregroup.addResourceClasses(this);
+        Pathway.addResourceClasses(this);
+        Protein.addResourceClasses(this);
+        Reference.addResourceClasses(this);
+        Source.addResourceClasses(this);
+        Substance.addResourceClasses(this);
+        Synonym.addResourceClasses(this);
 
-        addProcedures(this);
+        Sachem.addResourceClasses(this);
+    }
 
+
+    private void addQuadMappings()
+    {
+        Bioassay.addQuadMappings(this);
+        Compound.addQuadMappings(this);
+        Concept.addQuadMappings(this);
+        ConservedDomain.addQuadMappings(this);
+        CompoundDescriptor.addQuadMappings(this);
+        SubstanceDescriptor.addQuadMappings(this);
+        Endpoint.addQuadMappings(this);
+        Gene.addQuadMappings(this);
+        InchiKey.addQuadMappings(this);
+        Measuregroup.addQuadMappings(this);
+        Pathway.addQuadMappings(this);
+        Protein.addQuadMappings(this);
+        Reference.addQuadMappings(this);
+        Source.addQuadMappings(this);
+        Substance.addQuadMappings(this);
+        Synonym.addQuadMappings(this);
+    }
+
+
+    private void addFunctions()
+    {
         Common.addFunctions(this);
     }
 
 
-    public static void addPrefixes(SparqlDatabaseConfiguration config)
+    private void addProcedures()
     {
-        config.addPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-        config.addPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-        config.addPrefix("owl", "http://www.w3.org/2002/07/owl#");
-        config.addPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
-
-        config.addPrefix("compound", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/");
-        config.addPrefix("substance", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/");
-        config.addPrefix("descriptor", "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/");
-        config.addPrefix("synonym", "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/");
-        config.addPrefix("inchikey", "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/");
-        config.addPrefix("bioassay", "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/");
-        config.addPrefix("measuregroup", "http://rdf.ncbi.nlm.nih.gov/pubchem/measuregroup/");
-        config.addPrefix("endpoint", "http://rdf.ncbi.nlm.nih.gov/pubchem/endpoint/");
-        config.addPrefix("reference", "http://rdf.ncbi.nlm.nih.gov/pubchem/reference/");
-        config.addPrefix("protein", "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/");
-        config.addPrefix("conserveddomain", "http://rdf.ncbi.nlm.nih.gov/pubchem/conserveddomain/");
-        config.addPrefix("gene", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/");
-        config.addPrefix("pathway", "http://rdf.ncbi.nlm.nih.gov/pubchem/pathway/");
-        config.addPrefix("source", "http://rdf.ncbi.nlm.nih.gov/pubchem/source/");
-        config.addPrefix("concept", "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/");
-        config.addPrefix("vocab", "http://rdf.ncbi.nlm.nih.gov/pubchem/vocabulary#");
-        config.addPrefix("obo", "http://purl.obolibrary.org/obo/");
-        config.addPrefix("sio", "http://semanticscience.org/resource/");
-        config.addPrefix("skos", "http://www.w3.org/2004/02/skos/core#");
-        config.addPrefix("bao", "http://www.bioassayontology.org/bao#");
-        config.addPrefix("bp", "http://www.biopax.org/release/biopax-level3.owl#");
-        config.addPrefix("ndfrt", "http://evs.nci.nih.gov/ftp1/NDF-RT/NDF-RT.owl#");
-        config.addPrefix("ncit", "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#");
-        config.addPrefix("wikidata", "http://www.wikidata.org/entity/");
-        config.addPrefix("ops", "http://www.openphacts.org/units/");
-        config.addPrefix("cito", "http://purl.org/spar/cito/");
-        config.addPrefix("fabio", "http://purl.org/spar/fabio/");
-        config.addPrefix("uniprot", "http://purl.uniprot.org/uniprot/");
-        config.addPrefix("up", "http://purl.uniprot.org/core/");
-        config.addPrefix("pdbo40", "http://rdf.wwpdb.org/schema/pdbx-v40.owl#");
-        config.addPrefix("pdbo", "https://rdf.wwpdb.org/schema/pdbx-v50.owl#");
-        config.addPrefix("pdbr", "http://rdf.wwpdb.org/pdb/");
-        config.addPrefix("taxonomy", "http://identifiers.org/taxonomy/");
-        config.addPrefix("reactome", "http://identifiers.org/reactome/");
-        //config.addPrefix("chembl", "http://rdf.ebi.ac.uk/resource/chembl/molecule/");
-        config.addPrefix("chemblchembl", "http://linkedchemistry.info/chembl/chemblid/");
-        config.addPrefix("foaf", "http://xmlns.com/foaf/0.1/");
-        config.addPrefix("void", "http://rdfs.org/ns/void#");
-        config.addPrefix("dcterms", "http://purl.org/dc/terms/");
-        config.addPrefix("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/");
-        config.addPrefix("cheminf", "http://semanticscience.org/resource/");
-        config.addPrefix("mesh", "http://id.nlm.nih.gov/mesh/");
-
-        // extension
-        config.addPrefix("pubchem", "http://rdf.ncbi.nlm.nih.gov/pubchem/");
-        config.addPrefix("sachem", "http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#");
-        config.addPrefix("template", "http://bioinfo.iocb.cz/0.9/template#");
-        config.addPrefix("meshv", "http://id.nlm.nih.gov/mesh/vocab#");
-        config.addPrefix("fulltext", "http://bioinfo.uochb.cas.cz/rdf/v1.0/fulltext#");
-    }
-
-
-    @SuppressWarnings("serial")
-    public static void addResourceClasses(SparqlDatabaseConfiguration config) throws SQLException
-    {
-        Bioassay.addResourceClasses(config);
-        Compound.addResourceClasses(config);
-        Concept.addResourceClasses(config);
-        ConservedDomain.addResourceClasses(config);
-        CompoundDescriptor.addResourceClasses(config);
-        SubstanceDescriptor.addResourceClasses(config);
-        Endpoint.addResourceClasses(config);
-        Gene.addResourceClasses(config);
-        InchiKey.addResourceClasses(config);
-        Measuregroup.addResourceClasses(config);
-        Pathway.addResourceClasses(config);
-        Protein.addResourceClasses(config);
-        Reference.addResourceClasses(config);
-        Source.addResourceClasses(config);
-        Substance.addResourceClasses(config);
-        Synonym.addResourceClasses(config);
-
-        String sachem = config.getPrefixes().get("sachem");
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:query_format", "sachem.query_format", new HashMap<String, String>()
-                {
-                    {
-                        put("UNSPECIFIED", sachem + "UnspecifiedFormat");
-                        put("SMILES", sachem + "SMILES");
-                        put("MOLFILE", sachem + "MolFile");
-                        put("RGROUP", sachem + "RGroup");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:search_mode", "sachem.search_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("SUBSTRUCTURE", sachem + "substructureSearch");
-                        put("EXACT", sachem + "exactSearch");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:charge_mode", "sachem.charge_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("IGNORE", sachem + "ignoreCharges");
-                        put("DEFAULT_AS_UNCHARGED", sachem + "defaultChargeAsZero");
-                        put("DEFAULT_AS_ANY", sachem + "defaultChargeAsAny");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:isotope_mode", "sachem.isotope_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("IGNORE", sachem + "ignoreIsotopes");
-                        put("DEFAULT_AS_STANDARD", sachem + "defaultIsotopeAsStandard");
-                        put("DEFAULT_AS_ANY", sachem + "defaultIsotopeAsAny");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:radical_mode", "sachem.radical_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("IGNORE", sachem + "ignoreSpinMultiplicity");
-                        put("DEFAULT_AS_STANDARD", sachem + "defaultSpinMultiplicityAsZero");
-                        put("DEFAULT_AS_ANY", sachem + "defaultSpinMultiplicityAsAny");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:stereo_mode", "sachem.stereo_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("IGNORE", sachem + "ignoreStereo");
-                        put("STRICT", sachem + "strictStereo");
-                    }
-                }));
-
-        config.addIriClass(new EnumUserIriClass("pubchem:aromaticity_mode", "sachem.aromaticity_mode",
-                new HashMap<String, String>()
-                {
-                    {
-                        put("PRESERVE", sachem + "aromaticityFromQuery");
-                        put("DETECT", sachem + "aromaticityDetect");
-                        put("AUTO", sachem + "aromaticityDetectIfMissing");
-                    }
-                }));
-
-        config.addIriClass(
-                new EnumUserIriClass("pubchem:tautomer_mode", "sachem.tautomer_mode", new HashMap<String, String>()
-                {
-                    {
-                        put("IGNORE", sachem + "ignoreTautomers");
-                        put("INCHI", sachem + "inchiTautomers");
-                    }
-                }));
-    }
-
-
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
-    {
-        Bioassay.addQuadMapping(config);
-        Compound.addQuadMapping(config);
-        Concept.addQuadMapping(config);
-        ConservedDomain.addQuadMapping(config);
-        CompoundDescriptor.addQuadMapping(config);
-        SubstanceDescriptor.addQuadMapping(config);
-        Endpoint.addQuadMapping(config);
-        Gene.addQuadMapping(config);
-        InchiKey.addQuadMapping(config);
-        Measuregroup.addQuadMapping(config);
-        Pathway.addQuadMapping(config);
-        Protein.addQuadMapping(config);
-        Reference.addQuadMapping(config);
-        Source.addQuadMapping(config);
-        Substance.addQuadMapping(config);
-        Synonym.addQuadMapping(config);
-    }
-
-
-    public static void addProcedures(SparqlDatabaseConfiguration config)
-    {
-        String fulltext = config.getPrefixes().get("fulltext");
-        UserIriClass compound = config.getIriClass("pubchem:compound");
+        String fulltext = getPrefixes().get("fulltext");
+        UserIriClass compound = getIriClass("pubchem:compound");
 
 
         /* fulltext:bioassaySearch */
         ProcedureDefinition bioassay = new ProcedureDefinition(fulltext + "bioassaySearch",
                 new Function("pubchem", "bioassay"));
         bioassay.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
-        bioassay.addResult(new ResultDefinition(config.getIriClass("pubchem:bioassay")));
-        config.addProcedure(bioassay);
+        bioassay.addResult(new ResultDefinition(getIriClass("pubchem:bioassay")));
+        addProcedure(bioassay);
 
 
         /* fulltext:compoundSearch */
@@ -257,6 +177,6 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         compoundSearch.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
         compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
-        config.addProcedure(compoundSearch);
+        addProcedure(compoundSearch);
     }
 }

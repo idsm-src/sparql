@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.chebi;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 
@@ -17,41 +18,36 @@ public class ChebiConfiguration extends SparqlDatabaseConfiguration
     {
         super(service, connectionPool, schema);
 
-        addPrefixes(this);
-
-        Ontology.addResourceClasses(this);
-        addResourceClasses(this);
-
-        addQuadMapping(this);
+        addPrefixes();
+        addResourceClasses();
+        addQuadMappings();
     }
 
 
-    public static void addPrefixes(SparqlDatabaseConfiguration config)
+    private void addPrefixes()
     {
-        config.addPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-        config.addPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-        config.addPrefix("owl", "http://www.w3.org/2002/07/owl#");
-        config.addPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
-        config.addPrefix("template", "http://bioinfo.iocb.cz/0.9/template#");
+        Common.addPrefixes(this);
 
-        config.addPrefix("ebi", "http://ebi.rdf.ac.uk/dataset/");
-        config.addPrefix("obo", "http://purl.obolibrary.org/obo/");
-        config.addPrefix("chebi", "http://purl.obolibrary.org/obo/chebi/");
-        config.addPrefix("oboInOwl", "http://www.geneontology.org/formats/oboInOwl#");
+        addPrefix("ebi", "http://ebi.rdf.ac.uk/dataset/");
+        addPrefix("obo", "http://purl.obolibrary.org/obo/");
+        addPrefix("chebi", "http://purl.obolibrary.org/obo/chebi/");
+        addPrefix("oboInOwl", "http://www.geneontology.org/formats/oboInOwl#");
 
         // extension
-        config.addPrefix("sio", "http://semanticscience.org/resource/");
+        addPrefix("sio", "http://semanticscience.org/resource/");
     }
 
 
-    public static void addResourceClasses(SparqlDatabaseConfiguration config)
+    private void addResourceClasses() throws SQLException
     {
-        Chebi.addResourceClasses(config);
+        Ontology.addResourceClasses(this);
+
+        Chebi.addResourceClasses(this);
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    private void addQuadMappings()
     {
-        Chebi.addQuadMapping(config);
+        Chebi.addQuadMappings(this);
     }
 }

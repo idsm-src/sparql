@@ -24,7 +24,7 @@ public class Schema
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         addSourceQuadMapping(config);
         addDatabaseQuadMapping(config);

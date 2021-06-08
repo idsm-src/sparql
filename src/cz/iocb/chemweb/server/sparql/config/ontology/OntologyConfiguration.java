@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.ontology;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.config.common.Common;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 
@@ -19,34 +20,28 @@ public class OntologyConfiguration extends SparqlDatabaseConfiguration
     {
         super(service, connectionPool, schema);
 
-        addPrefixes(this);
-
-        addResourceClasses(this);
-
-        addQuadMapping(this);
+        addPrefixes();
+        addResourceClasses();
+        addQuadMappings();
     }
 
 
-    public static void addPrefixes(SparqlDatabaseConfiguration config)
+    private void addPrefixes()
     {
-        config.addPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-        config.addPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-        config.addPrefix("owl", "http://www.w3.org/2002/07/owl#");
-        config.addPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
-        config.addPrefix("template", "http://bioinfo.iocb.cz/0.9/template#");
+        Common.addPrefixes(this);
 
-        config.addPrefix("dataset", "http://bioinfo.iocb.cz/dataset/");
+        addPrefix("dataset", "http://bioinfo.iocb.cz/dataset/");
     }
 
 
-    public static void addResourceClasses(SparqlDatabaseConfiguration config) throws SQLException
+    private void addResourceClasses() throws SQLException
     {
-        Ontology.addResourceClasses(config);
+        Ontology.addResourceClasses(this);
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    private void addQuadMappings()
     {
-        Ontology.addQuadMapping(config);
+        Ontology.addQuadMappings(this);
     }
 }

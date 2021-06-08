@@ -21,7 +21,7 @@ public class Activity
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 

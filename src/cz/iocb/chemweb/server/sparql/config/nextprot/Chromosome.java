@@ -43,7 +43,7 @@ public class Chromosome
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         addIsomorfQuadMapping(config);
         addAnnotationQuadMapping(config);

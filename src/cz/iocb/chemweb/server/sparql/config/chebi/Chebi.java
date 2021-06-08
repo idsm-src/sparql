@@ -23,7 +23,7 @@ public class Chebi
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("ebi:chebi");
 
@@ -33,6 +33,8 @@ public class Chebi
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Class"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("base/Class.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),

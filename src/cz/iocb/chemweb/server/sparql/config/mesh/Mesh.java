@@ -24,7 +24,7 @@ public class Mesh
     }
 
 
-    public static void addQuadMapping(SparqlDatabaseConfiguration config)
+    public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("mesh:heading");
 
@@ -34,6 +34,8 @@ public class Mesh
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology:resource", Ontology.unitUncategorized, "type_id"));
+
+            // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("mesh/Mesh.vm"));
         }
