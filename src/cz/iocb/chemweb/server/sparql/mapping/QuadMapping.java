@@ -114,4 +114,31 @@ public abstract class QuadMapping
     {
         return object;
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(obj == null || getClass() != obj.getClass())
+            return false;
+
+        QuadMapping mapping = (QuadMapping) obj;
+
+        if(graph == null ? mapping.graph != null : !graph.equals(mapping.graph))
+            return false;
+
+        if(!predicate.equals(mapping.predicate))
+            return false;
+
+        if(!subject.equals(mapping.subject))
+            return false;
+
+        if(!object.equals(mapping.object))
+            return false;
+
+        return true;
+    }
 }

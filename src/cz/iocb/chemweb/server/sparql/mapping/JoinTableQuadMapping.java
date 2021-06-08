@@ -224,4 +224,44 @@ public class JoinTableQuadMapping extends QuadMapping
     {
         return objectJoinMapping;
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(!super.equals(obj))
+            return false;
+
+        JoinTableQuadMapping mapping = (JoinTableQuadMapping) obj;
+
+        if(!subjectTable.equals(mapping.subjectTable))
+            return false;
+
+        if(!objectTable.equals(mapping.objectTable))
+            return false;
+
+        if(!subjectJoinColumns.equals(mapping.subjectJoinColumns))
+            return false;
+
+        if(!objectJoinColumns.equals(mapping.objectJoinColumns))
+            return false;
+
+        if(!subjectJoinMapping.equals(mapping.subjectJoinMapping))
+            return false;
+
+        if(!objectJoinMapping.equals(mapping.objectJoinMapping))
+            return false;
+
+        if(subjectCondition == null ? mapping.subjectCondition != null :
+                !subjectCondition.equals(mapping.subjectCondition))
+            return false;
+
+        if(objectCondition == null ? mapping.objectCondition != null : !objectCondition.equals(mapping.objectCondition))
+            return false;
+
+        return true;
+    }
 }

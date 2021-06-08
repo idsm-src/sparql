@@ -391,7 +391,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                         .noneMatch(d -> d.getSourceSelector().equals(graphIri)))
                     continue;
             }
-            else if(request.getConfiguration().isStrictDefaultGraph() && graph == null && mapping.getGraph() != null)
+            else if(graph == null && mapping.getGraph() != null)
             {
                 continue;
             }

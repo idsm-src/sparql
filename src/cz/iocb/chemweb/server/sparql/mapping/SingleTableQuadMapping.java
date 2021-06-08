@@ -37,4 +37,25 @@ public class SingleTableQuadMapping extends QuadMapping
     {
         return condition;
     }
+
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if(this == obj)
+            return true;
+
+        if(!super.equals(obj))
+            return false;
+
+        SingleTableQuadMapping mapping = (SingleTableQuadMapping) obj;
+
+        if(table == null ? mapping.table != null : !table.equals(mapping.table))
+            return false;
+
+        if(condition == null ? mapping.condition != null : !condition.equals(mapping.condition))
+            return false;
+
+        return true;
+    }
 }

@@ -60,8 +60,6 @@ public abstract class SparqlDatabaseConfiguration
     protected HashMap<IRI, HashMap<String, ProcedureDefinition>> procedures = new HashMap<IRI, HashMap<String, ProcedureDefinition>>();
     protected HashMap<IRI, HashMap<String, FunctionDefinition>> functions = new HashMap<IRI, HashMap<String, FunctionDefinition>>();
 
-    protected boolean strictDefaultGraph = false;
-
 
     protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
             throws SQLException
@@ -118,6 +116,12 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public NodeMapping createIriMapping(String iriClass, List<Column> columns)
+    {
+        return new ParametrisedIriMapping(getIriClass(iriClass), columns);
+    }
+
+
     public NodeMapping createIriMapping(String iriClassName, String... columns)
     {
         return new ParametrisedIriMapping(getIriClass(iriClassName), getColumns(columns));
@@ -159,8 +163,6 @@ public abstract class SparqlDatabaseConfiguration
                 iriClass = (UserIriClass) c;
             }
         }
-
-        assert iriClass != null;
 
         if(iriClass == null)
             iriClass = BuiltinClasses.unsupportedIri;
@@ -245,10 +247,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(IRI service, QuadMapping mapping)
+    private void addQuadMapping(IRI service, QuadMapping mapping)
     {
         if(!services.contains(service))
             addEmptyService(service);
+
+        if(mappings.get(service).contains(mapping))
+            return;
 
         mappings.get(service).add(mapping);
 
@@ -281,7 +286,11 @@ public abstract class SparqlDatabaseConfiguration
         mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
 
         if(graph != null)
+        {
             graphs.get(serviceIri).add(graph);
+
+            mappings.get(serviceIri).add(new SingleTableQuadMapping(table, null, subject, predicate, object));
+        }
     }
 
 
@@ -291,7 +300,12 @@ public abstract class SparqlDatabaseConfiguration
         mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, condition));
 
         if(graph != null)
+        {
             graphs.get(serviceIri).add(graph);
+
+            mappings.get(serviceIri)
+                    .add(new SingleTableQuadMapping(table, null, subject, predicate, object, condition));
+        }
     }
 
 
@@ -305,7 +319,14 @@ public abstract class SparqlDatabaseConfiguration
                         Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object));
 
         if(graph != null)
+        {
             graphs.get(serviceIri).add(graph);
+
+            mappings.get(serviceIri)
+                    .add(new JoinTableQuadMapping(subjectTable, objectTable,
+                            Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                            Arrays.asList(new TableColumn(objectTableJoinColumn)), null, subject, predicate, object));
+        }
     }
 
 
@@ -320,7 +341,15 @@ public abstract class SparqlDatabaseConfiguration
                         subjectCondition, objectCondition));
 
         if(graph != null)
+        {
             graphs.get(serviceIri).add(graph);
+
+            mappings.get(serviceIri)
+                    .add(new JoinTableQuadMapping(subjectTable, objectTable,
+                            Arrays.asList(new TableColumn(subjectTableJoinColumn)),
+                            Arrays.asList(new TableColumn(objectTableJoinColumn)), null, subject, predicate, object,
+                            subjectCondition, objectCondition));
+        }
     }
 
 
@@ -504,18 +533,6 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public boolean isStrictDefaultGraph()
-    {
-        return strictDefaultGraph;
-    }
-
-
-    public void setStrictDefaultGraph(boolean strict)
-    {
-        strictDefaultGraph = strict;
-    }
-
-
     protected void setConstraints() throws SQLException
     {
         try(Connection connection = getConnectionPool().getConnection())
@@ -577,7 +594,7 @@ public abstract class SparqlDatabaseConfiguration
         if(mapping instanceof ConstantIriMapping)
         {
             ConstantIriMapping original = (ConstantIriMapping) mapping;
-            return new ConstantIriMapping((IriClass) remap(original.getIriClass()), (IRI) original.getValue());
+            return createIriMapping(((IRI) original.getValue()).toString());
         }
 
         if(mapping instanceof ParametrisedIriMapping)
