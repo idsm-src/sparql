@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -31,6 +32,7 @@ import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
@@ -90,6 +92,7 @@ public class EndpointServlet extends HttpServlet
     private static int processLimit = 100000000;
 
     private Engine engine;
+    private SparqlDatabaseConfiguration sparqlConfig;
 
 
     @Override
@@ -104,8 +107,7 @@ public class EndpointServlet extends HttpServlet
         try
         {
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
-            SparqlDatabaseConfiguration sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
-
+            sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
             engine = new Engine(sparqlConfig);
         }
         catch(NamingException e)
@@ -134,6 +136,8 @@ public class EndpointServlet extends HttpServlet
 
         if(isHtmlRequest(req))
             processHtmlRequest(res);
+        else if(isInfoRequest(req))
+            processInfoRequest(res);
         else
             process(req, res, query, defaultGraphs, namedGraphs);
     }
@@ -377,42 +381,75 @@ public class EndpointServlet extends HttpServlet
         res.setContentType("text/html");
 
         // @formatter:off
-        res.getWriter().append("<!DOCTYPE html>\n" +
-                "<html lang='en' manifest='index.html.manifest'>\n" +
+        res.getWriter().append(
+                "<!DOCTYPE html>\n" +
+                "<html lang='en'>\n" +
                 "  <head>\n" +
                 "    <meta charset='utf-8'>\n" +
-                "    <meta http-equiv='X-UA-Compatible' content='IE=edge'>\n" +
                 "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n" +
                 "    <title>YASGUI</title>\n" +
-                "  <link href='https://cdn.jsdelivr.net/npm/yasgui@2.7.29/dist/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
+                "    <link href='/chemweb/css/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
+                "    <script src='/chemweb/js/yasgui.min.js'></script>\n" +
+                "    <script src='/chemweb/js/endpoint.js'></script>\n" +
                 "  </head>\n" +
-                "  <body style='background: #FFF'>\n" +
-                "    <div id='yasgui' style='margin: 20px 25px'></div>\n" +
-                "    <script src='https://cdn.jsdelivr.net/npm/yasgui@2.7.29/dist/yasgui.js'></script>\n" +
-                "    <script type='text/javascript'>\n" +
-                "      var endpoint = window.location.protocol + '//' + window.location.host + window.location.pathname;\n" +
-                "      if(window.location.search || window.location.hash) YASGUI.defaults.tabs = [];\n" +
-                "      YASGUI.defaults.catalogueEndpoints = [];\n" +
-                "      YASGUI.YASR.defaults.outputPlugins = ['error', 'boolean', 'table', 'rawResponse', 'pivot', 'gchart'];\n" +
-                "      YASGUI.YASQE.defaults.autocompleters = [];\n" +
-                "      YASGUI.YASQE.defaults.value = 'SELECT * WHERE\\n{\\n  ?S ?P ?O.\\n}\\nLIMIT 10';\n" +
-                "      YASGUI(document.getElementById('yasgui'),\n" +
-                "      {\n" +
-                "        'persistencyPrefix': false,\n" +
-                "        'endpoint': endpoint,\n" +
-                "        'catalogueEndpoints': [ {endpoint: endpoint } ]\n" +
-                "      });\n" +
-                "      window.history.replaceState({}, document.title, endpoint);\n" +
-                "    </script>\n" +
+                "  <body>\n" +
+                "    <div id='yasgui'></div>\n" +
                 "  </body>\n" +
-                "</html>\n" +
-                "");
+                "</html>\n");
         // @formatter:on
+    }
+
+
+    private void processInfoRequest(HttpServletResponse res) throws IOException
+    {
+        res.setContentType("application/json");
+
+        final IRI type = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+
+        PrintWriter out = res.getWriter();
+
+        out.append("{\n");
+        out.append("  \"prefixes\": {\n");
+
+        out.append(sparqlConfig.getPrefixes().entrySet().stream()
+                .map(e -> "    \"" + e.getKey() + "\": \"" + e.getValue() + "\"").collect(Collectors.joining(",\n")));
+
+        out.append("\n");
+        out.append("  },\n");
+        out.append("  \"properties\": [\n");
+
+        out.append(sparqlConfig.getMappings(null).stream().map(m -> ((IRI) m.getPredicate().getValue()).getValue())
+                .distinct().sorted().map(i -> "    \"" + i + "\"").collect(Collectors.joining(",\n")));
+
+        out.append("\n");
+        out.append("  ],\n");
+        out.append("  \"classes\": [\n");
+
+        out.append(sparqlConfig.getMappings(null).stream()
+                .filter(m -> m.getPredicate().getValue().equals(type) && m.getObject() instanceof ConstantIriMapping)
+                .map(m -> ((IRI) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
+                .map(i -> "    \"" + i + "\"").collect(Collectors.joining(",\n")));
+
+        out.append("\n");
+        out.append("  ]\n");
+        out.append("}");
+    }
+
+
+    private static boolean isInfoRequest(HttpServletRequest req)
+    {
+        if(req.getParameter("info") != null && req.getParameter("query") == null)
+            return true;
+
+        return false;
     }
 
 
     private static boolean isHtmlRequest(HttpServletRequest req)
     {
+        if(req.getParameter("info") != null)
+            return false;
+
         if(req.getParameter("query") == null)
             return true;
 
