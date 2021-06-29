@@ -10,8 +10,14 @@ public class NormalizeIRI
 {
     public static class PrefixedName
     {
-        String prefix;
-        String name;
+        public PrefixedName(String prefix, String name)
+        {
+            this.name = name;
+            this.prefix = prefix;
+        }
+
+        public final String prefix;
+        public final String name;
     }
 
 
@@ -44,22 +50,18 @@ public class NormalizeIRI
 
 
         PrefixedName result = null;
-        int size = iri.length();
 
-        for(Entry<String, String> prefix : dbConfig.getPrefixes().entrySet())
+        for(Entry<String, String> definition : dbConfig.getPrefixes().entrySet())
         {
-            if(iri.startsWith(prefix.getValue()))
+            if(iri.startsWith(definition.getValue()))
             {
-                String name = iri.substring(prefix.getValue().length());
+                String prefix = definition.getKey();
+                String name = iri.substring(definition.getValue().length());
 
-                if(name.length() < size && name.matches(PN_LOCAL))
-                {
-                    size = name.length();
-
-                    result = new PrefixedName();
-                    result.prefix = prefix.getKey();
-                    result.name = iri.replaceFirst(prefix.getValue(), "");
-                }
+                if((result == null || result.name.length() > name.length()
+                        || result.name.length() == name.length() && result.prefix.length() > prefix.length())
+                        && name.matches(PN_LOCAL))
+                    result = new PrefixedName(prefix, name);
             }
         }
 

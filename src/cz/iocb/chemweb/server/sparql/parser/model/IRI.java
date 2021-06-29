@@ -59,7 +59,9 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
             {
                 String name = iri.substring(prefix.getValue().length());
 
-                if(name.length() < size && name.matches(PN_LOCAL))
+                if((size > name.length()
+                        || size == name.length() && result.length() - size - 1 > prefix.getKey().length())
+                        && name.matches(PN_LOCAL))
                 {
                     result = prefix.getKey() + ":" + name;
                     size = name.length();

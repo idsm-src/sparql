@@ -62,7 +62,8 @@ public class IriHelper
             {
                 String name = iri.substring(prefix.getIri().length());
 
-                if(name.length() < size && name.matches(PN_LOCAL))
+                if((size > name.length() || size == name.length() && result.length() - size > prefix.getName().length())
+                        && name.matches(PN_LOCAL))
                 {
                     result = prefix.getName() + name;
                     size = name.length();
