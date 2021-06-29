@@ -78,9 +78,12 @@ public class CorsProxyServlet extends HttpServlet
             }
         }
 
-        if(connection.getResponseCode() == HttpURLConnection.HTTP_OK)
+        res.setStatus(connection.getResponseCode());
+        res.setContentType(connection.getContentType());
+
+        try(InputStream input = dispatchStream(connection))
         {
-            try(InputStream input = connection.getInputStream())
+            if(input != null)
             {
                 try(OutputStream output = res.getOutputStream())
                 {
@@ -88,9 +91,18 @@ public class CorsProxyServlet extends HttpServlet
                 }
             }
         }
-        else
+    }
+
+
+    private InputStream dispatchStream(HttpURLConnection http)
+    {
+        try
         {
-            res.sendError(connection.getResponseCode(), connection.getResponseMessage());
+            return http.getInputStream();
+        }
+        catch(Exception e)
+        {
+            return http.getErrorStream();
         }
     }
 }
