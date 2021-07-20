@@ -6,13 +6,18 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.InternalNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.InternalResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.Element;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
@@ -497,42 +502,56 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             JoinTableQuadMapping mapping = (JoinTableQuadMapping) qmapping;
 
-            Variable joinvar = new Variable(variablePrefix + variableId++);
+            List<Table> tables = mapping.getTables();
+            List<String> conditions = mapping.getConditions();
+            List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
+            ResourceClass resourceClass = null;
+            NodeMapping nodeMapping = null;
+            Node node = subject;
 
-            SqlTableAccess subjectAcess = new SqlTableAccess(schema, mapping.getSubjectTable(),
-                    mapping.getSubjectCondition());
+            SqlIntercode result = SqlEmptySolution.get();
 
-            if(!processNodeMapping(subjectAcess, graph, mapping.getGraph()))
-                return SqlNoSolution.get();
+            for(int i = 0; i < tables.size(); i++)
+            {
+                Table table = tables.get(i);
+                String condition = conditions != null ? conditions.get(i) : null;
 
-            if(!processNodeMapping(subjectAcess, subject, mapping.getSubject()))
-                return SqlNoSolution.get();
+                SqlTableAccess acess = new SqlTableAccess(schema, table, condition);
 
-            if(!processNodeMapping(subjectAcess, predicate, mapping.getPredicate()))
-                return SqlNoSolution.get();
+                //if(!processNodeMapping(acess, graph, mapping.getGraph()))
+                //    return SqlNoSolution.get();
 
-            if(!processNodeMapping(subjectAcess, joinvar, mapping.getSubjectJoinMapping()))
-                return SqlNoSolution.get();
+                if(i == 0)
+                    nodeMapping = mapping.getSubject();
+                else
+                    nodeMapping = new InternalNodeMapping(resourceClass, joinColumnsPairs.get(i - 1).getRightColumns());
 
+                if(!processNodeMapping(acess, node, nodeMapping))
+                    return SqlNoSolution.get();
 
-            SqlTableAccess objectAcess = new SqlTableAccess(schema, mapping.getObjectTable(),
-                    mapping.getObjectCondition());
+                //if(!processNodeMapping(acess, predicate, mapping.getPredicate()))
+                //    return SqlNoSolution.get();
 
-            //if(!processNodeMapping(objectAcess, graph, mapping.getGraph())) // useless for ConstantIriMapping
-            //    return SqlNoSolution.get();
+                if(i < tables.size() - 1)
+                {
+                    resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getLeftColumns().size());
+                    nodeMapping = new InternalNodeMapping(resourceClass, joinColumnsPairs.get(i).getLeftColumns());
+                    node = new Variable(variablePrefix + variableId++);
+                }
+                else
+                {
+                    nodeMapping = mapping.getObject();
+                    node = object;
+                }
 
-            if(!processNodeMapping(objectAcess, joinvar, mapping.getObjectJoinMapping()))
-                return SqlNoSolution.get();
+                if(!processNodeMapping(acess, node, nodeMapping))
+                    return SqlNoSolution.get();
 
-            //if(!processNodeMapping(objectAcess, predicate, mapping.getPredicate())) // useless for ConstantIriMapping
-            //    return SqlNoSolution.get();
+                result = SqlJoin.join(schema, result, acess);
+            }
 
-            if(!processNodeMapping(objectAcess, object, mapping.getObject()))
-                return SqlNoSolution.get();
-
-
-            return SqlJoin.join(schema, subjectAcess, objectAcess);
+            return result;
         }
 
         return null;

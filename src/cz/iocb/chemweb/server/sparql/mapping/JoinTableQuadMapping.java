@@ -1,120 +1,32 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 
 
 
 public class JoinTableQuadMapping extends QuadMapping
 {
-    private class InternalResourceClass extends ResourceClass
+    public static class JoinColumns
     {
-        public InternalResourceClass(int size)
+        private List<Column> leftColumns;
+        private List<Column> rightColumns;
+
+        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns)
         {
-            super("internal", new ArrayList<String>(Collections.nCopies(size, "any")),
-                    new ArrayList<ResultTag>(Collections.nCopies(size, ResultTag.NULL)));
+            this.leftColumns = leftColumns;
+            this.rightColumns = rightColumns;
+
+            assert leftColumns.size() == rightColumns.size();
         }
 
-        @Override
-        public ResourceClass getGeneralClass()
+        public JoinColumns(String leftColumn, String rightColumn)
         {
-            return this;
-        }
-
-        @Override
-        public String getPatternCode(Node node, int part)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getSpecialisedPatternCode(String table, String var, int part)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getPatternCode(String column, int part, boolean isBoxed)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getResultCode(String variable, int part)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean match(Node node, Request request)
-        {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-
-    private class InternalNodeMapping extends NodeMapping implements ParametrisedMapping
-    {
-        private final List<Column> columns;
-
-        public InternalNodeMapping(ResourceClass resourceClass, List<Column> columns)
-        {
-            super(resourceClass);
-            this.columns = columns;
-        }
-
-        @Override
-        public boolean match(Node node, Request request)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getSqlValueAccess(int part)
-        {
-            return columns.get(part).getCode();
-        }
-
-        @Override
-        public Column getSqlColumn(int part)
-        {
-            return columns.get(part);
-        }
-
-        @Override
-        public NodeMapping remapColumns(List<ColumnPair> columnMap)
-        {
-            ArrayList<Column> remappedColumns = new ArrayList<Column>();
-
-            for(Column col : columns)
-            {
-                Column remapped = columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight();
-                assert remapped != null;
-                remappedColumns.add(remapped);
-            }
-
-            return new InternalNodeMapping(getResourceClass(), remappedColumns);
+            this.leftColumns = Arrays.asList(new TableColumn(leftColumn));
+            this.rightColumns = Arrays.asList(new TableColumn(rightColumn));
         }
 
         @Override
@@ -123,106 +35,72 @@ public class JoinTableQuadMapping extends QuadMapping
             if(this == obj)
                 return true;
 
-            if(obj == null || !(obj instanceof InternalNodeMapping))
+            if(obj == null || getClass() != obj.getClass())
                 return false;
 
-            if(!super.equals(obj))
+            JoinColumns pair = (JoinColumns) obj;
+
+            if(!leftColumns.equals(pair.leftColumns))
                 return false;
 
-            InternalNodeMapping other = (InternalNodeMapping) obj;
+            if(!rightColumns.equals(pair.rightColumns))
+                return false;
 
-            return columns.equals(other.columns);
+            return true;
+        }
+
+        public List<Column> getLeftColumns()
+        {
+            return leftColumns;
+        }
+
+        public List<Column> getRightColumns()
+        {
+            return rightColumns;
         }
     }
 
 
-    private final Table subjectTable;
-    private final Table objectTable;
-    private final List<Column> subjectJoinColumns;
-    private final List<Column> objectJoinColumns;
-    private final NodeMapping subjectJoinMapping;
-    private final NodeMapping objectJoinMapping;
-    private final String subjectCondition;
-    private final String objectCondition;
+    private final List<Table> tables;
+    private final List<JoinColumns> joinColumnsPairs;
+    private final List<String> conditions;
 
 
-    public JoinTableQuadMapping(Table subjectTable, Table objectTable, List<Column> subjectJoinColumns,
-            List<Column> objectJoinColumns, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
-    {
-        this(subjectTable, objectTable, subjectJoinColumns, objectJoinColumns, graph, subject, predicate, object, null,
-                null);
-    }
-
-
-    public JoinTableQuadMapping(Table subjectTable, Table objectTable, List<Column> subjectJoinColumns,
-            List<Column> objectJoinColumns, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, String subjectCondition, String objectCondition)
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<String> conditions)
     {
         super(graph, subject, predicate, object);
 
-        this.subjectTable = subjectTable;
-        this.objectTable = objectTable;
+        this.tables = tables;
+        this.joinColumnsPairs = joinColumnsPairs;
+        this.conditions = conditions;
 
-        this.subjectJoinColumns = subjectJoinColumns;
-        this.objectJoinColumns = objectJoinColumns;
-
-        assert subjectJoinColumns.size() == objectJoinColumns.size();
-        ResourceClass resourceClass = new InternalResourceClass(subjectJoinColumns.size());
-
-        this.subjectJoinMapping = new InternalNodeMapping(resourceClass, subjectJoinColumns);
-        this.objectJoinMapping = new InternalNodeMapping(resourceClass, objectJoinColumns);
-
-        this.subjectCondition = subjectCondition;
-        this.objectCondition = objectCondition;
+        assert tables.size() == joinColumnsPairs.size() + 1;
     }
 
 
-    public final Table getSubjectTable()
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
-        return subjectTable;
+        this(tables, joinColumnsPairs, graph, subject, predicate, object, null);
     }
 
 
-    public final Table getObjectTable()
+    public final List<Table> getTables()
     {
-        return objectTable;
+        return tables;
     }
 
 
-    public final List<Column> getSubjectJoinColumns()
+    public final List<JoinColumns> getJoinColumnsPairs()
     {
-        return subjectJoinColumns;
+        return joinColumnsPairs;
     }
 
 
-    public final List<Column> getObjectJoinColumns()
+    public final List<String> getConditions()
     {
-        return objectJoinColumns;
-    }
-
-
-    public final String getSubjectCondition()
-    {
-        return subjectCondition;
-    }
-
-
-    public final String getObjectCondition()
-    {
-        return objectCondition;
-    }
-
-
-    public NodeMapping getSubjectJoinMapping()
-    {
-        return subjectJoinMapping;
-    }
-
-
-    public NodeMapping getObjectJoinMapping()
-    {
-        return objectJoinMapping;
+        return conditions;
     }
 
 
@@ -237,29 +115,13 @@ public class JoinTableQuadMapping extends QuadMapping
 
         JoinTableQuadMapping mapping = (JoinTableQuadMapping) obj;
 
-        if(!subjectTable.equals(mapping.subjectTable))
+        if(!tables.equals(mapping.tables))
             return false;
 
-        if(!objectTable.equals(mapping.objectTable))
+        if(!joinColumnsPairs.equals(mapping.joinColumnsPairs))
             return false;
 
-        if(!subjectJoinColumns.equals(mapping.subjectJoinColumns))
-            return false;
-
-        if(!objectJoinColumns.equals(mapping.objectJoinColumns))
-            return false;
-
-        if(!subjectJoinMapping.equals(mapping.subjectJoinMapping))
-            return false;
-
-        if(!objectJoinMapping.equals(mapping.objectJoinMapping))
-            return false;
-
-        if(subjectCondition == null ? mapping.subjectCondition != null :
-                !subjectCondition.equals(mapping.subjectCondition))
-            return false;
-
-        if(objectCondition == null ? mapping.objectCondition != null : !objectCondition.equals(mapping.objectCondition))
+        if(conditions == null ? mapping.conditions != null : !conditions.equals(mapping.conditions))
             return false;
 
         return true;

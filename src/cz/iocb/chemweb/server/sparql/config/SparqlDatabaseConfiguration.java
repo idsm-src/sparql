@@ -1,11 +1,11 @@
 package cz.iocb.chemweb.server.sparql.config;
 
+import static java.util.Arrays.asList;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -21,6 +21,7 @@ import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantLiteralMapping;
 import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
+import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedBlankNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
@@ -309,24 +310,45 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
+    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         mappings.get(serviceIri)
-                .add(new JoinTableQuadMapping(subjectTable, objectTable,
-                        Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                        Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object));
+                .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object));
 
         if(graph != null)
         {
             graphs.get(serviceIri).add(graph);
 
             mappings.get(serviceIri)
-                    .add(new JoinTableQuadMapping(subjectTable, objectTable,
-                            Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                            Arrays.asList(new TableColumn(objectTableJoinColumn)), null, subject, predicate, object));
+                    .add(new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object));
         }
+    }
+
+
+    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<String> conditions)
+    {
+        mappings.get(serviceIri)
+                .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions));
+
+        if(graph != null)
+        {
+            graphs.get(serviceIri).add(graph);
+
+            mappings.get(serviceIri).add(
+                    new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object, conditions));
+        }
+    }
+
+
+    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
+            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
+    {
+        addQuadMapping(asList(subjectTable, objectTable),
+                asList(new JoinColumns(subjectTableJoinColumn, objectTableJoinColumn)), graph, subject, predicate,
+                object);
     }
 
 
@@ -334,22 +356,9 @@ public abstract class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, String subjectCondition, String objectCondition)
     {
-        mappings.get(serviceIri)
-                .add(new JoinTableQuadMapping(subjectTable, objectTable,
-                        Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                        Arrays.asList(new TableColumn(objectTableJoinColumn)), graph, subject, predicate, object,
-                        subjectCondition, objectCondition));
-
-        if(graph != null)
-        {
-            graphs.get(serviceIri).add(graph);
-
-            mappings.get(serviceIri)
-                    .add(new JoinTableQuadMapping(subjectTable, objectTable,
-                            Arrays.asList(new TableColumn(subjectTableJoinColumn)),
-                            Arrays.asList(new TableColumn(objectTableJoinColumn)), null, subject, predicate, object,
-                            subjectCondition, objectCondition));
-        }
+        addQuadMapping(asList(subjectTable, objectTable),
+                asList(new JoinColumns(subjectTableJoinColumn, objectTableJoinColumn)), graph, subject, predicate,
+                object, asList(subjectCondition, objectCondition));
     }
 
 
@@ -394,11 +403,10 @@ public abstract class SparqlDatabaseConfiguration
                 {
                     JoinTableQuadMapping map = (JoinTableQuadMapping) original;
 
-                    JoinTableQuadMapping mapping = new JoinTableQuadMapping(map.getSubjectTable(), map.getObjectTable(),
-                            map.getSubjectJoinColumns(), map.getObjectJoinColumns(),
+                    JoinTableQuadMapping mapping = new JoinTableQuadMapping(map.getTables(), map.getJoinColumnsPairs(),
                             (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
                             (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()),
-                            map.getSubjectCondition(), map.getObjectCondition());
+                            map.getConditions());
 
                     addQuadMapping(target, mapping);
                 }
