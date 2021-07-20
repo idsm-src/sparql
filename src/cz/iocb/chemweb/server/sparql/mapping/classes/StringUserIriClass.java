@@ -149,4 +149,22 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         return true;
     }
+
+
+    public String getPrefix()
+    {
+        return prefix;
+    }
+
+
+    public String getSuffix()
+    {
+        return suffix;
+    }
+
+
+    public int getIdLength()
+    {
+        return length;
+    }
 }

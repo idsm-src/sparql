@@ -171,4 +171,22 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         return true;
     }
+
+
+    public String getPrefix()
+    {
+        return prefix;
+    }
+
+
+    public String getSuffix()
+    {
+        return suffix;
+    }
+
+
+    public int getIdLength()
+    {
+        return length;
+    }
 }
