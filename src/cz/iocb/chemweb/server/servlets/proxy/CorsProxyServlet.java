@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -23,6 +25,15 @@ public class CorsProxyServlet extends HttpServlet
     private static final List<String> specialParameters = new ArrayList<>(
             Arrays.asList("endpoint", "requestMethod", "method"));
 
+    private String origin = null;
+
+
+    @Override
+    public void init(ServletConfig config) throws ServletException
+    {
+        origin = config.getInitParameter("origin");
+    }
+
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException
@@ -34,6 +45,8 @@ public class CorsProxyServlet extends HttpServlet
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
+        setCrossOriginResourceSharingHeaders(res);
+
         if(!req.getContentType().matches("application/x-www-form-urlencoded.*"))
         {
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -90,6 +103,25 @@ public class CorsProxyServlet extends HttpServlet
                     IOUtils.copy(input, output);
                 }
             }
+        }
+    }
+
+
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException
+    {
+        setCrossOriginResourceSharingHeaders(res);
+        super.doOptions(req, res);
+    }
+
+
+    private void setCrossOriginResourceSharingHeaders(HttpServletResponse res)
+    {
+        if(origin != null)
+        {
+            res.setHeader("access-control-allow-headers",
+                    "x-requested-with, Content-Type, origin, authorization, accept, client-security-token");
+            res.setHeader("access-control-allow-origin", origin);
         }
     }
 
