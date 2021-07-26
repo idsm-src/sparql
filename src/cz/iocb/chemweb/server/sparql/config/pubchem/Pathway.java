@@ -36,7 +36,7 @@ public class Pathway
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("pubchem:source", "source"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "organism_id"));
+                    config.createIriMapping("ncbi:taxonomy", "organism_id"));
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:pathbank-pathway", "reference"), "reference_type = 'PATHBANK'");

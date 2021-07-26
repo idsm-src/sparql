@@ -28,6 +28,8 @@ public class Common
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new StringUserIriClass("ncbi:protein", "https://www.ncbi.nlm.nih.gov/protein/"));
+        config.addIriClass(new IntegerUserIriClass("ncbi:taxonomy", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/taxonomy/TAXID", 0));
         config.addIriClass(new StringUserIriClass("purl:uniprot", "http://purl.uniprot.org/uniprot/"));
 
         config.addIriClass(new IntegerUserIriClass("linkedchemistry:chembl", "integer",
@@ -60,6 +62,8 @@ public class Common
                 "[A-Z][0-9]+(\\.[0-9]+|[A-Z][0-9]+)*"));
         config.addIriClass(new StringUserIriClass("identifiers:wikipathway", "http://identifiers.org/wikipathways/WP",
                 "[1-9][0-9]*"));
+        config.addIriClass(new StringUserIriClass("identifiers:glytoucan", "http://identifiers.org/glytoucan/",
+                "G[0-9]{5}[A-Z]{2}"));
 
         config.addIriClass(new IntegerUserIriClass("reference:ncbi-taxonomy", "integer",
                 "http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id="));

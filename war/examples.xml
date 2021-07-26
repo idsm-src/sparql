@@ -144,7 +144,7 @@ WHERE
     <description><![CDATA[
       <div lang="en" class="exampleTitle">PubChemRDF Case 6:</div>
       <p lang="en" class="exampleDescription">
-        Which substances inhibit protein targets similar to ACCP05979 and have the function domain PSSMID188648?
+        Which substances inhibit protein targets similar to ACCNP_542158 and have the function domain PSSMID188648?
       </p>
     ]]></description>
     <code><![CDATA[
@@ -158,7 +158,7 @@ WHERE
 {
   ?substance obo:RO_0000056 ?measuregroup.
   ?measuregroup obo:RO_0000057 ?protein.
-  protein:ACCP05979 vocab:hasSimilarProtein ?protein.
+  protein:ACCNP_542158 vocab:hasSimilarProtein ?protein.
   ?protein obo:RO_0002180 conserveddomain:PSSMID188648.
   ?measuregroup obo:OBI_0000299 ?endpoint.
   ?endpoint obo:IAO_0000136 ?substance.

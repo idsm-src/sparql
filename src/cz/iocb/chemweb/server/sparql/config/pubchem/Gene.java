@@ -35,7 +35,7 @@ public class Gene
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:gene-symbol"),
                     config.createLiteralMapping(rdfLangStringEn, "symbol"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "organism_id"));
+                    config.createIriMapping("ncbi:taxonomy", "organism_id"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),

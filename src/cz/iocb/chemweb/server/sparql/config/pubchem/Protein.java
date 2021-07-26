@@ -34,7 +34,7 @@ public class Protein
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(rdfLangStringEn, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "organism_id"));
+                    config.createIriMapping("ncbi:taxonomy", "organism_id"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),

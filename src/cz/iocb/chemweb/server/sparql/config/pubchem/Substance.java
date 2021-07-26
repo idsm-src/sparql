@@ -61,13 +61,21 @@ public class Substance
         }
 
         {
-            Table table = new Table(schema, "substance_matches");
+            Table table = new Table(schema, "substance_chembl_matches");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("linkedchemistry:chembl", "match"));
+                    config.createIriMapping("linkedchemistry:chembl", "chembl"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("chembl:compound", "match"));
+                    config.createIriMapping("chembl:compound", "chembl"));
+        }
+
+        {
+            Table table = new Table(schema, "substance_glytoucan_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("identifiers:glytoucan", "glytoucan"));
         }
 
         {
