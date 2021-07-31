@@ -32,9 +32,25 @@ public class SqlMinus extends SqlIntercode
     {
         boolean shareVariables = false;
 
-        for(UsedVariable variable : right.getVariables().getValues())
-            if(left.getVariables().get(variable.getName()) != null)
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
+        {
+            if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+            {
                 shareVariables = true;
+
+                if(!pair.getLeftVariable().canBeNull() && !pair.getRightVariable().canBeNull())
+                {
+                    boolean isJoinable = false;
+
+                    for(PairedClass pairedClass : pair.getClasses())
+                        if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
+                            isJoinable = true;
+
+                    if(!isJoinable)
+                        return left;
+                }
+            }
+        }
 
         if(shareVariables == false)
             return left;
