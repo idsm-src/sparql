@@ -282,7 +282,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         // translate the WHERE clause
         GraphPattern pattern = select.getPattern();
 
-        if(select.getValues() != null)
+        if(select.getValues() != null && !select.isInAggregateMode())
         {
             List<Pattern> patterns = new LinkedList<Pattern>();
 
@@ -342,9 +342,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         SqlIntercode translatedWhereClause = visitElement(pattern);
-
-        if(select.getValues() != null)
-            translatedWhereClause = SqlJoin.join(schema, translatedWhereClause, visitElement(select.getValues()));
 
 
         // translate the GROUP BY clause
@@ -461,6 +458,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             // translate having as filters
             translatedWhereClause = translateFilters(havingConditions, translatedWhereClause);
         }
+
+
+        // translate final values clause
+        if(select.getValues() != null)
+            translatedWhereClause = SqlJoin.join(schema, translatedWhereClause, visitElement(select.getValues()));
 
 
         // translate projection expressions
