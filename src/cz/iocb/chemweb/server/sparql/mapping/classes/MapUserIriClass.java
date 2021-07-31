@@ -276,4 +276,40 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         return true;
     }
+
+
+    public Table getTable()
+    {
+        return table;
+    }
+
+
+    public TableColumn getFrom()
+    {
+        return from;
+    }
+
+
+    public TableColumn getTo()
+    {
+        return to;
+    }
+
+
+    public String getPrefix()
+    {
+        return prefix;
+    }
+
+
+    public String getSuffix()
+    {
+        return suffix;
+    }
+
+
+    public int getIdLength()
+    {
+        return length;
+    }
 }
