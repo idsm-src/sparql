@@ -204,7 +204,8 @@ public class PiwikFilter implements Filter
                 @Override
                 public void failed(Exception e)
                 {
-                    request.getServletContext().log("PiwikFilter: Exception: " + e.getMessage());
+                    request.getServletContext()
+                            .log("PiwikFilter: Exception: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
                 }
 
                 @Override
@@ -231,7 +232,7 @@ public class PiwikFilter implements Filter
             {
             }
 
-            tracker = new PiwikAsyncTracker(address, 20000);
+            tracker = new PiwikAsyncTracker(this.address, 20000);
         }
     }
 }
