@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
-import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -10,39 +10,11 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public abstract class NodeMapping
 {
-    protected final ResourceClass resourceClass;
+    public abstract ResourceClass getResourceClass();
 
+    public abstract List<Column> getColumns();
 
-    protected NodeMapping(ResourceClass resourceClass)
-    {
-        this.resourceClass = resourceClass;
-    }
+    public abstract boolean match(Node node);
 
-
-    public abstract boolean match(Node node, Request request);
-
-    public abstract String getSqlValueAccess(int part);
-
-    public abstract NodeMapping remapColumns(List<ColumnPair> columnMap);
-
-
-    public final ResourceClass getResourceClass()
-    {
-        return resourceClass;
-    }
-
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if(this == obj)
-            return true;
-
-        if(obj == null || !(obj instanceof NodeMapping))
-            return false;
-
-        NodeMapping other = (NodeMapping) obj;
-
-        return resourceClass.equals(other.resourceClass);
-    }
+    public abstract NodeMapping remap(List<ColumnPair> columnMap);
 }

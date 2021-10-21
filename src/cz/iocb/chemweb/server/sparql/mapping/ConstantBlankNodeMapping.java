@@ -1,71 +1,29 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
-import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
-public class ConstantBlankNodeMapping extends BlankNodeMapping implements ConstantMapping
+public class ConstantBlankNodeMapping extends ConstantMapping
 {
-    private final BlankNodeLiteral value;
-
-
-    public ConstantBlankNodeMapping(BlankNodeClass blanknodeClass, BlankNodeLiteral node)
+    public ConstantBlankNodeMapping(BlankNodeLiteral blankNodeLiteral)
     {
-        super(blanknodeClass);
-        value = node;
+        super(blankNodeLiteral);
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public ResourceClass getResourceClass()
     {
-        if(node instanceof VariableOrBlankNode)
-            return true;
-
-        return false;
+        return ((BlankNodeLiteral) value).getResourceClass();
     }
 
 
     @Override
-    public String getSqlValueAccess(int part)
+    public List<Column> getColumns()
     {
-        return getBlankNodeClass().getPatternCode(value, part);
-    }
-
-
-    @Override
-    public NodeMapping remapColumns(List<ColumnPair> columnMap)
-    {
-        return this;
-    }
-
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if(this == obj)
-            return true;
-
-        if(obj == null || !(obj instanceof ConstantBlankNodeMapping))
-            return false;
-
-        if(!super.equals(obj))
-            return false;
-
-        ConstantBlankNodeMapping other = (ConstantBlankNodeMapping) obj;
-
-        return resourceClass == other.resourceClass && value.equals(other.value);
-    }
-
-
-    @Override
-    public Node getValue()
-    {
-        return value;
+        return ((BlankNodeLiteral) value).getResourceClass().toColumns(value);
     }
 }

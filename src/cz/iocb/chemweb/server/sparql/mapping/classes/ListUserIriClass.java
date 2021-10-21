@@ -1,27 +1,28 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import java.sql.Connection;
+import static java.util.Arrays.asList;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import javax.sql.DataSource;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
+import cz.iocb.chemweb.server.sparql.engine.IriCache;
 import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
 public class ListUserIriClass extends SimpleUserIriClass
 {
-    private static final int cacheSize = 10000;
     private final Table table;
     private final TableColumn column;
-    private final Map<String, Boolean> sqlCheckCache;
-    private final String sqlCheckQuery;
+    private final String sqlQuery;
 
 
     public ListUserIriClass(String name, Table table, TableColumn column)
@@ -31,80 +32,47 @@ public class ListUserIriClass extends SimpleUserIriClass
         this.table = table;
         this.column = column;
 
-        this.sqlCheckCache = Collections.synchronizedMap(new LinkedHashMap<String, Boolean>(cacheSize, 0.75f, true)
-        {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest)
-            {
-                return size() > cacheSize;
-            }
-        });
-
-        this.sqlCheckQuery = String.format("(select 1 from %s where %s = ?::varchar)", table.getCode(),
-                column.getCode());
+        this.sqlQuery = String.format("(SELECT 1 FROM %s WHERE %s = ?::varchar)", table, column);
     }
 
 
     @Override
-    public boolean match(String iri, Request request)
+    public List<Column> toColumns(Node node)
     {
-        return check(iri, request);
+        IRI iri = (IRI) node;
+        assert match(iri);
+
+        return asList(new ConstantColumn("'" + iri.getValue().replaceAll("'", "''") + "'::varchar"));
     }
 
 
     @Override
-    public boolean match(String iri, DataSource connectionPool)
+    public boolean match(IRI iri)
     {
-        return check(iri, connectionPool);
-    }
+        IriCache cache = Request.currentRequest().getIriCache();
 
+        List<Column> hit = cache.getFromCache(iri, this);
 
-    private boolean check(String iri, Request request)
-    {
-        Boolean check = sqlCheckCache.get(iri);
+        if(hit == IriCache.mismatch)
+            return false;
+        else if(hit != null)
+            return true;
 
-        if(check != null)
-            return check;
-
-        try(PreparedStatement statement = request.getStatement(sqlCheckQuery))
+        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
         {
-            statement.setString(1, iri);
+            statement.setString(1, iri.getValue());
 
             try(ResultSet result = statement.executeQuery())
             {
-                boolean value = result.next();
-                sqlCheckCache.put(iri, value);
-                return value;
-            }
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
-        }
-    }
+                boolean match = result.next();
 
+                if(!match)
+                    cache.storeToCache(iri, this, IriCache.mismatch);
+                else
+                    cache.storeToCache(iri, this,
+                            asList(new ConstantColumn("'" + iri.getValue().replaceAll("'", "''") + "'::varchar")));
 
-    private boolean check(String iri, DataSource connectionPool)
-    {
-        Boolean check = sqlCheckCache.get(iri);
-
-        if(check != null)
-            return check;
-
-        try(Connection connection = connectionPool.getConnection())
-        {
-            try(PreparedStatement statement = connection.prepareStatement(sqlCheckQuery))
-            {
-                statement.setString(1, iri);
-
-                try(ResultSet result = statement.executeQuery())
-                {
-                    boolean value = result.next();
-                    sqlCheckCache.put(iri, value);
-                    return value;
-                }
+                return match;
             }
         }
         catch(SQLException e)
@@ -122,16 +90,23 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    protected String generateFunction(String parameter)
+    protected Column generateFunction(Column parameter)
     {
         return parameter;
     }
 
 
     @Override
-    protected String generateInverseFunction(String parameter)
+    protected Column generateInverseFunction(Column parameter, boolean check)
     {
-        return parameter;
+        if(!check)
+            return parameter;
+
+        String access = String.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
+
+        String code = String.format("(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, parameter);
+
+        return new ExpressionColumn(code);
     }
 
 

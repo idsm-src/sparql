@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import java.util.List;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -13,5 +15,5 @@ public abstract class SqlNodeValue extends SqlExpressionIntercode
     }
 
 
-    public abstract String getNodeAccess(ResourceClass resourceClass, int part);
+    public abstract List<Column> asResource(ResourceClass resourceClass);
 }

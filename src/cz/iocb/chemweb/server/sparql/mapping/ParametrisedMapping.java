@@ -1,19 +1,80 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public interface ParametrisedMapping
+public abstract class ParametrisedMapping extends NodeMapping
 {
-    ResourceClass getResourceClass();
+    protected final ResourceClass resourceClass;
+    protected final List<Column> columns;
 
-    String getSqlValueAccess(int part);
 
-    Column getSqlColumn(int part);
+    protected ParametrisedMapping(ResourceClass resourceClass, List<Column> columns)
+    {
+        this.resourceClass = resourceClass;
+        this.columns = columns;
 
-    NodeMapping remapColumns(List<ColumnPair> columnMap);
+        if(resourceClass.getColumnCount() != columns.size())
+            throw new IllegalArgumentException("wrong number of columns");
+    }
+
+
+    @Override
+    public ResourceClass getResourceClass()
+    {
+        return resourceClass;
+    }
+
+
+    @Override
+    public List<Column> getColumns()
+    {
+        return columns;
+    }
+
+
+    @Override
+    public boolean match(Node node)
+    {
+        return resourceClass.match(node);
+    }
+
+
+    public ArrayList<Column> remapColumns(List<ColumnPair> columnMap)
+    {
+        ArrayList<Column> remappedColumns = new ArrayList<Column>();
+
+        for(Column col : columns)
+            remappedColumns.add(columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight());
+
+        return remappedColumns;
+    }
+
+
+    @Override
+    public int hashCode()
+    {
+        return columns.hashCode();
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        ParametrisedMapping other = (ParametrisedMapping) object;
+
+        return resourceClass == other.resourceClass && columns.equals(other.columns);
+    }
 }

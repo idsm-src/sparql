@@ -20,7 +20,7 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdLongIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdShortIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.List;
 
 
@@ -47,16 +47,16 @@ public class BuiltinClasses
     public static final IntBlankNodeClass intBlankNode = new CommonIntBlankNodeClass();
     public static final StrBlankNodeClass strBlankNode = new CommonStrBlankNodeClass();
     public static final CommonIriClass iri = new CommonIriClass();
-    public static final CommonIriClass unsupportedIri = new CommonIriClass();
+    public static final UnsupportedIriClass unsupportedIri = new UnsupportedIriClass();
 
     public static final IntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass();
     public static final StrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass();
 
 
-    private static final List<LiteralClass> literalClasses = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong,
-            xsdFloat, xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
+    private static final List<LiteralClass> literalClasses = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
+            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
 
-    private static final List<ResourceClass> classes = Arrays.asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
+    private static final List<ResourceClass> classes = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
             xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString, rdfLangString,
             unsupportedLiteral, intBlankNode, strBlankNode, iri);
 

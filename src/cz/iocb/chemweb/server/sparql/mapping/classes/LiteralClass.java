@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
@@ -23,36 +22,7 @@ public abstract class LiteralClass extends ResourceClass
 
 
     @Override
-    public final String getPatternCode(Node node, int part)
-    {
-        if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
-        else
-            return getLiteralPatternCode((Literal) node, part);
-    }
-
-
-    /**
-     * Gets SQL code to obtain the given part of the pattern representation for the given SPARQL literal.
-     *
-     * @param node SPARQL literal
-     * @param part part index
-     * @return SQL code
-     */
-    public abstract String getLiteralPatternCode(Literal literal, int part);
-
-
-    /**
-     * Gets SQL code to obtain the expression representation for the given literal node.
-     *
-     * @param literal SPARQL literal node
-     * @return SQL code
-     */
-    public abstract String getExpressionCode(Literal literal);
-
-
-    @Override
-    public boolean match(Node node, Request request)
+    public boolean match(Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;

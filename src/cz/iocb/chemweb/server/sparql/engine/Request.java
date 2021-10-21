@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.engine;
 
+import static java.util.stream.Collectors.toList;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -8,7 +9,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ParserRuleContext;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
@@ -37,9 +37,12 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 
 public class Request implements AutoCloseable
 {
+    private static ThreadLocal<Request> requests = new ThreadLocal<Request>();
     private static int fetchSize = 1000;
 
     private final SparqlDatabaseConfiguration config;
+
+    private final IriCache iriCache = new IriCache(1000, 10);
 
     private Connection connection;
     private Statement statement;
@@ -49,14 +52,23 @@ public class Request implements AutoCloseable
     private boolean canceled;
 
 
-    Request(SparqlDatabaseConfiguration config)
+    public Request(SparqlDatabaseConfiguration config)
     {
         this.config = config;
     }
 
 
+    static public Request currentRequest()
+    {
+        return requests.get();
+    }
+
+
     public List<TranslateMessage> check(String query, List<DataSet> dataSets, int timeout) throws SQLException
     {
+        Request previous = requests.get();
+        requests.set(this);
+
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
         try
@@ -70,7 +82,7 @@ public class Request implements AutoCloseable
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
 
-            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
+            TranslateVisitor translateVisitor = new TranslateVisitor(messages, false);
             translateVisitor.translate(syntaxTree);
         }
         catch(SQLException e)
@@ -83,6 +95,10 @@ public class Request implements AutoCloseable
             System.err.println(query);
             e.printStackTrace(System.err);
             System.err.println("RequestCheck: log end");
+        }
+        finally
+        {
+            requests.set(previous);
         }
 
         return messages;
@@ -131,25 +147,28 @@ public class Request implements AutoCloseable
             type = ResultType.CONSTRUCT;
 
 
-        TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
-        SqlQuery imcode = translateVisitor.translate(syntaxTree);
-
-        if(type != ResultType.CONSTRUCT)
-        {
-            imcode.setOffset(offset);
-
-            if(limit >= 0)
-                imcode.setLimit(limit);
-        }
-
-        String code = imcode.translate();
-
-        checkForErrors(messages);
-
-        Statement statement = getStatement();
+        Request previous = requests.get();
+        requests.set(this);
 
         try
         {
+            TranslateVisitor translateVisitor = new TranslateVisitor(messages, true);
+            SqlQuery imcode = translateVisitor.translate(syntaxTree);
+
+            if(type != ResultType.CONSTRUCT)
+            {
+                imcode.setOffset(offset);
+
+                if(limit >= 0)
+                    imcode.setLimit(limit);
+            }
+
+            String code = imcode.translate();
+
+            checkForErrors(messages);
+
+            Statement statement = getStatement();
+
             if(type == ResultType.CONSTRUCT)
             {
                 ArrayList<RdfNode[]> templates = new ArrayList<RdfNode[]>();
@@ -175,9 +194,17 @@ public class Request implements AutoCloseable
         }
         catch(Throwable e)
         {
-            statement.close();
-            e.printStackTrace();
+            if(!(e instanceof TranslateExceptions))
+                e.printStackTrace();
+
+            if(statement != null)
+                statement.close();
+
             throw e;
+        }
+        finally
+        {
+            requests.set(previous);
         }
     }
 
@@ -203,7 +230,7 @@ public class Request implements AutoCloseable
     private void checkForErrors(List<TranslateMessage> messages) throws TranslateExceptions
     {
         List<TranslateMessage> errors = messages.stream().filter(m -> m.getCategory() == MessageCategory.ERROR)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         if(!errors.isEmpty())
             throw new TranslateExceptions(errors);
@@ -301,6 +328,12 @@ public class Request implements AutoCloseable
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
+    }
+
+
+    public IriCache getIriCache()
+    {
+        return iriCache;
     }
 
 

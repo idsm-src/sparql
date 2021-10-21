@@ -1,25 +1,22 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
-import java.sql.Connection;
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.joining;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
+import cz.iocb.chemweb.server.sparql.engine.IriCache;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -31,10 +28,8 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    private static final int cacheSize = 10000;
     private final SqlCheck sqlCheck;
-    private final String sqlCheckQuery;
-    private final Map<String, Boolean> sqlCheckCache;
+    private final String sqlQuery;
     private final String pattern;
     private final Function function;
     private final List<Function> inverseFunction;
@@ -43,11 +38,11 @@ public class GeneralUserIriClass extends UserIriClass
     public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern,
             SqlCheck sqlCheck)
     {
-        super(name, sqlTypes, Arrays.asList(ResultTag.IRI));
+        super(name, sqlTypes, asList(ResultTag.IRI));
+
         this.sqlCheck = sqlCheck;
         this.pattern = pattern;
         this.function = new Function(schema, function);
-
 
         inverseFunction = new ArrayList<Function>(sqlTypes.size());
 
@@ -61,41 +56,7 @@ public class GeneralUserIriClass extends UserIriClass
                 inverseFunction.add(new Function(schema, function + "_inv" + (i + 1)));
         }
 
-
-        if(sqlCheck != SqlCheck.NEVER)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            builder.append("select ");
-
-            for(int i = 0; i < sqlTypes.size(); i++)
-            {
-                if(i > 0)
-                    builder.append(" and ");
-
-                builder.append(inverseFunction.get(i).getCode());
-                builder.append("(?) is not null");
-            }
-
-            sqlCheckQuery = builder.toString();
-
-
-            sqlCheckCache = Collections.synchronizedMap(new LinkedHashMap<String, Boolean>(cacheSize, 0.75f, true)
-            {
-                private static final long serialVersionUID = 1L;
-
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest)
-                {
-                    return size() > cacheSize;
-                }
-            });
-        }
-        else
-        {
-            sqlCheckQuery = null;
-            sqlCheckCache = null;
-        }
+        sqlQuery = "SELECT " + inverseFunction.stream().map(f -> f + "(?)").collect(joining(", "));
     }
 
 
@@ -106,122 +67,155 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public String getPatternCode(Node node, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
+        IRI iri = ((IRI) node);
+        assert match(iri);
 
-        IRI iri = (IRI) node;
+        IriCache cache = Request.currentRequest().getIriCache();
 
-        return inverseFunction.get(part).getCode() + "('" + iri.getValue() + "'::varchar)";
+        List<Column> hit = cache.getFromCache(iri, this);
+
+        if(hit != null)
+            return hit;
+
+        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
+        {
+            for(int i = 1; i <= getColumnCount(); i++)
+                statement.setString(i, iri.getValue());
+
+            try(ResultSet result = statement.executeQuery())
+            {
+                result.next();
+
+                List<Column> columns = new ArrayList<Column>();
+
+                for(int i = 0; i < getColumnCount(); i++)
+                {
+                    String code = "'" + result.getString(i + 1).replaceAll("'", "''") + "'::" + sqlTypes.get(i);
+                    columns.add(new ConstantColumn(code));
+                }
+
+                cache.storeToCache(iri, this, columns);
+                return columns;
+            }
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
+        }
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        StringBuffer strBuf = new StringBuffer();
+        List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        strBuf.append(function.getCode());
-        strBuf.append("(");
-
-        for(int i = 0; i < getPatternPartsCount(); i++)
+        for(int part = 0; part < getColumnCount(); part++)
         {
-            if(i > 0)
-                strBuf.append(", ");
+            StringBuilder builder = new StringBuilder();
 
-            if(table != null)
-                strBuf.append(table).append(".");
+            builder.append(inverseFunction.get(part));
+            builder.append("(");
+            builder.append(columns.get(0));
+            builder.append(")");
 
-            strBuf.append(getSqlColumn(var, i));
+            result.add(new ExpressionColumn(builder.toString()));
         }
 
-        strBuf.append(")");
-
-        return strBuf.toString();
+        return result;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append(inverseFunction.get(part).getCode());
+        builder.append(function);
         builder.append("(");
 
-        if(table != null)
-            builder.append(table).append(".");
+        for(int i = 0; i < getColumnCount(); i++)
+        {
+            if(i > 0)
+                builder.append(", ");
 
-        builder.append(iri.getSqlColumn(var, 0));
+            builder.append(columns.get(i));
+        }
+
         builder.append(")");
 
-        return builder.toString();
+        return asList(new ExpressionColumn(builder.toString()));
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
-        if(isBoxed)
-            return inverseFunction.get(part).getCode() + "(sparql.rdfbox_extract_iri(" + column + "))";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        return inverseFunction.get(part).getCode() + "(" + column + ")";
+        String iri = isBoxed ? "sparql.rdfbox_extract_iri(" + column + ")" : column.toString();
+
+        for(int part = 0; part < getColumnCount(); part++)
+            result.add(new ExpressionColumn(inverseFunction.get(part) + "(" + iri + ")"));
+
+        return result;
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        StringBuffer strBuf = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
         if(rdfbox)
-            strBuf.append("sparql.cast_as_rdfbox_from_iri(");
+            builder.append("sparql.cast_as_rdfbox_from_iri(");
 
-        strBuf.append(function.getCode());
-        strBuf.append("(");
+        builder.append(function);
+        builder.append("(");
 
-        for(int i = 0; i < getPatternPartsCount(); i++)
+        for(int i = 0; i < getColumnCount(); i++)
         {
             if(i > 0)
-                strBuf.append(", ");
+                builder.append(", ");
 
-            strBuf.append(variableAccessor.getSqlVariableAccess(variable, this, i));
+            builder.append(columns.get(i));
         }
 
-        strBuf.append(")");
+        builder.append(")");
 
         if(rdfbox)
-            strBuf.append(")");
+            builder.append(")");
 
-        return strBuf.toString();
+        return new ExpressionColumn(builder.toString());
     }
 
 
     @Override
-    public String getResultCode(String var, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        StringBuffer strBuf = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
-        strBuf.append(function.getCode());
-        strBuf.append("(");
+        builder.append(function);
+        builder.append("(");
 
-        for(int i = 0; i < getPatternPartsCount(); i++)
+        for(int i = 0; i < getColumnCount(); i++)
         {
             if(i > 0)
-                strBuf.append(", ");
+                builder.append(", ");
 
-            strBuf.append(getSqlColumn(var, i));
+            builder.append(columns.get(i));
         }
 
-        strBuf.append(")");
+        builder.append(")");
 
-        return strBuf.toString();
+        return asList(new ExpressionColumn(builder.toString()));
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public boolean match(Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;
@@ -229,44 +223,24 @@ public class GeneralUserIriClass extends UserIriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match(((IRI) node).getValue(), request);
+        return match((IRI) node);
     }
 
 
     @Override
-    public boolean match(String iri, Request request)
+    public boolean match(IRI iri)
     {
-        if(iri.matches(pattern))
+        if(iri.getValue().matches(pattern))
         {
             if(sqlCheck == SqlCheck.IF_MATCH)
-                return check(iri, request);
+                return check(iri);
 
             return true;
         }
         else
         {
             if(sqlCheck == SqlCheck.IF_NOT_MATCH)
-                return check(iri, request);
-
-            return false;
-        }
-    }
-
-
-    @Override
-    public boolean match(String iri, DataSource connectionPool)
-    {
-        if(iri.matches(pattern))
-        {
-            if(sqlCheck == SqlCheck.IF_MATCH)
-                return check(iri, connectionPool);
-
-            return true;
-        }
-        else
-        {
-            if(sqlCheck == SqlCheck.IF_NOT_MATCH)
-                return check(iri, connectionPool);
+                return check(iri);
 
             return false;
         }
@@ -292,82 +266,56 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    private boolean check(String iri, Request request)
+    private boolean check(IRI iri)
     {
-        Boolean check = sqlCheckCache.get(iri);
+        IriCache cache = Request.currentRequest().getIriCache();
 
-        if(check != null)
-            return check;
+        List<Column> hit = cache.getFromCache(iri, this);
 
-        try(PreparedStatement statement = request.getStatement(sqlCheckQuery))
+        if(hit == IriCache.mismatch)
+            return false;
+        else if(hit != null)
+            return true;
+
+        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
         {
-            for(int i = 1; i <= getPatternPartsCount(); i++)
-                statement.setString(i, iri);
+            for(int i = 1; i <= getColumnCount(); i++)
+                statement.setString(i, iri.getValue());
 
             try(ResultSet result = statement.executeQuery())
             {
                 result.next();
-                sqlCheckCache.put(iri, result.getBoolean(1));
 
-                return result.getBoolean(1);
-            }
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
-        }
-    }
+                boolean match = true;
 
+                for(int i = 1; i <= getColumnCount(); i++)
+                    if(result.getString(i) == null)
+                        match = false;
 
-    private boolean check(String iri, DataSource connectionPool)
-    {
-        Boolean check = sqlCheckCache.get(iri);
-
-        if(check != null)
-            return check;
-
-        try(Connection connection = connectionPool.getConnection())
-        {
-            try(PreparedStatement statement = connection.prepareStatement(sqlCheckQuery))
-            {
-                for(int i = 1; i <= getPatternPartsCount(); i++)
-                    statement.setString(i, iri);
-
-                try(ResultSet result = statement.executeQuery())
+                if(!match)
                 {
-                    result.next();
-                    sqlCheckCache.put(iri, result.getBoolean(1));
-
-                    return result.getBoolean(1);
+                    cache.storeToCache(iri, this, IriCache.mismatch);
                 }
+                else
+                {
+                    List<Column> columns = new ArrayList<Column>();
+
+                    for(int i = 0; i < getColumnCount(); i++)
+                    {
+                        String code = "'" + result.getString(i + 1).replaceAll("'", "''") + "'::" + sqlTypes.get(i);
+                        columns.add(new ConstantColumn(code));
+                    }
+
+                    cache.storeToCache(iri, this, columns);
+                }
+
+                return match;
             }
         }
         catch(SQLException e)
         {
             throw new SQLRuntimeException(e);
         }
-    }
-
-
-    @Override
-    public String getIriValueCode(List<Column> columns)
-    {
-        StringBuffer strBuf = new StringBuffer();
-
-        strBuf.append(function.getCode());
-        strBuf.append("(");
-
-        for(int i = 0; i < getPatternPartsCount(); i++)
-        {
-            if(i > 0)
-                strBuf.append(", ");
-
-            strBuf.append(columns.get(i).getCode());
-        }
-
-        strBuf.append(")");
-
-        return strBuf.toString();
     }
 
 

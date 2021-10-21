@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffe
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -70,10 +70,10 @@ public class SqlBinaryLogical extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variableAccessor);
-        SqlExpressionIntercode right = getRight().optimize(variableAccessor);
+        SqlExpressionIntercode left = getLeft().optimize(variables);
+        SqlExpressionIntercode right = getRight().optimize(variables);
         return create(operator, left, right);
     }
 

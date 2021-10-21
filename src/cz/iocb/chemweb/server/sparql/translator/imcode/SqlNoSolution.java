@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import java.util.HashSet;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.Set;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
@@ -24,7 +23,7 @@ public class SqlNoSolution extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         return this;
     }

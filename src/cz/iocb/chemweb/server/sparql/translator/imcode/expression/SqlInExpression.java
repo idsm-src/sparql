@@ -6,7 +6,7 @@ import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffe
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -21,7 +21,7 @@ public class SqlInExpression extends SqlExpressionIntercode
             super(operand.getResourceClasses(), operand.canBeNull(), operand.isDeterministic());
             this.operand = operand;
 
-            this.variables.addAll(operand.getVariables());
+            this.referencedVariables.addAll(operand.getReferencedVariables());
         }
 
         public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
@@ -33,9 +33,9 @@ public class SqlInExpression extends SqlExpressionIntercode
         }
 
         @Override
-        public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+        public SqlExpressionIntercode optimize(UsedVariables variables)
         {
-            return create(operand.optimize(variableAccessor));
+            return create(operand.optimize(variables));
         }
 
         @Override
@@ -63,10 +63,10 @@ public class SqlInExpression extends SqlExpressionIntercode
         this.rights = rights;
         this.expression = expression;
 
-        this.variables.addAll(left.getVariables());
+        this.referencedVariables.addAll(left.getReferencedVariables());
 
         for(SqlExpressionIntercode right : rights)
-            this.variables.addAll(right.getVariables());
+            this.referencedVariables.addAll(right.getReferencedVariables());
     }
 
 
@@ -100,14 +100,14 @@ public class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode right : rights)
-            optimized.add(right.optimize(variableAccessor));
+            optimized.add(right.optimize(variables));
 
-        return create(negated, left.optimize(variableAccessor), optimized);
+        return create(negated, left.optimize(variables), optimized);
     }
 
 

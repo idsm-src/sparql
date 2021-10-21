@@ -104,23 +104,23 @@ public final class IRI extends BaseComplexNode implements VarOrIri, Path
 
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if(this == o)
-            return true;
-
-        if(o == null || getClass() != o.getClass())
-            return false;
-
-        IRI iri = (IRI) o;
-
-        return value.equals(iri.value);
+        return value.hashCode();
     }
 
 
     @Override
-    public int hashCode()
+    public boolean equals(Object object)
     {
-        return value.hashCode();
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        IRI iri = (IRI) object;
+
+        return value.equals(iri.value);
     }
 }

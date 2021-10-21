@@ -1,49 +1,48 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.joining;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
-import javax.sql.DataSource;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
 public class EnumUserIriClass extends SimpleUserIriClass
 {
     private final String pattern;
-    private final HashMap<String, String> values;
+    private final HashMap<IRI, String> values;
 
 
-    public EnumUserIriClass(String name, String sqlType, HashMap<String, String> values)
+    public EnumUserIriClass(String name, String sqlType, HashMap<IRI, String> values)
     {
         super(name, sqlType);
 
-        StringBuffer buffer = new StringBuffer();
-
-        for(String key : values.values())
-        {
-            if(buffer.length() > 0)
-                buffer.append('|');
-
-            buffer.append(Pattern.quote(key));
-        }
-
-        this.pattern = buffer.toString();
+        this.pattern = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
         this.values = values;
     }
 
 
     @Override
-    public boolean match(String iri, Request request)
+    public List<Column> toColumns(Node node)
     {
-        return iri.matches(pattern);
+        IRI iri = (IRI) node;
+        assert match(node);
+
+        return asList(new ConstantColumn("'" + values.get(iri).replaceAll("'", "''") + "'::" + sqlTypes.get(0)));
     }
 
 
     @Override
-    public boolean match(String iri, DataSource connectionPool)
+    public boolean match(IRI iri)
     {
-        return iri.matches(pattern);
+        return iri.getValue().matches(pattern);
     }
 
 
@@ -55,36 +54,36 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    protected String generateFunction(String parameter)
+    protected Column generateFunction(Column parameter)
     {
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
-        buffer.append(String.format("(select case %s ", parameter));
+        builder.append(String.format("CASE %s ", parameter));
 
-        for(Entry<String, String> entry : values.entrySet())
-            buffer.append(String.format("when '%s'::%s then '%s' ", entry.getKey().replaceAll("'", "''"),
-                    sqlTypes.get(0), entry.getValue().replaceAll("'", "''")));
+        for(Entry<IRI, String> entry : values.entrySet())
+            builder.append(String.format("WHEN '%s'::%s THEN '%s' ", entry.getValue().replaceAll("'", "''"),
+                    sqlTypes.get(0), entry.getKey().getValue().replaceAll("'", "''")));
 
-        buffer.append("end)");
+        builder.append("END");
 
-        return buffer.toString();
+        return new ExpressionColumn(builder.toString());
     }
 
 
     @Override
-    protected String generateInverseFunction(String parameter)
+    protected Column generateInverseFunction(Column parameter, boolean check)
     {
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
-        buffer.append(String.format("(select case %s ", parameter));
+        builder.append(String.format("CASE %s ", parameter));
 
-        for(Entry<String, String> entry : values.entrySet())
-            buffer.append(String.format("when '%s' then '%s'::%s ", entry.getValue().replaceAll("'", "''"),
-                    entry.getKey().replaceAll("'", "''"), sqlTypes.get(0)));
+        for(Entry<IRI, String> entry : values.entrySet())
+            builder.append(String.format("WHEN '%s' THEN '%s'::%s ", entry.getKey().getValue().replaceAll("'", "''"),
+                    entry.getValue().replaceAll("'", "''"), sqlTypes.get(0)));
 
-        buffer.append("end)");
+        builder.append("END");
 
-        return buffer.toString();
+        return new ExpressionColumn(builder.toString());
     }
 
 

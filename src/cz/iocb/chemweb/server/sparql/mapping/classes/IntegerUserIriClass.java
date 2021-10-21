@@ -1,8 +1,13 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static java.util.Arrays.asList;
+import java.util.List;
 import java.util.regex.Pattern;
-import javax.sql.DataSource;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
@@ -18,25 +23,25 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     {
         super(name, sqlType);
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
-        buffer.append(Pattern.quote(prefix));
+        builder.append(Pattern.quote(prefix));
 
         if(length > 0)
-            buffer.append(String.format("[0-9]{%d}", length));
+            builder.append(String.format("[0-9]{%d}", length));
         else if(sqlType.equals("smallint"))
-            buffer.append(generateMaxNumberPattern("32767", -length));
+            builder.append(generateMaxNumberPattern("32767", -length));
         else if(sqlType.equals("integer"))
-            buffer.append(generateMaxNumberPattern("2147483647", -length));
+            builder.append(generateMaxNumberPattern("2147483647", -length));
         else if(sqlType.equals("bigint"))
-            buffer.append(generateMaxNumberPattern("9223372036854775807", -length));
+            builder.append(generateMaxNumberPattern("9223372036854775807", -length));
         else
             throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);
 
         if(suffix != null)
-            buffer.append(Pattern.quote(suffix));
+            builder.append(Pattern.quote(suffix));
 
-        this.pattern = buffer.toString();
+        this.pattern = builder.toString(); //FIXME: check whether the pattern is valid also in pcre2
         this.prefix = prefix;
         this.length = length;
         this.suffix = suffix;
@@ -62,16 +67,28 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(String iri, Request request)
+    public List<Column> toColumns(Node node)
     {
-        return iri.matches(pattern);
+        IRI iri = (IRI) node;
+        assert match(iri);
+
+        String value = iri.getValue();
+
+        String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
+
+        id = id.replaceFirst("^0+", "");
+
+        if(id.isEmpty())
+            id = "0";
+
+        return asList(new ConstantColumn("'" + id.replaceAll("'", "''") + "'::" + sqlTypes.get(0)));
     }
 
 
     @Override
-    public boolean match(String iri, DataSource connectionPool)
+    public boolean match(IRI iri)
     {
-        return iri.matches(pattern);
+        return iri.getValue().matches(pattern);
     }
 
 
@@ -83,14 +100,14 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    protected String generateFunction(String parameter)
+    protected Column generateFunction(Column parameter)
     {
         String code = String.format("(%s)::varchar", parameter);
 
         if(length > 0)
             code = String.format("lpad(%s, %d, '0')", code, length);
         else if(length < 0)
-            code = String.format("(case when 1%0" + (-1 - length) + "d <= (%s) THEN %s else lpad(%s, %d, '0') end)", 0,
+            code = String.format("CASE WHEN 1%0" + (-1 - length) + "d <= (%s) THEN %s ELSE lpad(%s, %d, '0') END", 0,
                     parameter, code, code, -length);
 
         code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
@@ -98,21 +115,37 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(suffix != null)
             code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
 
-        return "(" + code + ")";
+        return new ExpressionColumn("(" + code + ")");
     }
 
 
     @Override
-    protected String generateInverseFunction(String parameter)
+    protected Column generateInverseFunction(Column parameter, boolean check)
     {
-        String sqlType = sqlTypes.get(0);
+        StringBuilder builder = new StringBuilder();
+
+        if(check)
+        {
+            builder.append("CASE WHEN sparql.regex_string(");
+            builder.append(parameter);
+            builder.append(", '^(");
+            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(")$', '') THEN ");
+        }
 
         if(length > 0)
-            return String.format("substring(%s, %d, %d)::%s", parameter, prefix.length() + 1, length, sqlType);
+            builder.append(String.format("substring(%s, %d, %d)::", parameter, prefix.length() + 1, length));
         else if(suffix == null)
-            return String.format("right(%s, -%d)::%s", parameter, prefix.length(), sqlType);
+            builder.append(String.format("right(%s, -%d)::", parameter, prefix.length()));
         else
-            return String.format("left(right(%s, -%d), -%d)::%s", parameter, prefix.length(), suffix.length(), sqlType);
+            builder.append(String.format("left(right(%s, -%d), -%d)::", parameter, prefix.length(), suffix.length()));
+
+        builder.append(sqlTypes.get(0));
+
+        if(check)
+            builder.append(" END");
+
+        return new ExpressionColumn(builder.toString());
     }
 
 
@@ -121,28 +154,28 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(max.length() - minLength < 1)
             throw new IllegalArgumentException("minimal length is to hight");
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
         if(minLength == 0)
-            buffer.append(String.format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
+            builder.append(String.format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
         else if(max.length() - minLength == 1)
-            buffer.append(String.format("([0-9]{%d}|", minLength));
+            builder.append(String.format("([0-9]{%d}|", minLength));
         else if(max.length() - minLength == 2)
-            buffer.append(String.format("([1-9]?[0-9]{%d}|", minLength));
+            builder.append(String.format("([1-9]?[0-9]{%d}|", minLength));
         else
-            buffer.append(String.format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
+            builder.append(String.format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
 
-        buffer.append(String.format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
+        builder.append(String.format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
 
         for(int i = 1; i < max.length() - 1; i++)
             if(max.charAt(i) > '0')
-                buffer.append(String.format("%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
+                builder.append(String.format("%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
                         max.length() - i - 1));
 
-        buffer.append(
+        builder.append(
                 String.format("%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
 
-        return buffer.toString();
+        return builder.toString();
     }
 
 

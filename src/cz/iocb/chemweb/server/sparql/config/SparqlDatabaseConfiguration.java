@@ -41,6 +41,7 @@ import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -50,6 +51,7 @@ public abstract class SparqlDatabaseConfiguration
 
     protected DatabaseSchema databaseSchema;
     protected DataSource connectionPool;
+    protected boolean autoAddToDefaultGraph;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
     protected ArrayList<UserIriClass> iriClasses = new ArrayList<UserIriClass>();
@@ -62,16 +64,24 @@ public abstract class SparqlDatabaseConfiguration
     protected HashMap<IRI, HashMap<String, FunctionDefinition>> functions = new HashMap<IRI, HashMap<String, FunctionDefinition>>();
 
 
-    protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
-            throws SQLException
+    protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
+            boolean autoAddToDefaultGraph) throws SQLException
     {
         IRI serviceIri = service == null ? null : new IRI(service);
 
         this.serviceIri = serviceIri;
         this.connectionPool = connectionPool;
         this.databaseSchema = schema;
+        this.autoAddToDefaultGraph = autoAddToDefaultGraph;
 
         addEmptyService(serviceIri);
+    }
+
+
+    protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
+            throws SQLException
+    {
+        this(service, connectionPool, schema, true);
     }
 
 
@@ -152,23 +162,7 @@ public abstract class SparqlDatabaseConfiguration
             iri = prefix + (parts.length == 2 ? parts[1] : "");
         }
 
-        IriClass iriClass = null;
-
-        for(ResourceClass c : iriClasses)
-        {
-            if(c instanceof UserIriClass && ((UserIriClass) c).match(iri, connectionPool))
-            {
-                if(iriClass != null)
-                    throw new RuntimeException("ambigous iri class for " + value);
-
-                iriClass = (UserIriClass) c;
-            }
-        }
-
-        if(iriClass == null)
-            iriClass = BuiltinClasses.unsupportedIri;
-
-        return new ConstantIriMapping(iriClass, new IRI(iri));
+        return new ConstantIriMapping(new IRI(iri));
     }
 
 
@@ -287,26 +281,24 @@ public abstract class SparqlDatabaseConfiguration
         mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
 
         if(graph != null)
-        {
             graphs.get(serviceIri).add(graph);
 
+        if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri).add(new SingleTableQuadMapping(table, null, subject, predicate, object));
-        }
     }
 
 
     public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, String condition)
+            NodeMapping object, Condition conditions)
     {
-        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, condition));
+        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions));
 
         if(graph != null)
-        {
             graphs.get(serviceIri).add(graph);
 
+        if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri)
-                    .add(new SingleTableQuadMapping(table, null, subject, predicate, object, condition));
-        }
+                    .add(new SingleTableQuadMapping(table, null, subject, predicate, object, conditions));
     }
 
 
@@ -317,28 +309,26 @@ public abstract class SparqlDatabaseConfiguration
                 .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object));
 
         if(graph != null)
-        {
             graphs.get(serviceIri).add(graph);
 
+        if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri)
                     .add(new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object));
-        }
     }
 
 
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<String> conditions)
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Condition> conditions)
     {
         mappings.get(serviceIri)
                 .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions));
 
         if(graph != null)
-        {
             graphs.get(serviceIri).add(graph);
 
+        if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri).add(
                     new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object, conditions));
-        }
     }
 
 
@@ -346,19 +336,20 @@ public abstract class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        addQuadMapping(asList(subjectTable, objectTable),
-                asList(new JoinColumns(subjectTableJoinColumn, objectTableJoinColumn)), graph, subject, predicate,
-                object);
+        addQuadMapping(asList(subjectTable, objectTable), asList(
+                new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn))),
+                graph, subject, predicate, object);
     }
 
 
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, String subjectCondition, String objectCondition)
+            NodeMapping object, Condition subjectCondition, Condition objectCondition)
     {
         addQuadMapping(asList(subjectTable, objectTable),
-                asList(new JoinColumns(subjectTableJoinColumn, objectTableJoinColumn)), graph, subject, predicate,
-                object, asList(subjectCondition, objectCondition));
+                asList(new JoinColumns(new TableColumn(subjectTableJoinColumn),
+                        new TableColumn(objectTableJoinColumn))),
+                graph, subject, predicate, object, asList(subjectCondition, objectCondition));
     }
 
 
@@ -452,19 +443,23 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public static Column getColumn(String value)
+    {
+        if(value.startsWith("("))
+            return new ExpressionColumn(value);
+        else if(value.matches(".*::[_a-zA-Z0-9.]+"))
+            return new ConstantColumn(value);
+        else
+            return new TableColumn(value);
+    }
+
+
     public static List<Column> getColumns(String[] values)
     {
         List<Column> columns = new ArrayList<Column>(values.length);
 
         for(String value : values)
-        {
-            if(value.startsWith("("))
-                columns.add(new ExpressionColumn(value));
-            else if(value.matches(".*::[_a-zA-Z0-9]+"))
-                columns.add(new ConstantColumn(value));
-            else
-                columns.add(new TableColumn(value));
-        }
+            columns.add(getColumn(value));
 
         return columns;
     }
@@ -608,9 +603,44 @@ public abstract class SparqlDatabaseConfiguration
         if(mapping instanceof ParametrisedIriMapping)
         {
             ParametrisedIriMapping original = (ParametrisedIriMapping) mapping;
-            return new ParametrisedIriMapping((IriClass) remap(original.getIriClass()), original.getColumns());
+            return new ParametrisedIriMapping((IriClass) remap(original.getResourceClass()), original.getColumns());
         }
 
         return mapping;
+    }
+
+
+    public Condition createAreEqualCondition(String column, String value)
+    {
+        Condition conditions = new Condition();
+        conditions.addAreEqual(getColumn(column), getColumn(value));
+        return conditions;
+    }
+
+
+    public Condition createAreNotEqualCondition(String column, String... values)
+    {
+        Condition conditions = new Condition();
+
+        for(String value : values)
+            conditions.addAreNotEqual(getColumn(column), getColumn(value));
+
+        return conditions;
+    }
+
+
+    public Condition createIsNotNullCondition(String column)
+    {
+        Condition conditions = new Condition();
+        conditions.addIsNotNull(getColumn(column));
+        return conditions;
+    }
+
+
+    public Condition createIsNullCondition(String column)
+    {
+        Condition conditions = new Condition();
+        conditions.addIsNull(getColumn(column));
+        return conditions;
     }
 }

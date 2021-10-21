@@ -40,23 +40,24 @@ public final class BlankNode extends BaseComplexNode implements Node, VariableOr
 
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if(this == o)
-            return true;
-        if(o == null || getClass() != o.getClass())
-            return false;
-
-        BlankNode blankNode = (BlankNode) o;
-
-        return name.equals(blankNode.name);
+        return name.hashCode();
     }
 
 
     @Override
-    public int hashCode()
+    public boolean equals(Object object)
     {
-        return name.hashCode();
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        BlankNode blankNode = (BlankNode) object;
+
+        return name.equals(blankNode.name);
     }
 
 

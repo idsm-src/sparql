@@ -28,15 +28,15 @@ public class LanguageTaggedLiteral extends LiteralNode
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || !(obj instanceof LanguageTaggedLiteral))
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        LanguageTaggedLiteral literal = (LanguageTaggedLiteral) obj;
+        LanguageTaggedLiteral literal = (LanguageTaggedLiteral) object;
 
         return value.equals(literal.value) && language.equals(literal.language);
     }

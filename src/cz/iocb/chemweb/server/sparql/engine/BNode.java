@@ -25,14 +25,14 @@ public class BNode extends ReferenceNode
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || !(obj instanceof BNode))
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        return value.equals(((BNode) obj).value);
+        return value.equals(((BNode) object).value);
     }
 }

@@ -1,14 +1,12 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -16,70 +14,58 @@ public abstract class SimpleUserIriClass extends UserIriClass
 {
     public SimpleUserIriClass(String name, String sqlType)
     {
-        super(name, Arrays.asList(sqlType), Arrays.asList(ResultTag.IRI));
+        super(name, asList(sqlType), asList(ResultTag.IRI));
     }
 
 
     @Override
-    public String getPatternCode(Node node, int part)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
-
-        return generateInverseFunction("'" + ((IRI) node).getValue().replaceAll("'", "''") + "'::varchar");
+        return asList(generateInverseFunction(columns.get(0), true));
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return generateFunction(table != null ? table + "." + getSqlColumn(var, 0) : getSqlColumn(var, 0));
+        return asList(generateFunction(columns.get(0)));
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
-        return generateInverseFunction((table != null ? table + "." : "") + iri.getSqlColumn(var, 0));
+        Column parameter = isBoxed ? new ExpressionColumn("sparql.rdfbox_extract_iri(" + column + ")") : column;
+        return asList(generateInverseFunction(parameter, check));
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        if(isBoxed)
-            return generateInverseFunction("sparql.rdfbox_extract_iri(" + column + ")");
-
-        return generateInverseFunction(column);
-    }
-
-
-    @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
-    {
-        StringBuffer strBuf = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
         if(rdfbox)
-            strBuf.append("sparql.cast_as_rdfbox_from_iri(");
+            builder.append("sparql.cast_as_rdfbox_from_iri(");
 
-        strBuf.append(generateFunction(variableAccessor.getSqlVariableAccess(variable, this, 0)));
+        builder.append(generateFunction(columns.get(0)));
 
         if(rdfbox)
-            strBuf.append(")");
+            builder.append(")");
 
-        return strBuf.toString();
+        return new ExpressionColumn(builder.toString());
     }
 
 
     @Override
-    public String getResultCode(String var, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        return generateFunction(getSqlColumn(var, 0));
+        return asList(generateFunction(columns.get(0)));
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public boolean match(Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;
@@ -87,19 +73,12 @@ public abstract class SimpleUserIriClass extends UserIriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match(((IRI) node).getValue(), request);
+        return match((IRI) node);
     }
 
 
-    @Override
-    public String getIriValueCode(List<Column> columns)
-    {
-        return generateFunction(columns.get(0).getCode());
-    }
+    protected abstract Column generateFunction(Column parameter);
 
 
-    protected abstract String generateFunction(String parameter);
-
-
-    protected abstract String generateInverseFunction(String parameter);
+    protected abstract Column generateInverseFunction(Column parameter, boolean check);
 }

@@ -37,23 +37,24 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
 
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if(this == o)
-            return true;
-        if(o == null || getClass() != o.getClass())
-            return false;
-
-        Variable variable = (Variable) o;
-
-        return name.equals(variable.name);
+        return name.hashCode();
     }
 
 
     @Override
-    public int hashCode()
+    public boolean equals(Object object)
     {
-        return name.hashCode();
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        Variable variable = (Variable) object;
+
+        return name.equals(variable.name);
     }
 
 

@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.parser;
 
+import static java.util.stream.Collectors.toList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +26,7 @@ public final class StreamUtils
     // http://stackoverflow.com/a/22695031/41071
     public static <T> Collector<T, ?, Optional<T>> singleCollector()
     {
-        return Collectors.collectingAndThen(Collectors.toList(), list -> {
+        return Collectors.collectingAndThen(toList(), list -> {
             if(list.size() != 1)
             {
                 return Optional.empty();

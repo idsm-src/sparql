@@ -18,8 +18,8 @@ public abstract class SqlBinary extends SqlExpressionIntercode
         this.left = left;
         this.right = right;
 
-        this.variables.addAll(left.getVariables());
-        this.variables.addAll(right.getVariables());
+        this.referencedVariables.addAll(left.getReferencedVariables());
+        this.referencedVariables.addAll(right.getReferencedVariables());
     }
 
 

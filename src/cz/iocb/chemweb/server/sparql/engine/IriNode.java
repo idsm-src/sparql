@@ -25,14 +25,14 @@ public class IriNode extends ReferenceNode
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || !(obj instanceof IriNode))
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        return value.equals(((IriNode) obj).value);
+        return value.equals(((IriNode) object).value);
     }
 }

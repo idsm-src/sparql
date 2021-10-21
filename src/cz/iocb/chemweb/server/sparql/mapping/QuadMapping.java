@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -26,18 +25,18 @@ public abstract class QuadMapping
     }
 
 
-    public boolean match(Node graph, Node subject, Node predicate, Node object, Request request)
+    public boolean match(Node graph, Node subject, Node predicate, Node object)
     {
-        if(!match(this.graph, graph, request))
+        if(!match(this.graph, graph))
             return false;
 
-        if(!match(this.subject, subject, request))
+        if(!match(this.subject, subject))
             return false;
 
-        if(!match(this.predicate, predicate, request))
+        if(!match(this.predicate, predicate))
             return false;
 
-        if(!match(this.object, object, request))
+        if(!match(this.object, object))
             return false;
 
         if(!checkNodeCondition(graph, subject, getGraph(), getSubject()))
@@ -62,7 +61,7 @@ public abstract class QuadMapping
     }
 
 
-    private boolean match(NodeMapping mapping, Node node, Request request)
+    private boolean match(NodeMapping mapping, Node node)
     {
         if(node == null)
             return true;
@@ -70,7 +69,7 @@ public abstract class QuadMapping
         if(mapping == null)
             return false;
 
-        return mapping.match(node, request);
+        return mapping.match(node);
     }
 
 
@@ -78,17 +77,16 @@ public abstract class QuadMapping
     {
         if(!(node1 instanceof VariableOrBlankNode && node2 instanceof VariableOrBlankNode))
             return true;
-
-        if(!node1.equals(node2))
+        else if(!node1.equals(node2))
             return true;
-
-        if(map1.getResourceClass().getGeneralClass() != map2.getResourceClass().getGeneralClass())
-            return false;
-
-        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping && !map1.equals(map2))
-            return false;
-
-        return true;
+        else if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
+            return map1.equals(map2);
+        else if(map1 instanceof ConstantMapping)
+            return map2.getResourceClass().match(((ConstantMapping) map1).getValue());
+        else if(map2 instanceof ConstantMapping)
+            return map1.getResourceClass().match(((ConstantMapping) map2).getValue());
+        else
+            return map1.getResourceClass() == map2.getResourceClass(); //NOTE: CommonIriClass cannot be used in mappings
     }
 
 
@@ -117,26 +115,33 @@ public abstract class QuadMapping
 
 
     @Override
-    public boolean equals(Object obj)
+    public int hashCode()
     {
-        if(this == obj)
+        return (subject != null ? subject.hashCode() : 0) ^ (predicate != null ? predicate.hashCode() : 0);
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
             return true;
 
-        if(obj == null || getClass() != obj.getClass())
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        QuadMapping mapping = (QuadMapping) obj;
+        QuadMapping mapping = (QuadMapping) object;
 
-        if(graph == null ? mapping.graph != null : !graph.equals(mapping.graph))
+        if(this.graph == null ? mapping.graph != null : !this.graph.equals(mapping.graph))
             return false;
 
-        if(!predicate.equals(mapping.predicate))
+        if(!this.predicate.equals(mapping.predicate))
             return false;
 
-        if(!subject.equals(mapping.subject))
+        if(!this.subject.equals(mapping.subject))
             return false;
 
-        if(!object.equals(mapping.object))
+        if(!this.object.equals(mapping.object))
             return false;
 
         return true;

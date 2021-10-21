@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.mapping.extension;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
@@ -25,7 +25,7 @@ public class ResultDefinition
 
     public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
-        List<Column> sqlTypeFields = Arrays.asList(new TableColumn(sqlTypeField));
+        List<Column> sqlTypeFields = asList(new TableColumn(sqlTypeField));
 
         this.resultName = resultName;
         this.resultClass = resultClass;

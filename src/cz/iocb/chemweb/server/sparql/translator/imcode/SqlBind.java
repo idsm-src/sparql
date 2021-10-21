@@ -1,300 +1,238 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static java.util.stream.Collectors.joining;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.List;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
-import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNodeValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
 
 public class SqlBind extends SqlIntercode
 {
+    private static final Column expressionColumn = new TableColumn("#expression");
+
+    SqlIntercode child;
     String variableName;
     SqlExpressionIntercode expression;
-    SqlIntercode context;
 
 
     protected SqlBind(UsedVariables variables, String variableName, SqlExpressionIntercode expression,
-            SqlIntercode context)
+            SqlIntercode child)
     {
-        super(variables, context.isDeterministic() && expression.isDeterministic());
+        super(variables, child.isDeterministic() && expression.isDeterministic());
+
+        this.child = child;
         this.variableName = variableName;
         this.expression = expression;
-        this.context = context;
     }
 
 
-    public static SqlIntercode bind(String variable, SqlExpressionIntercode expression, SqlIntercode context)
+    public static SqlIntercode bind(String variableName, SqlExpressionIntercode expression, SqlIntercode child)
     {
-        if(context == SqlNoSolution.get())
+        return bind(variableName, expression, child, null);
+    }
+
+
+    protected static SqlIntercode bind(String variableName, SqlExpressionIntercode expression, SqlIntercode child,
+            Set<String> restrictions)
+    {
+        /* special cases */
+
+        if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
         if(expression == SqlNull.get())
-            return context;
+            return child.restrict(restrictions);
 
-        if(context instanceof SqlUnion)
+        if(child instanceof SqlUnion)
         {
             SqlIntercode union = SqlNoSolution.get();
 
-            for(SqlIntercode child : ((SqlUnion) context).getChilds())
-            {
-                VariableAccessor variableAccessor = new SimpleVariableAccessor(child.getVariables());
-                union = SqlUnion.union(union, bind(variable, expression.optimize(variableAccessor), child));
-            }
+            for(SqlIntercode intercode : ((SqlUnion) child).getChilds())
+                union = SqlUnion.union(union,
+                        bind(variableName, expression.optimize(intercode.getVariables()), intercode, restrictions));
 
             return union;
         }
 
 
-        UsedVariables variables = new UsedVariables();
-        variables.add(new UsedVariable(variable, expression.getResourceClasses(), expression.canBeNull()));
+        /* standard bind */
 
-        for(UsedVariable var : context.getVariables().getValues())
-            variables.add(var);
+        UsedVariable variable = null;
 
-        return new SqlBind(variables, variable, expression, context);
+        if(expression instanceof SqlIri)
+        {
+            IriClass resClass = ((SqlIri) expression).getIriClass();
+            List<Column> columns = resClass.toColumns(((SqlIri) expression).getIri());
+            variable = new UsedVariable(variableName, resClass, columns, expression.canBeNull());
+        }
+        else if(expression instanceof SqlLiteral)
+        {
+            LiteralClass resClass = ((SqlLiteral) expression).getLiteralClass();
+            List<Column> columns = resClass.toColumns(((SqlLiteral) expression).getLiteral());
+            variable = new UsedVariable(variableName, resClass, columns, expression.canBeNull());
+        }
+        else if(expression instanceof SqlVariable)
+        {
+            UsedVariable source = child.getVariables().get(((SqlVariable) expression).getName());
+            variable = new UsedVariable(variableName, source.getMappings(), expression.canBeNull());
+        }
+        else
+        {
+            UsedVariable bindVariable = new UsedVariable(variableName, expression.canBeNull());
+            expression.getResourceClasses().stream()
+                    .forEach(res -> bindVariable.addMapping(res, res.createColumns(variableName)));
+            variable = bindVariable;
+        }
+
+        UsedVariables variables = child.getVariables().restrict(restrictions);
+
+        if(restrictions == null || restrictions.contains(variableName))
+            variables.add(variable);
+
+        return new SqlBind(variables, variableName, expression, child);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         if(!restrictions.contains(variableName))
-            return context.optimize(request, restrictions, reduced);
+            return child.optimize(restrictions, reduced);
 
-        HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
-        contextRestrictions.addAll(expression.getVariables());
+        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+        childRestrictions.addAll(expression.getReferencedVariables());
 
-        return bind(variableName, expression,
-                context.optimize(request, contextRestrictions, reduced && expression.isDeterministic()));
+        SqlIntercode optimizedChild = child.optimize(childRestrictions, reduced && expression.isDeterministic());
+        SqlExpressionIntercode optimizedExpression = expression.optimize(optimizedChild.getVariables());
+
+        return bind(variableName, optimizedExpression, optimizedChild, restrictions);
     }
 
 
     @Override
     public String translate()
     {
-        boolean useTwoPhases = true;
+        if(expression instanceof SqlNodeValue)
+            return child.translate();
+
+
+        UsedVariable variable = getVariables().get(variableName);
+        boolean expand = isExpressionExpansionNeeded(expression);
+
+        Column column = expand ? expressionColumn : variable.getMapping(variable.getClasses().iterator().next()).get(0);
+        Set<Column> columns = child.getVariables().getNonConstantColumns();
+
         StringBuilder builder = new StringBuilder();
 
-        if(expression instanceof SqlNodeValue)
+        if(expand)
         {
-            useTwoPhases = false;
             builder.append("SELECT ");
 
-            SqlNodeValue node = (SqlNodeValue) expression;
-            boolean hasSelect = false;
+            builder.append(translateExpressionExpansion(column, variable));
 
-            for(ResourceClass resourceClass : node.getResourceClasses())
+            if(!columns.isEmpty())
             {
-                for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    builder.append(node.getNodeAccess(resourceClass, i));
-                    builder.append(" AS ");
-                    builder.append(resourceClass.getSqlColumn(variableName, i));
-                }
+                builder.append(", ");
+                builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
             }
+
+            builder.append(" FROM (");
         }
-        else
+
+        builder.append("SELECT ");
+        builder.append(expression.translate());
+        builder.append(" AS ");
+        builder.append(column);
+
+        if(!columns.isEmpty())
         {
-            String columnName = '"' + variableName + "#expression\"";
-
-            if(expression.isBoxed() == false && expression.getResourceClasses().size() == 1)
-            {
-                ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
-
-                if(!(resourceClass instanceof UserIriClass) && resourceClass.getPatternPartsCount() == 1)
-                {
-                    columnName = resourceClass.getSqlColumn(variableName, 0);
-                    useTwoPhases = false;
-                }
-            }
-
-
-            if(useTwoPhases)
-            {
-                boolean splitDateTimeClasses = expression.getResourceClasses().stream()
-                        .filter(r -> r instanceof DateTimeConstantZoneClass).count() > 1;
-
-                boolean splitDateClasses = expression.getResourceClasses().stream()
-                        .filter(r -> r instanceof DateConstantZoneClass).count() > 1;
-
-                boolean splitLangClasses = expression.getResourceClasses().stream()
-                        .filter(r -> r instanceof LangStringConstantTagClass).count() > 1;
-
-                boolean splitIntBlankNodeClasses = expression.getResourceClasses().stream()
-                        .filter(r -> r instanceof UserIntBlankNodeClass).count() > 1;
-
-                boolean splitStrBlankNodeClasses = expression.getResourceClasses().stream()
-                        .filter(r -> r instanceof UserStrBlankNodeClass).count() > 1;
-
-
-                builder.append("SELECT ");
-
-                boolean hasSelect = false;
-
-                for(ResourceClass resourceClass : expression.getResourceClasses())
-                {
-                    if(resourceClass instanceof DateTimeConstantZoneClass && splitDateTimeClasses)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append("CASE ");
-                        builder.append(xsdDateTime.getPatternCode(columnName, 1, expression.isBoxed()));
-                        builder.append(" WHEN '");
-                        builder.append(((DateTimeConstantZoneClass) resourceClass).getZone());
-                        builder.append("'::int4 THEN ");
-                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" END AS ");
-                        builder.append(resourceClass.getSqlColumn(variableName, 0));
-                    }
-                    else if(resourceClass instanceof DateConstantZoneClass && splitDateClasses)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append("CASE ");
-                        builder.append(xsdDate.getPatternCode(columnName, 1, expression.isBoxed()));
-                        builder.append(" WHEN '");
-                        builder.append(((DateConstantZoneClass) resourceClass).getZone());
-                        builder.append("'::int4 THEN ");
-                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" END AS ");
-                        builder.append(resourceClass.getSqlColumn(variableName, 0));
-                    }
-                    else if(resourceClass instanceof LangStringConstantTagClass && splitLangClasses)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append("CASE ");
-                        builder.append(rdfLangString.getPatternCode(columnName, 1, expression.isBoxed()));
-                        builder.append(" WHEN '");
-                        builder.append(((LangStringConstantTagClass) resourceClass).getTag());
-                        builder.append("'::varchar THEN ");
-                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" END AS ");
-                        builder.append(resourceClass.getSqlColumn(variableName, 0));
-                    }
-                    else if(resourceClass instanceof UserIntBlankNodeClass && splitIntBlankNodeClasses)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append("CASE sparql.");
-
-                        if(expression.isBoxed())
-                            builder.append("rdfbox_extract_");
-
-                        builder.append("int_blanknode_segment(");
-                        builder.append(columnName);
-                        builder.append(") WHEN '");
-                        builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
-                        builder.append("'::int4 THEN ");
-                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" END AS ");
-                        builder.append(resourceClass.getSqlColumn(variableName, 0));
-                    }
-                    else if(resourceClass instanceof UserStrBlankNodeClass && splitStrBlankNodeClasses)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append("CASE sparql.");
-
-                        if(expression.isBoxed())
-                            builder.append("rdfbox_extract_");
-
-                        builder.append("str_blanknode_segment(");
-                        builder.append(columnName);
-                        builder.append(") WHEN '");
-                        builder.append(((UserIntBlankNodeClass) resourceClass).getSegment());
-                        builder.append("'::int4 THEN ");
-                        builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                        builder.append(" END AS ");
-                        builder.append(resourceClass.getSqlColumn(variableName, 0));
-                    }
-                    else
-                    {
-                        for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append(resourceClass.getPatternCode(columnName, i, expression.isBoxed()));
-                            builder.append(" AS ");
-                            builder.append(resourceClass.getSqlColumn(variableName, i));
-                        }
-                    }
-                }
-
-                for(UsedVariable variable : variables.getValues())
-                {
-                    if(variable.getName().equals(variableName))
-                        continue;
-
-                    for(ResourceClass resClass : variable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendComma(builder, true);
-                            builder.append(resClass.getSqlColumn(variable.getName(), i));
-                        }
-                    }
-                }
-
-                builder.append(" FROM (");
-            }
-
-            builder.append("SELECT ");
-            builder.append(expression.translate());
-            builder.append(" AS ");
-            builder.append(columnName);
+            builder.append(", ");
+            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
         }
 
-
-        for(UsedVariable variable : variables.getValues())
-        {
-            if(variable.getName().equals(variableName))
-                continue;
-
-            for(ResourceClass resClass : variable.getClasses())
-            {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, true);
-                    builder.append(resClass.getSqlColumn(variable.getName(), i));
-                }
-            }
-        }
-
-        if(context != SqlEmptySolution.get())
+        if(child != SqlEmptySolution.get())
         {
             builder.append(" FROM (");
-            builder.append(context.translate());
+            builder.append(child.translate());
             builder.append(" ) AS tab");
         }
 
-        if(useTwoPhases)
+        if(expand)
             builder.append(" ) AS tab");
+
+        return builder.toString();
+    }
+
+
+    protected static boolean isExpressionExpansionNeeded(SqlExpressionIntercode expression)
+    {
+        if(expression.isBoxed() || expression.getResourceClasses().size() != 1)
+            return true;
+
+        ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
+
+        if(resourceClass instanceof UserIriClass || resourceClass.getColumnCount() != 1)
+            return true;
+
+        return false;
+    }
+
+
+    protected static String translateExpressionExpansion(Column column, UsedVariable variable)
+    {
+        Set<ResourceClass> resClasses = variable.getClasses();
+
+        boolean isBoxed = SqlExpressionIntercode.isBoxed(resClasses);
+        boolean splitDateTime = resClasses.stream().filter(r -> r instanceof DateTimeConstantZoneClass).count() > 1;
+        boolean splitDate = resClasses.stream().filter(r -> r instanceof DateConstantZoneClass).count() > 1;
+        boolean splitLang = resClasses.stream().filter(r -> r instanceof LangStringConstantTagClass).count() > 1;
+        boolean splitIntBlankNode = resClasses.stream().filter(r -> r instanceof UserIntBlankNodeClass).count() > 1;
+        boolean splitStrBlankNode = resClasses.stream().filter(r -> r instanceof UserStrBlankNodeClass).count() > 1;
+
+        StringBuilder builder = new StringBuilder();
+
+        boolean hasSelect = false;
+
+        for(ResourceClass resourceClass : resClasses)
+        {
+            boolean check = (resourceClass instanceof DateTimeConstantZoneClass && splitDateTime)
+                    || (resourceClass instanceof DateConstantZoneClass && splitDate)
+                    || (resourceClass instanceof LangStringConstantTagClass && splitLang)
+                    || (resourceClass instanceof UserIntBlankNodeClass && splitIntBlankNode)
+                    || (resourceClass instanceof UserStrBlankNodeClass && splitStrBlankNode);
+
+            List<Column> columns = resourceClass.fromExpression(column, isBoxed, check);
+
+            for(int i = 0; i < resourceClass.getColumnCount(); i++)
+            {
+                appendComma(builder, hasSelect);
+                hasSelect = true;
+
+                builder.append(columns.get(i));
+                builder.append(" AS ");
+                builder.append(variable.getMapping(resourceClass).get(i));
+            }
+        }
 
         return builder.toString();
     }

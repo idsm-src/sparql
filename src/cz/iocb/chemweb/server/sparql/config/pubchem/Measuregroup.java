@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -16,7 +16,7 @@ public class Measuregroup
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new GeneralUserIriClass("pubchem:measuregroup", "pubchem", "measuregroup",
-                Arrays.asList("integer", "integer"),
+                asList("integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/measuregroup/AID[0-9]+(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0)?)?"));
     }
 

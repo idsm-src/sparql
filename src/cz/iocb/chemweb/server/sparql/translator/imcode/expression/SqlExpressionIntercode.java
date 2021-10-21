@@ -17,11 +17,13 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -34,33 +36,33 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
 
 
 
 public abstract class SqlExpressionIntercode extends SqlBaseClass
 {
-    private static final List<ResourceClass> numericOrder = Arrays.asList(xsdShort, xsdInt, xsdLong, xsdInteger,
-            xsdDecimal, xsdFloat, xsdDouble);
+    private static final List<ResourceClass> numericOrder = asList(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal,
+            xsdFloat, xsdDouble);
 
     private final boolean canBeNull;
     private final boolean isDeterministic;
     private final boolean isBoxed;
     private final Set<ResourceClass> resourceClasses;
-    protected final Set<String> variables = new HashSet<String>();
+    protected final Set<String> referencedVariables = new HashSet<String>();
 
 
     protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull, boolean isDeterministic)
     {
         this.canBeNull = canBeNull;
         this.isDeterministic = isDeterministic;
-        this.isBoxed = getExpressionResourceClass(resourceClasses) == null;
+        this.isBoxed = isBoxed(resourceClasses);
         this.resourceClasses = resourceClasses;
     }
 
 
-    public abstract SqlExpressionIntercode optimize(VariableAccessor variableAccessor);
+    public abstract SqlExpressionIntercode optimize(UsedVariables variables);
 
 
     public abstract String translate();
@@ -90,9 +92,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public Set<String> getVariables()
+    public Set<String> getReferencedVariables()
     {
-        return variables;
+        return referencedVariables;
     }
 
 
@@ -214,7 +216,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static ResourceClass getExpressionResourceClass(Set<ResourceClass> resourceClasses)
+    public static ResourceClass getExpressionResourceClass(Set<ResourceClass> resourceClasses)
     {
         if(resourceClasses.size() == 0)
             return null;
@@ -244,6 +246,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public static boolean isBoxed(Set<ResourceClass> resourceClasses)
+    {
+        return getExpressionResourceClass(resourceClasses) == null;
+    }
+
+
     protected static Set<ResourceClass> joinResourceClasses(Set<ResourceClass> left, Set<ResourceClass> right)
     {
         Set<ResourceClass> set = new HashSet<ResourceClass>();
@@ -251,22 +259,22 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         set.addAll(right);
 
         if(set.contains(xsdDateTime))
-            set = set.stream().filter(r -> !(r instanceof DateTimeConstantZoneClass)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof DateTimeConstantZoneClass)).collect(toSet());
 
         if(set.contains(xsdDate))
-            set = set.stream().filter(r -> !(r instanceof DateConstantZoneClass)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof DateConstantZoneClass)).collect(toSet());
 
         if(set.contains(rdfLangString))
-            set = set.stream().filter(r -> !(r instanceof LangStringConstantTagClass)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof LangStringConstantTagClass)).collect(toSet());
 
         if(set.contains(iri))
-            set = set.stream().filter(r -> !(r instanceof IriClass && r != iri)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof IriClass && r != iri)).collect(toSet());
 
         if(set.contains(intBlankNode))
-            set = set.stream().filter(r -> !(r instanceof UserIntBlankNodeClass)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof UserIntBlankNodeClass)).collect(toSet());
 
         if(set.contains(strBlankNode))
-            set = set.stream().filter(r -> !(r instanceof UserStrBlankNodeClass)).collect(Collectors.toSet());
+            set = set.stream().filter(r -> !(r instanceof UserStrBlankNodeClass)).collect(toSet());
 
         return set;
     }
@@ -315,7 +323,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(operand instanceof SqlVariable)
         {
             SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
 
             boolean hasOuterVariants = false;
 
@@ -332,12 +339,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 hasOuterVariants = true;
                 boolean hasInnerVariants = false;
 
-                if(resourceClass.getPatternPartsCount() > 1)
+                if(resourceClass.getColumnCount() > 1)
                     builder.append("(");
 
-                for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
+                for(int i = 0; i < resourceClass.getColumnCount(); i++)
                 {
-                    String access = variable.getVariableAccessor().getSqlVariableAccess(name, resourceClass, i);
+                    Column access = variable.getUsedVariable().getMapping(resourceClass).get(i);
 
                     if(not)
                         appendAnd(builder, hasInnerVariants);
@@ -349,7 +356,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                     builder.append(not ? " IS NOT NULL" : " IS NULL");
                 }
 
-                if(resourceClass.getPatternPartsCount() > 1)
+                if(resourceClass.getColumnCount() > 1)
                     builder.append(")");
             }
 
@@ -373,7 +380,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(operand instanceof SqlVariable)
         {
             SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
 
             List<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> r == resourceClass
@@ -381,17 +387,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                             || isDateTime(r) && isDateTime(resourceClass) || isDate(r) && isDate(resourceClass)
                             || isIri(r) && isIri(resourceClass) || isIntBlankNode(r) && isIntBlankNode(resourceClass)
                             || isStrBlankNode(r) && isStrBlankNode(resourceClass))
-                    .collect(Collectors.toList());
+                    .collect(toList());
 
 
             boolean hasAlternative = false;
 
             if(compatibleClasses.size() > 1)
-                builder.append("COALESCE(");
+                builder.append("coalesce(");
 
             for(ResourceClass compatibleClass : compatibleClasses)
             {
-                String code = compatibleClass.getExpressionCode(name, variable.getVariableAccessor(), false);
+                List<Column> cols = variable.getUsedVariable().getMapping(compatibleClass);
+                Column code = compatibleClass.toExpression(cols, false);
 
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
@@ -530,19 +537,19 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(operand instanceof SqlVariable)
         {
             SqlVariable variable = (SqlVariable) operand;
-            String name = variable.getName();
 
             boolean hasAlternative = false;
 
             if(requestedClasses.size() > 1)
-                builder.append("COALESCE(");
+                builder.append("coalesce(");
 
             for(ResourceClass patternClass : requestedClasses)
             {
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                builder.append(patternClass.getExpressionCode(name, variable.getVariableAccessor(), true));
+                List<Column> cols = variable.getUsedVariable().getMapping(patternClass);
+                builder.append(patternClass.toExpression(cols, true));
             }
 
             if(requestedClasses.size() > 1)
@@ -598,7 +605,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static String translateAsStringLiteral(SqlExpressionIntercode operand, ResourceClass resourceClass)
     {
         if(operand instanceof SqlVariable)
-            return ((SqlVariable) operand).getExpressionValue(resourceClass, false);
+            return ((SqlVariable) operand).getExpressionValue(resourceClass, false).toString();
         else if(!operand.isBoxed())
             return operand.translate();
         else if(resourceClass == xsdString)
@@ -616,10 +623,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             SqlVariable variable = (SqlVariable) operand;
 
             Set<ResourceClass> compatible = operand.getResourceClasses().stream().filter(r -> isStringLiteral(r))
-                    .collect(Collectors.toSet());
+                    .collect(toSet());
 
             if(compatible.size() > 1)
-                builder.append("COALESCE(");
+                builder.append("coalesce(");
 
             boolean hasVariant = false;
 
@@ -628,7 +635,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 appendComma(builder, hasVariant);
                 hasVariant = true;
 
-                builder.append(variable.getNodeAccess(resClass, 0));
+                builder.append(variable.asResource(resClass).get(0));
             }
 
             if(compatible.size() > 1)

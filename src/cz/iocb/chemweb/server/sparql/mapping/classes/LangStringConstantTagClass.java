@@ -4,12 +4,15 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import java.util.ArrayList;
 import java.util.Hashtable;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -22,7 +25,7 @@ public class LangStringConstantTagClass extends LiteralClass
 
     private LangStringConstantTagClass(String lang)
     {
-        super("lang-" + lang, Arrays.asList("varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang-" + lang, asList("varchar"), asList(LANGSTRING, LANG), rdfLangStringIri);
         this.lang = lang;
     }
 
@@ -59,110 +62,116 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public String getLiteralPatternCode(Literal literal, int part)
+    public List<Column> toColumns(Node node)
     {
-        return "'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar";
+        String code = "'" + ((String) ((Literal) node).getValue()).replaceAll("'", "''") + "'::varchar";
+        return asList(new ConstantColumn(code));
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        if(part == 0)
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("CASE WHEN ");
+        builder.append(columns.get(1));
+        builder.append(" = '");
+        builder.append(lang);
+        builder.append("'::varchar THEN ");
+        builder.append(columns.get(0));
+        builder.append(" END");
+
+        return asList(new ExpressionColumn(builder.toString()));
+    }
+
+
+    @Override
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getGeneralClass().getColumnCount());
+
+        result.add(columns.get(0));
+
+        if(check == false)
         {
-            return (table != null ? table + "." : "") + getSqlColumn(var, part);
-        }
-        else if(check == false)
-        {
-            return "'" + lang + "'::varchar";
+            result.add(new ConstantColumn("'" + lang + "'::varchar"));
         }
         else
         {
             StringBuilder builder = new StringBuilder();
 
             builder.append("CASE WHEN ");
-
-            if(table != null)
-                builder.append(table).append(".");
-
-            builder.append(getSqlColumn(var, part));
+            builder.append(columns.get(0));
             builder.append(" IS NOT NULL THEN '");
             builder.append(lang);
             builder.append("'::varchar END");
 
-            return builder.toString();
+            result.add(new ExpressionColumn(builder.toString()));
         }
+
+        return result;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append("CASE WHEN ");
-
-        if(table != null)
-            builder.append(table).append(".");
-
-        builder.append(rdfLangString.getSqlColumn(var, 1));
-        builder.append(" = '");
-        builder.append(lang);
-        builder.append("'::varchar THEN ");
-
-        if(table != null)
-            builder.append(table).append(".");
-
-        builder.append(rdfLangString.getSqlColumn(var, 0));
-        builder.append(" END");
-
-        return builder.toString();
-    }
-
-
-    @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
             throw new IllegalArgumentException();
 
-        return "sparql.rdfbox_extract_lang_string_string" + "(" + column + ")";
-    }
+        StringBuilder builder = new StringBuilder();
 
-
-    @Override
-    public String getExpressionCode(Literal literal)
-    {
-        return "'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar";
-    }
-
-
-    @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
-    {
-        String code = variableAccessor.getSqlVariableAccess(variable, this, 0);
-
-        if(rdfbox)
-            code = "sparql.cast_as_rdfbox_from_lang_string(" + code + ", '" + lang + "'::varchar)";
-
-        return code;
-    }
-
-
-    @Override
-    public String getResultCode(String variable, int part)
-    {
-        if(part == 0)
-            return getSqlColumn(variable, part);
+        if(check)
+        {
+            builder.append("CASE ");
+            builder.append("sparql.rdfbox_extract_lang_string_lang" + "(" + column + ")");
+            builder.append(" WHEN '");
+            builder.append(getTag());
+            builder.append("'::varchar THEN ");
+            builder.append("sparql.rdfbox_extract_lang_string_string" + "(" + column + ")");
+            builder.append(" END");
+        }
         else
-            return "CASE WHEN " + getSqlColumn(variable, 0) + "IS NOT NULL THEN '" + lang + "'::varchar END";
+        {
+            builder.append("sparql.rdfbox_extract_lang_string_string" + "(" + column + ")");
+        }
+
+        return asList(new ExpressionColumn(builder.toString()));
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public Column toExpression(Node node)
     {
-        if(!super.match(node, request))
+        return new ConstantColumn("'" + ((String) ((Literal) node).getValue()).replaceAll("'", "''") + "'::varchar");
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns, boolean rdfbox)
+    {
+        if(!rdfbox)
+            return columns.get(0);
+
+        return new ExpressionColumn(
+                "sparql.cast_as_rdfbox_from_lang_string(" + columns.get(0) + ", '" + lang + "'::varchar)");
+    }
+
+
+    @Override
+    public List<Column> toResult(List<Column> columns)
+    {
+        String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + lang + "'::varchar END";
+
+        return asList(columns.get(0), new ExpressionColumn(code));
+    }
+
+
+    @Override
+    public boolean match(Node node)
+    {
+        if(!super.match(node))
             return false;
 
         if(!(node instanceof Literal))

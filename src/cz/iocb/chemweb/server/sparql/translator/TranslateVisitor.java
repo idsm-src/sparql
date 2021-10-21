@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -11,7 +11,6 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -23,7 +22,6 @@ import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
-import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -31,7 +29,6 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
 import cz.iocb.chemweb.server.sparql.engine.IriNode;
 import cz.iocb.chemweb.server.sparql.engine.LanguageTaggedLiteral;
@@ -45,16 +42,8 @@ import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
-import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral.Category;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
@@ -103,11 +92,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.BlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
-import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionAggregationRewriteVisitor;
-import cz.iocb.chemweb.server.sparql.translator.expression.ExpressionTranslateVisitor;
-import cz.iocb.chemweb.server.sparql.translator.expression.LeftJoinVariableAccessor;
-import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlAggregation;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
@@ -123,13 +107,12 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlSelect;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlValues;
-import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
-import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
@@ -140,6 +123,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private static final int serviceContextLimit = 1000;
     private static final int serviceResultLimit = 100000;
     private static final String variablePrefix = "@additionalvar";
+
     private int variableId = 0;
     private int serviceId = 0;
 
@@ -149,8 +133,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private final SparqlDatabaseConfiguration configuration;
     private final List<UserIriClass> iriClasses;
-    private final DatabaseSchema schema;
-    private final Request request;
     private final boolean evalSeriveces;
 
     private HashMap<String, List<Range>> variableOccurrences;
@@ -158,12 +140,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private Prologue prologue;
 
 
-    public TranslateVisitor(Request request, List<TranslateMessage> messages, boolean evalSeriveces)
+    public TranslateVisitor(List<TranslateMessage> messages, boolean evalSeriveces)
     {
+        Request request = Request.currentRequest();
+
         this.configuration = request.getConfiguration();
         this.iriClasses = configuration.getIriClasses();
-        this.schema = configuration.getDatabaseSchema();
-        this.request = request;
         this.messages = messages;
         this.evalSeriveces = evalSeriveces;
 
@@ -195,8 +177,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         variablesInScope.add(variable.getName());
 
         SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
-        VariableAccessor variableAccessor = new SimpleVariableAccessor(new UsedVariables());
-        SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, variableAccessor);
+        SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, new UsedVariables());
         SqlIntercode bind = SqlBind.bind(variable.getSqlName(), expression, SqlEmptySolution.get());
 
         return new SqlQuery(variablesInScope, bind);
@@ -213,12 +194,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Variable predicate = new Variable("@predikate");
         Variable object = new Variable("@object");
 
-        HashSet<String> restrictions = new LinkedHashSet<String>();
+        Set<String> restrictions = new LinkedHashSet<String>();
         restrictions.add(subject.getSqlName());
         restrictions.add(predicate.getSqlName());
         restrictions.add(object.getSqlName());
 
-        PathTranslateVisitor visitor = new PathTranslateVisitor(request, this, datasets);
+        PathTranslateVisitor visitor = new PathTranslateVisitor(this, datasets);
         SqlIntercode result = SqlNoSolution.get();
         SqlIntercode select = visitElement(describeQuery.getSelect());
 
@@ -227,7 +208,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(resource instanceof IRI)
             {
                 IRI iri = (IRI) resource;
-                SqlExpressionIntercode expression = SqlIri.create(iri, request);
+                SqlExpressionIntercode expression = SqlIri.create(iri);
 
                 SqlIntercode subjectPattern = visitor.translate(null, iri, predicate, object);
                 subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
@@ -240,25 +221,24 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else
             {
                 Variable variable = (Variable) resource;
-                SqlExpressionIntercode expression = SqlVariable.create(variable.getSqlName(),
-                        new SimpleVariableAccessor(select.getVariables()));
+                SqlExpressionIntercode expression = SqlVariable.create(variable.getSqlName(), select.getVariables());
 
-                SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, Arrays.asList(expression));
-                SqlIntercode source = SqlFilter.filter(Arrays.asList(filter), select);
+                SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, asList(expression));
+                SqlIntercode source = SqlFilter.filter(asList(filter), select);
 
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
-                subjectPattern = SqlJoin.join(schema, source, subjectPattern);
+                subjectPattern = SqlJoin.join(source, subjectPattern);
                 subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
                 result = SqlUnion.union(result, subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
-                objectPattern = SqlJoin.join(schema, source, objectPattern);
+                objectPattern = SqlJoin.join(source, objectPattern);
                 objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern);
                 result = SqlUnion.union(result, objectPattern);
             }
         }
 
-        return new SqlQuery(restrictions, result).optimize(request);
+        return new SqlQuery(restrictions, result).optimize();
     }
 
 
@@ -358,7 +338,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 Variable variable = groupBy.getVariable();
 
                 if(variable == null)
-                    variable = new Variable(variablePrefix + variableId++);
+                    variable = createVariable(variablePrefix);
 
                 groupByVariables.add(variable.getSqlName());
 
@@ -370,8 +350,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 checkExpressionForUnGroupedSolutions(groupBy.getExpression());
 
                 ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                        new SimpleVariableAccessor(translatedWhereClause.getVariables()), this);
-
+                        translatedWhereClause.getVariables(), this);
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
 
                 //TODO: optimize based on the expression value
@@ -389,7 +368,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor();
 
             List<Filter> havingConditions = select.getHavingConditions().stream()
-                    .map(e -> new Filter(rewriter.visitElement(e))).collect(Collectors.toList());
+                    .map(e -> new Filter(rewriter.visitElement(e))).collect(toList());
 
 
             projections = new LinkedList<Projection>();
@@ -441,16 +420,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
 
 
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(translatedWhereClause.getVariables()), this);
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(translatedWhereClause.getVariables(),
+                    this);
 
             LinkedHashMap<String, SqlExpressionIntercode> aggregations = new LinkedHashMap<>();
 
             for(Entry<Variable, BuiltInCallExpression> entry : rewriter.getAggregations().entrySet())
                 aggregations.put(entry.getKey().getSqlName(), visitor.visitElement(entry.getValue()));
 
-            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause,
-                    null);
+            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause);
 
             translatedWhereClause = intercode;
 
@@ -462,7 +440,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         // translate final values clause
         if(select.getValues() != null)
-            translatedWhereClause = SqlJoin.join(schema, translatedWhereClause, visitElement(select.getValues()));
+            translatedWhereClause = SqlJoin.join(translatedWhereClause, visitElement(select.getValues()));
 
 
         // translate projection expressions
@@ -501,7 +479,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else
             {
-                Variable variable = new Variable(variablePrefix + variableId++);
+                Variable variable = createVariable(variablePrefix);
                 String varName = variable.getSqlName();
 
                 Bind bind = new Bind(condition.getExpression(), variable);
@@ -604,7 +582,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(rename)
             translatedPattern = SqlMerge.create(((Variable) graph.getName()).getSqlName(),
-                    ((Variable) graphVariable).getSqlName(), translatedPattern, false);
+                    ((Variable) graphVariable).getSqlName(), translatedPattern);
 
 
         if(graph.getName() instanceof Variable)
@@ -618,23 +596,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     //TODO: can be ignored, if the graph variable is not required outside the graph pattern
 
-                    ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-                    ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
-
-                    Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
-                    typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
+                    List<List<Node>> values = new ArrayList<List<Node>>();
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                    {
-                        valueClasses.add(g.getIriClass());
+                        values.add(asList(g.getValue()));
 
-                        ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
-                        list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
-                        typedValuesList.add(list);
-                    }
-
-                    translatedPattern = SqlJoin.join(schema, translatedPattern,
-                            SqlValues.create(typedVariables, typedValuesList));
+                    translatedPattern = SqlJoin.join(translatedPattern, SqlValues.create(asList(varName), values));
                 }
                 else if(variable == null)
                 {
@@ -643,7 +610,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
                         translatedPattern = SqlUnion.union(translatedPattern,
-                                SqlBind.bind(varName, SqlIri.create((IRI) g.getValue(), request), innerPattern));
+                                SqlBind.bind(varName, SqlIri.create((IRI) g.getValue()), innerPattern));
                 }
                 else
                 {
@@ -651,22 +618,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     translatedPattern = SqlNoSolution.get();
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                    {
-                        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-                        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
-
-                        Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
-                        typedVariables.add(new Pair<String, Set<ResourceClass>>(varName, valueClasses));
-
-                        valueClasses.add(g.getIriClass());
-
-                        ArrayList<Pair<Node, ResourceClass>> list = new ArrayList<Pair<Node, ResourceClass>>();
-                        list.add(new Pair<Node, ResourceClass>(g.getValue(), g.getIriClass()));
-                        typedValuesList.add(list);
-
-                        translatedPattern = SqlUnion.union(translatedPattern,
-                                SqlJoin.join(schema, innerPattern, SqlValues.create(typedVariables, typedValuesList)));
-                    }
+                        translatedPattern = SqlUnion.union(translatedPattern, SqlJoin.join(innerPattern,
+                                SqlValues.create(asList(varName), asList(asList(g.getValue())))));
                 }
             }
         }
@@ -702,96 +655,32 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Values values)
     {
-        final int size = values.getVariables().size();
-
         ArrayList<String> variables = new ArrayList<String>();
-        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
-
-        for(int j = 0; j < values.getValuesLists().size(); j++)
-            typedValuesList.add(new ArrayList<Pair<Node, ResourceClass>>(size));
-
 
         for(int i = 0; i < values.getVariables().size(); i++)
         {
             Variable variable = values.getVariables().get(i);
 
-            if(!variables.contains(variable.getName()))
-                variables.add(variable.getName());
-            else
+            if(variables.contains(variable.getName()))
                 messages.add(new TranslateMessage(MessageType.repeatOfValuesVariable,
                         values.getVariables().get(i).getRange(), variable.getName()));
 
-
-            Set<ResourceClass> valueClasses = new HashSet<ResourceClass>();
-            typedVariables.add(new Pair<String, Set<ResourceClass>>(variable.getSqlName(), valueClasses));
-
-
-            for(int j = 0; j < values.getValuesLists().size(); j++)
-            {
-                ValuesList valuesList = values.getValuesLists().get(j);
-                Expression value = valuesList.getValues().get(i);
-                ResourceClass valueType = null;
-
-                if(value != null)
-                {
-                    if(value instanceof Literal)
-                    {
-                        Literal literal = (Literal) value;
-
-                        if(literal.getLanguageTag() != null)
-                        {
-                            valueType = LangStringConstantTagClass.get(literal.getLanguageTag());
-                        }
-                        else
-                        {
-                            valueType = BuiltinClasses.unsupportedLiteral;
-
-                            if(literal.getValue() != null)
-                            {
-                                IRI iri = literal.getTypeIri();
-
-                                if(iri != null)
-                                    for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
-                                        if(literalClass.getTypeIri().equals(iri))
-                                            valueType = literalClass;
-
-                                if(valueType == xsdDateTime)
-                                    valueType = DateTimeConstantZoneClass
-                                            .get(DateTimeConstantZoneClass.getZone(literal));
-
-                                if(valueType == xsdDate)
-                                    valueType = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
-                            }
-                        }
-                    }
-                    else if(value instanceof IRI)
-                    {
-                        valueType = BuiltinClasses.unsupportedIri;
-
-                        for(UserIriClass resClass : iriClasses)
-                        {
-                            if(resClass.match((Node) value, request))
-                            {
-                                valueType = resClass;
-                                break;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        assert false;
-                    }
-
-                    valueClasses.add(valueType);
-                }
-
-                typedValuesList.get(j).add(new Pair<Node, ResourceClass>((Node) value, valueType));
-            }
+            variables.add(variable.getName());
         }
 
+        List<List<Node>> lines = new ArrayList<List<Node>>(values.getValuesLists().size());
 
-        return SqlValues.create(typedVariables, typedValuesList);
+        for(ValuesList list : values.getValuesLists())
+        {
+            List<Node> line = new ArrayList<Node>(list.getValues().size());
+
+            for(Expression expression : list.getValues())
+                line.add((Node) expression);
+
+            lines.add(line);
+        }
+
+        return SqlValues.create(variables, lines);
     }
 
 
@@ -803,7 +692,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Verb predicate = triple.getPredicate();
         Node object = triple.getObject();
 
-        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, datasets);
+        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(this, datasets);
         SqlIntercode translatedPattern = pathVisitor.translate(graph, subject, predicate, object);
 
         return translatedPattern;
@@ -845,7 +734,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         return null;
     }
 
-    /**************************************************************************/
 
     private void checkProjectionVariables(Select select)
     {
@@ -1264,7 +1152,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 SqlIntercode translatedPattern = visitElement(pattern);
 
-                translatedGroupPattern = SqlJoin.join(schema, translatedGroupPattern, translatedPattern);
+                translatedGroupPattern = SqlJoin.join(translatedGroupPattern, translatedPattern);
                 inScopeVariables.addAll(pattern.getVariablesInScope());
             }
         }
@@ -1276,56 +1164,27 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
             LinkedList<Filter> optionalFilters)
     {
-        List<SqlExpressionIntercode> conditions = null;
+        List<SqlExpressionIntercode> conditions = new LinkedList<SqlExpressionIntercode>();
 
         if(!optionalFilters.isEmpty())
         {
-            VariableAccessor variableAccessor = new LeftJoinVariableAccessor(translatedGroupPattern.getVariables(),
+            UsedVariables variables = SqlLeftJoin.getExpressionVariables(translatedGroupPattern.getVariables(),
                     translatedPattern.getVariables());
-            conditions = translateLeftJoinFilters(optionalFilters, variableAccessor);
 
-            if(conditions == null)
-                return translatedGroupPattern;
+            for(Filter filter : optionalFilters)
+            {
+                checkExpressionForUnGroupedSolutions(filter.getConstraint());
+
+                ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variables, this);
+                SqlExpressionIntercode expression = SqlEffectiveBooleanValue
+                        .create(visitor.visitElement(filter.getConstraint()));
+
+                if(expression != SqlEffectiveBooleanValue.trueValue)
+                    conditions.add(expression);
+            }
         }
 
-        if(conditions == null)
-            conditions = new LinkedList<SqlExpressionIntercode>();
-
-        SqlIntercode intercode = SqlLeftJoin.leftJoin(schema, translatedGroupPattern, translatedPattern, conditions,
-                null);
-
-        return intercode;
-    }
-
-
-    List<SqlExpressionIntercode> translateLeftJoinFilters(LinkedList<Filter> optionalFilters,
-            VariableAccessor variableAccessor)
-    {
-        List<SqlExpressionIntercode> expressions = new LinkedList<SqlExpressionIntercode>();
-        boolean isFalse = false;
-
-        for(Filter filter : optionalFilters)
-        {
-            checkExpressionForUnGroupedSolutions(filter.getConstraint());
-
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(variableAccessor, this);
-
-            SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
-            expression = SqlEffectiveBooleanValue.create(expression);
-
-            if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
-                isFalse = true;
-            else if(expression instanceof SqlBinaryComparison
-                    && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
-                isFalse = true;
-            else if(expression != SqlEffectiveBooleanValue.trueValue)
-                expressions.add(expression);
-        }
-
-        if(isFalse)
-            return null;
-
-        return expressions;
+        return SqlLeftJoin.leftJoin(translatedGroupPattern, translatedPattern, conditions);
     }
 
 
@@ -1333,7 +1192,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         SqlIntercode minusPattern = visitElement(pattern.getPattern());
 
-        return SqlMinus.minus(translatedGroupPattern, minusPattern, null);
+        return SqlMinus.minus(translatedGroupPattern, minusPattern);
     }
 
 
@@ -1343,13 +1202,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         checkExpressionForUnGroupedSolutions(bind.getExpression());
 
-        ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                new SimpleVariableAccessor(translatedGroupPattern.getVariables()), this);
-
+        ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(translatedGroupPattern.getVariables(),
+                this);
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
 
-        SqlIntercode intercode = SqlBind.bind(variableName, expression, translatedGroupPattern);
-        return intercode;
+        return SqlBind.bind(variableName, expression, translatedGroupPattern);
     }
 
 
@@ -1359,17 +1216,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return groupPattern;
 
 
-        List<SqlExpressionIntercode> filterExpressions = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> filterExpressions = new ArrayList<SqlExpressionIntercode>(filters.size());
 
         for(Filter filter : filters)
         {
             checkExpressionForUnGroupedSolutions(filter.getConstraint());
 
-            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(
-                    new SimpleVariableAccessor(groupPattern.getVariables()), this);
-
-            SqlExpressionIntercode expression = visitor.visitElement(filter.getConstraint());
-            expression = SqlEffectiveBooleanValue.create(expression);
+            ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(groupPattern.getVariables(), this);
+            SqlExpressionIntercode expression = SqlEffectiveBooleanValue
+                    .create(visitor.visitElement(filter.getConstraint()));
 
             filterExpressions.add(expression);
         }
@@ -1395,17 +1250,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        /* check paramaters */
+        /* check parameters */
 
         LinkedHashMap<ParameterDefinition, Node> parameterNodes = new LinkedHashMap<ParameterDefinition, Node>();
 
         for(ParameterDefinition parameter : procedureDefinition.getParameters())
             parameterNodes.put(parameter, null);
 
-
-        ArrayList<String> variablesInScope = new ArrayList<String>();
-
-        for(ProcedureCall.Parameter parameter : procedureCallBase.getParameters())
+        for(Parameter parameter : procedureCallBase.getParameters())
         {
             String parameterName = parameter.getName().getValue();
             ParameterDefinition parameterDefinition = procedureDefinition.getParameter(parameterName);
@@ -1444,10 +1296,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 parameterNodes.put(parameterDefinition, value);
             }
-
-
-            if(parameter.getValue() instanceof Variable)
-                variablesInScope.add(((Variable) parameter.getValue()).getName());
         }
 
 
@@ -1472,8 +1320,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         /* check results */
 
-        LinkedHashMap<ResultDefinition, Node> resultNodes = new LinkedHashMap<ResultDefinition, Node>();
+        LinkedHashMap<ResultDefinition, VariableOrBlankNode> resultNodes = new LinkedHashMap<ResultDefinition, VariableOrBlankNode>();
 
+        Set<String> used = new HashSet<String>(contextVariables.getNames());
+        LinkedHashMap<Variable, Node> conditions = new LinkedHashMap<Variable, Node>();
 
         if(procedureCallBase instanceof ProcedureCall)
         {
@@ -1481,10 +1331,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             ResultDefinition resultDefinition = procedureDefinition.getResult(null);
             Node result = ((ProcedureCall) procedureCallBase).getResult();
-            resultNodes.put(resultDefinition, result);
 
-            if(result instanceof Variable)
-                variablesInScope.add(((Variable) result).getName());
+            if(!(result instanceof VariableOrBlankNode) || used.contains(((VariableOrBlankNode) result).getSqlName()))
+            {
+                Variable fakeResult = createVariable(variablePrefix);
+                conditions.put(fakeResult, result);
+                result = fakeResult;
+            }
+
+            used.add(((VariableOrBlankNode) result).getSqlName());
+
+            resultNodes.put(resultDefinition, (VariableOrBlankNode) result);
         }
         else
         {
@@ -1492,34 +1349,71 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             MultiProcedureCall multiProcedureCall = (MultiProcedureCall) procedureCallBase;
 
-            for(Parameter result : multiProcedureCall.getResults())
+            for(Parameter resultParameter : multiProcedureCall.getResults())
             {
-                String parameterName = result.getName().getValue();
+                String parameterName = resultParameter.getName().getValue();
                 ResultDefinition resultDefinition = procedureDefinition.getResult(parameterName);
 
                 if(resultDefinition == null)
                 {
-                    messages.add(new TranslateMessage(MessageType.invalidResultPredicate, result.getName().getRange(),
-                            result.getName().toString(prologue), procedureCallBase.getProcedure().toString(prologue)));
+                    messages.add(new TranslateMessage(MessageType.invalidResultPredicate,
+                            resultParameter.getName().getRange(), resultParameter.getName().toString(prologue),
+                            procedureCallBase.getProcedure().toString(prologue)));
 
                 }
                 else if(resultNodes.get(resultDefinition) != null)
                 {
-                    messages.add(new TranslateMessage(MessageType.repeatOfResultPredicate, result.getName().getRange(),
-                            result.getName().toString(prologue)));
+                    messages.add(new TranslateMessage(MessageType.repeatOfResultPredicate,
+                            resultParameter.getName().getRange(), resultParameter.getName().toString(prologue)));
                 }
                 else
                 {
-                    resultNodes.put(resultDefinition, result.getValue());
+                    Node result = resultParameter.getValue();
+
+                    if(!(result instanceof VariableOrBlankNode)
+                            || used.contains(((VariableOrBlankNode) result).getSqlName()))
+                    {
+                        Variable fakeResult = createVariable(variablePrefix);
+                        conditions.put(fakeResult, result);
+                        result = fakeResult;
+                    }
+
+                    used.add(((VariableOrBlankNode) result).getSqlName());
+
+                    resultNodes.put(resultDefinition, (VariableOrBlankNode) result);
                 }
-
-
-                if(result.getValue() instanceof Variable)
-                    variablesInScope.add(((Variable) result.getValue()).getName());
             }
         }
 
-        return SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context, request, null);
+
+        SqlIntercode intercode = SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
+
+        for(Entry<Variable, Node> entry : conditions.entrySet())
+        {
+            Variable fakeResult = entry.getKey();
+            Node result = entry.getValue();
+
+            VariableOrBlankNode var = null;
+
+            if(result instanceof Literal)
+            {
+                var = createVariable(variablePrefix);
+                intercode = SqlBind.bind(var.getSqlName(), SqlLiteral.create((Literal) result), intercode);
+            }
+            else if(result instanceof IRI)
+            {
+                var = createVariable(variablePrefix);
+                intercode = SqlBind.bind(var.getSqlName(), SqlIri.create((IRI) result), intercode);
+            }
+            else //if(result instanceof VariableOrBlankNode)
+            {
+                var = (VariableOrBlankNode) result;
+            }
+
+            intercode = SqlMerge.create(var.getSqlName(), fakeResult.getSqlName(), intercode);
+        }
+
+        return intercode;
     }
 
 
@@ -1554,6 +1448,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         /* create variable lists */
+
         HashSet<String> contextVariables = new HashSet<String>(context.getVariables().getNames());
 
         List<String> mergedVariables = new LinkedList<String>();
@@ -1561,11 +1456,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         serviceInScopeVars.stream().filter(v -> !contextVariables.contains(v)).forEach(v -> mergedVariables.add(v));
 
         List<String> sharedVariables = contextVariables.stream().filter(v -> serviceInScopeVars.contains(v))
-                .collect(Collectors.toList());
+                .collect(toList());
 
 
         if(!evalSeriveces)
-            return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
+            return context;
 
 
         ArrayList<RdfNode[]> rows = new ArrayList<RdfNode[]>();
@@ -1581,12 +1476,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             try
             {
                 /* evaluate context pattern */
+
                 SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context, new HashSet<String>(),
                         new LinkedHashMap<String, Direction>());
                 sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
                 SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
 
-                String code = query.optimize(request).translate();
+                String code = query.optimize().translate();
+
+                Request request = Request.currentRequest();
 
                 try(Result result = new SelectResult(ResultType.SELECT, request.getStatement().executeQuery(code),
                         request.getBegin(), request.getTimeout()))
@@ -1610,20 +1508,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(rows.size() > serviceContextLimit)
             {
                 messages.add(new TranslateMessage(MessageType.serviceContextLimitExceeded, service.getRange()));
-                return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
+                return context;
             }
         }
 
 
         /* create result lists */
-        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
 
-        for(String var : mergedVariables)
-            typedVariables.add(new Pair<String, Set<ResourceClass>>(var, new HashSet<>()));
-
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> results = new ArrayList<>();
-        Pair<Node, ResourceClass> emptyResult = new Pair<Node, ResourceClass>(null, null);
-
+        ArrayList<List<Node>> results = new ArrayList<List<Node>>();
 
         BlankNodeClass blankNodeClass = new UserStrBlankNodeClass(--serviceId);
         int call = 0;
@@ -1641,23 +1533,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
             /* build default result */
-            ArrayList<Pair<Node, ResourceClass>> defaulResult = new ArrayList<>(mergedVariables.size());
-            ArrayList<ArrayList<Pair<Node, ResourceClass>>> rowResults = new ArrayList<>();
 
-            ArrayList<Pair<String, Set<ResourceClass>>> rowTypedVariables = new ArrayList<>();
-
-            for(String var : mergedVariables)
-                rowTypedVariables.add(new Pair<String, Set<ResourceClass>>(var, new HashSet<>()));
-
+            ArrayList<Node> defaulResult = new ArrayList<Node>(mergedVariables.size());
+            ArrayList<ArrayList<Node>> rowResults = new ArrayList<ArrayList<Node>>();
 
             for(int i = 0; i < mergedVariables.size(); i++)
             {
-                Integer idx = varIndexes.get(mergedVariables.get(i));
+                String varName = mergedVariables.get(i);
+                Integer idx = varIndexes.get(varName);
                 Node node = null;
 
                 if(idx != null)
                 {
-                    RdfNode term = row[varIndexes.get(mergedVariables.get(i))];
+                    RdfNode term = row[varIndexes.get(varName)];
 
                     if(term instanceof IriNode)
                         node = new IRI(term.getValue());
@@ -1666,24 +1554,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     else if(term instanceof TypedLiteral)
                         node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
                     else if(term instanceof ReferenceNode)
-                        node = new BlankNodeLiteral(term.getValue());
+                        node = new BlankNodeLiteral(term.getValue(), context.getVariables().get(varName).getClasses());
                 }
 
-                if(node != null)
-                {
-                    Set<ResourceClass> classes = context.getVariables().get(mergedVariables.get(i)).getClasses();
-                    ResourceClass resourceClass = getResourceClass(node, classes);
-                    typedVariables.get(i).getValue().add(resourceClass);
-                    defaulResult.add(new Pair<>(node, resourceClass));
-                }
-                else
-                {
-                    defaulResult.add(emptyResult);
-                }
+                defaulResult.add(node);
             }
 
 
             /* build service query */
+
             StringBuilder sparqlQueryBuilder = new StringBuilder();
             sparqlQueryBuilder.append("select * where ");
             sparqlQueryBuilder.append(serviceCode);
@@ -1716,6 +1595,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             try
             {
                 /* process service query */
+
                 HttpURLConnection connection = null;
                 String url = endpoint;
 
@@ -1745,7 +1625,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 DefaultHandler handler = new DefaultHandler()
                 {
-                    ArrayList<Pair<Node, ResourceClass>> result;
+                    ArrayList<Node> result;
                     int varIndex;
                     StringBuilder data;
                     String datatype;
@@ -1757,7 +1637,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     {
                         if(qName.equalsIgnoreCase("result"))
                         {
-                            result = new ArrayList<Pair<Node, ResourceClass>>(mergedVariables.size());
+                            result = new ArrayList<Node>(mergedVariables.size());
                             result.addAll(defaulResult);
 
                             if(rowResults.size() + results.size() >= serviceResultLimit)
@@ -1796,7 +1676,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         if(qName.equalsIgnoreCase("uri"))
                             node = new IRI(data.toString());
                         else if(qName.equalsIgnoreCase("bnode"))
-                            node = new BlankNodeLiteral(Category.STR, serviceId, bnprefix + "r" + data.toString());
+                            node = new BlankNodeLiteral(bnprefix + "r" + data.toString(), blankNodeClass);
                         else if(!qName.equalsIgnoreCase("literal"))
                             return;
                         else if(lang != null)
@@ -1807,17 +1687,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                             node = new Literal(data.toString(), BuiltinTypes.xsdStringIri);
 
 
-                        if(defaulResult.get(varIndex).getKey() instanceof BlankNodeLiteral)
+                        if(defaulResult.get(varIndex) instanceof BlankNodeLiteral)
                             result = null;
 
                         if(result != null)
                         {
-                            if(result.get(varIndex).getKey() != null && !result.get(varIndex).getKey().equals(node))
+                            if(result.get(varIndex) != null && !result.get(varIndex).equals(node))
                                 throw new SAXException("unexpected value");
 
-                            ResourceClass resourceClass = getResourceClass(node, blankNodeClass);
-                            rowTypedVariables.get(varIndex).getValue().add(resourceClass);
-                            result.set(varIndex, new Pair<Node, ResourceClass>(node, resourceClass));
+                            result.set(varIndex, node);
                         }
                     }
 
@@ -1834,11 +1712,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     saxParser.parse(input, handler);
                 }
 
-
-                /* merge results */
-                for(int i = 0; i < rowTypedVariables.size(); i++)
-                    typedVariables.get(i).getValue().addAll(rowTypedVariables.get(i).getValue());
-
                 results.addAll(rowResults);
             }
             catch(ParserConfigurationException | SAXException | IOException e)
@@ -1846,7 +1719,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(limitExceeded[0])
                 {
                     messages.add(new TranslateMessage(MessageType.serviceResultLimitExceeded, service.getRange()));
-                    return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
+                    return context;
                 }
 
                 e.printStackTrace();
@@ -1858,104 +1731,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 else
                 {
                     messages.add(new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
-                    return createEmptyServiceTranslatedSegment(serviceInScopeVars, context);
+                    return context;
                 }
             }
         }
 
 
-        return SqlValues.create(typedVariables, results);
-    }
-
-
-    private SqlIntercode createEmptyServiceTranslatedSegment(HashSet<String> serviceInScopeVars, SqlIntercode context)
-    {
-        ArrayList<Pair<String, Set<ResourceClass>>> typedVariables = new ArrayList<>();
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList = new ArrayList<>();
-
-        Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
-        resourceClasses.addAll(BuiltinClasses.getClasses());
-
-        for(String var : serviceInScopeVars)
-        {
-            typedVariables.add(new Pair<String, Set<ResourceClass>>(var, resourceClasses));
-            typedValuesList.add(null);
-        }
-
-        return SqlJoin.join(schema, context, SqlValues.create(typedVariables, new ArrayList<>()));
-    }
-
-
-    private ResourceClass getResourceClass(Node node, ResourceClass blankNodeClass)
-    {
-        if(node instanceof Literal)
-        {
-            Literal literal = (Literal) node;
-
-            if(literal.getLanguageTag() != null)
-                LangStringConstantTagClass.get(literal.getLanguageTag());
-
-            ResourceClass resourceClass = BuiltinClasses.unsupportedLiteral;
-
-            for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
-                if(literalClass.getTypeIri().equals(literal.getTypeIri()))
-                    resourceClass = literalClass;
-
-            if(resourceClass == xsdDateTime)
-                resourceClass = DateTimeConstantZoneClass.get(DateTimeConstantZoneClass.getZone(literal));
-
-            if(resourceClass == xsdDate)
-                resourceClass = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
-
-            return resourceClass;
-        }
-        else if(node instanceof IRI)
-        {
-            ResourceClass resourceClass = BuiltinClasses.unsupportedIri;
-
-            for(UserIriClass resClass : iriClasses)
-            {
-                if(resClass.match(node, request))
-                {
-                    resourceClass = resClass;
-                    break;
-                }
-            }
-
-            return resourceClass;
-        }
-        else if(node instanceof BlankNodeLiteral)
-        {
-            return blankNodeClass;
-        }
-
-        return null;
-    }
-
-
-    private ResourceClass getResourceClass(Node node, Set<ResourceClass> classes)
-    {
-        if(!(node instanceof BlankNodeLiteral))
-            return getResourceClass(node, (ResourceClass) null);
-
-        BlankNodeLiteral bnode = (BlankNodeLiteral) node;
-
-        if(bnode.getCategory() == Category.STR)
-        {
-            for(ResourceClass resClass : classes)
-                if(resClass instanceof UserStrBlankNodeClass
-                        && bnode.getSegment() == ((UserStrBlankNodeClass) resClass).getSegment())
-                    return resClass;
-        }
-        else if(bnode.getCategory() == Category.INT)
-        {
-            for(ResourceClass resClass : classes)
-                if(resClass instanceof UserIntBlankNodeClass
-                        && bnode.getSegment() == ((UserIntBlankNodeClass) resClass).getSegment())
-                    return resClass;
-        }
-
-        return null;
+        return SqlValues.create(mergedVariables, results);
     }
 
 
@@ -1989,12 +1771,18 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         try
         {
             SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
-            return (SqlQuery) imcode.optimize(request);
+            return (SqlQuery) imcode.optimize();
         }
         catch(SQLRuntimeException e)
         {
             throw(SQLException) e.getCause();
         }
+    }
+
+
+    protected Variable createVariable(String prefix)
+    {
+        return new Variable(variablePrefix + variableId++);
     }
 
 
@@ -2013,12 +1801,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     public final List<UserIriClass> getIriClasses()
     {
         return iriClasses;
-    }
-
-
-    public Request getRequest()
-    {
-        return request;
     }
 
 

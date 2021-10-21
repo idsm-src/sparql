@@ -3,33 +3,38 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
-import java.util.Set;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
 public class SqlLiteral extends SqlNodeValue
 {
     private final Literal literal;
+    private final LiteralClass literalClass;
 
 
-    protected SqlLiteral(Literal literal, Set<ResourceClass> resourceClasses)
+    protected SqlLiteral(Literal literal, LiteralClass resourceClass)
     {
-        super(resourceClasses, false);
+        super(asSet(resourceClass), false);
+        this.literalClass = resourceClass;
         this.literal = literal;
     }
 
 
     public static SqlExpressionIntercode create(Literal literal)
     {
-        ResourceClass resourceClass = unsupportedLiteral;
+        LiteralClass resourceClass = unsupportedLiteral;
 
         if(literal.getLanguageTag() != null)
         {
@@ -42,17 +47,17 @@ public class SqlLiteral extends SqlNodeValue
                     resourceClass = literalClass;
 
             if(resourceClass == xsdDateTime)
-                resourceClass = DateTimeConstantZoneClass.get(DateTimeConstantZoneClass.getZone(literal));
+                resourceClass = DateTimeConstantZoneClass.get(DateTimeClass.getZone(literal));
             else if(resourceClass == xsdDate)
-                resourceClass = DateConstantZoneClass.get(DateConstantZoneClass.getZone(literal));
+                resourceClass = DateConstantZoneClass.get(DateClass.getZone(literal));
         }
 
-        return new SqlLiteral(literal, asSet(resourceClass));
+        return new SqlLiteral(literal, resourceClass);
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         return this;
     }
@@ -63,7 +68,7 @@ public class SqlLiteral extends SqlNodeValue
     {
         LiteralClass resourceClass = (LiteralClass) getResourceClasses().iterator().next();
 
-        return resourceClass.getExpressionCode(literal);
+        return resourceClass.toExpression(literal).toString();
     }
 
 
@@ -73,9 +78,15 @@ public class SqlLiteral extends SqlNodeValue
     }
 
 
-    @Override
-    public String getNodeAccess(ResourceClass resourceClass, int part)
+    public LiteralClass getLiteralClass()
     {
-        return resourceClass.getPatternCode(literal, part);
+        return literalClass;
+    }
+
+
+    @Override
+    public List<Column> asResource(ResourceClass resourceClass)
+    {
+        return resourceClass.toColumns(literal);
     }
 }

@@ -48,7 +48,8 @@ public class Assay
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasCellLine"),
                     config.createIriMapping("chembl:cell_line", "cell_line_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:targetConfScore"),
-                    config.createLiteralMapping(xsdInt, "confidence_score"), "confidence_score != 0");
+                    config.createLiteralMapping(xsdInt, "confidence_score"),
+                    config.createAreNotEqualCondition("confidence_score", "'0'::integer"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:targetRelType"),
                     config.createLiteralMapping(xsdString, "relationship_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
@@ -93,7 +94,7 @@ public class Assay
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString,
                             "(chembl_id || ' PubChem BioAssay Reference: ' || pubchem_assay_id)"),
-                    "pubchem_assay_id is not null");
+                    config.createIsNotNullCondition("pubchem_assay_id"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),

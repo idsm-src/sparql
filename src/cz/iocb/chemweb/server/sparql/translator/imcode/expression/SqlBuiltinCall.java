@@ -2,8 +2,10 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.bnodeIntBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.bnodeStrBlankNode;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
@@ -16,12 +18,15 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
@@ -31,7 +36,8 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.SimpleLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -52,7 +58,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         this.arguments = arguments;
 
         for(SqlExpressionIntercode argument : arguments)
-            this.variables.addAll(argument.getVariables());
+            this.referencedVariables.addAll(argument.getReferencedVariables());
     }
 
 
@@ -70,22 +76,28 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         {
             // aggregate functions
             case "count":
+            {
+                if(!arguments.isEmpty() && arguments.stream().allMatch(r -> r == SqlNull.get()))
+                    return SqlLiteral.create(new Literal("0", xsdInteger.getTypeIri()));
+
                 return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdInteger), false);
+            }
 
             case "sum":
             case "avg":
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                Set<ResourceClass> numerics = argument.getResourceClasses().stream().filter(r -> isNumeric(r))
-                        .collect(Collectors.toSet());
-                ResourceClass baseType = function.equals("avg") ? xsdDecimal : xsdInteger;
-                Set<ResourceClass> resourceClass = numerics.stream()
-                        .map(r -> isNumericCompatibleWith(r, baseType) ? baseType : r).collect(Collectors.toSet());
-                boolean canBeNull = argument.canBeNull() || argument.getResourceClasses().size() > numerics.size();
+                if(argument == SqlNull.get())
+                    return SqlLiteral.create(new Literal("0", xsdInteger.getTypeIri()));
 
-                if(resourceClass.size() == 0)
-                    return SqlNull.get();
+                ResourceClass baseType = function.equals("avg") ? xsdDecimal : xsdInteger;
+                Set<ResourceClass> resourceClass = argument.getResourceClasses().stream().filter(r -> isNumeric(r))
+                        .map(r -> isNumericCompatibleWith(r, baseType) ? baseType : r).collect(toSet());
+
+                resourceClass.add(xsdInteger);
+
+                boolean canBeNull = argument.getResourceClasses().stream().anyMatch(r -> !isNumeric(r));
 
                 return new SqlBuiltinCall(function, distinct, arguments, resourceClass, canBeNull);
             }
@@ -96,23 +108,21 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                if(argument.getResourceClasses().size() == 0)
+                if(argument == SqlNull.get())
                     return SqlNull.get();
 
-                return new SqlBuiltinCall(function, distinct, arguments, argument.getResourceClasses(),
-                        argument.canBeNull());
+                //NOTE: even if the argument cannot be null, the result can be null for an empty group
+                return new SqlBuiltinCall(function, distinct, arguments, argument.getResourceClasses(), true);
             }
 
             case "group_concat":
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                Set<ResourceClass> resourceClass = argument.getResourceClasses().stream()
-                        .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
-                boolean canBeNull = argument.canBeNull() || argument.getResourceClasses().size() > resourceClass.size();
+                if(argument == SqlNull.get())
+                    return SqlLiteral.create(new Literal(""));
 
-                if(resourceClass.size() == 0)
-                    return SqlNull.get();
+                boolean canBeNull = argument.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r));
 
                 return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdString), canBeNull);
             }
@@ -268,7 +278,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 Set<ResourceClass> resourceSet = operand.getResourceClasses().contains(xsdString) ? asSet(iri) :
-                        operand.getResourceClasses().stream().filter(r -> isIri(r)).collect(Collectors.toSet());
+                        operand.getResourceClasses().stream().filter(r -> isIri(r)).collect(toSet());
 
                 return new SqlBuiltinCall(function, arguments, resourceSet, operand.canBeNull()
                         || operand.getResourceClasses().stream().anyMatch(r -> !isIri(r) && r != xsdString));
@@ -389,7 +399,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode length = arguments.size() > 2 ? arguments.get(2) : null;
 
                 Set<ResourceClass> resourceClasses = operand.getResourceClasses().stream()
-                        .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                        .filter(r -> isStringLiteral(r)).collect(toSet());
 
                 if(resourceClasses.size() == 0
                         || location.getResourceClasses().stream().noneMatch(r -> isNumericCompatibleWith(r, xsdInteger))
@@ -411,7 +421,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode operand = arguments.get(0);
 
                 Set<ResourceClass> resourceClasses = operand.getResourceClasses().stream()
-                        .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                        .filter(r -> isStringLiteral(r)).collect(toSet());
 
                 if(resourceClasses.size() == 0)
                     return SqlNull.get();
@@ -541,7 +551,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(nextResourceClasses.contains(rdfLangString))
                         nextResourceClasses = nextResourceClasses.stream()
-                                .filter(r -> !(r instanceof LangStringConstantTagClass)).collect(Collectors.toSet());
+                                .filter(r -> !(r instanceof LangStringConstantTagClass)).collect(toSet());
 
                     canBeNull |= next.canBeNull();
                     resultClasses = nextResourceClasses;
@@ -588,7 +598,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode flags = arguments.size() > 3 ? arguments.get(3) : null;
 
                 Set<ResourceClass> resourceClasses = operand.getResourceClasses().stream()
-                        .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                        .filter(r -> isStringLiteral(r)).collect(toSet());
 
                 if(resourceClasses.size() == 0 || !pattern.getResourceClasses().contains(xsdString)
                         || !replacement.getResourceClasses().contains(xsdString)
@@ -615,7 +625,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 Set<ResourceClass> resultClasses = resourceClasses.stream().filter(r -> isNumeric(r))
-                        .map(r -> determineNumericResultClass(r)).collect(Collectors.toSet());
+                        .map(r -> determineNumericResultClass(r)).collect(toSet());
 
                 return new SqlBuiltinCall(function, arguments, resultClasses,
                         operand.canBeNull() || resourceClasses.stream().anyMatch(r -> !isNumeric(r)));
@@ -708,12 +718,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
-            optimized.add(argument.optimize(variableAccessor));
+            optimized.add(argument.optimize(variables));
 
         return create(function, distinct, optimized);
     }
@@ -727,6 +737,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             // aggregate functions
             case "count":
             {
+                boolean allCanBeNull = arguments.stream().allMatch(a -> a.canBeNull());
+
                 StringBuilder builder = new StringBuilder();
 
                 builder.append("count(");
@@ -734,7 +746,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(distinct)
                     builder.append("DISTINCT ");
 
-                if(arguments.size() == 0)
+                if(arguments.size() == 0 || !allCanBeNull && !distinct)
                 {
                     builder.append("1");
                 }
@@ -744,41 +756,31 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 }
                 else
                 {
-                    int columns = 0;
+                    Set<Column> columns = new HashSet<Column>();
 
                     for(int i = 0; i < arguments.size(); i++)
-                        for(ResourceClass resClass : arguments.get(i).getResourceClasses())
-                            columns += resClass.getPatternPartsCount();
+                        columns.addAll(((SqlVariable) arguments.get(i)).getUsedVariable().getNonConstantColumns());
 
-                    if(columns > 1)
-                        builder.append("row(");
-
-                    boolean hasColumn = false;
-
-                    for(int i = 0; i < arguments.size(); i++)
+                    if(allCanBeNull && columns.size() > 1)
                     {
-                        if(arguments.get(i) == SqlNull.get())
-                            continue;
-
-                        SqlVariable variable = (SqlVariable) arguments.get(i);
-
-                        for(ResourceClass resClass : variable.getResourceClasses())
-                        {
-                            for(int j = 0; j < resClass.getPatternPartsCount(); j++)
-                            {
-                                appendComma(builder, hasColumn);
-                                hasColumn = true;
-
-                                builder.append(resClass.getSqlColumn(variable.getName(), j));
-                            }
-                        }
+                        builder.append("CASE WHEN ");
+                        builder.append(columns.stream().map(c -> c + " IS NOT NULL").collect(joining(" OR ")));
+                        builder.append(" THEN ");
                     }
 
-                    if(!hasColumn)
+                    if(columns.size() > 1)
+                        builder.append("row(");
+
+                    if(columns.size() > 0)
+                        builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+                    else
                         builder.append("NULL");
 
-                    if(columns > 1)
+                    if(columns.size() > 1)
                         builder.append(")");
+
+                    if(allCanBeNull && columns.size() > 1)
+                        builder.append(" END");
                 }
 
                 builder.append(")::decimal");
@@ -789,22 +791,29 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "sum":
             case "avg":
             {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                ResourceClass resClass = argument.getExpressionResourceClass();
+
+                if(argument.getResourceClasses().stream().allMatch(r -> isNumericCompatibleWith(r, xsdInteger)))
+                    resClass = xsdInteger;
+
+
                 StringBuilder builder = new StringBuilder();
 
                 builder.append("sparql.");
                 builder.append(function);
+                builder.append("_");
+                builder.append(resClass != null ? resClass.getName() : "rdfbox");
                 builder.append("(");
 
                 if(distinct)
                     builder.append("DISTINCT ");
 
-                SqlExpressionIntercode argument = arguments.get(0);
-
-                if(!isBoxed())
-                    builder.append(translateAsUnboxedOperand(argument, getExpressionResourceClass()));
+                if(resClass != null)
+                    builder.append(translateAsUnboxedOperand(argument, resClass));
                 else
-                    builder.append(translateAsBoxedOperand(argument, argument.getResourceClasses().stream()
-                            .filter(r -> isNumeric(r)).collect(Collectors.toSet())));
+                    builder.append(translateAsBoxedOperand(argument, argument.getResourceClasses()));
 
                 builder.append(")");
 
@@ -815,6 +824,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "max":
             case "sample":
             {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+
                 StringBuilder builder = new StringBuilder();
 
                 builder.append("sparql.");
@@ -824,7 +836,6 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(distinct)
                     builder.append("DISTINCT ");
 
-                SqlExpressionIntercode argument = arguments.get(0);
                 builder.append(argument.translate());
                 builder.append(")");
 
@@ -833,48 +844,24 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
             case "group_concat":
             {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                boolean unboxed = argument.getResourceClasses().stream().allMatch(r -> isStringLiteral(r));
+
+
                 StringBuilder builder = new StringBuilder();
 
-                builder.append("sparql.group_concat(");
+                builder.append("sparql.group_concat_");
+                builder.append(unboxed ? "string" : "rdfbox");
+                builder.append("(");
 
                 if(distinct)
                     builder.append("DISTINCT ");
 
-                SqlExpressionIntercode argument = arguments.get(0);
-
-                if(argument instanceof SqlVariable)
-                {
-                    SqlVariable variable = (SqlVariable) argument;
-
-                    Set<ResourceClass> compatible = argument.getResourceClasses().stream()
-                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
-
-                    if(compatible.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasVariant = false;
-
-                    for(ResourceClass resClass : compatible)
-                    {
-                        appendComma(builder, hasVariant);
-                        hasVariant = true;
-
-                        builder.append(variable.getNodeAccess(resClass, 0));
-                    }
-
-                    if(compatible.size() > 1)
-                        builder.append(")");
-                }
-                else if(argument.isBoxed())
-                {
-                    builder.append("sparql.rdfbox_extract_string_literal(");
-                    builder.append(argument.translate());
-                    builder.append(")");
-                }
+                if(unboxed)
+                    builder.append(translateAsStringLiteral(argument));
                 else
-                {
-                    builder.append(argument.translate());
-                }
+                    builder.append(translateAsBoxedOperand(argument, argument.getResourceClasses()));
 
                 builder.append(", ");
 
@@ -903,10 +890,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     appendOr(builder, hasVariants);
                     hasVariants = true;
 
-                    for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
+                    List<Column> columns = variable.asResource(resourceClass);
+
+                    for(int i = 0; i < resourceClass.getColumnCount(); i++)
                     {
                         appendAnd(builder, i > 0);
-                        builder.append(variable.getNodeAccess(resourceClass, i));
+                        builder.append(columns.get(i));
                         builder.append(" IS NOT NULL");
                     }
                 }
@@ -958,7 +947,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 ResourceClass expressionResourceClass = getExpressionResourceClass();
                 StringBuilder builder = new StringBuilder();
 
-                builder.append("COALESCE(");
+                builder.append("coalesce(");
                 boolean hasVariants = false;
 
                 for(SqlExpressionIntercode argument : arguments)
@@ -999,132 +988,51 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         for(ResourceClass rightClass : rightNode.getResourceClasses())
                         {
+                            List<Column> leftCols = null;
+                            List<Column> rightCols = null;
+
                             if(leftClass == rightClass)
                             {
-                                appendComma(builder, variants++ > 0);
-
-                                for(int i = 0; i < leftClass.getPatternPartsCount(); i++)
-                                {
-                                    appendAnd(builder, i > 0);
-                                    builder.append(leftNode.getNodeAccess(leftClass, i));
-                                    builder.append(" = ");
-                                    builder.append(rightNode.getNodeAccess(rightClass, i));
-                                }
+                                leftCols = leftNode.asResource(leftClass);
+                                rightCols = rightNode.asResource(rightClass);
                             }
-                            else if(leftClass == xsdDateTime && rightClass instanceof DateTimeConstantZoneClass)
+                            else if(leftClass.getGeneralClass() == rightClass)
                             {
-                                appendComma(builder, variants++ > 0);
+                                rightCols = rightNode.asResource(rightClass);
 
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 1));
-                                builder.append(" = CASE WHEN ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((DateTimeConstantZoneClass) rightClass).getZone());
-                                builder.append("'::int4 END");
-                            }
-                            else if(leftClass instanceof DateTimeConstantZoneClass && rightClass == xsdDateTime)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND CASE WHEN ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((DateTimeConstantZoneClass) leftClass).getZone());
-                                builder.append("'::int4 END = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 1));
-                            }
-                            else if(leftClass == xsdDate && rightClass instanceof DateConstantZoneClass)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 1));
-                                builder.append(" = CASE WHEN ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((DateConstantZoneClass) rightClass).getZone());
-                                builder.append("'::int4 END");
-                            }
-                            else if(leftClass instanceof DateConstantZoneClass && rightClass == xsdDate)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND CASE WHEN ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((DateConstantZoneClass) leftClass).getZone());
-                                builder.append("'::int4 END = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 1));
-                            }
-                            else if(leftClass == rdfLangString && rightClass instanceof LangStringConstantTagClass)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 1));
-                                builder.append(" = CASE WHEN ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((LangStringConstantTagClass) rightClass).getTag());
-                                builder.append("'::varchar END");
-                            }
-                            else if(leftClass instanceof LangStringConstantTagClass && rightClass == rdfLangString)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
-                                builder.append(" AND CASE WHEN ");
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" IS NOT NULL THEN '");
-                                builder.append(((LangStringConstantTagClass) leftClass).getTag());
-                                builder.append("'::varchar END = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 1));
-                            }
-                            else if(leftClass == iri && rightClass instanceof IriClass)
-                            {
-                                appendComma(builder, variants++ > 0);
-
-                                builder.append(leftNode.getNodeAccess(leftClass, 0));
-                                builder.append(" = ");
-
-                                if(right instanceof SqlVariable)
-                                    builder.append(((SqlVariable) right).getExpressionValue(leftClass, false));
+                                if(left instanceof SqlIri)
+                                    leftCols = rightClass.toColumns(((SqlIri) left).getIri());
+                                else if(left instanceof SqlLiteral)
+                                    leftCols = rightClass.toColumns(((SqlLiteral) left).getLiteral());
                                 else
-                                    builder.append("'" + ((SqlIri) right).getIri().getValue() + "'");
+                                    leftCols = leftClass.toGeneralClass(leftNode.asResource(leftClass), false);
                             }
-                            else if(leftClass instanceof IriClass && rightClass == iri)
+                            else if(leftClass == rightClass.getGeneralClass())
                             {
-                                appendComma(builder, variants++ > 0);
 
-                                if(left instanceof SqlVariable)
-                                    builder.append(((SqlVariable) left).getExpressionValue(leftClass, false));
+                                leftCols = leftNode.asResource(leftClass);
+
+                                if(right instanceof SqlIri)
+                                    rightCols = leftClass.toColumns(((SqlIri) right).getIri());
+                                else if(right instanceof SqlLiteral)
+                                    rightCols = leftClass.toColumns(((SqlLiteral) right).getLiteral());
                                 else
-                                    builder.append("'" + ((SqlIri) left).getIri().getValue() + "'");
-
-                                builder.append(" = ");
-                                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                                    rightCols = rightClass.toGeneralClass(rightNode.asResource(rightClass), false);
                             }
                             else
                             {
                                 incomparable = true;
+                                continue;
+                            }
+
+                            appendComma(builder, variants++ > 0);
+
+                            for(int i = 0; i < leftCols.size(); i++)
+                            {
+                                appendAnd(builder, i > 0);
+                                builder.append(leftCols.get(i));
+                                builder.append(" = ");
+                                builder.append(rightCols.get(i));
                             }
                         }
                     }
@@ -1156,7 +1064,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(variants > 1)
                     {
-                        builder.insert(0, "COALESCE(");
+                        builder.insert(0, "coalesce(");
                         builder.append(")");
                     }
                 }
@@ -1217,6 +1125,18 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(translateAsUnboxedOperand(right, xsdDate));
                         builder.append(")");
                     }
+                    else if(leftExpressionResourceClass == intBlankNode || rightExpressionResourceClass == intBlankNode)
+                    {
+                        builder.append(translateAsUnboxedOperand(left, intBlankNode));
+                        builder.append(" = ");
+                        builder.append(translateAsUnboxedOperand(right, intBlankNode));
+                    }
+                    else if(leftExpressionResourceClass == strBlankNode || rightExpressionResourceClass == strBlankNode)
+                    {
+                        builder.append(translateAsUnboxedOperand(left, strBlankNode));
+                        builder.append(" = ");
+                        builder.append(translateAsUnboxedOperand(right, strBlankNode));
+                    }
                 }
 
                 return builder.toString();
@@ -1240,7 +1160,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     StringBuilder builder = new StringBuilder();
 
                     if(operand.getResourceClasses().size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasVariants = false;
 
@@ -1249,14 +1169,16 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         appendComma(builder, hasVariants);
                         hasVariants = true;
 
+                        List<Column> columns = variable.asResource(resourceClass);
+
                         if(is.apply(resourceClass))
                         {
                             builder.append("NULLIF(");
 
-                            for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
+                            for(int i = 0; i < resourceClass.getColumnCount(); i++)
                             {
                                 appendAnd(builder, i > 0);
-                                builder.append(variable.getNodeAccess(resourceClass, i));
+                                builder.append(columns.get(i));
                                 builder.append(" IS NOT NULL");
                             }
 
@@ -1266,10 +1188,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         {
                             builder.append("NULLIF(");
 
-                            for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
+                            for(int i = 0; i < resourceClass.getColumnCount(); i++)
                             {
                                 appendOr(builder, i > 0);
-                                builder.append(variable.getNodeAccess(resourceClass, i));
+                                builder.append(columns.get(i));
                                 builder.append(" IS NULL");
                             }
 
@@ -1347,13 +1269,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 else
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> convertible = variable.getResourceClasses().stream()
-                            .filter(r -> isIri(r) || isLiteral(r)).collect(Collectors.toSet());
+                            .filter(r -> isIri(r) || isLiteral(r)).collect(toSet());
 
                     if(convertible.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -1384,23 +1305,29 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(resClass == xsdDate)
                         {
+                            List<Column> columns = variable.asResource(resClass);
+
                             builder.append("sparql.cast_as_string_from_date(");
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                            builder.append(columns.get(0));
                             builder.append(", ");
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 1));
+                            builder.append(columns.get(1));
                             builder.append(")");
                         }
                         else if(resClass == xsdDateTime)
                         {
+                            List<Column> columns = variable.asResource(resClass);
+
                             builder.append("sparql.cast_as_string_from_datetime(");
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                            builder.append(columns.get(0));
                             builder.append(", ");
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 1));
+                            builder.append(columns.get(1));
                             builder.append(")");
                         }
                         else if(resClass == rdfLangString || resClass == unsupportedLiteral)
                         {
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                            List<Column> columns = variable.asResource(resClass);
+
+                            builder.append(columns.get(0));
                         }
                         else if(resClass == xsdString || resClass instanceof IriClass)
                         {
@@ -1449,15 +1376,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 else
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> applicable = variable.getResourceClasses().stream().filter(r -> isLiteral(r))
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -1468,7 +1394,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                         if(resClass == rdfLangString)
                         {
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 1));
+                            builder.append(variable.asResource(resClass).get(1));
                         }
                         else
                         {
@@ -1479,10 +1405,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                             {
                                 builder.append("CASE WHEN ");
 
-                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                                List<Column> columns = variable.asResource(resClass);
+
+                                for(int i = 0; i < resClass.getColumnCount(); i++)
                                 {
                                     appendAnd(builder, i > 0);
-                                    builder.append(variable.getNodeAccess(resClass, i));
+                                    builder.append(columns.get(i));
                                     builder.append(" IS NOT NULL");
                                 }
 
@@ -1527,15 +1455,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 else
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> applicable = variable.getResourceClasses().stream().filter(r -> isLiteral(r))
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -1546,7 +1473,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                         if(resClass == unsupportedLiteral)
                         {
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 1));
+                            builder.append(variable.asResource(resClass).get(1));
                         }
                         else
                         {
@@ -1554,12 +1481,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                             if(operand.canBeNull() || variable.getResourceClasses().size() > 1)
                             {
+                                List<Column> columns = variable.asResource(resClass);
+
                                 builder.append("CASE WHEN ");
 
-                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                                for(int i = 0; i < resClass.getColumnCount(); i++)
                                 {
                                     appendAnd(builder, i > 0);
-                                    builder.append(variable.getNodeAccess(resClass, i));
+                                    builder.append(columns.get(i));
                                     builder.append(" IS NOT NULL");
                                 }
 
@@ -1597,12 +1526,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlVariable variable = (SqlVariable) operand;
 
                     Set<ResourceClass> applicable = variable.getResourceClasses().stream()
-                            .filter(r -> isIri(r) || r == xsdString).collect(Collectors.toSet());
+                            .filter(r -> isIri(r) || r == xsdString).collect(toSet());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -1665,15 +1594,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand instanceof SqlVariable)
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> applicable = operand.getResourceClasses().stream()
-                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                            .filter(r -> isStringLiteral(r)).collect(toSet());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -1683,7 +1611,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         hasAlternative = true;
 
                         builder.append("sparql.strlen_string(");
-                        builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                        builder.append(variable.asResource(resClass).get(0));
                         builder.append(")");
                     }
 
@@ -1789,9 +1717,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                 builder.append("sparql.");
                                 builder.append(function);
                                 builder.append("_string_string(");
-                                builder.append(leftNode.getNodeAccess(leftResClass, 0));
+                                builder.append(leftNode.asResource(leftResClass).get(0));
                                 builder.append(", ");
-                                builder.append(rightNode.getNodeAccess(rightResClass, 0));
+                                builder.append(rightNode.asResource(rightResClass).get(0));
                                 builder.append(")");
                             }
                             else if(leftResClass == rdfLangString && isLangString(rightResClass)
@@ -1803,7 +1731,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                                 if(leftResClass == rdfLangString)
                                 {
-                                    builder.append(leftNode.getNodeAccess(leftResClass, 1));
+                                    builder.append(leftNode.asResource(leftResClass).get(1));
                                 }
                                 else
                                 {
@@ -1816,7 +1744,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                                 if(rightResClass == rdfLangString)
                                 {
-                                    builder.append(rightNode.getNodeAccess(rightResClass, 1));
+                                    builder.append(rightNode.asResource(rightResClass).get(1));
                                 }
                                 else
                                 {
@@ -1828,9 +1756,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                                 builder.append(" THEN sparql.");
                                 builder.append(function);
                                 builder.append("_string_string(");
-                                builder.append(leftNode.getNodeAccess(leftResClass, 0));
+                                builder.append(leftNode.asResource(leftResClass).get(0));
                                 builder.append(", ");
-                                builder.append(rightNode.getNodeAccess(rightResClass, 0));
+                                builder.append(rightNode.asResource(rightResClass).get(0));
                                 builder.append(") END");
                             }
                         }
@@ -1838,7 +1766,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(variants > 1)
                     {
-                        builder.insert(0, "COALESCE(");
+                        builder.insert(0, "coalesce(");
                         builder.append(")");
                     }
                 }
@@ -1914,9 +1842,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append("sparql.");
                     builder.append(function);
                     builder.append("_string_string(");
-                    builder.append(leftNode.getNodeAccess(xsdString, 0));
+                    builder.append(leftNode.asResource(xsdString).get(0));
                     builder.append(", ");
-                    builder.append(rightNode.getNodeAccess(xsdString, 0));
+                    builder.append(rightNode.asResource(xsdString).get(0));
                     builder.append(")");
                 }
                 else
@@ -1991,15 +1919,14 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand instanceof SqlVariable)
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> applicable = operand.getResourceClasses().stream()
-                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                            .filter(r -> isStringLiteral(r)).collect(toSet());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -2009,7 +1936,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         hasAlternative = true;
 
                         builder.append("sparql.encode_for_uri_string(");
-                        builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                        builder.append(variable.asResource(resClass).get(0));
                         builder.append(")");
                     }
 
@@ -2042,7 +1969,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     SqlExpressionIntercode argument = arguments.get(i);
                     Set<ResourceClass> applicable = argument.getResourceClasses().stream()
-                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                            .filter(r -> isStringLiteral(r)).collect(toSet());
 
                     if(isBoxed())
                     {
@@ -2051,10 +1978,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(argument instanceof SqlVariable)
                     {
                         SqlVariable variable = (SqlVariable) argument;
-                        String varName = variable.getName();
 
                         if(applicable.size() > 1)
-                            builder.append("COALESCE(");
+                            builder.append("coalesce(");
 
                         boolean hasAlternative = false;
 
@@ -2063,7 +1989,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                             appendComma(builder, hasAlternative);
                             hasAlternative = true;
 
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                            builder.append(variable.asResource(resClass).get(0));
                         }
 
                         if(applicable.size() > 1)
@@ -2121,13 +2047,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand instanceof SqlVariable)
                 {
                     SqlVariable variable = (SqlVariable) operand;
-                    String varName = variable.getName();
 
                     Set<ResourceClass> applicable = operand.getResourceClasses().stream()
-                            .filter(r -> isStringLiteral(r)).collect(Collectors.toSet());
+                            .filter(r -> isStringLiteral(r)).collect(toSet());
 
                     if(applicable.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -2136,7 +2061,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         appendComma(builder, hasAlternative);
                         hasAlternative = true;
 
-                        builder.append(variable.getVariableAccessor().getSqlVariableAccess(varName, resClass, 0));
+                        builder.append(variable.asResource(resClass).get(0));
                     }
 
                     if(applicable.size() > 1)
@@ -2233,12 +2158,12 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     SqlVariable variable = (SqlVariable) operand;
 
                     List<ResourceClass> compatible = variable.getResourceClasses().stream().filter(r -> isNumeric(r))
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     StringBuilder builder = new StringBuilder();
 
                     if(compatible.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
@@ -2249,7 +2174,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                         ResourceClass effectiveClass = determineNumericResultClass(resClass);
 
-                        String code = variable.getExpressionValue(resClass, false);
+                        String code = variable.getExpressionValue(resClass, false).toString();
 
                         if(resClass != effectiveClass)
                             code = "sparql.cast_as_integer_from_" + resClass.getName() + "(" + code + ")";
@@ -2331,19 +2256,21 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(function.equals("hours") || function.equals("minutes") || function.equals("seconds"))
                         compatible = variable.getResourceClasses().stream().filter(r -> isDateTime(r))
-                                .collect(Collectors.toList());
+                                .collect(toList());
                     else
                         compatible = variable.getResourceClasses().stream().filter(r -> isDateTime(r) || isDate(r))
-                                .collect(Collectors.toList());
+                                .collect(toList());
 
 
                     if(compatible.size() > 1)
-                        builder.append("COALESCE(");
+                        builder.append("coalesce(");
 
                     boolean hasAlternative = false;
 
                     for(ResourceClass resClass : compatible)
                     {
+                        List<Column> columns = variable.asResource(resClass);
+
                         appendComma(builder, hasAlternative);
                         hasAlternative = true;
 
@@ -2353,13 +2280,11 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(isDateTime(resClass) ? "datetime" : "date");
                         builder.append("(");
 
-                        builder.append(
-                                variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                        builder.append(columns.get(0));
                         builder.append(", ");
 
                         if(resClass == xsdDateTime || resClass == xsdDate)
-                            builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(),
-                                    resClass, 1));
+                            builder.append(columns.get(1));
                         else if(resClass instanceof DateTimeConstantZoneClass)
                             builder.append("'" + ((DateTimeConstantZoneClass) resClass).getZone() + "'::int4");
                         else if(resClass instanceof DateConstantZoneClass)

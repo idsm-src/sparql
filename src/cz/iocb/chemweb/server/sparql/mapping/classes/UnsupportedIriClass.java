@@ -3,23 +3,26 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class CommonIntBlankNodeClass extends IntBlankNodeClass
+public class UnsupportedIriClass extends IriClass
 {
-    CommonIntBlankNodeClass()
+    UnsupportedIriClass()
     {
-        super("int_blanknode", asList("int8"));
+        super("unsupported", asList("varchar"), asList(ResultTag.IRI));
     }
 
 
     @Override
     public List<Column> toColumns(Node node)
     {
-        throw new IllegalArgumentException();
+        return asList(new ConstantColumn("'" + (((IRI) node).getValue()).replaceAll("'", "''") + "'::varchar"));
     }
 
 
@@ -41,9 +44,9 @@ public class CommonIntBlankNodeClass extends IntBlankNodeClass
     public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
-            return asList(column);
+            throw new IllegalArgumentException();
 
-        return asList(new ExpressionColumn("sparql.rdfbox_extract_int_blanknode" + "(" + column + ")"));
+        return asList(new ExpressionColumn("sparql.rdfbox_extract_iri" + "(" + column + ")"));
     }
 
 
@@ -53,7 +56,7 @@ public class CommonIntBlankNodeClass extends IntBlankNodeClass
         if(!rdfbox)
             return columns.get(0);
 
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_int_blanknode(" + columns.get(0) + ")");
+        return new ExpressionColumn("sparql.cast_as_rdfbox_from_iri(" + columns.get(0) + ")");
     }
 
 
@@ -61,5 +64,15 @@ public class CommonIntBlankNodeClass extends IntBlankNodeClass
     public List<Column> toResult(List<Column> columns)
     {
         return columns;
+    }
+
+
+    @Override
+    public boolean match(Node node)
+    {
+        if(node instanceof VariableOrBlankNode || node instanceof IRI)
+            return true;
+
+        return false;
     }
 }

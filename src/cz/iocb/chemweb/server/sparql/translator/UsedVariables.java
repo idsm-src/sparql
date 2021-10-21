@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -14,7 +15,18 @@ public class UsedVariables
     private final LinkedHashMap<String, UsedVariable> usedVariables = new LinkedHashMap<String, UsedVariable>();
 
 
-    public UsedVariables restrict(HashSet<String> restrictions)
+    public UsedVariables()
+    {
+    }
+
+
+    public UsedVariables(UsedVariables variables)
+    {
+        this.usedVariables.putAll(variables.usedVariables);
+    }
+
+
+    public UsedVariables restrict(Collection<String> restrictions)
     {
         UsedVariables result = new UsedVariables();
 
@@ -26,16 +38,21 @@ public class UsedVariables
     }
 
 
+    public UsedVariable get(String name)
+    {
+        return usedVariables.get(name);
+    }
+
+
     public void add(UsedVariable usedVariable)
     {
-        assert usedVariables.get(usedVariable.getName()) == null;
         usedVariables.put(usedVariable.getName(), usedVariable);
     }
 
 
-    public UsedVariable get(String name)
+    public void remove(String name)
     {
-        return usedVariables.get(name);
+        usedVariables.remove(name);
     }
 
 
@@ -58,6 +75,17 @@ public class UsedVariables
         if(variable == null)
             return false;
 
-        return variable.getClasses().contains(resClass);
+        return variable.getClasses().stream().filter(r -> r == resClass).findAny().isPresent();
+    }
+
+
+    public Set<Column> getNonConstantColumns()
+    {
+        Set<Column> columns = new HashSet<Column>();
+
+        for(UsedVariable variable : getValues())
+            columns.addAll(variable.getNonConstantColumns());
+
+        return columns;
     }
 }

@@ -1,6 +1,10 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
@@ -9,116 +13,43 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class BlankNodeLiteral implements Node
 {
-    public static enum Category
-    {
-        STR, INT
-    }
-
-
-    private final Category category;
     private final String label;
-    private final int segment;
+    private final ResourceClass resourceClass;
 
 
-    public BlankNodeLiteral(Category category, int segment, String label)
+    public BlankNodeLiteral(String label, ResourceClass resourceClass)
     {
-        this.category = category;
-        this.segment = segment;
         this.label = label;
+        this.resourceClass = resourceClass;
     }
 
 
-    public BlankNodeLiteral(String id)
+    public BlankNodeLiteral(String id, Set<ResourceClass> classes)
     {
         if(id.startsWith("S"))
         {
             String value = decodeBlankNodeValue(id);
+            int segment = Integer.parseInt(value.substring(0, 8));
 
-            this.category = Category.STR;
-            this.segment = Integer.parseInt(value.substring(0, 8));
             this.label = value.substring(8);
+            this.resourceClass = classes.stream().filter(
+                    r -> r instanceof UserStrBlankNodeClass && segment == ((UserStrBlankNodeClass) r).getSegment())
+                    .findAny().get();
         }
         else if(id.startsWith("I"))
         {
             long value = Long.parseLong(id.substring(1));
+            int segment = (int) (value >> 32);
 
-            this.category = Category.INT;
-            this.segment = (int) (value >> 32);
             this.label = Integer.toString((int) (value & 0xFFFFFFFF));
+            this.resourceClass = classes.stream().filter(
+                    r -> r instanceof UserIntBlankNodeClass && segment == ((UserIntBlankNodeClass) r).getSegment())
+                    .findAny().get();
         }
         else
         {
             throw new IllegalArgumentException();
         }
-    }
-
-
-    public Category getCategory()
-    {
-        return category;
-    }
-
-
-    public int getSegment()
-    {
-        return segment;
-    }
-
-
-    public String getLabel()
-    {
-        return label;
-    }
-
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if(this == o)
-            return true;
-
-        if(o == null || getClass() != o.getClass())
-            return false;
-
-        BlankNodeLiteral literal = (BlankNodeLiteral) o;
-
-        if(category != literal.category)
-            return false;
-
-        if(segment != literal.segment)
-            return false;
-
-        if(!label.equals(literal.label))
-            return false;
-
-        return true;
-    }
-
-
-    @Override
-    public int hashCode()
-    {
-        return label.hashCode();
-    }
-
-
-    @Override
-    public <T> T accept(ElementVisitor<T> visitor)
-    {
-        return null;
-    }
-
-
-    @Override
-    public Range getRange()
-    {
-        return null;
-    }
-
-
-    @Override
-    public void setRange(Range range)
-    {
     }
 
 
@@ -141,5 +72,66 @@ public class BlankNodeLiteral implements Node
         }
 
         return new String(buffer, 0, length, StandardCharsets.UTF_8);
+    }
+
+
+    public String getLabel()
+    {
+        return label;
+    }
+
+
+    public ResourceClass getResourceClass()
+    {
+        return resourceClass;
+    }
+
+
+    @Override
+    public int hashCode()
+    {
+        return label.hashCode();
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        BlankNodeLiteral literal = (BlankNodeLiteral) object;
+
+        if(!label.equals(literal.label))
+            return false;
+
+        if(!resourceClass.equals(literal.resourceClass))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    public <T> T accept(ElementVisitor<T> visitor)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public Range getRange()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public void setRange(Range range)
+    {
+        throw new UnsupportedOperationException();
     }
 }

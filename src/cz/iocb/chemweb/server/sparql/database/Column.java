@@ -19,7 +19,7 @@ public abstract class Column
     }
 
 
-    public abstract String getCode();
+    public abstract Column fromTable(Table table);
 
 
     @Override
@@ -30,15 +30,15 @@ public abstract class Column
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || getClass() != obj.getClass())
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        Column other = (Column) obj;
+        Column other = (Column) object;
 
         return value.equals(other.value);
     }

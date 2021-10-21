@@ -112,16 +112,6 @@
     <url-pattern>/sparql/endpoint/idsm</url-pattern>
   </servlet-mapping>
 
-  <servlet>
-    <servlet-name>NeXtProtEndpointServlet</servlet-name>
-    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
-    <init-param><param-name>resource</param-name><param-value>sparql:nextprot</param-value></init-param>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>NeXtProtEndpointServlet</servlet-name>
-    <url-pattern>/sparql/endpoint/nextprot</url-pattern>
-  </servlet-mapping>
-
 
   <servlet>
     <servlet-name>SachemEndpointServlet</servlet-name>
@@ -329,16 +319,6 @@
   <filter-mapping>
     <filter-name>IdsmEndpointPiwikFilter</filter-name>
     <url-pattern>/sparql/endpoint/idsm</url-pattern>
-  </filter-mapping>
-
-  <filter>
-    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
-    <filter-class>cz.iocb.chemweb.server.filters.piwik.PiwikFilter</filter-class>
-    <init-param><param-name>actionName</param-name><param-value>NeXtProt SPARQL Endpoint</param-value></init-param>
-  </filter>
-  <filter-mapping>
-    <filter-name>NeXtProtEndpointPiwikFilter</filter-name>
-    <url-pattern>/sparql/endpoint/nextprot</url-pattern>
   </filter-mapping>
 
   <filter>

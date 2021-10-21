@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.servlets.endpoint;
 
+import static java.util.stream.Collectors.joining;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
@@ -9,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -412,14 +412,14 @@ public class EndpointServlet extends HttpServlet
         out.append("  \"prefixes\": {\n");
 
         out.append(sparqlConfig.getPrefixes().entrySet().stream()
-                .map(e -> "    \"" + e.getKey() + "\": \"" + e.getValue() + "\"").collect(Collectors.joining(",\n")));
+                .map(e -> "    \"" + e.getKey() + "\": \"" + e.getValue() + "\"").collect(joining(",\n")));
 
         out.append("\n");
         out.append("  },\n");
         out.append("  \"properties\": [\n");
 
         out.append(sparqlConfig.getMappings(null).stream().map(m -> ((IRI) m.getPredicate().getValue()).getValue())
-                .distinct().sorted().map(i -> "    \"" + i + "\"").collect(Collectors.joining(",\n")));
+                .distinct().sorted().map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
         out.append("  ],\n");
@@ -428,7 +428,7 @@ public class EndpointServlet extends HttpServlet
         out.append(sparqlConfig.getMappings(null).stream()
                 .filter(m -> m.getPredicate().getValue().equals(type) && m.getObject() instanceof ConstantIriMapping)
                 .map(m -> ((IRI) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
-                .map(i -> "    \"" + i + "\"").collect(Collectors.joining(",\n")));
+                .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
         out.append("  ]\n");

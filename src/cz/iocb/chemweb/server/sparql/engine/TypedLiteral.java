@@ -37,15 +37,15 @@ public class TypedLiteral extends LiteralNode
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || !(obj instanceof TypedLiteral))
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        TypedLiteral literal = (TypedLiteral) obj;
+        TypedLiteral literal = (TypedLiteral) object;
 
         return value.equals(literal.value) && datatype.equals(literal.datatype);
     }

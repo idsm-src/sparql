@@ -36,74 +36,74 @@ public abstract class Sachem
     {
         String sachem = config.getPrefixes().get("sachem");
 
-        config.addIriClass(new EnumUserIriClass("query_format", "sachem.query_format", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("query_format", "sachem.query_format", new HashMap<IRI, String>()
         {
             {
-                put("UNSPECIFIED", sachem + "UnspecifiedFormat");
-                put("SMILES", sachem + "SMILES");
-                put("MOLFILE", sachem + "MolFile");
-                put("RGROUP", sachem + "RGroup");
+                put(new IRI(sachem + "UnspecifiedFormat"), "UNSPECIFIED");
+                put(new IRI(sachem + "SMILES"), "SMILES");
+                put(new IRI(sachem + "MolFile"), "MOLFILE");
+                put(new IRI(sachem + "RGroup"), "RGROUP");
             }
         }));
 
-        config.addIriClass(new EnumUserIriClass("search_mode", "sachem.search_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("search_mode", "sachem.search_mode", new HashMap<IRI, String>()
         {
             {
-                put("SUBSTRUCTURE", sachem + "substructureSearch");
-                put("EXACT", sachem + "exactSearch");
+                put(new IRI(sachem + "substructureSearch"), "SUBSTRUCTURE");
+                put(new IRI(sachem + "exactSearch"), "EXACT");
             }
         }));
 
-        config.addIriClass(new EnumUserIriClass("charge_mode", "sachem.charge_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("charge_mode", "sachem.charge_mode", new HashMap<IRI, String>()
         {
             {
-                put("IGNORE", sachem + "ignoreCharges");
-                put("DEFAULT_AS_UNCHARGED", sachem + "defaultChargeAsZero");
-                put("DEFAULT_AS_ANY", sachem + "defaultChargeAsAny");
+                put(new IRI(sachem + "ignoreCharges"), "IGNORE");
+                put(new IRI(sachem + "defaultChargeAsZero"), "DEFAULT_AS_UNCHARGED");
+                put(new IRI(sachem + "defaultChargeAsAny"), "DEFAULT_AS_ANY");
             }
         }));
 
-        config.addIriClass(new EnumUserIriClass("isotope_mode", "sachem.isotope_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("isotope_mode", "sachem.isotope_mode", new HashMap<IRI, String>()
         {
             {
-                put("IGNORE", sachem + "ignoreIsotopes");
-                put("DEFAULT_AS_STANDARD", sachem + "defaultIsotopeAsStandard");
-                put("DEFAULT_AS_ANY", sachem + "defaultIsotopeAsAny");
+                put(new IRI(sachem + "ignoreIsotopes"), "IGNORE");
+                put(new IRI(sachem + "defaultIsotopeAsStandard"), "DEFAULT_AS_STANDARD");
+                put(new IRI(sachem + "defaultIsotopeAsAny"), "DEFAULT_AS_ANY");
             }
         }));
 
-        config.addIriClass(new EnumUserIriClass("radical_mode", "sachem.radical_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("radical_mode", "sachem.radical_mode", new HashMap<IRI, String>()
         {
             {
-                put("IGNORE", sachem + "ignoreSpinMultiplicity");
-                put("DEFAULT_AS_STANDARD", sachem + "defaultSpinMultiplicityAsZero");
-                put("DEFAULT_AS_ANY", sachem + "defaultSpinMultiplicityAsAny");
+                put(new IRI(sachem + "ignoreSpinMultiplicity"), "IGNORE");
+                put(new IRI(sachem + "defaultSpinMultiplicityAsZero"), "DEFAULT_AS_STANDARD");
+                put(new IRI(sachem + "defaultSpinMultiplicityAsAny"), "DEFAULT_AS_ANY");
             }
         }));
 
-        config.addIriClass(new EnumUserIriClass("stereo_mode", "sachem.stereo_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("stereo_mode", "sachem.stereo_mode", new HashMap<IRI, String>()
         {
             {
-                put("IGNORE", sachem + "ignoreStereo");
-                put("STRICT", sachem + "strictStereo");
+                put(new IRI(sachem + "ignoreStereo"), "IGNORE");
+                put(new IRI(sachem + "strictStereo"), "STRICT");
             }
         }));
 
         config.addIriClass(
-                new EnumUserIriClass("aromaticity_mode", "sachem.aromaticity_mode", new HashMap<String, String>()
+                new EnumUserIriClass("aromaticity_mode", "sachem.aromaticity_mode", new HashMap<IRI, String>()
                 {
                     {
-                        put("PRESERVE", sachem + "aromaticityFromQuery");
-                        put("DETECT", sachem + "aromaticityDetect");
-                        put("AUTO", sachem + "aromaticityDetectIfMissing");
+                        put(new IRI(sachem + "aromaticityFromQuery"), "PRESERVE");
+                        put(new IRI(sachem + "aromaticityDetect"), "DETECT");
+                        put(new IRI(sachem + "aromaticityDetectIfMissing"), "AUTO");
                     }
                 }));
 
-        config.addIriClass(new EnumUserIriClass("tautomer_mode", "sachem.tautomer_mode", new HashMap<String, String>()
+        config.addIriClass(new EnumUserIriClass("tautomer_mode", "sachem.tautomer_mode", new HashMap<IRI, String>()
         {
             {
-                put("IGNORE", sachem + "ignoreTautomers");
-                put("INCHI", sachem + "inchiTautomers");
+                put(new IRI(sachem + "ignoreTautomers"), "IGNORE");
+                put(new IRI(sachem + "inchiTautomers"), "INCHI");
             }
         }));
     }

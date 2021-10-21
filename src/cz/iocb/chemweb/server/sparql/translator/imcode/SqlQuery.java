@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
@@ -17,31 +16,32 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlQuery extends SqlIntercode
 {
-    private final Collection<String> selectedVariables;
     private final SqlIntercode child;
+    private final Collection<String> selectedVariables;
     private int offset = 0;
     private int limit = -1;
 
 
     public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
     {
-        super(child.variables, child.isDeterministic());
-        this.selectedVariables = selectedVariables;
+        super(new UsedVariables(child.variables), child.isDeterministic());
+
         this.child = child;
+        this.selectedVariables = selectedVariables;
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         throw new UnsupportedOperationException();
     }
 
 
-    public SqlIntercode optimize(Request request)
+    public SqlIntercode optimize()
     {
-        HashSet<String> restrictions = new HashSet<String>(selectedVariables);
-        return new SqlQuery(selectedVariables, child.optimize(request, restrictions, false));
+        Set<String> restrictions = new HashSet<String>(selectedVariables);
+        return new SqlQuery(selectedVariables, child.optimize(restrictions, false));
     }
 
 
@@ -88,7 +88,6 @@ public class SqlQuery extends SqlIntercode
                     list.add(resClass);
                 }
 
-
                 for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
                 {
                     List<ResultTag> tags = entry.getKey();
@@ -100,14 +99,14 @@ public class SqlQuery extends SqlIntercode
                         hasSelect = true;
 
                         if(resClasses.size() > 1)
-                            builder.append("COALESCE(");
+                            builder.append("coalesce(");
 
                         for(int i = 0; i < resClasses.size(); i++)
                         {
                             appendComma(builder, i > 0);
 
                             ResourceClass resClass = resClasses.get(i);
-                            builder.append(resClass.getResultCode(variableName, part));
+                            builder.append(resClass.toResult(variable.getMapping(resClass)).get(part));
                         }
 
                         if(resClasses.size() > 1)

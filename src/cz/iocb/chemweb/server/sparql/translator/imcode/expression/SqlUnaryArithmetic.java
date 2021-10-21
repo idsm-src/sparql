@@ -4,11 +4,11 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDe
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -51,9 +51,9 @@ public class SqlUnaryArithmetic extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        SqlExpressionIntercode operand = getOperand().optimize(variableAccessor);
+        SqlExpressionIntercode operand = getOperand().optimize(variables);
         return create(isMinus, operand);
     }
 
@@ -64,8 +64,8 @@ public class SqlUnaryArithmetic extends SqlUnary
         ResourceClass expressionResourceClass = getExpressionResourceClass();
         String operandCode = expressionResourceClass != null ?
                 translateAsUnboxedOperand(getOperand(), getExpressionResourceClass()) :
-                translateAsBoxedOperand(getOperand(), getOperand().getResourceClasses().stream()
-                        .filter(r -> isNumeric(r)).collect(Collectors.toSet()));
+                translateAsBoxedOperand(getOperand(),
+                        getOperand().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(toSet()));
 
         if(!isMinus)
             return operandCode;

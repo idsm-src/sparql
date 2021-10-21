@@ -4,9 +4,14 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import java.util.ArrayList;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
@@ -14,7 +19,7 @@ public class LangStringClass extends LiteralClass
 {
     LangStringClass()
     {
-        super("lang", Arrays.asList("varchar", "varchar"), Arrays.asList(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang", asList("varchar", "varchar"), asList(LANGSTRING, LANG), rdfLangStringIri);
     }
 
 
@@ -26,58 +31,70 @@ public class LangStringClass extends LiteralClass
 
 
     @Override
-    public String getLiteralPatternCode(Literal literal, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(part == 0)
-            return "'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar";
-        else
-            return "'" + literal.getLanguageTag() + "'::varchar";
+        Literal literal = (Literal) node;
+
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ConstantColumn("'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar"));
+        result.add(new ConstantColumn("'" + literal.getLanguageTag() + "'::varchar"));
+
+        return result;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
             throw new IllegalArgumentException();
 
-        return "sparql.rdfbox_extract_lang_string_" + (part == 0 ? "string" : "lang") + "(" + column + ")";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn("sparql.rdfbox_extract_lang_string_string(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_extract_lang_string_lang(" + column + ")"));
+
+        return result;
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getExpressionCode(Literal literal)
+    public Column toExpression(Node node)
     {
-        return "sparql.cast_as_rdfbox_from_lang_string('" + ((String) literal.getValue()).replaceAll("'", "''")
-                + "'::varchar, '" + literal.getLanguageTag() + "'::varchar)";
+        Literal literal = (Literal) node;
+
+        return new ExpressionColumn(
+                "sparql.cast_as_rdfbox_from_lang_string('" + ((String) literal.getValue()).replaceAll("'", "''")
+                        + "'::varchar, '" + literal.getLanguageTag() + "'::varchar)");
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        return "sparql.cast_as_rdfbox_from_lang_string(" + variableAccessor.getSqlVariableAccess(variable, this, 0)
-                + ", " + variableAccessor.getSqlVariableAccess(variable, this, 1) + ")";
+        return new ExpressionColumn(
+                "sparql.cast_as_rdfbox_from_lang_string(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        return getSqlColumn(variable, part);
+        return columns;
     }
 }

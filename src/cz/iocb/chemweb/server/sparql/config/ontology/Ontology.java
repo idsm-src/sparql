@@ -3,11 +3,11 @@ package cz.iocb.chemweb.server.sparql.config.ontology;
 import static cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import static java.util.Arrays.asList;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -18,22 +18,22 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
 
 public class Ontology
 {
-    public static final String unitUncategorized = "0::smallint";
-    public static final String unitBlank = "1::smallint";
-    public static final String unitSIO = "2::smallint";
-    public static final String unitCHEMINF = "3::smallint";
-    public static final String unitBAO = "4::smallint";
-    public static final String unitGO = "5::smallint";
-    public static final String unitPR = "6::smallint";
-    public static final String unitCHEBI = "7::smallint";
-    public static final String unitTaxonomy = "11::smallint";
-    public static final String unitNCBITaxon = "64::smallint";
-    public static final String unitCL = "71::smallint";
-    public static final String unitUO = "74::smallint";
-    public static final String unitIAO = "75::smallint";
-    public static final String unitCLO = "77::smallint";
-    public static final String unitEFO = "92::smallint";
-    public static final String unitStar = "95::smallint";
+    public static final String unitUncategorized = "'0'::smallint";
+    public static final String unitBlank = "'1'::smallint";
+    public static final String unitSIO = "'2'::smallint";
+    public static final String unitCHEMINF = "'3'::smallint";
+    public static final String unitBAO = "'4'::smallint";
+    public static final String unitGO = "'5'::smallint";
+    public static final String unitPR = "'6'::smallint";
+    public static final String unitCHEBI = "'7'::smallint";
+    public static final String unitTaxonomy = "'11'::smallint";
+    public static final String unitNCBITaxon = "'64'::smallint";
+    public static final String unitCL = "'71'::smallint";
+    public static final String unitUO = "'74'::smallint";
+    public static final String unitIAO = "'75'::smallint";
+    public static final String unitCLO = "'77'::smallint";
+    public static final String unitEFO = "'92'::smallint";
+    public static final String unitStar = "'95'::smallint";
 
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config) throws SQLException
@@ -65,7 +65,7 @@ public class Ontology
         String ontologyPattern = builder.toString();
 
         config.addIriClass(new GeneralUserIriClass("ontology:resource", "ontology", "ontology_resource",
-                Arrays.asList("smallint", "integer"), ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
+                asList("smallint", "integer"), ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
     }
 
 

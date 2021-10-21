@@ -1,8 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
-import javax.sql.DataSource;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 
 
 
@@ -14,10 +13,7 @@ public abstract class UserIriClass extends IriClass
     }
 
 
-    public abstract boolean match(String iri, Request request);
-
-
-    public abstract boolean match(String iri, DataSource connectionPool);
+    public abstract boolean match(IRI iri);
 
 
     public abstract int getCheckCost();

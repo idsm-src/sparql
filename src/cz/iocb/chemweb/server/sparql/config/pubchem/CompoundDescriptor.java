@@ -75,12 +75,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:hydrogen_bond_acceptor_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000388"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -89,12 +89,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:tautomer_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000391"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -103,12 +103,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:defined_atom_stereo_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000370"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -117,12 +117,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:defined_bond_stereo_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000371"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -131,12 +131,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:undefined_bond_stereo_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000375"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -145,12 +145,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:isotope_atom_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000372"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -159,12 +159,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:covalent_unit_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000369"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -173,12 +173,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:hydrogen_bond_donor_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000387"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -187,12 +187,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:non_hydrogen_atom_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000373"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -201,12 +201,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:rotatable_bond_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000389"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -215,12 +215,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:undefined_atom_stereo_count", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000374"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -229,12 +229,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:total_formal_charge", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000336"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdShort, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -243,12 +243,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:structure_complexity", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000390"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -257,14 +257,14 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:mono_isotopic_weight", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000337"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -273,12 +273,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:xlogp3_aa", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -287,12 +287,12 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:xlogp3", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000395"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -301,14 +301,14 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:exact_mass", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000338"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -317,14 +317,14 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:molecular_weight", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000334"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000055"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {
@@ -333,14 +333,14 @@ public class CompoundDescriptor
             NodeMapping subject = config.createIriMapping("pubchem:tpsa", "compound");
 
             config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000392"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
             config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(xsdFloat, field));
             config.addQuadMapping(table, graph, subject, unit, config.createIriMapping("obo:UO_0000324"),
-                    field + " is not null");
+                    config.createIsNotNullCondition(field));
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), field + " is not null");
+                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
         }
 
         {

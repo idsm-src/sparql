@@ -19,23 +19,24 @@ import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdLongIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdShortIri;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toSet;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
 public class SqlEffectiveBooleanValue extends SqlUnary
 {
-    private static final List<IRI> ebvTypes = Arrays.asList(xsdBooleanIri, xsdShortIri, xsdIntIri, xsdLongIri,
-            xsdIntegerIri, xsdDecimalIri, xsdFloatIri, xsdDoubleIri, xsdStringIri);
+    private static final List<IRI> ebvTypes = asList(xsdBooleanIri, xsdShortIri, xsdIntIri, xsdLongIri, xsdIntegerIri,
+            xsdDecimalIri, xsdFloatIri, xsdDoubleIri, xsdStringIri);
 
     public static final SqlEffectiveBooleanValue trueValue = new SqlEffectiveBooleanValue(
             SqlLiteral.create(new Literal("true", xsdBooleanIri)), false);
@@ -100,7 +101,7 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
 
         Set<ResourceClass> compatibleClasses = operandClasses.stream().filter(r -> isEffectiveBooleanClass(r))
-                .collect(Collectors.toSet());
+                .collect(toSet());
 
         if(compatibleClasses.isEmpty())
             return SqlNull.get();
@@ -118,9 +119,9 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        return getOperand().optimize(variableAccessor);
+        return create(getOperand().optimize(variables));
     }
 
 
@@ -132,14 +133,14 @@ public class SqlEffectiveBooleanValue extends SqlUnary
             SqlVariable variable = (SqlVariable) getOperand();
 
             Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
-                    .filter(r -> isEffectiveBooleanClass(r)).collect(Collectors.toSet());
+                    .filter(r -> isEffectiveBooleanClass(r)).collect(toSet());
 
 
             StringBuilder builder = new StringBuilder();
             boolean hasAlternative = false;
 
             if(compatibleClasses.size() > 1)
-                builder.append("COALESCE(");
+                builder.append("coalesce(");
 
             for(ResourceClass resourceClass : variable.getResourceClasses())
             {
@@ -149,19 +150,19 @@ public class SqlEffectiveBooleanValue extends SqlUnary
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                String code = variable.getExpressionValue(resourceClass, isBoxed());
+                Column column = variable.getExpressionValue(resourceClass, isBoxed());
 
                 if(resourceClass != xsdBoolean)
                 {
                     builder.append("sparql.ebv_");
                     builder.append(resourceClass.getName());
                     builder.append("(");
-                    builder.append(code);
+                    builder.append(column);
                     builder.append(")");
                 }
                 else
                 {
-                    builder.append(code);
+                    builder.append(column);
                 }
             }
 

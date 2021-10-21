@@ -41,9 +41,9 @@ public class Activity
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasDocument"),
                 config.createIriMapping("chembl:document", "document_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:dataValidityIssue"),
-                config.createLiteralMapping(true), "data_validity_comment is not null");
+                config.createLiteralMapping(true), config.createIsNotNullCondition("data_validity_comment"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:potentialDuplicate"),
-                config.createLiteralMapping(true), "potential_duplicate");
+                config.createLiteralMapping(true), config.createAreEqualCondition("potential_duplicate", "'true'::boolean"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:value"),
                 config.createLiteralMapping(xsdDouble, "value"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardValue"),

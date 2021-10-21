@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
 import static cz.iocb.chemweb.server.sparql.parser.StreamUtils.mapList;
+import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -10,7 +11,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Stack;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -297,14 +297,14 @@ public class QueryVisitor extends BaseVisitor<Query>
                     {
                         ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
                         Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListNotEmpty());
-                        expander.visit(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                        expander.visit(new ComplexTriple(node, properties.collect(toList())));
                     }
                     else
                     {
                         ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNode());
                         Stream<Property> properties = triplesCtx.propertyList().propertyListNotEmpty() != null ?
                                 propertiesVisitor.visit(triplesCtx.propertyList()) : Stream.empty();
-                        expander.visit(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                        expander.visit(new ComplexTriple(node, properties.collect(toList())));
                     }
                 }
             }
@@ -770,7 +770,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
         List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
-                .visit(ctx).collect(Collectors.toList());
+                .visit(ctx).collect(toList());
 
         return new GroupGraph(patterns);
     }
@@ -992,13 +992,13 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
             {
                 ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
                 Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPathNotEmpty());
-                triples.add(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                triples.add(new ComplexTriple(node, properties.collect(toList())));
             }
             else
             {
                 ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNodePath());
                 Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPath());
-                triples.add(new ComplexTriple(node, properties.collect(Collectors.toList())));
+                triples.add(new ComplexTriple(node, properties.collect(toList())));
             }
         }
 

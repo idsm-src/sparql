@@ -19,10 +19,14 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -149,12 +153,22 @@ public class Literal extends BaseComplexNode implements Expression, Node
 
 
     @Override
-    public boolean equals(Object obj)
+    public int hashCode()
     {
-        if(!(obj instanceof Literal))
+        return value != null ? value.hashCode() : stringValue.hashCode();
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        Literal literal = (Literal) obj;
+        Literal literal = (Literal) object;
 
         if(!type.equals(literal.type))
             return false;
@@ -193,31 +207,43 @@ class Type<T>
     private static final LocalDate maxDate = LocalDate.parse("5874898-01-01Z", dateFormatter);
     private static final LocalDate minDate = LocalDate.parse("-4714-11-24Z", dateFormatter);
 
-    private static final String dateWithoutZonePattern = "-?([1-9][0-9]{3,}|0[0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])";
+    private static final String dateWithoutZonePattern = "-?([1-9][0-9]{3,}|0[0-9][0-9][1-9]|0[0-9][1-9][0-9]|0[1-9][0-9][0-9])-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])";
     private static final String timezonePattern = "(Z|(\\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?";
     private static final String datePattern = dateWithoutZonePattern + timezonePattern;
 
 
+    @SuppressWarnings("serial") private static final Map<Long, String> eraSign = new HashMap<Long, String>()
+    {
+        {
+            put(0L, "-");
+            put(1L, "");
+        }
+    };
+
     private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()//
-            .appendValue(ChronoField.YEAR, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
+            .appendText(ChronoField.ERA, eraSign)//
+            .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NEVER).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
             .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
             .appendValue(ChronoField.HOUR_OF_DAY, 2).appendLiteral(":")//
             .appendValue(ChronoField.MINUTE_OF_HOUR, 2).appendLiteral(":")//
             .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
-            .optionalStart()//
-            .appendOffset("+HH:MM", "Z")//
-            .optionalEnd()//
-            .toFormatter();
+            .optionalStart().appendOffset("+HH:MM", "Z").optionalEnd()//
+            .toFormatter(Locale.ENGLISH);
 
     private static final OffsetDateTime maxDateTime = OffsetDateTime.parse("294277-01-01T00:00:00Z", dateTimeFormatter);
     private static final OffsetDateTime minDateTime = OffsetDateTime.parse("-4714-11-24T00:00:00Z", dateTimeFormatter);
+
+    private static final LocalDateTime maxLocalDateTime = maxDateTime.toLocalDateTime();
+    private static final LocalDateTime minLocalDateTime = minDateTime.toLocalDateTime();
 
     private static final String timeWithoutZonePattern = "(([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?|(24:00:00(\\.0+)?))";
     private static final String dateTimeWithoutZonePattern = dateWithoutZonePattern + "T" + timeWithoutZonePattern;
     private static final String dateTimePattern = dateTimeWithoutZonePattern + timezonePattern;
 
+    private static final String dayTimeDurationPattern = "-?P((([0-9]+D)(T(([0-9]+H)([0-9]+M)?([0-9]+(\\.[0-9]+)?S)?|([0-9]+M)([0-9]+(\\.[0-9]+)?S)?|([0-9]+(\\.[0-9]+)?S)))?)|(T(([0-9]+H)([0-9]+M)?([0-9]+(\\.[0-9]+)?S)?|([0-9]+M)([0-9]+(\\.[0-9]+)?S)?|([0-9]+(\\.[0-9]+)?S))))";
+    private static final String dayTimeDurationSplitPattern = "^-?P(([0-9]+)D)?(T(([0-9]+)H)?(([0-9]+)M)?(([0-9]+(\\.[0-9]{1,6})?)[0-9]*S)?)?$";
 
     private final IRI iri;
     private final Class<T> javaClass;
@@ -291,61 +317,67 @@ class Type<T>
     }
 
 
-    private static Object parseDateTime(String s)
+    private static Object parseDateTime(String value)
     {
-        String value = s;
-
-        if(!value.matches(dateTimePattern))
-            throw new IllegalArgumentException();
-
-        // truncate to microseconds
-        value = value.replace("(\\.[0-9]{6})[0-9]*", "$1");
-
-        if(value.matches(dateTimeWithoutZonePattern))
+        try
         {
-            LocalDateTime date = LocalDateTime.parse(value, dateTimeFormatter);
+            if(!value.matches(dateTimePattern))
+                throw new IllegalArgumentException();
 
-            if(date.compareTo(maxDateTime.toLocalDateTime()) < 0 && date.compareTo(minDateTime.toLocalDateTime()) >= 0)
-                return date;
+            value = value.replace("(\\.[0-9]{6})[0-9]*", "$1");
+
+            if(value.matches(dateTimeWithoutZonePattern))
+            {
+                LocalDateTime date = LocalDateTime.parse(value, dateTimeFormatter);
+
+                if(date.compareTo(maxLocalDateTime) < 0 && date.compareTo(minLocalDateTime) >= 0)
+                    return date;
+            }
+            else
+            {
+                OffsetDateTime date = OffsetDateTime.parse(value, dateTimeFormatter);
+
+                if(date.compareTo(maxDateTime) < 0 && date.compareTo(minDateTime) >= 0)
+                    return date;
+            }
+
+            return null;
         }
-        else
+        catch(DateTimeParseException e)
         {
-            OffsetDateTime date = OffsetDateTime.parse(value, dateTimeFormatter);
-
-            if(date.compareTo(maxDateTime) < 0 && date.compareTo(minDateTime) >= 0)
-                return date;
+            return null;
         }
-
-        return null;
     }
 
 
     private static String parseDate(String s)
     {
-        String value = s;
+        try
+        {
+            String value = s;
 
-        if(!value.matches(datePattern))
-            throw new IllegalArgumentException();
+            if(!value.matches(datePattern))
+                throw new IllegalArgumentException();
 
-        if(value.matches(dateWithoutZonePattern))
-            value = value + "Z";
+            if(value.matches(dateWithoutZonePattern))
+                value = value + "Z";
 
-        LocalDate date = LocalDate.parse(value, dateFormatter);
+            LocalDate date = LocalDate.parse(value, dateFormatter);
 
-        if(date.compareTo(maxDate) >= 0 || date.compareTo(minDate) < 0)
+            if(date.compareTo(maxDate) >= 0 || date.compareTo(minDate) < 0)
+                return null;
+
+            return s.replaceAll("[+-]00:00$", "Z");
+        }
+        catch(DateTimeParseException e)
+        {
             return null;
-
-        String canonical = s.replaceAll("[+-]00:00$", "Z");
-
-        return canonical;
+        }
     }
 
 
     private static Long parseDayTimeDuration(String s)
     {
-        String dayTimeDurationPattern = "-?P((([0-9]+D)(T(([0-9]+H)([0-9]+M)?([0-9]+(\\.[0-9]+)?S)?|([0-9]+M)([0-9]+(\\.[0-9]+)?S)?|([0-9]+(\\.[0-9]+)?S)))?)|(T(([0-9]+H)([0-9]+M)?([0-9]+(\\.[0-9]+)?S)?|([0-9]+M)([0-9]+(\\.[0-9]+)?S)?|([0-9]+(\\.[0-9]+)?S))))";
-        String dayTimeDurationSplitPattern = "^-?P(([0-9]+)D)?(T(([0-9]+)H)?(([0-9]+)M)?(([0-9]+(\\.[0-9]{1,6})?)[0-9]*S)?)?$";
-
         if(!s.matches(dayTimeDurationPattern))
             throw new IllegalArgumentException();
 

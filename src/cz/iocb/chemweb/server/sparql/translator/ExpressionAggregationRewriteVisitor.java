@@ -1,8 +1,8 @@
-package cz.iocb.chemweb.server.sparql.translator.expression;
+package cz.iocb.chemweb.server.sparql.translator;
 
+import static java.util.stream.Collectors.toList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
@@ -41,8 +41,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     public Expression visit(InExpression inExpression)
     {
         Expression left = visitElement(inExpression.getLeft());
-        List<Expression> right = inExpression.getRight().stream().map(e -> visitElement(e))
-                .collect(Collectors.toList());
+        List<Expression> right = inExpression.getRight().stream().map(e -> visitElement(e)).collect(toList());
         Expression result = new InExpression(left, right, inExpression.isNegated());
         result.setRange(inExpression.getRange());
         return result;
@@ -81,7 +80,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
         else
         {
             List<Expression> arguments = builtInCallExpression.getArguments().stream().map(e -> visitElement(e))
-                    .collect(Collectors.toList());
+                    .collect(toList());
             Expression result = new BuiltInCallExpression(builtInCallExpression.getFunctionName(), arguments);
             result.setRange(builtInCallExpression.getRange());
             return result;
@@ -100,7 +99,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     public Expression visit(FunctionCallExpression functionCallExpression)
     {
         List<Expression> arguments = functionCallExpression.getArguments().stream().map(e -> visitElement(e))
-                .collect(Collectors.toList());
+                .collect(toList());
         Expression result = new FunctionCallExpression(functionCallExpression.getFunction(), arguments);
         result.setRange(functionCallExpression.getRange());
         return result;

@@ -1,19 +1,18 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind.isExpressionExpansionNeeded;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.SqlBind.translateExpressionExpansion;
+import static java.util.stream.Collectors.joining;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
@@ -21,25 +20,49 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
 public class SqlAggregation extends SqlIntercode
 {
+    private final SqlIntercode child;
     private final HashSet<String> groupVariables;
     private final LinkedHashMap<String, SqlExpressionIntercode> aggregations;
-    private final SqlIntercode child;
 
 
     protected SqlAggregation(UsedVariables variables, boolean isDeterministic, HashSet<String> groupVariables,
             LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
         super(variables, isDeterministic);
+
+        this.child = child;
         this.groupVariables = groupVariables;
         this.aggregations = aggregations;
-        this.child = child;
     }
 
 
     public static SqlIntercode aggregate(HashSet<String> groupVariables,
-            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child,
-            HashSet<String> restrictions)
+            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
+        return aggregate(groupVariables, aggregations, child, null);
+    }
+
+
+    protected static SqlIntercode aggregate(HashSet<String> groupVariables,
+            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child, Set<String> restrictions)
+    {
+        /* special cases */
+
+        //NOTE: special case - implicit group with eliminated aggregates
+        if(groupVariables.isEmpty() && aggregations.values().stream().noneMatch(r -> r instanceof SqlBuiltinCall))
+        {
+            SqlIntercode result = SqlEmptySolution.get();
+
+            for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+                if(entry.getValue() != SqlNull.get())
+                    result = SqlBind.bind(entry.getKey(), entry.getValue(), result);
+
+            return result;
+        }
+
+
+        /* standard aggregates */
+
         UsedVariables variables = new UsedVariables();
 
         for(String variable : groupVariables)
@@ -47,10 +70,17 @@ public class SqlAggregation extends SqlIntercode
                 variables.add(child.getVariables().get(variable));
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+        {
             if(entry.getValue() != SqlNull.get() && (restrictions == null || restrictions.contains(entry.getKey())))
-                variables.add(new UsedVariable(entry.getKey(), entry.getValue().getResourceClasses(),
-                        entry.getValue().canBeNull()));
+            {
+                UsedVariable variable = new UsedVariable(entry.getKey(), entry.getValue().canBeNull());
 
+                for(ResourceClass resClass : entry.getValue().getResourceClasses())
+                    variable.addMapping(resClass, resClass.createColumns(entry.getKey()));
+
+                variables.add(variable);
+            }
+        }
 
         boolean isDeterministic = child.isDeterministic();
 
@@ -63,25 +93,33 @@ public class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>(groupVariables);
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
             if(restrictions == null || restrictions.contains(entry.getKey()))
-                childRestrictions.addAll(entry.getValue().getVariables());
+                childRestrictions.addAll(entry.getValue().getReferencedVariables());
 
-        return aggregate(groupVariables, aggregations, child.optimize(request, childRestrictions, false), restrictions);
+        SqlIntercode optimizedChild = child.optimize(childRestrictions, false);
+
+        LinkedHashMap<String, SqlExpressionIntercode> optimizedAggregations = new LinkedHashMap<String, SqlExpressionIntercode>();
+        aggregations.forEach((k, v) -> optimizedAggregations.put(k, v.optimize(optimizedChild.getVariables())));
+
+        return aggregate(groupVariables, optimizedAggregations, optimizedChild, restrictions);
     }
 
 
     @Override
     public String translate()
     {
-        boolean useTwoPhases = false;
+        boolean useTwoPhases = aggregations.values().stream().anyMatch(e -> isExpressionExpansionNeeded(e));
 
-        for(SqlExpressionIntercode expression : aggregations.values())
-            useTwoPhases |= isExpansionNeeded(expression);
+        Set<Column> groupByColumns = new HashSet<Column>();
+
+        for(String variableName : groupVariables)
+            if(child.getVariables().get(variableName) != null)
+                groupByColumns.addAll(child.getVariables().get(variableName).getNonConstantColumns());
 
 
         StringBuilder builder = new StringBuilder();
@@ -93,117 +131,40 @@ public class SqlAggregation extends SqlIntercode
 
             for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
             {
-                if(variables.get(entry.getKey()) == null)
-                    continue;
-
-                String variable = entry.getKey();
+                String variableName = entry.getKey();
                 SqlExpressionIntercode expression = entry.getValue();
+                UsedVariable variable = getVariables().get(variableName);
 
-
-                if(!isExpansionNeeded(expression))
-                {
-                    for(ResourceClass resClass : expression.getResourceClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append(resClass.getSqlColumn(variable, i));
-                        }
-                    }
-                }
-                else
-                {
-                    String columnName = '"' + variable + "#expression\"";
-
-
-                    boolean splitDateTimeClasses = expression.getResourceClasses().stream()
-                            .filter(r -> r instanceof DateTimeConstantZoneClass).count() > 1;
-
-                    boolean splitDateClasses = expression.getResourceClasses().stream()
-                            .filter(r -> r instanceof DateConstantZoneClass).count() > 1;
-
-                    boolean splitLangClasses = expression.getResourceClasses().stream()
-                            .filter(r -> r instanceof LangStringConstantTagClass).count() > 1;
-
-
-                    for(ResourceClass resourceClass : expression.getResourceClasses())
-                    {
-                        if(resourceClass instanceof DateTimeConstantZoneClass && splitDateTimeClasses)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append("CASE ");
-                            builder.append(xsdDateTime.getPatternCode(columnName, 1, expression.isBoxed()));
-                            builder.append(" WHEN '");
-                            builder.append(((DateTimeConstantZoneClass) resourceClass).getZone());
-                            builder.append("'::int4 THEN ");
-                            builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                            builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variable, 0));
-                        }
-                        else if(resourceClass instanceof DateConstantZoneClass && splitDateClasses)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append("CASE ");
-                            builder.append(xsdDate.getPatternCode(columnName, 1, expression.isBoxed()));
-                            builder.append(" WHEN '");
-                            builder.append(((DateConstantZoneClass) resourceClass).getZone());
-                            builder.append("'::int4 THEN ");
-                            builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                            builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variable, 0));
-                        }
-                        else if(resourceClass instanceof LangStringConstantTagClass && splitLangClasses)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append("CASE ");
-                            builder.append(rdfLangString.getPatternCode(columnName, 1, expression.isBoxed()));
-                            builder.append(" WHEN '");
-                            builder.append(((LangStringConstantTagClass) resourceClass).getTag());
-                            builder.append("'::varchar THEN ");
-                            builder.append(resourceClass.getPatternCode(columnName, 0, expression.isBoxed()));
-                            builder.append(" END AS ");
-                            builder.append(resourceClass.getSqlColumn(variable, 0));
-                        }
-                        else
-                        {
-                            for(int i = 0; i < resourceClass.getPatternPartsCount(); i++)
-                            {
-                                appendComma(builder, hasSelect);
-                                hasSelect = true;
-
-                                builder.append(resourceClass.getPatternCode(columnName, i, expression.isBoxed()));
-                                builder.append(" AS ");
-                                builder.append(resourceClass.getSqlColumn(variable, i));
-                            }
-                        }
-                    }
-                }
-            }
-
-
-            for(String variable : groupVariables)
-            {
-                if(variables.get(variable) == null)
+                if(variable == null)
                     continue;
 
-                for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
+                if(!isExpressionExpansionNeeded(expression))
                 {
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                    Set<Column> columns = variable.getNonConstantColumns();
+
+                    if(!columns.isEmpty())
                     {
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        builder.append(resClass.getSqlColumn(variable, i));
+                        builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
                     }
                 }
+                else
+                {
+                    appendComma(builder, hasSelect);
+                    hasSelect = true;
+
+                    Column column = new TableColumn(variableName + "##expression");
+                    builder.append(translateExpressionExpansion(column, variable));
+                }
+            }
+
+            if(!groupByColumns.isEmpty())
+            {
+                appendComma(builder, hasSelect);
+                hasSelect = true;
+                builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
             }
 
             if(!hasSelect)
@@ -218,92 +179,53 @@ public class SqlAggregation extends SqlIntercode
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
         {
-            if(variables.get(entry.getKey()) == null)
+            String variableName = entry.getKey();
+            SqlExpressionIntercode expression = entry.getValue();
+            UsedVariable variable = getVariables().get(variableName);
+
+            if(variable == null)
                 continue;
 
             appendComma(builder, hasSelect);
             hasSelect = true;
 
-            String variable = entry.getKey();
-            SqlExpressionIntercode expression = entry.getValue();
-
-            String columnName = '"' + variable + "#expression\"";
-
-            if(expression.isBoxed() == false && expression.getResourceClasses().size() == 1)
-            {
-                ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
-
-                if(!(resourceClass instanceof UserIriClass) && resourceClass.getPatternPartsCount() == 1)
-                    columnName = resourceClass.getSqlColumn(variable, 0);
-            }
+            boolean expand = isExpressionExpansionNeeded(expression);
+            Column column = expand ? new TableColumn(variableName + "##expression") :
+                    variable.getMapping(variable.getClasses().iterator().next()).get(0);
 
             builder.append(expression.translate());
             builder.append(" AS ");
-            builder.append(columnName);
+            builder.append(column);
         }
 
-        for(String variable : groupVariables)
+        if(!groupByColumns.isEmpty())
         {
-            if(variables.get(variable) == null)
-                continue;
-
-            for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
-            {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    builder.append(resClass.getSqlColumn(variable, i));
-                }
-            }
+            appendComma(builder, hasSelect);
+            hasSelect = true;
+            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
         }
+
+        if(!hasSelect)
+            builder.append("1");
 
         builder.append(" FROM (");
         builder.append(child.translate());
         builder.append(" ) AS tab");
 
-        if(groupVariables.stream().anyMatch(v -> child.getVariables().get(v) != null))
+        if(!groupByColumns.isEmpty())
         {
             builder.append(" GROUP BY ");
-            boolean hasGroupBy = false;
-
-            for(String variable : groupVariables)
-            {
-                if(child.getVariables().get(variable) == null)
-                    continue;
-
-                for(ResourceClass resClass : child.getVariables().get(variable).getClasses())
-                {
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, hasGroupBy);
-                        hasGroupBy = true;
-
-                        builder.append(resClass.getSqlColumn(variable, i));
-                    }
-                }
-            }
+            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
         }
+        else if(!groupVariables.isEmpty())
+        {
+            builder.append(" GROUP BY true");
+        }
+
 
         if(useTwoPhases)
             builder.append(" ) AS tab");
 
-
         return builder.toString();
-    }
-
-
-    private static boolean isExpansionNeeded(SqlExpressionIntercode expression)
-    {
-        if(expression.isBoxed() || expression.getResourceClasses().size() != 1)
-            return true;
-
-        ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
-
-        if(resourceClass instanceof UserIriClass || resourceClass.getPatternPartsCount() != 1)
-            return true;
-
-        return false;
     }
 }

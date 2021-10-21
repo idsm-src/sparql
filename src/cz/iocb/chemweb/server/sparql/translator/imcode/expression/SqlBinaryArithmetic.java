@@ -4,15 +4,15 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDe
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
+import static java.util.stream.Collectors.toSet;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -87,10 +87,10 @@ public class SqlBinaryArithmetic extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variableAccessor);
-        SqlExpressionIntercode right = getRight().optimize(variableAccessor);
+        SqlExpressionIntercode left = getLeft().optimize(variables);
+        SqlExpressionIntercode right = getRight().optimize(variables);
         return create(operator, left, right);
     }
 
@@ -103,9 +103,9 @@ public class SqlBinaryArithmetic extends SqlBinary
         if(expressionResourceClass == null)
         {
             String leftCode = translateAsBoxedOperand(getLeft(),
-                    getLeft().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(Collectors.toSet()));
+                    getLeft().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(toSet()));
             String rightCode = translateAsBoxedOperand(getRight(),
-                    getRight().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(Collectors.toSet()));
+                    getRight().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(toSet()));
 
             return "sparql." + operator.getName() + "_rdfbox(" + leftCode + ", " + rightCode + ")";
         }

@@ -3,9 +3,14 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATE;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import java.util.ArrayList;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
@@ -13,7 +18,7 @@ public class DateClass extends LiteralClass
 {
     DateClass()
     {
-        super("date", Arrays.asList("date", "int4"), Arrays.asList(DATE), xsdDateIri);
+        super("date", asList("date", "int4"), asList(DATE), xsdDateIri);
     }
 
 
@@ -25,59 +30,84 @@ public class DateClass extends LiteralClass
 
 
     @Override
-    public String getLiteralPatternCode(Literal literal, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(part == 0)
-            return "sparql.zoneddate_date('" + (String) literal.getValue() + "'::sparql.zoneddate)";
-        else
-            return "sparql.zoneddate_zone('" + (String) literal.getValue() + "'::sparql.zoneddate)";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ConstantColumn("'" + getDate((Literal) node) + "'::date"));
+        result.add(new ConstantColumn("'" + getZone((Literal) node) + "'::int4"));
+
+        return result;
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
-        if(isBoxed)
-            return "sparql.rdfbox_extract_date_" + (part == 0 ? "date" : "zone") + "(" + column + ")";
-        else
-            return "sparql.zoneddate_" + (part == 0 ? "date" : "zone") + "(" + column + ")";
+        String prefix = isBoxed ? "sparql.rdfbox_extract_date" : "sparql.zoneddate";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn(prefix + "_date(" + column + ")"));
+        result.add(new ExpressionColumn(prefix + "_zone(" + column + ")"));
+
+        return result;
     }
 
 
     @Override
-    public String getExpressionCode(Literal literal)
+    public Column toExpression(Node node)
     {
-        return "'" + (String) literal.getValue() + "'::sparql.zoneddate";
+        return new ConstantColumn("'" + ((Literal) node).getValue() + "'::sparql.zoneddate");
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        return (rdfbox ? "sparql.cast_as_rdfbox_from_date" : "sparql.zoneddate_create") + "("
-                + variableAccessor.getSqlVariableAccess(variable, this, 0) + ", "
-                + variableAccessor.getSqlVariableAccess(variable, this, 1) + ")";
+        String function = rdfbox ? "sparql.cast_as_rdfbox_from_date" : "sparql.zoneddate_create";
+
+        return new ExpressionColumn(function + "(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
         // xsdDate is returned as zoneddate because there are many discrepancies in date interpretations
-        return "sparql.zoneddate_create(" + getSqlColumn(variable, 0) + ", " + getSqlColumn(variable, 1) + ")";
+        return asList(new ExpressionColumn("sparql.zoneddate_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+    }
+
+
+    public static String getDate(Literal literal)
+    {
+        return ((String) literal.getValue()).replaceFirst("(Z|(\\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))$", "");
+    }
+
+
+    public static int getZone(Literal literal)
+    {
+        String value = (String) literal.getValue();
+
+        String[] parts = value.replaceFirst(".*(Z|(([+-])([0-9][0-9]):([0-9][0-9])))$", "$31#0$4#0$5").split("#");
+        int zone = Integer.MIN_VALUE;
+
+        if(parts.length == 3)
+            zone = Integer.parseInt(parts[0]) * (Integer.parseInt(parts[1]) * 3600 + Integer.parseInt(parts[2]) * 60);
+
+        return zone;
     }
 }

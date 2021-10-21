@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.common;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
@@ -148,7 +148,7 @@ public class Common
         String fulltext = config.getPrefixes().get("fulltext");
 
         FunctionDefinition match = new FunctionDefinition(fulltext + "match", new Function("common", "fulltext_match"),
-                xsdBoolean, Arrays.asList(FunctionDefinition.stringLiteral, xsdString), false, true);
+                xsdBoolean, asList(FunctionDefinition.stringLiteral, xsdString), false, true);
 
         config.addFunction(match);
     }

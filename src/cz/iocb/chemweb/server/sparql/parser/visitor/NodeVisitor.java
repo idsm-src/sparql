@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
 import static cz.iocb.chemweb.server.sparql.parser.StreamUtils.mapList;
+import static java.util.stream.Collectors.toList;
 import java.util.List;
-import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.BlankNodePropertyListContext;
@@ -119,7 +119,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     public BlankNodePropertyList visitBlankNodePropertyListPath(BlankNodePropertyListPathContext ctx)
     {
         List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPathNotEmpty())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         return new BlankNodePropertyList(properties);
     }
@@ -129,7 +129,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     public BlankNodePropertyList visitBlankNodePropertyList(BlankNodePropertyListContext ctx)
     {
         List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListNotEmpty())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         return new BlankNodePropertyList(properties);
     }

@@ -6,8 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.sql.DataSource;
 
 
@@ -25,27 +26,6 @@ public class DatabaseSchema
             this.right = right;
         }
 
-        @Override
-        public int hashCode()
-        {
-            return left.hashCode() ^ right.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if(this == obj)
-                return true;
-
-            if(obj == null || getClass() != obj.getClass())
-                return false;
-
-            @SuppressWarnings("rawtypes")
-            Pair other = (Pair) obj;
-
-            return left.equals(other.left) && right.equals(other.right);
-        }
-
         public final T getLeft()
         {
             return left;
@@ -54,6 +34,27 @@ public class DatabaseSchema
         public final T getRight()
         {
             return right;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return left.hashCode() ^ right.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object object)
+        {
+            if(this == object)
+                return true;
+
+            if(object == null || getClass() != object.getClass())
+                return false;
+
+            @SuppressWarnings("rawtypes")
+            Pair other = (Pair) object;
+
+            return left.equals(other.left) && right.equals(other.right);
         }
     }
 
@@ -198,7 +199,6 @@ public class DatabaseSchema
             primaryKeys.put(table, primaryKeyList);
         }
 
-
         ArrayList<Column> key = new ArrayList<Column>();
         key.addAll(columns);
 
@@ -218,7 +218,6 @@ public class DatabaseSchema
             foreignKeyList = new ArrayList<List<ColumnPair>>();
             foreignKeys.put(tablePair, foreignKeyList);
         }
-
 
         ArrayList<ColumnPair> keyPairs = new ArrayList<ColumnPair>();
 
@@ -268,7 +267,7 @@ public class DatabaseSchema
     }
 
 
-    public List<Column> getCompatibleKey(Table table, List<Column> columns)
+    public List<Column> getCompatibleKey(Table table, Set<Column> columns)
     {
         List<List<Column>> keys = primaryKeys.get(table);
 
@@ -289,27 +288,28 @@ public class DatabaseSchema
     }
 
 
-    public List<ColumnPair> getCompatibleForeignKey(Table parentTable, Table foreignTable,
-            ArrayList<ColumnPair> columns, LinkedHashSet<Column> parentColumns)
+    public List<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
+            Set<Column> parentColumns)
     {
-        List<List<ColumnPair>> keys = getForeignKeys(parentTable, foreignTable);
+        List<List<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
 
         if(keys == null)
             return null;
 
-
-        loop:
         for(List<ColumnPair> key : keys)
         {
-            for(ColumnPair keyPair : key)
-                if(!columns.contains(keyPair))
-                    continue loop;
+            if(key.stream().allMatch(k -> columns.contains(k)))
+            {
+                Set<Column> covered = new HashSet<Column>();
 
-            for(Column parentColumn : parentColumns)
-                if(key.stream().noneMatch(keyPair -> keyPair.getLeft().equals(parentColumn)))
-                    continue loop;
+                for(ColumnPair keyPair : key)
+                    for(ColumnPair pair : columns)
+                        if(keyPair.getRight().equals(pair.getRight()))
+                            covered.add(pair.getLeft());
 
-            return key;
+                if(parentColumns.stream().allMatch(c -> covered.contains(c)))
+                    return key;
+            }
         }
 
         return null;
@@ -322,7 +322,6 @@ public class DatabaseSchema
 
         if(list == null)
             return null;
-
 
         loop:
         for(List<ColumnPair> key : list)

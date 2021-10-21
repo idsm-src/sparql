@@ -1,10 +1,10 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
+import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Stack;
-import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
@@ -212,7 +212,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         if(ctx == null)
             return new ArrayList<>();
 
-        return ctx.expression().stream().map(this::visit).collect(Collectors.toList());
+        return ctx.expression().stream().map(this::visit).collect(toList());
     }
 
 
@@ -419,7 +419,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
         return contexts.stream().map(new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)::visit)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
 

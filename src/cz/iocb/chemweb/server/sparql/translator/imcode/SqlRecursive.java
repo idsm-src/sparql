@@ -1,14 +1,17 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import java.util.ArrayList;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.stream.Stream;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -16,58 +19,87 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlRecursive extends SqlIntercode
 {
-    private static final String leftTable = "tab0";
-    private static final String rightTable = "tab1";
+    private static final Table leftTable = new Table("tab0");
+    private static final Table rightTable = new Table("tab1");
 
     private final SqlIntercode init;
     private final SqlIntercode next;
     private final UsedVariable endVar;
     private final String joinName;
-    private final String subjectName;
-    private final Node cndNode;
-    private final ResourceClass cndClass;
+    private final String beginName;
 
 
     protected SqlRecursive(UsedVariables variables, SqlIntercode init, SqlIntercode next, UsedVariable endVar,
-            String joinName, String subjectName, Node cndNode, ResourceClass cndClass)
+            String joinName, String beginName)
     {
         super(variables, init.isDeterministic() && next.isDeterministic());
         this.init = init;
         this.next = next;
         this.endVar = endVar;
         this.joinName = joinName;
-        this.subjectName = subjectName;
-        this.cndNode = cndNode;
-        this.cndClass = cndClass;
+        this.beginName = beginName;
     }
 
 
-    public static SqlIntercode create(SqlIntercode init, SqlIntercode next, String subjectName, String joinName,
-            String endName, Node cndNode, Request request, HashSet<String> restrictions)
+    public static SqlIntercode create(SqlIntercode init, SqlIntercode next, String beginName, String joinName,
+            String endName)
     {
+        return create(init, next, beginName, joinName, endName, null);
+    }
+
+
+    protected static SqlIntercode create(SqlIntercode init, SqlIntercode next, String beginName, String joinName,
+            String endName, Set<String> restrictions)
+    {
+        if(init == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(next instanceof SqlUnion)
+        {
+            SqlIntercode union = SqlNoSolution.get();
+
+            UsedVariable initEnd = init.getVariables().get(endName);
+
+            for(SqlIntercode child : ((SqlUnion) next).getChilds())
+                if((new UsedPairedVariable(initEnd, child.getVariables().get(joinName))).isJoinable())
+                    union = SqlUnion.union(union, child);
+
+            next = union;
+        }
+
+        if(next == SqlNoSolution.get())
+            return SqlDistinct.create(init, Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
+
+        if(!(new UsedPairedVariable(init.getVariables().get(endName), next.getVariables().get(joinName))).isJoinable())
+            return SqlDistinct.create(init, Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
+
+
+        /* standard recursion */
+
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable var : init.getVariables().getValues())
-            if(!var.getName().equals(joinName) && (restrictions == null || restrictions.contains(var.getName())))
+            if(!var.getName().equals(endName) && (restrictions == null || restrictions.contains(var.getName())))
                 variables.add(var);
-
 
         UsedVariable endVar = new UsedVariable(endName, false);
 
         if(restrictions == null || restrictions.contains(endName))
             variables.add(endVar);
 
-        Set<ResourceClass> initEndClasses = init.getVariables().get(joinName).getClasses();
+        //TODO: handle constant columns
+
+        Set<ResourceClass> initEndClasses = init.getVariables().get(endName).getClasses();
         Set<ResourceClass> nextEndClasses = next.getVariables().get(endName).getClasses();
 
         for(ResourceClass initClass : initEndClasses)
         {
             if(nextEndClasses.contains(initClass))
-                endVar.addClass(initClass);
+                endVar.addMapping(initClass, initClass.createColumns(endName));
             else if(nextEndClasses.contains(initClass.getGeneralClass()))
-                endVar.addClass(initClass.getGeneralClass());
+                endVar.addMapping(initClass.getGeneralClass(), initClass.getGeneralClass().createColumns(endName));
             else if(nextEndClasses.stream().noneMatch(r -> r.getGeneralClass() == initClass))
-                endVar.addClass(initClass);
+                endVar.addMapping(initClass, initClass.createColumns(endName));
         }
 
         for(ResourceClass nextClass : nextEndClasses)
@@ -75,111 +107,96 @@ public class SqlRecursive extends SqlIntercode
             if(initEndClasses.contains(nextClass))
                 continue;
             else if(initEndClasses.contains(nextClass.getGeneralClass()))
-                endVar.addClass(nextClass.getGeneralClass());
+                endVar.addMapping(nextClass.getGeneralClass(), nextClass.getGeneralClass().createColumns(endName));
             else if(initEndClasses.stream().noneMatch(r -> r.getGeneralClass() == nextClass))
-                endVar.addClass(nextClass);
+                endVar.addMapping(nextClass, nextClass.createColumns(endName));
         }
 
-
-        ResourceClass cndClass = null;
-
-        if(cndNode != null)
-        {
-            for(ResourceClass resClass : endVar.getClasses())
-                if(resClass.match(cndNode, request))
-                    cndClass = resClass;
-
-            if(cndClass == null)
-                return SqlEmptySolution.get();
-        }
-
-        return new SqlRecursive(variables, init, next, endVar, joinName, subjectName, cndNode, cndClass);
+        return new SqlRecursive(variables, init, next, endVar, joinName, beginName);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        HashSet<String> initRestrictions = new HashSet<String>(restrictions);
-        initRestrictions.add(joinName);
+        Set<String> childRestrictions = new HashSet<String>(restrictions);
 
-        HashSet<String> nextRestrictions = new HashSet<String>();
-        nextRestrictions.add(joinName);
-        nextRestrictions.add(endVar.getName());
+        childRestrictions.add(endVar.getName());
+        childRestrictions.add(joinName);
 
-        return create(init.optimize(request, initRestrictions, reduced),
-                next.optimize(request, nextRestrictions, reduced), subjectName, joinName, endVar.getName(), cndNode,
-                request, restrictions);
+        if(beginName != null)
+            childRestrictions.add(beginName);
+
+        return create(init.optimize(childRestrictions, reduced), next.optimize(childRestrictions, reduced), beginName,
+                joinName, endVar.getName(), restrictions);
     }
 
 
     @Override
     public String translate()
     {
+        UsedVariables initVars = new UsedVariables(init.variables);
+        initVars.remove(endVar.getName());
+
+        List<Column> sharedColumns = new LinkedList<Column>(initVars.getNonConstantColumns());
+
+        List<ResourceClass> endVarClasses = new LinkedList<ResourceClass>(endVar.getClasses()); // to stable order
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("WITH RECURSIVE recursion(");
 
-        boolean hasDeclaration = buildInitColumns(builder, null);
+        builder.append(sharedColumns.stream().map(Object::toString).collect(joining(", ")));
 
-        for(ResourceClass resClass : endVar.getClasses())
+        boolean hasRecursionVariable = !sharedColumns.isEmpty();
+
+        for(ResourceClass resClass : endVarClasses)
         {
-            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+            List<Column> columns = endVar.getMapping(resClass);
+
+            for(int j = 0; j < resClass.getColumnCount(); j++)
             {
-                appendComma(builder, hasDeclaration);
-                hasDeclaration = true;
-                builder.append(resClass.getSqlColumn(endVar.getName(), i));
+                if(columns.get(j) instanceof ConstantColumn)
+                    continue;
+
+                appendComma(builder, hasRecursionVariable);
+                hasRecursionVariable = true;
+
+                builder.append(columns.get(j));
             }
         }
 
+        if(!hasRecursionVariable)
+            builder.append("\"@none\"");
 
         builder.append(") AS (SELECT ");
 
-        boolean hasInitSelect = buildInitColumns(builder, null);
+        builder.append(sharedColumns.stream().map(Object::toString).collect(joining(", ")));
 
-        for(ResourceClass resClass : endVar.getClasses())
+        boolean hasInitSelect = !sharedColumns.isEmpty();
+
+        UsedVariable initEndVariable = init.getVariables().get(endVar.getName());
+
+        for(ResourceClass resClass : endVarClasses)
         {
-            Set<ResourceClass> initResClasses = init.getVariables().get(joinName).getCompatible(resClass);
+            List<Column> columns = initEndVariable.toResource(resClass);
 
-            for(int j = 0; j < resClass.getPatternPartsCount(); j++)
+            for(int j = 0; j < resClass.getColumnCount(); j++)
             {
+                if(endVar.getMapping(resClass).get(j) instanceof ConstantColumn)
+                    continue;
+
                 appendComma(builder, hasInitSelect);
                 hasInitSelect = true;
 
-                if(initResClasses.size() == 0)
-                {
-                    builder.append("NULL::");
-                    builder.append(resClass.getSqlType(j));
-                }
-                else if(initResClasses.contains(resClass))
-                {
-                    builder.append(resClass.getSqlColumn(joinName, j));
-                }
-                else
-                {
-                    if(initResClasses.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasAlternative = false;
-
-                    for(ResourceClass childResClass : initResClasses)
-                    {
-                        appendComma(builder, hasAlternative);
-                        hasAlternative = true;
-
-                        //TODO: do not use CASE check if it is not needed
-                        builder.append(childResClass.getGeneralisedPatternCode(null, joinName, j, true));
-                    }
-
-                    if(initResClasses.size() > 1)
-                        builder.append(")");
-                }
-
+                builder.append(columns.get(j));
                 builder.append(" AS ");
-                builder.append(resClass.getSqlColumn(endVar.getName(), j));
+                builder.append(endVar.getMapping(resClass).get(j));
             }
         }
 
+        if(!hasInitSelect)
+            builder.append("1");
 
         builder.append(" FROM (");
         builder.append(init.translate());
@@ -187,53 +204,28 @@ public class SqlRecursive extends SqlIntercode
 
         builder.append(" UNION SELECT ");
 
-        boolean hasUnionSelect = buildInitColumns(builder, leftTable);
+        builder.append(sharedColumns.stream().map(c -> c.fromTable(leftTable).toString()).collect(joining(", ")));
 
-        for(ResourceClass resClass : endVar.getClasses())
+        boolean hasUnionSelect = !sharedColumns.isEmpty();
+
+        for(ResourceClass resClass : endVarClasses)
         {
-            Set<ResourceClass> endResClasses = next.getVariables().get(endVar.getName()).getCompatible(resClass);
+            List<Column> columns = endVar.getMapping(resClass);
 
-            for(int j = 0; j < resClass.getPatternPartsCount(); j++)
+            for(int j = 0; j < resClass.getColumnCount(); j++)
             {
+                if(columns.get(j) instanceof ConstantColumn)
+                    continue;
+
                 appendComma(builder, hasUnionSelect);
                 hasUnionSelect = true;
 
-                if(endResClasses.size() == 0)
-                {
-                    builder.append("NULL::");
-                    builder.append(resClass.getSqlType(j));
-                }
-                else if(!endResClasses.contains(resClass))
-                {
-                    if(endResClasses.size() > 1)
-                        builder.append("COALESCE(");
-
-                    boolean hasAlternative = false;
-
-                    for(ResourceClass childResClass : endResClasses)
-                    {
-                        appendComma(builder, hasAlternative);
-                        hasAlternative = true;
-
-                        //TODO: do not use CASE check if it is not needed
-                        builder.append(childResClass.getGeneralisedPatternCode(rightTable, endVar.getName(), j, true));
-                    }
-
-                    if(endResClasses.size() > 1)
-                        builder.append(")");
-                }
-                else
-                {
-                    builder.append(rightTable);
-                    builder.append('.');
-                    builder.append(resClass.getSqlColumn(endVar.getName(), j));
-                }
-
-                builder.append(" AS ");
-                builder.append(resClass.getSqlColumn(endVar.getName(), j));
+                builder.append(columns.get(j).fromTable(rightTable));
             }
         }
 
+        if(!hasUnionSelect)
+            builder.append("1");
 
         builder.append(" FROM recursion AS ");
         builder.append(leftTable);
@@ -243,183 +235,25 @@ public class SqlRecursive extends SqlIntercode
         builder.append(") AS ");
         builder.append(rightTable);
 
-        builder.append(" WHERE ");
+        String condition = generateJoinCondition(endVar, next.getVariables().get(joinName), leftTable, rightTable);
 
-
-        boolean restricted = false;
-        String endName = endVar.getName();
-
-        for(PairedClass pairedClass : getPairs(endVar, next.getVariables().get(joinName)))
+        if(condition != null)
         {
-            appendOr(builder, restricted);
-            restricted = true;
-
-            builder.append("(");
-
-            if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-            {
-                ResourceClass resClass = pairedClass.getLeftClass();
-
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendAnd(builder, i > 0);
-
-                    builder.append(leftTable).append('.').append(resClass.getSqlColumn(endName, i));
-                    builder.append(" = ");
-                    builder.append(rightTable).append('.').append(resClass.getSqlColumn(joinName, i));
-                }
-            }
-            else
-            {
-                ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
-
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendAnd(builder, i > 0);
-
-                    builder.append(pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, endName, i, false));
-                    builder.append(" = ");
-                    builder.append(
-                            pairedClass.getRightClass().getGeneralisedPatternCode(rightTable, joinName, i, false));
-                }
-            }
-
-            builder.append(")");
+            builder.append(" WHERE ");
+            builder.append(condition);
         }
-
 
         builder.append(") SELECT ");
 
-        boolean hasFinalSelect = buildInitColumns(builder, null);
+        Set<Column> columns = getVariables().getNonConstantColumns();
 
-        if(cndNode == null && variables.get(endVar.getName()) != null)
-        {
-            for(ResourceClass resClass : endVar.getClasses())
-            {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, hasFinalSelect);
-                    hasFinalSelect = true;
-                    builder.append(resClass.getSqlColumn(endVar.getName(), i));
-                }
-            }
-        }
-
-        if(!hasFinalSelect)
-            builder.append(" 1 ");
-
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+        else
+            builder.append("1");
 
         builder.append(" FROM recursion");
 
-        if(cndNode != null)
-        {
-            builder.append(" WHERE ");
-
-            if(cndNode instanceof VariableOrBlankNode)
-            {
-                boolean hasVariant = false;
-
-                for(PairedClass pairedClass : getPairs(init.getVariables().get(subjectName), endVar))
-                {
-                    appendOr(builder, hasVariant);
-                    hasVariant = true;
-
-                    builder.append("(");
-
-                    if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                    {
-                        ResourceClass resClass = pairedClass.getLeftClass();
-
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, i > 0);
-
-                            builder.append(resClass.getSqlColumn(subjectName, i));
-                            builder.append(" = ");
-                            builder.append(resClass.getSqlColumn(endVar.getName(), i));
-                        }
-                    }
-                    else
-                    {
-                        ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
-
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, i > 0);
-
-                            builder.append(
-                                    pairedClass.getLeftClass().getGeneralisedPatternCode(null, subjectName, i, false));
-                            builder.append(" = ");
-                            builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(null, endVar.getName(),
-                                    i, false));
-                        }
-                    }
-
-                    builder.append(")");
-                }
-            }
-            else
-            {
-                for(int i = 0; i < cndClass.getPatternPartsCount(); i++)
-                {
-                    appendAnd(builder, i > 0);
-                    builder.append(cndClass.getSqlColumn(endVar.getName(), i));
-                    builder.append(" = ");
-                    builder.append(cndClass.getPatternCode(cndNode, i));
-                }
-            }
-        }
-
         return builder.toString();
-    }
-
-
-    public static List<PairedClass> getPairs(UsedVariable left, UsedVariable right)
-    {
-        ArrayList<PairedClass> pairs = new ArrayList<PairedClass>();
-
-        for(ResourceClass leftClass : left.getClasses())
-        {
-            if(right.getClasses().contains(leftClass))
-                pairs.add(new PairedClass(leftClass, leftClass));
-            else if(right.getClasses().contains(leftClass.getGeneralClass()))
-                pairs.add(new PairedClass(leftClass, leftClass.getGeneralClass()));
-        }
-
-        for(ResourceClass rightClass : right.getClasses())
-        {
-            if(!left.getClasses().contains(rightClass) && left.getClasses().contains(rightClass.getGeneralClass()))
-                pairs.add(new PairedClass(rightClass.getGeneralClass(), rightClass));
-        }
-
-        return pairs;
-    }
-
-
-    private boolean buildInitColumns(StringBuilder builder, String table)
-    {
-        boolean hasDeclaration = false;
-
-        for(UsedVariable var : init.getVariables().getValues())
-        {
-            if(var.getName() == joinName || variables.get(var.getName()) == null)
-                continue;
-
-            for(ResourceClass resClass : var.getClasses())
-            {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, hasDeclaration);
-                    hasDeclaration = true;
-
-                    if(table != null)
-                        builder.append(table).append('.');
-
-                    builder.append(resClass.getSqlColumn(var.getName(), i));
-                }
-            }
-        }
-
-        return hasDeclaration;
     }
 }

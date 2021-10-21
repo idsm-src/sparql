@@ -1,7 +1,10 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.stream.Collectors.joining;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
@@ -9,31 +12,49 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 public class SqlDistinct extends SqlIntercode
 {
     private final SqlIntercode child;
+    private final Set<String> distinctVariables;
 
 
-    protected SqlDistinct(UsedVariables variables, SqlIntercode child)
+    protected SqlDistinct(UsedVariables variables, SqlIntercode child, Set<String> distinctVariables)
     {
         super(variables, child.isDeterministic());
+
         this.child = child;
+        this.distinctVariables = distinctVariables;
     }
 
 
-    public static SqlIntercode create(SqlIntercode child)
+    public static SqlIntercode create(SqlIntercode child, Set<String> distinct)
+    {
+        return create(child, distinct, null);
+    }
+
+
+    protected static SqlIntercode create(SqlIntercode child, Set<String> distinct, Set<String> restrictions)
     {
         if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(child instanceof SqlTableAccess && ((SqlTableAccess) child).isDistinct())
-            return child;
+        if(child instanceof SqlTableAccess && ((SqlTableAccess) child).isDistinct(distinct))
+            return child.restrict(restrictions);
 
-        return new SqlDistinct(child.getVariables(), child);
+        UsedVariables variables = new UsedVariables();
+
+        for(UsedVariable var : child.getVariables().getValues())
+            if(distinct.contains(var.getName()) && (restrictions == null || restrictions.contains(var.getName())))
+                variables.add(var);
+
+        return new SqlDistinct(variables, child, distinct);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        return create(child.optimize(request, restrictions, reduced));
+        HashSet<String> childRestriction = new HashSet<String>(restrictions);
+        childRestriction.addAll(distinctVariables);
+
+        return create(child.optimize(childRestriction, true), distinctVariables, restrictions);
     }
 
 
@@ -42,11 +63,27 @@ public class SqlDistinct extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append("SELECT DISTINCT * ");
+        builder.append("SELECT ");
+
+        Set<Column> columns = getVariables().getNonConstantColumns();
+
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+        else
+            builder.append("1");
 
         builder.append(" FROM (");
         builder.append(child.translate());
         builder.append(" ) AS tab");
+
+        builder.append(" GROUP BY ");
+
+        Set<Column> groupColumns = child.getVariables().restrict(distinctVariables).getNonConstantColumns();
+
+        if(!groupColumns.isEmpty())
+            builder.append(groupColumns.stream().map(Object::toString).collect(joining(", ")));
+        else
+            builder.append("1");
 
         return builder.toString();
     }

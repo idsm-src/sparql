@@ -15,15 +15,17 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import static java.util.stream.Collectors.toSet;
+import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -53,7 +55,7 @@ public class SqlCast extends SqlUnary
 
 
         Set<ResourceClass> resultClasses = operand.getResourceClasses().stream()
-                .map(r -> resultCastClass(r, resourceClass)).filter(r -> r != null).collect(Collectors.toSet());
+                .map(r -> resultCastClass(r, resourceClass)).filter(r -> r != null).collect(toSet());
 
         if(resultClasses.isEmpty())
             return SqlNull.get();
@@ -65,9 +67,9 @@ public class SqlCast extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        return create(resourceClass, getOperand().optimize(variableAccessor));
+        return create(resourceClass, getOperand().optimize(variables));
     }
 
 
@@ -128,10 +130,10 @@ public class SqlCast extends SqlUnary
         StringBuilder builder = new StringBuilder();
 
         Set<ResourceClass> convertible = variable.getResourceClasses().stream()
-                .filter(r -> resultCastClass(r, resourceClass) != null).collect(Collectors.toSet());
+                .filter(r -> resultCastClass(r, resourceClass) != null).collect(toSet());
 
         if(convertible.size() > 1)
-            builder.append("COALESCE(");
+            builder.append("coalesce(");
 
         boolean hasAlternative = false;
 
@@ -149,10 +151,12 @@ public class SqlCast extends SqlUnary
             /* special casts from datetime */
             else if(resClass == xsdDateTime && castClass == xsdDate)
             {
+                List<Column> columns = variable.asResource(resClass);
+
                 builder.append("sparql.cast_as_date_from_datetime(");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(columns.get(0));
                 builder.append(", ");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(columns.get(1));
                 builder.append(")");
             }
             else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdDate)
@@ -183,10 +187,12 @@ public class SqlCast extends SqlUnary
             /* special casts from date */
             else if(resClass == xsdDate && castClass == xsdDateTime)
             {
+                List<Column> columns = variable.asResource(resClass);
+
                 builder.append("sparql.cast_as_datetime_from_date(");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(columns.get(0));
                 builder.append(", ");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(columns.get(1));
                 builder.append(")");
             }
             else if(resClass instanceof DateConstantZoneClass && castClass == xsdDateTime)
@@ -217,18 +223,22 @@ public class SqlCast extends SqlUnary
             /* special to-string casts */
             else if(resClass == xsdDate && castClass == xsdString)
             {
+                List<Column> columns = variable.asResource(resClass);
+
                 builder.append("sparql.cast_as_string_from_date(");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(columns.get(0));
                 builder.append(", ");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(columns.get(1));
                 builder.append(")");
             }
             else if(resClass == xsdDateTime && castClass == xsdString)
             {
+                List<Column> columns = variable.asResource(resClass);
+
                 builder.append("sparql.cast_as_string_from_datetime(");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(columns.get(0));
                 builder.append(", ");
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 1));
+                builder.append(columns.get(1));
                 builder.append(")");
             }
             else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdString)
@@ -253,7 +263,7 @@ public class SqlCast extends SqlUnary
             }
             else if(resClass == unsupportedLiteral)
             {
-                builder.append(variable.getVariableAccessor().getSqlVariableAccess(variable.getName(), resClass, 0));
+                builder.append(variable.asResource(resClass).get(0));
             }
 
             /* standard literal casts */

@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.servlets.proxy;
 
+import static java.util.Arrays.asList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -7,7 +8,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import javax.servlet.ServletConfig;
@@ -22,8 +22,8 @@ import org.apache.commons.io.IOUtils;
 @SuppressWarnings("serial")
 public class CorsProxyServlet extends HttpServlet
 {
-    private static final List<String> specialParameters = new ArrayList<>(
-            Arrays.asList("endpoint", "requestMethod", "method"));
+    private static final List<String> specialParameters = new ArrayList<String>(
+            asList("endpoint", "requestMethod", "method"));
 
     private String origin = null;
 

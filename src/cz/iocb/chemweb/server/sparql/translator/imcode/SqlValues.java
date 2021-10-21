@@ -1,12 +1,32 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
+import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.Pair;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -14,98 +34,144 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlValues extends SqlIntercode
 {
-    final ArrayList<Pair<String, Set<ResourceClass>>> typedVariables;
-    final ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList;
+    private final LinkedHashMap<Column, List<Column>> data;
+    private final int size;
 
 
-    SqlValues(UsedVariables usedVariables, ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
-            ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
+    protected SqlValues(UsedVariables usedVariables, LinkedHashMap<Column, List<Column>> data, int size)
     {
         super(usedVariables, true);
-        this.typedVariables = typedVariables;
-        this.typedValuesList = typedValuesList;
+
+        this.data = data;
+        this.size = size;
     }
 
 
-    public static SqlIntercode create(ArrayList<Pair<String, Set<ResourceClass>>> typedVariables,
-            ArrayList<ArrayList<Pair<Node, ResourceClass>>> typedValuesList)
+    public static SqlIntercode create(List<String> variableNames, List<List<Node>> lines)
     {
-        if(typedValuesList.isEmpty())
+        if(lines.size() == 0)
             return SqlNoSolution.get();
 
-        UsedVariables usedVariables = new UsedVariables();
 
+        LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
+        Map<List<Column>, Column> revData = new HashMap<List<Column>, Column>();
+        UsedVariables variables = new UsedVariables();
 
-        ArrayList<Pair<String, Set<ResourceClass>>> filteredTypedVariables = new ArrayList<>(typedVariables.size());
-        boolean mask[] = new boolean[typedVariables.size()];
-
-        for(int i = 0; i < typedVariables.size(); i++)
+        for(int i = 0; i < variableNames.size(); i++)
         {
-            if(!typedVariables.get(i).getValue().isEmpty())
+            if(variables.get(variableNames.get(i)) != null)
+                continue; // ignore repeated occurrences of the variable
+
+            LinkedHashSet<ResourceClass> resClasses = new LinkedHashSet<ResourceClass>();
+            boolean canBeNull = false;
+
+            Map<Node, ResourceClass> nodeTypes = new HashMap<Node, ResourceClass>();
+
+            for(List<Node> line : lines)
             {
-                mask[i] = true;
-                filteredTypedVariables.add(typedVariables.get(i));
+                Node node = line.get(i);
 
-                final int fi = i;
-                boolean canBeNull = typedValuesList.size() > typedValuesList.stream()
-                        .filter(l -> l.get(fi).getValue() != null).count();
-                usedVariables.add(
-                        new UsedVariable(typedVariables.get(i).getKey(), typedVariables.get(i).getValue(), canBeNull));
+                if(node != null)
+                {
+                    ResourceClass resClass = getType(node);
+
+                    resClasses.add(resClass);
+                    nodeTypes.put(node, resClass);
+                }
+                else
+                {
+                    canBeNull = true;
+                }
             }
+
+            if(resClasses.size() == 0)
+                continue;
+
+
+            UsedVariable variable = new UsedVariable(variableNames.get(i), canBeNull);
+
+            for(ResourceClass resClass : resClasses)
+            {
+                List<List<Column>> classColumns = new ArrayList<List<Column>>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                    classColumns.add(new ArrayList<Column>(lines.size()));
+
+                for(List<Node> line : lines)
+                {
+                    Node node = line.get(i);
+
+                    if(node != null && resClass == nodeTypes.get(node))
+                    {
+                        List<Column> cols = resClass.toColumns(node);
+
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(cols.get(j));
+                    }
+                    else
+                    {
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(new ConstantColumn("NULL::" + resClass.getSqlTypes().get(j)));
+                    }
+                }
+
+
+                List<Column> tableColumns = resClass.createColumns(variableNames.get(i));
+                List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                {
+                    List<Column> columns = classColumns.get(j);
+
+                    if(columns.stream().allMatch(c -> c.equals(columns.get(0))))
+                    {
+                        mapping.add(columns.get(0));
+                    }
+                    else
+                    {
+                        Column tableColumn = revData.get(columns);
+
+                        if(tableColumn == null)
+                        {
+                            tableColumn = tableColumns.get(j);
+                            revData.put(columns, tableColumn);
+                            data.put(tableColumn, columns);
+                        }
+
+                        mapping.add(tableColumn);
+                    }
+                }
+
+                variable.addMapping(resClass, mapping);
+            }
+
+            variables.add(variable);
         }
 
-
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> filteredTypedValuesList = new ArrayList<>(
-                typedValuesList.size());
-
-        for(ArrayList<Pair<Node, ResourceClass>> values : typedValuesList)
-        {
-            ArrayList<Pair<Node, ResourceClass>> optimizedValues = new ArrayList<>(filteredTypedVariables.size());
-
-            for(int i = 0; i < values.size(); i++)
-                if(mask[i])
-                    optimizedValues.add(values.get(i));
-
-            filteredTypedValuesList.add(optimizedValues);
-        }
-
-
-        return new SqlValues(usedVariables, filteredTypedVariables, filteredTypedValuesList);
+        return new SqlValues(variables, data, lines.size());
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        ArrayList<Pair<String, Set<ResourceClass>>> optimizedTypedVariables = new ArrayList<>(typedVariables.size());
-        boolean mask[] = new boolean[typedVariables.size()];
+        UsedVariables optimizedVariables = new UsedVariables();
+        LinkedHashMap<Column, List<Column>> optimizedData = new LinkedHashMap<Column, List<Column>>();
 
-        for(int i = 0; i < typedVariables.size(); i++)
+        for(UsedVariable variable : variables.getValues())
         {
-            if(restrictions.contains(typedVariables.get(i).getKey()))
+            if(restrictions.contains(variable.getName()))
             {
-                mask[i] = true;
-                optimizedTypedVariables.add(typedVariables.get(i));
+                optimizedVariables.add(variable);
+
+                for(List<Column> mapping : variable.getMappings().values())
+                    for(Column column : mapping)
+                        if(column instanceof TableColumn)
+                            optimizedData.put(column, data.get(column));
             }
         }
 
-
-        ArrayList<ArrayList<Pair<Node, ResourceClass>>> optimizedTypedValuesList = new ArrayList<>(
-                typedValuesList.size());
-
-        for(ArrayList<Pair<Node, ResourceClass>> values : typedValuesList)
-        {
-            ArrayList<Pair<Node, ResourceClass>> optimizedValues = new ArrayList<>(optimizedTypedVariables.size());
-
-            for(int i = 0; i < values.size(); i++)
-                if(mask[i])
-                    optimizedValues.add(values.get(i));
-
-            optimizedTypedValuesList.add(optimizedValues);
-        }
-
-
-        return SqlValues.create(optimizedTypedVariables, optimizedTypedValuesList);
+        return new SqlValues(optimizedVariables, optimizedData, size);
     }
 
 
@@ -113,101 +179,92 @@ public class SqlValues extends SqlIntercode
     public String translate()
     {
         StringBuilder builder = new StringBuilder();
+
         builder.append("SELECT * FROM (VALUES ");
 
-        for(int i = 0; i < typedValuesList.size(); i++)
+        for(int i = 0; i < size; i++)
         {
             appendComma(builder, i > 0);
             builder.append("(");
 
-            ArrayList<Pair<Node, ResourceClass>> valueList = typedValuesList.get(i);
-
             boolean hasValue = false;
 
-            for(int j = 0; j < typedVariables.size(); j++)
+            for(List<Column> column : data.values())
             {
-                Pair<String, Set<ResourceClass>> typedVariable = typedVariables.get(j);
-                Pair<Node, ResourceClass> value = valueList.get(j);
+                appendComma(builder, hasValue);
+                hasValue = true;
 
-                if(variables.get(typedVariable.getKey()) == null)
-                    continue;
-
-                if(!typedVariable.getValue().isEmpty())
-                {
-                    for(ResourceClass resClass : typedVariable.getValue())
-                    {
-                        if(resClass == value.getValue())
-                        {
-                            for(int k = 0; k < resClass.getPatternPartsCount(); k++)
-                            {
-                                appendComma(builder, hasValue);
-                                hasValue = true;
-
-                                builder.append(resClass.getPatternCode(value.getKey(), k));
-                            }
-                        }
-                        else
-                        {
-                            for(int k = 0; k < resClass.getPatternPartsCount(); k++)
-                            {
-                                appendComma(builder, hasValue);
-                                hasValue = true;
-
-                                builder.append("null");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    appendComma(builder, hasValue);
-                    hasValue = true;
-                    builder.append("null");
-                }
+                builder.append(column.get(i));
             }
 
             if(!hasValue)
-                builder.append("null");
+                builder.append("1");
 
-            builder.append(") ");
+            builder.append(")");
         }
 
         builder.append(") AS tab (");
 
-
-        boolean hasValue = false;
-
-        for(Pair<String, Set<ResourceClass>> typedVariable : typedVariables)
-        {
-            if(variables.get(typedVariable.getKey()) == null)
-                continue;
-
-            if(!typedVariable.getValue().isEmpty())
-            {
-                for(ResourceClass resClass : typedVariable.getValue())
-                {
-                    for(int k = 0; k < resClass.getPatternPartsCount(); k++)
-                    {
-                        appendComma(builder, hasValue);
-                        hasValue = true;
-
-                        builder.append(resClass.getSqlColumn(typedVariable.getKey(), k));
-                    }
-                }
-            }
-            else
-            {
-                appendComma(builder, hasValue);
-                hasValue = true;
-                builder.append("\"null\"");
-            }
-        }
-
-        if(!hasValue)
+        if(data.size() > 0)
+            builder.append(data.keySet().stream().map(Object::toString).collect(joining(",")));
+        else
             builder.append("\"#null\"");
 
         builder.append(")");
 
         return builder.toString();
+    }
+
+
+    @SuppressWarnings("resource")
+    private static ResourceClass getType(Node value)
+    {
+        if(value instanceof Literal)
+        {
+            Literal literal = (Literal) value;
+
+            if(literal.getLanguageTag() != null)
+            {
+                return LangStringConstantTagClass.get(literal.getLanguageTag());
+            }
+            else
+            {
+                ResourceClass valueType = BuiltinClasses.unsupportedLiteral;
+
+                if(literal.getValue() != null)
+                {
+                    IRI iri = literal.getTypeIri();
+
+                    if(iri != null)
+                        for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
+                            if(literalClass.getTypeIri().equals(iri))
+                                valueType = literalClass;
+
+                    if(valueType == xsdDateTime)
+                        valueType = DateTimeConstantZoneClass.get(DateTimeClass.getZone(literal));
+
+                    if(valueType == xsdDate)
+                        valueType = DateConstantZoneClass.get(DateClass.getZone(literal));
+                }
+
+                return valueType;
+            }
+        }
+        else if(value instanceof IRI)
+        {
+            for(UserIriClass resClass : Request.currentRequest().getConfiguration().getIriClasses())
+                if(resClass.match(value))
+                    return resClass;
+
+            return BuiltinClasses.unsupportedIri;
+        }
+        else if(value instanceof BlankNodeLiteral)
+        {
+            return ((BlankNodeLiteral) value).getResourceClass();
+        }
+        else
+        {
+            return null;
+        }
     }
 }

@@ -39,33 +39,42 @@ public class Pathway
                     config.createIriMapping("ncbi:taxonomy", "organism_id"));
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:pathbank-pathway", "reference"), "reference_type = 'PATHBANK'");
+                    config.createIriMapping("reference:pathbank-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PATHBANK'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:biocyc-image-pathway", "reference"),
-                    "reference_type = 'BIOCYC_IMAGE'");
+                    config.createAreEqualCondition("reference_type", "'BIOCYC_IMAGE'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("identifiers:reactome", "reference"), "reference_type = 'REACTOME'");
+                    config.createIriMapping("identifiers:reactome", "reference"),
+                    config.createAreEqualCondition("reference_type", "'REACTOME'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("identifiers:wikipathway", "reference"), "reference_type = 'WIKIPATHWAY'");
+                    config.createIriMapping("identifiers:wikipathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'WIKIPATHWAY'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:biocyc-pathway", "reference"), "reference_type = 'BIOCYC'");
+                    config.createIriMapping("reference:biocyc-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'BIOCYC'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:plantcyc-pathway", "reference"), "reference_type = 'PLANTCYC'");
+                    config.createIriMapping("reference:plantcyc-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PLANTCYC'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:pid-pathway", "reference"), "reference_type = 'PID'");
+                    config.createIriMapping("reference:pid-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PID'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:inoh-pathway", "reference"), "reference_type = 'INOH'");
+                    config.createIriMapping("reference:inoh-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'INOH'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:plantreactome-pathway", "reference"),
-                    "reference_type = 'PLANTREACTOME'");
+                    config.createAreEqualCondition("reference_type",
+                            "'PLANTREACTOME'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("reference:pharmgkb-pathway", "reference"), "reference_type = 'PHARMGKB'");
+                    config.createIriMapping("reference:pharmgkb-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PHARMGKB'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:fairdomhub-model", "reference"),
-                    "reference_type = 'FAIRDOMHUB'");
+                    config.createAreEqualCondition("reference_type", "'FAIRDOMHUB'::pubchem.pathway_reference_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:lipidmaps-pathway", "reference"),
-                    "reference_type = 'LIPIDMAPS'");
+                    config.createAreEqualCondition("reference_type", "'LIPIDMAPS'::pubchem.pathway_reference_type"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),

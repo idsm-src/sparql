@@ -1,11 +1,13 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashSet;
-import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import java.util.List;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -13,8 +15,8 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlMinus extends SqlIntercode
 {
-    private static final String leftTable = "tab0";
-    private static final String rightTable = "tab1";
+    private static final Table leftTable = new Table("tab0");
+    private static final Table rightTable = new Table("tab1");
 
     private final SqlIntercode left;
     private final SqlIntercode right;
@@ -23,52 +25,48 @@ public class SqlMinus extends SqlIntercode
     protected SqlMinus(UsedVariables variables, SqlIntercode left, SqlIntercode right)
     {
         super(variables, left.isDeterministic() && right.isDeterministic());
+
         this.left = left;
         this.right = right;
     }
 
 
-    public static SqlIntercode minus(SqlIntercode left, SqlIntercode right, HashSet<String> restrictions)
+    public static SqlIntercode minus(SqlIntercode left, SqlIntercode right)
+    {
+        return minus(left, right, null);
+    }
+
+
+    protected static SqlIntercode minus(SqlIntercode left, SqlIntercode right, Set<String> restrictions)
     {
         boolean shareVariables = false;
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
         {
             if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
-            {
                 shareVariables = true;
 
-                if(!pair.getLeftVariable().canBeNull() && !pair.getRightVariable().canBeNull())
-                {
-                    boolean isJoinable = false;
-
-                    for(PairedClass pairedClass : pair.getClasses())
-                        if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                            isJoinable = true;
-
-                    if(!isJoinable)
-                        return left;
-                }
-            }
+            if(!pair.isJoinable())
+                return left.restrict(restrictions);
         }
 
         if(shareVariables == false)
-            return left;
+            return left.restrict(restrictions);
 
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>();
         childRestrictions.addAll(left.getVariables().getNames());
         childRestrictions.retainAll(right.getVariables().getNames());
         childRestrictions.addAll(restrictions);
 
-        return minus(left.optimize(request, childRestrictions, reduced),
-                right.optimize(request, childRestrictions, reduced), restrictions);
+        return minus(left.optimize(childRestrictions, reduced), right.optimize(childRestrictions, reduced),
+                restrictions);
     }
 
 
@@ -77,239 +75,96 @@ public class SqlMinus extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
-
         builder.append("SELECT ");
-        boolean hasSelect = false;
 
-        for(UsedVariable variable : variables.getValues())
-        {
-            String varName = variable.getName();
+        Set<Column> columns = getVariables().getNonConstantColumns();
 
-            for(ResourceClass resClass : variable.getClasses())
-            {
-                for(int j = 0; j < resClass.getPatternPartsCount(); j++)
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    builder.append(resClass.getSqlColumn(varName, j));
-                }
-            }
-        }
-
-        if(!hasSelect)
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+        else
             builder.append("1");
-
 
         builder.append(" FROM (");
         builder.append(left.translate());
         builder.append(") AS ");
         builder.append(leftTable);
 
-
         builder.append(" WHERE (SELECT 1 FROM (");
         builder.append(right.translate());
         builder.append(") AS ");
         builder.append(rightTable);
-        builder.append(" WHERE ");
-        generateWhereCondition(builder);
-        builder.append(" LIMIT 1) IS NULL");
 
+        String condition = generateCondition(left.getVariables(), right.getVariables(), leftTable, rightTable);
+
+        if(condition != null)
+        {
+            builder.append(" WHERE ");
+            builder.append(condition);
+        }
+
+        builder.append(" LIMIT 1) IS NULL");
 
         return builder.toString();
     }
 
 
-    private void generateWhereCondition(StringBuilder builder)
+    private String generateCondition(UsedVariables left, UsedVariables right, Table leftTable, Table rightTable)
     {
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
+        String joinCondition = generateJoinCondition(left, right, leftTable, rightTable);
 
-        boolean hasWhere = false;
-        boolean simpleCondition = false;
+        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left, right);
+
+        for(UsedPairedVariable pair : pairs)
+            if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+                if(!pair.getLeftVariable().canBeNull() && !pair.getRightVariable().canBeNull())
+                    return joinCondition;
+
+
+        List<String> condition = new ArrayList<String>();
 
         for(UsedPairedVariable pair : pairs)
         {
-            String var = pair.getName();
             UsedVariable leftVariable = pair.getLeftVariable();
             UsedVariable rightVariable = pair.getRightVariable();
 
             if(leftVariable != null && rightVariable != null)
             {
-                simpleCondition |= !leftVariable.canBeNull() && !rightVariable.canBeNull();
-
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
-
-                builder.append("(");
-                boolean restricted = false;
+                StringBuilder builder = new StringBuilder();
 
                 if(leftVariable.canBeNull())
                 {
-                    boolean use = false;
+                    Set<Column> columns = leftVariable.getNonConstantColumns();
+                    assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
+
                     builder.append("(");
-
-                    for(ResourceClass resClass : leftVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, use);
-                            use = true;
-
-                            builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
+                    builder.append(columns.stream().map(c -> c.fromTable(leftTable) + " IS NOT NULL").sorted()
+                            .collect(joining(" OR ")));
                     builder.append(")");
-
-                    assert use;
-                    restricted = true;
                 }
+
+                if(leftVariable.canBeNull() && rightVariable.canBeNull())
+                    builder.append(" AND ");
 
                 if(rightVariable.canBeNull())
                 {
-                    appendOr(builder, restricted);
-                    restricted = true;
+                    Set<Column> columns = rightVariable.getNonConstantColumns();
+                    assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
 
-                    boolean use = false;
                     builder.append("(");
-
-                    for(ResourceClass resClass : rightVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, use);
-                            use = true;
-
-                            builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
+                    builder.append(columns.stream().map(c -> c.fromTable(rightTable) + " IS NOT NULL").sorted()
+                            .collect(joining(" OR ")));
                     builder.append(")");
-
-                    assert use;
                 }
 
-                for(PairedClass pairedClass : pair.getClasses())
-                {
-                    if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                    {
-                        appendOr(builder, restricted);
-                        restricted = true;
-
-                        builder.append("(");
-
-                        if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                        {
-                            ResourceClass resClass = pairedClass.getLeftClass();
-
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, i > 0);
-
-                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" = ");
-                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                            }
-                        }
-                        else
-                        {
-                            ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
-
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, i > 0);
-
-                                builder.append(
-                                        pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, var, i, false));
-                                builder.append(" = ");
-                                builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(rightTable, var, i,
-                                        false));
-                            }
-                        }
-
-                        builder.append(")");
-                    }
-                }
-
-                builder.append(")");
-
-                assert restricted;
+                condition.add(builder.toString());
             }
         }
 
+        String domCondition = condition.stream().sorted().collect(joining(" OR "));
 
-        if(!simpleCondition)
-        {
-            builder.append(" AND (");
-            boolean restricted = false;
-
-            for(UsedPairedVariable pair : pairs)
-            {
-                String var = pair.getName();
-                UsedVariable leftVariable = pair.getLeftVariable();
-                UsedVariable rightVariable = pair.getRightVariable();
-
-                if(leftVariable != null && rightVariable != null)
-                {
-                    appendOr(builder, restricted);
-                    restricted = true;
-
-                    builder.append("(");
-
-                    if(leftVariable.canBeNull())
-                    {
-                        boolean use = false;
-                        builder.append("(");
-
-                        for(ResourceClass resClass : leftVariable.getClasses())
-                        {
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendOr(builder, use);
-                                use = true;
-
-                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" IS NOT NULL");
-                            }
-                        }
-
-                        builder.append(")");
-
-                        assert use;
-                    }
-
-                    if(leftVariable.canBeNull() && rightVariable.canBeNull())
-                        builder.append(" AND ");
-
-                    if(rightVariable.canBeNull())
-                    {
-                        boolean use = false;
-                        builder.append("(");
-
-                        for(ResourceClass resClass : rightVariable.getClasses())
-                        {
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendOr(builder, use);
-                                use = true;
-
-                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" IS NOT NULL");
-                            }
-                        }
-
-                        builder.append(")");
-
-                        assert use;
-                    }
-
-                    builder.append(")");
-                }
-            }
-
-            builder.append(")");
-        }
+        if(joinCondition == null)
+            return domCondition;
+        else
+            return "(" + joinCondition + ") AND (" + domCondition + ")";
     }
 }

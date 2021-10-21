@@ -8,6 +8,7 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -100,37 +101,40 @@ public class Bioassay
         {
             Table table = new Table(schema, "bioassay_data");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay_description", "bioassay");
+            Condition condition = config.createAreEqualCondition("type_id", "'136'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_000136"), "type_id = '136'::smallint");
+                    config.createIriMapping("cheminf:SIO_000136"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
-                    config.createIriMapping("pubchem:bioassay", "bioassay"), "type_id = '136'::smallint");
+                    config.createIriMapping("pubchem:bioassay", "bioassay"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '136'::smallint");
+                    config.createLiteralMapping(rdfLangStringEn, "value"), condition);
         }
 
         {
             Table table = new Table(schema, "bioassay_data");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay_protocol", "bioassay");
+            Condition condition = config.createAreEqualCondition("type_id", "'1041'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_001041"), "type_id = '1041'::smallint");
+                    config.createIriMapping("cheminf:SIO_001041"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
-                    config.createIriMapping("pubchem:bioassay", "bioassay"), "type_id = '1041'::smallint");
+                    config.createIriMapping("pubchem:bioassay", "bioassay"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '1041'::smallint");
+                    config.createLiteralMapping(rdfLangStringEn, "value"), condition);
         }
 
         {
             Table table = new Table(schema, "bioassay_data");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay_comment", "bioassay");
+            Condition condition = config.createAreEqualCondition("type_id", "'1167'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_001167"), "type_id = '1167'::smallint");
+                    config.createIriMapping("cheminf:SIO_001167"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
-                    config.createIriMapping("pubchem:bioassay", "bioassay"), "type_id = '1167'::smallint");
+                    config.createIriMapping("pubchem:bioassay", "bioassay"), condition);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(rdfLangStringEn, "value"), "type_id = '1167'::smallint");
+                    config.createLiteralMapping(rdfLangStringEn, "value"), condition);
         }
     }
 }

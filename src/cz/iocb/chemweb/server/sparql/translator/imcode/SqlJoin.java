@@ -1,66 +1,66 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import com.google.common.collect.Lists;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.Pair;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
-import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
 public class SqlJoin extends SqlIntercode
 {
-    private static final String leftTable = "tab0";
-    private static final String rightTable = "tab1";
+    private static final Table leftTable = new Table("tab0");
+    private static final Table rightTable = new Table("tab1");
 
-    private final ArrayList<SqlIntercode> childs;
+    private final List<SqlIntercode> childs;
+    private final List<UsedVariables> variables;
+    private final List<Map<Column, Column>> columnMaps;
 
 
-    protected SqlJoin(UsedVariables variables, ArrayList<SqlIntercode> childs)
+    protected SqlJoin(List<SqlIntercode> childs, List<UsedVariables> variables, List<Map<Column, Column>> columnMaps)
     {
-        super(variables, childs.stream().allMatch(c -> c.isDeterministic()));
+        super(variables.get(variables.size() - 1), childs.stream().allMatch(c -> c.isDeterministic()));
+
         this.childs = childs;
+        this.variables = variables;
+        this.columnMaps = columnMaps;
     }
 
 
-    public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode join(SqlIntercode left, SqlIntercode right)
     {
-        return join(schema, left, right, null);
+        return join(left, right, null);
     }
 
 
-    public static SqlIntercode join(DatabaseSchema schema, SqlIntercode left, SqlIntercode right,
-            HashSet<String> restrictions)
+    protected static SqlIntercode join(SqlIntercode left, SqlIntercode right, Set<String> restrictions)
     {
         /* special cases */
 
         if(left == SqlNoSolution.get() || right == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-
         if(left == SqlEmptySolution.get())
-            return right;
+            return right.restrict(restrictions);
 
         if(right == SqlEmptySolution.get())
-            return left;
+            return left.restrict(restrictions);
 
 
         if(left instanceof SqlUnion || right instanceof SqlUnion)
         {
-            ArrayList<SqlIntercode> leftChilds;
+            List<SqlIntercode> leftChilds;
 
             if(left instanceof SqlUnion)
                 leftChilds = ((SqlUnion) left).getChilds();
@@ -68,7 +68,7 @@ public class SqlJoin extends SqlIntercode
                 leftChilds = Lists.newArrayList(left);
 
 
-            ArrayList<SqlIntercode> rightChilds;
+            List<SqlIntercode> rightChilds;
 
             if(right instanceof SqlUnion)
                 rightChilds = ((SqlUnion) right).getChilds();
@@ -80,20 +80,13 @@ public class SqlJoin extends SqlIntercode
 
             for(SqlIntercode leftChild : leftChilds)
                 for(SqlIntercode rightChild : rightChilds)
-                    union = SqlUnion.union(union, join(schema, leftChild, rightChild, restrictions));
+                    union = SqlUnion.union(union, join(leftChild, rightChild, restrictions));
 
             return union;
         }
 
 
         /* standard join */
-
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = getUsedVariable(pairs, restrictions);
-
-        if(variables == null)
-            return SqlNoSolution.get();
-
 
         ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
@@ -107,28 +100,23 @@ public class SqlJoin extends SqlIntercode
         else
             childs.add(right);
 
-        SqlJoin join = new SqlJoin(variables, childs);
-
-
-        return optimize(join, schema, restrictions);
+        return join(childs, restrictions);
     }
 
 
-    private static SqlIntercode optimize(SqlJoin join, DatabaseSchema schema, HashSet<String> restrictions)
+    private static SqlIntercode join(List<SqlIntercode> childs, Set<String> restrictions)
     {
-        if(schema == null)
-            return join;
-
+        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
 
         loop:
         while(true)
         {
-            for(int i = 0; i < join.childs.size(); i++)
+            for(int i = 0; i < childs.size(); i++)
             {
-                for(int j = i + 1; j < join.childs.size(); j++)
+                for(int j = i + 1; j < childs.size(); j++)
                 {
-                    SqlIntercode iSql = join.childs.get(i);
-                    SqlIntercode jSql = join.childs.get(j);
+                    SqlIntercode iSql = childs.get(i);
+                    SqlIntercode jSql = childs.get(j);
 
                     if(!(iSql instanceof SqlTableAccess))
                         continue;
@@ -139,20 +127,22 @@ public class SqlJoin extends SqlIntercode
                     SqlTableAccess left = (SqlTableAccess) iSql;
                     SqlTableAccess right = (SqlTableAccess) jSql;
 
-
-                    if(!SqlTableAccess.areCompatible(schema, left, right))
-                        return SqlNoSolution.get();
-
+                    //TODO: add unjoinable check
+                    //if(!SqlTableAccess.areCompatible(schema, left, right))
+                    //    return SqlNoSolution.get();
 
                     List<ColumnPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
 
                     if(variantA != null)
                     {
-                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, variantA, subrestrictions);
+                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
+                        SqlIntercode merge = SqlTableAccess.merge(left, right, variantA, subrestrictions);
 
-                        join.childs.set(j, merge);
-                        join.childs.remove(i);
+                        if(merge == SqlNoSolution.get())
+                            return SqlNoSolution.get();
+
+                        childs.set(j, merge);
+                        childs.remove(i);
                         continue loop;
                     }
 
@@ -161,22 +151,28 @@ public class SqlJoin extends SqlIntercode
 
                     if(variantB != null)
                     {
-                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
-                        SqlTableAccess merge = SqlTableAccess.merge(right, left, variantB, subrestrictions);
+                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
+                        SqlIntercode merge = SqlTableAccess.merge(right, left, variantB, subrestrictions);
 
-                        join.childs.set(i, merge);
-                        join.childs.remove(j);
+                        if(merge == SqlNoSolution.get())
+                            return SqlNoSolution.get();
+
+                        childs.set(i, merge);
+                        childs.remove(j);
                         continue loop;
                     }
 
 
                     if(SqlTableAccess.canBeMerged(schema, left, right))
                     {
-                        HashSet<String> subrestrictions = getRestrictions(join, i, j, restrictions);
-                        SqlTableAccess merge = SqlTableAccess.merge(left, right, subrestrictions);
+                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
+                        SqlIntercode merge = SqlTableAccess.merge(left, right, subrestrictions);
 
-                        join.childs.set(i, merge);
-                        join.childs.remove(j);
+                        if(merge == SqlNoSolution.get())
+                            return SqlNoSolution.get();
+
+                        childs.set(i, merge);
+                        childs.remove(j);
                         continue loop;
                     }
                 }
@@ -185,16 +181,34 @@ public class SqlJoin extends SqlIntercode
             break loop;
         }
 
+        if(childs.size() == 1)
+            return childs.get(0);
 
-        if(join.childs.size() == 1)
-            return join.childs.get(0);
+        UsedVariables variables = childs.get(0).getVariables();
+        List<UsedVariables> variablesChain = new ArrayList<UsedVariables>(childs.size() - 1);
+        List<Map<Column, Column>> columnMaps = new ArrayList<Map<Column, Column>>(childs.size() - 1);
 
-        return join;
+        for(int i = 1; i < childs.size(); i++)
+        {
+            Map<Column, Column> map = new HashMap<Column, Column>();
+            variables = getJoinUsedVariables(variables, childs.get(i).getVariables(), leftTable, rightTable, null, map);
+
+            if(variables == null)
+                return SqlNoSolution.get();
+
+            if(i == childs.size() - 1)
+                variables = variables.restrict(restrictions);
+
+            variablesChain.add(variables);
+            columnMaps.add(map);
+        }
+
+        return new SqlJoin(childs, variablesChain, columnMaps);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
@@ -211,9 +225,10 @@ public class SqlJoin extends SqlIntercode
 
         SqlIntercode result = SqlEmptySolution.get();
 
-        for(SqlIntercode child : childs)
-            result = join(request.getConfiguration().getDatabaseSchema(), result,
-                    child.optimize(request, childRestrictions, reduced), restrictions);
+        for(int i = 0; i < childs.size() - 1; i++)
+            result = join(result, childs.get(i).optimize(childRestrictions, reduced), childRestrictions);
+
+        result = join(result, childs.get(childs.size() - 1).optimize(childRestrictions, reduced), restrictions);
 
         return result;
     }
@@ -222,487 +237,61 @@ public class SqlJoin extends SqlIntercode
     @Override
     public String translate()
     {
-        @SuppressWarnings("unchecked")
-        ArrayList<SqlIntercode> childs = (ArrayList<SqlIntercode>) this.childs.clone();
-        childs.sort(new Comparator<SqlIntercode>()
+        String translate = childs.get(0).translate();
+        UsedVariables leftVariables = childs.get(0).getVariables();
+
+        for(int i = 1; i < childs.size(); i++)
         {
-            @Override
-            public int compare(SqlIntercode i1, SqlIntercode i2)
-            {
-                if(i1 instanceof SqlValues && !(i2 instanceof SqlValues))
-                    return 1;
-                if(i2 instanceof SqlValues && !(i1 instanceof SqlValues))
-                    return -1;
-                else
-                    return 0;
-            }
-        });
-
-
-        String joinResult = childs.get(0).translate();
-        UsedVariables joinVariables = childs.get(0).getVariables();
-
-        for(int idx = 1; idx < childs.size(); idx++)
-        {
-            SqlIntercode child = childs.get(idx);
-            ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(joinVariables, child.getVariables());
-
-            HashSet<String> restrictions = new HashSet<String>(variables.getNames());
-
-            for(int i = idx + 1; i < childs.size(); i++)
-                restrictions.addAll(childs.get(i).getVariables().getNames());
-
-            UsedVariables variables = getUsedVariable(pairs, restrictions);
-
-
-            SimpleValuesJoin:
-            if(child instanceof SqlValues)
-            {
-                HashSet<String> shared = new HashSet<String>();
-
-                for(UsedVariable var : child.getVariables().getValues())
-                {
-                    UsedVariable joinVar = joinVariables.get(var.getName());
-
-                    if(joinVar != null)
-                    {
-                        shared.add(var.getName());
-
-                        if(var.canBeNull() || joinVar.canBeNull())
-                            break SimpleValuesJoin;
-                    }
-                    else
-                    {
-                        if(restrictions.contains(var.getName()))
-                            break SimpleValuesJoin;
-                    }
-                }
-
-                SqlValues values = (SqlValues) child;
-
-                for(int k = 0; k < values.typedValuesList.size(); k++)
-                {
-                    for(int l = k + 1; l < values.typedValuesList.size(); l++)
-                    {
-                        boolean equal = true;
-
-                        for(int i = 0; i < values.typedValuesList.get(k).size(); i++)
-                        {
-                            if(shared.contains(values.typedVariables.get(i).getKey()))
-                            {
-                                Node n1 = values.typedValuesList.get(k).get(i).getKey();
-                                Node n2 = values.typedValuesList.get(l).get(i).getKey();
-
-                                if(!n1.equals(n2))
-                                    equal = false;
-                            }
-                        }
-
-                        if(equal)
-                            break SimpleValuesJoin;
-                    }
-                }
-
-                for(UsedPairedVariable pair : pairs)
-                {
-                    if(shared.contains(pair.getName()))
-                    {
-                        for(PairedClass pairedClass : pair.getClasses())
-                        {
-                            if(pairedClass.getRightClass() != null
-                                    && pairedClass.getLeftClass() != pairedClass.getRightClass())
-                                break SimpleValuesJoin;
-                        }
-                    }
-                }
-
-
-                StringBuilder builder = new StringBuilder();
-
-                builder.append("SELECT ");
-                boolean hasSelect = false;
-
-                for(UsedVariable variable : variables.getValues())
-                {
-                    for(ResourceClass resClass : variable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendComma(builder, hasSelect);
-                            hasSelect = true;
-
-                            builder.append(resClass.getSqlColumn(variable.getName(), i));
-                        }
-                    }
-                }
-
-                if(!hasSelect)
-                    builder.append("1");
-
-                builder.append(" FROM (");
-                builder.append(joinResult);
-                builder.append(" ) AS tab");
-
-                if(!shared.isEmpty())
-                {
-                    builder.append(" WHERE ");
-
-                    boolean hasWhere = false;
-
-                    conditions:
-                    for(ArrayList<Pair<Node, ResourceClass>> row : values.typedValuesList)
-                    {
-                        for(int i = 0; i < values.typedVariables.size(); i++)
-                        {
-                            String varName = values.typedVariables.get(i).getKey();
-
-                            if(shared.contains(varName)
-                                    && !child.getVariables().contains(varName, row.get(i).getValue()))
-                                continue conditions;
-                        }
-
-
-                        appendOr(builder, hasWhere);
-                        hasWhere = true;
-
-                        builder.append("(");
-
-                        boolean hasPart = false;
-
-                        for(int i = 0; i < values.typedVariables.size(); i++)
-                        {
-                            String varName = values.typedVariables.get(i).getKey();
-
-                            if(shared.contains(varName))
-                            {
-                                Node node = row.get(i).getKey();
-                                ResourceClass resClass = row.get(i).getValue();
-
-                                for(int j = 0; j < resClass.getPatternPartsCount(); j++)
-                                {
-                                    appendAnd(builder, hasPart);
-                                    hasPart = true;
-
-                                    builder.append(resClass.getSqlColumn(varName, j));
-                                    builder.append(" = ");
-                                    builder.append(resClass.getPatternCode(node, j));
-                                }
-
-                            }
-                        }
-
-                        builder.append(")");
-                    }
-
-                    if(!hasWhere)
-                        builder.append("true");
-                }
-
-                joinResult = builder.toString();
-                joinVariables = variables;
-
-                continue;
-            }
-
-
-
-            Set<ResourceClass> emptySet = new HashSet<ResourceClass>();
+            Set<Column> columns = variables.get(i - 1).getNonConstantColumns();
+            Map<Column, Column> map = columnMaps.get(i - 1);
 
             StringBuilder builder = new StringBuilder();
+
             builder.append("SELECT ");
 
-            boolean hasSelect = false;
+            if(!columns.isEmpty())
+                builder.append(columns.stream().map(c -> map.get(c) + " AS " + c).collect(joining(", ")));
+            else
+                builder.append("1");
 
-            for(UsedVariable variable : variables.getValues())
-            {
-                String var = variable.getName();
-                UsedVariable leftVar = joinVariables.get(var);
-                UsedVariable rightVar = child.getVariables().get(var);
-
-
-                for(ResourceClass resClass : variable.getClasses())
-                {
-                    boolean leftCanBeNull = leftVar == null ? true : leftVar.canBeNull();
-                    boolean rightCanBeNull = rightVar == null ? true : rightVar.canBeNull();
-                    Set<ResourceClass> leftClasses = leftVar != null ? leftVar.getCompatible(resClass) : emptySet;
-                    Set<ResourceClass> rightClasses = rightVar != null ? rightVar.getCompatible(resClass) : emptySet;
-
-
-                    if(leftCanBeNull && !rightCanBeNull)
-                        leftClasses = emptySet;
-                    else if(!leftCanBeNull && rightCanBeNull)
-                        rightClasses = emptySet;
-                    else if(!leftCanBeNull && !rightCanBeNull && !leftClasses.isEmpty())
-                        rightClasses = emptySet;
-
-
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        generateJoinSelectVariable(builder, var, resClass, i, leftClasses, rightClasses);
-                    }
-                }
-            }
-
-            if(!hasSelect)
-                builder.append(" 1 ");
-
-
-            builder.append(" FROM ");
-            builder.append("(");
-            builder.append(joinResult);
-            builder.append(") AS ");
+            builder.append(" FROM (");
+            builder.append(translate);
+            builder.append(" ) AS ");
             builder.append(leftTable);
 
             builder.append(", (");
-            builder.append(child.translate());
-            builder.append(") AS ");
+            builder.append(childs.get(i).translate());
+            builder.append(" ) AS ");
             builder.append(rightTable);
 
+            String condition = generateJoinCondition(leftVariables, childs.get(i).getVariables(), leftTable,
+                    rightTable);
 
-            builder.append(" WHERE ");
-
-            boolean hasWhere = false;
-
-            for(UsedPairedVariable pair : pairs)
+            if(condition != null)
             {
-                String var = pair.getName();
-                UsedVariable leftVariable = pair.getLeftVariable();
-                UsedVariable rightVariable = pair.getRightVariable();
-
-                if(leftVariable != null && rightVariable != null)
-                {
-                    appendAnd(builder, hasWhere);
-                    hasWhere = true;
-
-                    builder.append("(");
-                    boolean restricted = false;
-
-                    if(leftVariable.canBeNull())
-                    {
-                        boolean use = false;
-                        builder.append("(");
-
-                        for(ResourceClass resClass : leftVariable.getClasses())
-                        {
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, use);
-                                use = true;
-
-                                builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" IS NULL");
-                            }
-                        }
-
-                        builder.append(")");
-
-                        assert use;
-                        restricted = true;
-                    }
-
-                    if(rightVariable.canBeNull())
-                    {
-                        appendOr(builder, restricted);
-                        restricted = true;
-
-                        boolean use = false;
-                        builder.append("(");
-
-                        for(ResourceClass resClass : rightVariable.getClasses())
-                        {
-                            for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                            {
-                                appendAnd(builder, use);
-                                use = true;
-
-                                builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                                builder.append(" IS NULL");
-                            }
-                        }
-
-                        builder.append(")");
-
-                        assert use;
-                    }
-
-                    for(PairedClass pairedClass : pair.getClasses())
-                    {
-                        if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                        {
-                            appendOr(builder, restricted);
-                            restricted = true;
-
-                            builder.append("(");
-
-                            if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                            {
-                                ResourceClass resClass = pairedClass.getLeftClass();
-
-                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                                {
-                                    appendAnd(builder, i > 0);
-
-                                    builder.append(leftTable).append('.').append(resClass.getSqlColumn(var, i));
-                                    builder.append(" = ");
-                                    builder.append(rightTable).append('.').append(resClass.getSqlColumn(var, i));
-                                }
-                            }
-                            else
-                            {
-                                ResourceClass resClass = pairedClass.getLeftClass().getGeneralClass();
-
-                                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                                {
-                                    appendAnd(builder, i > 0);
-
-                                    builder.append(pairedClass.getLeftClass().getGeneralisedPatternCode(leftTable, var,
-                                            i, false));
-                                    builder.append(" = ");
-                                    builder.append(pairedClass.getRightClass().getGeneralisedPatternCode(rightTable,
-                                            var, i, false));
-                                }
-                            }
-
-                            builder.append(")");
-                        }
-                    }
-
-                    builder.append(")");
-
-                    assert restricted;
-                }
+                builder.append(" WHERE ");
+                builder.append(condition);
             }
 
-            if(!hasWhere)
-                builder.append("true");
-
-
-
-            joinResult = builder.toString();
-            joinVariables = variables;
+            leftVariables = variables.get(i - 1);
+            translate = builder.toString();
         }
 
-
-        return joinResult;
+        return translate;
     }
 
 
-    private static HashSet<String> getRestrictions(SqlJoin join, int i, int j, HashSet<String> restrictions)
+    private static HashSet<String> getRestrictions(List<SqlIntercode> childs, int i, int j, Set<String> restrictions)
     {
         if(restrictions == null)
             return null;
 
         HashSet<String> subrestrictions = new HashSet<String>(restrictions);
 
-        for(int k = 0; k < join.childs.size(); k++)
+        for(int k = 0; k < childs.size(); k++)
             if(k != i && k != j)
-                subrestrictions.addAll(join.childs.get(k).getVariables().getNames());
+                subrestrictions.addAll(childs.get(k).getVariables().getNames());
 
         return subrestrictions;
-    }
-
-
-    public static UsedVariables getUsedVariable(ArrayList<UsedPairedVariable> pairs, HashSet<String> restrictions)
-    {
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-
-            String var = pair.getName();
-            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-            boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
-
-            UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-
-            if(restrictions == null || restrictions.contains(var))
-                variables.add(variable);
-
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() == null)
-                {
-                    if(leftVariable != null && !leftVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else if(pairedClass.getRightClass() == null)
-                {
-                    if(rightVariable != null && !rightVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                {
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else if(pairedClass.getLeftClass().getGeneralClass() == pairedClass.getRightClass())
-                {
-                    if(leftVariable.canBeNull())
-                        variable.addClass(pairedClass.getRightClass());
-                    else
-                        variable.addClass(pairedClass.getLeftClass());
-                }
-                else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass())
-                {
-                    if(rightVariable.canBeNull())
-                        variable.addClass(pairedClass.getLeftClass());
-                    else
-                        variable.addClass(pairedClass.getRightClass());
-                }
-                else
-                {
-                    assert false;
-                }
-            }
-
-            if(variable.getClasses().isEmpty())
-                return null;
-        }
-
-        return variables;
-    }
-
-
-    private void generateJoinSelectVariable(StringBuilder builder, String var, ResourceClass resourceClass, int part,
-            Set<ResourceClass> leftClasses, Set<ResourceClass> rightClasses)
-    {
-        if(leftClasses.size() + rightClasses.size() > 1)
-            builder.append("COALESCE(");
-
-        boolean hasVariant = false;
-
-        for(ResourceClass leftClass : leftClasses)
-        {
-            appendComma(builder, hasVariant);
-            hasVariant = true;
-
-            if(leftClass == resourceClass)
-                builder.append(leftTable).append('.').append(leftClass.getSqlColumn(var, part));
-            else
-                builder.append(leftClass.getGeneralisedPatternCode(leftTable, var, part, true));
-        }
-
-        for(ResourceClass rightClass : rightClasses)
-        {
-            appendComma(builder, hasVariant);
-            hasVariant = true;
-
-            if(rightClass == resourceClass)
-                builder.append(rightTable).append('.').append(rightClass.getSqlColumn(var, part));
-            else
-                builder.append(rightClass.getGeneralisedPatternCode(rightTable, var, part, true));
-        }
-
-        if(leftClasses.size() + rightClasses.size() > 1)
-            builder.append(") AS ").append(resourceClass.getSqlColumn(var, part));
     }
 }

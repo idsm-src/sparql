@@ -276,25 +276,25 @@ public class SelectResult extends Result
     {
         byte[] data = value.getBytes(StandardCharsets.UTF_8);
 
-        StringBuffer buffer = new StringBuffer();
-        buffer.append('S');
+        StringBuilder builder = new StringBuilder();
+        builder.append('S');
 
         for(int j = 0; j < data.length; j++)
         {
             if((data[j] < '0' || data[j] > '9') && (data[j] < 'A' || data[j] > 'Z') && (data[j] < 'a' || data[j] > 'z'))
             {
                 int val = data[j] < 0 ? data[j] + 256 : data[j];
-                buffer.append('_');
-                buffer.append(encodeTable[val / 16]);
-                buffer.append(encodeTable[val % 16]);
+                builder.append('_');
+                builder.append(encodeTable[val / 16]);
+                builder.append(encodeTable[val % 16]);
             }
             else
             {
-                buffer.append((char) data[j]);
+                builder.append((char) data[j]);
             }
         }
 
-        return buffer.toString();
+        return builder.toString();
     }
 
 
@@ -306,10 +306,10 @@ public class SelectResult extends Result
         if(value == Long.MAX_VALUE)
             return "-P106751991DT4H54.775808S";
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
         if(value < 0)
-            buffer.append('-');
+            builder.append('-');
 
         value = Math.abs(value);
 
@@ -319,49 +319,49 @@ public class SelectResult extends Result
         long seconds = value % USECS_PER_MINUTE / USECS_PER_SEC;
         long useconds = value % USECS_PER_SEC;
 
-        buffer.append('P');
+        builder.append('P');
 
         if(days > 0)
         {
-            buffer.append(days);
-            buffer.append('D');
+            builder.append(days);
+            builder.append('D');
         }
 
         if(hours > 0 || minutes > 0 || seconds > 0 || useconds > 0)
-            buffer.append('T');
+            builder.append('T');
 
         if(hours > 0)
         {
-            buffer.append(hours);
-            buffer.append('H');
+            builder.append(hours);
+            builder.append('H');
         }
 
         if(minutes > 0)
         {
-            buffer.append(minutes);
-            buffer.append('M');
+            builder.append(minutes);
+            builder.append('M');
         }
 
         if(seconds > 0)
         {
-            buffer.append(seconds);
+            builder.append(seconds);
 
             if(useconds == 0)
-                buffer.append('S');
+                builder.append('S');
         }
 
         if(useconds > 0)
         {
             if(seconds == 0)
-                buffer.append('0');
+                builder.append('0');
 
             String str = Long.toString(useconds);
 
-            buffer.append('.');
-            buffer.append("000000".substring(str.length(), 6) + str.replaceFirst("0+$", ""));
-            buffer.append('S');
+            builder.append('.');
+            builder.append("000000".substring(str.length(), 6) + str.replaceFirst("0+$", ""));
+            builder.append('S');
         }
 
-        return buffer.toString();
+        return builder.toString();
     }
 }

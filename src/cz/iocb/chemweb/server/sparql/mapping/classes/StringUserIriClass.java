@@ -1,8 +1,13 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static java.util.Arrays.asList;
+import java.util.List;
 import java.util.regex.Pattern;
-import javax.sql.DataSource;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
+import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
@@ -21,17 +26,17 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(pattern == null)
             pattern = length > 0 ? ".{" + length + "}" : ".*";
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder builder = new StringBuilder();
 
         if(prefix != null)
-            buffer.append(Pattern.quote(prefix));
+            builder.append(Pattern.quote(prefix));
 
-        buffer.append(pattern);
+        builder.append(pattern);
 
         if(suffix != null)
-            buffer.append(Pattern.quote(suffix));
+            builder.append(Pattern.quote(suffix));
 
-        this.pattern = buffer.toString();
+        this.pattern = builder.toString(); //FIXME: check whether the pattern is valid also in pcre2
         this.prefix = prefix;
         this.length = length;
         this.suffix = suffix;
@@ -69,16 +74,23 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(String iri, Request request)
+    public List<Column> toColumns(Node node)
     {
-        return iri.matches(pattern);
+        IRI iri = (IRI) node;
+        assert match(iri);
+
+        String value = iri.getValue();
+
+        String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
+
+        return asList(new ConstantColumn("'" + id.replaceAll("'", "''") + "'::varchar"));
     }
 
 
     @Override
-    public boolean match(String iri, DataSource connectionPool)
+    public boolean match(IRI iri)
     {
-        return iri.matches(pattern);
+        return iri.getValue().matches(pattern);
     }
 
 
@@ -90,12 +102,12 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    protected String generateFunction(String parameter)
+    protected Column generateFunction(Column parameter)
     {
-        String code = parameter;
-
         if(prefix == null && suffix == null)
-            return code;
+            return parameter;
+
+        String code = parameter.toString();
 
         if(prefix != null)
             code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
@@ -103,24 +115,45 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(suffix != null)
             code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
 
-        return "(" + code + ")::varchar";
+        return new ExpressionColumn("(" + code + ")::varchar");
     }
 
 
     @Override
-    protected String generateInverseFunction(String parameter)
+    protected Column generateInverseFunction(Column parameter, boolean check)
     {
-        if(prefix == null && suffix == null)
+        if(prefix == null && suffix == null && !check)
             return parameter;
+
+        StringBuilder builder = new StringBuilder();
+
+        if(check)
+        {
+            builder.append("CASE WHEN sparql.regex_string(");
+            builder.append(parameter);
+            builder.append(", '^(");
+            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(")$', '') THEN ");
+        }
+
+        if(prefix == null && suffix == null)
+            builder.append(parameter);
         else if(length > 0)
-            return String.format("substring(%s, %d, %d)::varchar", parameter, prefix != null ? prefix.length() + 1 : 1,
-                    length);
+            builder.append(String.format("substring(%s, %d, %d)::", parameter, prefix != null ? prefix.length() + 1 : 1,
+                    length));
         else if(prefix == null)
-            return String.format("left(%s, -%d)::varchar", parameter, suffix.length());
+            builder.append(String.format("left(%s, -%d)::", parameter, suffix.length()));
         else if(suffix == null)
-            return String.format("right(%s, -%d)::varchar", parameter, prefix.length());
+            builder.append(String.format("right(%s, -%d)::", parameter, prefix.length()));
         else
-            return String.format("left(right(%s, -%d), -%d)::varchar", parameter, prefix.length(), suffix.length());
+            builder.append(String.format("left(right(%s, -%d), -%d)::", parameter, prefix.length(), suffix.length()));
+
+        builder.append(sqlTypes.get(0));
+
+        if(check)
+            builder.append(" END");
+
+        return new ExpressionColumn(builder.toString());
     }
 
 

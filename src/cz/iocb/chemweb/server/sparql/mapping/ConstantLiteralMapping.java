@@ -1,75 +1,38 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
-public class ConstantLiteralMapping extends LiteralMapping implements ConstantMapping
+public class ConstantLiteralMapping extends ConstantMapping
 {
-    private final Literal value;
+    protected final ResourceClass resourceClass;
+    protected final List<Column> columns;
 
 
     public ConstantLiteralMapping(LiteralClass literalClass, Literal value)
     {
-        super(literalClass);
-        this.value = value;
+        super(value);
 
-        if(value == null)
-            throw new RuntimeException();
+        this.resourceClass = literalClass;
+        this.columns = literalClass.toColumns(value);
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public ResourceClass getResourceClass()
     {
-        if(node instanceof VariableOrBlankNode)
-            return true;
-
-        return value.equals(node);
+        return resourceClass;
     }
 
 
     @Override
-    public String getSqlValueAccess(int part)
+    public List<Column> getColumns()
     {
-        return getResourceClass().getPatternCode(value, part);
-    }
-
-
-    @Override
-    public NodeMapping remapColumns(List<ColumnPair> columnMap)
-    {
-        return this;
-    }
-
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if(this == obj)
-            return true;
-
-        if(obj == null || !(obj instanceof ConstantLiteralMapping))
-            return false;
-
-        if(!super.equals(obj))
-            return false;
-
-        ConstantLiteralMapping other = (ConstantLiteralMapping) obj;
-
-        return value.equals(other.value);
-    }
-
-
-    @Override
-    public Node getValue()
-    {
-        return value;
+        return columns;
     }
 }

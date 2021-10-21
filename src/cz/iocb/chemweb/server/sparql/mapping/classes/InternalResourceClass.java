@@ -2,9 +2,9 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -25,49 +25,56 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public String getPatternCode(Node node, int part)
+    public List<Column> toColumns(Node node)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(Node node)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public boolean match(Node node)
     {
         throw new UnsupportedOperationException();
     }

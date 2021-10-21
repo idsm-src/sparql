@@ -1,9 +1,16 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
@@ -14,13 +21,16 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlUnion extends SqlIntercode
 {
-    private final ArrayList<SqlIntercode> childs;
+    private final List<SqlIntercode> childs;
+    private final List<Map<Column, Column>> columnMappings;
 
 
-    protected SqlUnion(UsedVariables variables, ArrayList<SqlIntercode> childs)
+    protected SqlUnion(UsedVariables variables, List<SqlIntercode> childs, List<Map<Column, Column>> columnMappings)
     {
         super(variables, childs.stream().allMatch(c -> c.isDeterministic()));
+
         this.childs = childs;
+        this.columnMappings = columnMappings;
     }
 
 
@@ -38,33 +48,28 @@ public class SqlUnion extends SqlIntercode
         /* standard union */
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
-        UsedVariables variables = new UsedVariables();
+        Map<String, Set<ResourceClass>> classes = new HashMap<String, Set<ResourceClass>>();
 
         for(UsedPairedVariable pair : pairs)
         {
-            String varName = pair.getName();
-            boolean canBeNull = pair.getLeftVariable() == null || pair.getLeftVariable().canBeNull()
-                    || pair.getRightVariable() == null || pair.getRightVariable().canBeNull();
-
-            UsedVariable newVar = new UsedVariable(varName, canBeNull);
+            Set<ResourceClass> set = new HashSet<ResourceClass>();
+            classes.put(pair.getName(), set);
 
             for(PairedClass pairedClass : pair.getClasses())
             {
                 if(pairedClass.getLeftClass() == null)
-                    newVar.addClass(pairedClass.getRightClass());
+                    set.add(pairedClass.getRightClass());
                 else if(pairedClass.getRightClass() == null)
-                    newVar.addClass(pairedClass.getLeftClass());
+                    set.add(pairedClass.getLeftClass());
                 else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                    newVar.addClass(pairedClass.getLeftClass());
+                    set.add(pairedClass.getLeftClass());
                 else
-                    newVar.addClass(pairedClass.getLeftClass().getGeneralClass());
+                    set.add(pairedClass.getLeftClass().getGeneralClass());
             }
-
-            variables.add(newVar);
         }
 
 
-        ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+        List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
         if(left instanceof SqlUnion)
             childs.addAll(((SqlUnion) left).childs);
@@ -78,23 +83,123 @@ public class SqlUnion extends SqlIntercode
             childs.add(right);
 
 
-        return new SqlUnion(variables, childs);
+        Map<List<Column>, Column> unionColumns = new HashMap<List<Column>, Column>();
+
+        List<Map<Column, Column>> columnMappings = new ArrayList<Map<Column, Column>>(childs.size());
+
+        for(int i = 0; i < childs.size(); i++)
+            columnMappings.add(new HashMap<Column, Column>());
+
+        UsedVariables variables = new UsedVariables();
+
+        for(Entry<String, Set<ResourceClass>> entry : classes.entrySet())
+        {
+            String name = entry.getKey();
+
+            boolean canBeNull = left.getVariables().get(name) == null || left.getVariables().get(name).canBeNull()
+                    || right.getVariables().get(name) == null || right.getVariables().get(name).canBeNull();
+
+            UsedVariable variable = new UsedVariable(name, canBeNull);
+
+            for(ResourceClass resourceClass : entry.getValue())
+            {
+                List<Column> columns = resourceClass.createColumns(variable.getName());
+                List<Column> mapping = new ArrayList<Column>(resourceClass.getColumnCount());
+
+                for(int i = 0; i < resourceClass.getColumnCount(); i++)
+                {
+                    List<Column> cols = new ArrayList<Column>(childs.size());
+
+                    for(SqlIntercode child : childs)
+                    {
+                        UsedVariable var = child.getVariables().get(name);
+
+                        if(var == null)
+                        {
+                            cols.add(new ConstantColumn("NULL::" + resourceClass.getSqlTypes().get(i)));
+                        }
+                        else if(var.containsClass(resourceClass))
+                        {
+                            cols.add(var.getMapping(resourceClass).get(i));
+                        }
+                        else
+                        {
+                            Set<ResourceClass> variants = var.getCompatibleClasses(resourceClass);
+
+                            if(variants.isEmpty())
+                            {
+                                cols.add(new ConstantColumn("NULL::" + resourceClass.getSqlTypes().get(i)));
+                            }
+                            else
+                            {
+                                StringBuilder builder = new StringBuilder();
+
+                                if(variants.size() > 1)
+                                    builder.append("coalesce(");
+
+                                boolean hasAlternative = false;
+
+                                for(ResourceClass variant : variants)
+                                {
+                                    appendComma(builder, hasAlternative);
+                                    hasAlternative = true;
+
+                                    builder.append(
+                                            variant.toGeneralClass(var.getMapping(variant), var.canBeNull()).get(i));
+                                }
+
+                                if(variants.size() > 1)
+                                    builder.append(")");
+
+                                cols.add(new ExpressionColumn(builder.toString()));
+                            }
+                        }
+                    }
+
+
+                    if(cols.get(0) instanceof ConstantColumn && Collections.frequency(cols, cols.get(0)) == cols.size())
+                    {
+                        mapping.add(cols.get(0));
+                    }
+                    else if(unionColumns.containsKey(cols))
+                    {
+                        Column col = unionColumns.get(cols);
+                        mapping.add(col);
+                    }
+                    else
+                    {
+                        Column col = columns.get(i);
+                        unionColumns.put(cols, col);
+                        mapping.add(col);
+
+                        for(int j = 0; j < childs.size(); j++)
+                            columnMappings.get(j).put(col, cols.get(j));
+                    }
+                }
+
+                variable.addMapping(resourceClass, mapping);
+            }
+
+            variables.add(variable);
+        }
+
+        return new SqlUnion(variables, childs, columnMappings);
     }
 
 
-    public final ArrayList<SqlIntercode> getChilds()
+    public final List<SqlIntercode> getChilds()
     {
         return childs;
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         SqlIntercode result = SqlNoSolution.get();
 
         for(SqlIntercode child : childs)
-            result = union(result, child.optimize(request, restrictions, reduced));
+            result = union(result, child.optimize(restrictions, reduced));
 
         return result;
     }
@@ -105,68 +210,37 @@ public class SqlUnion extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
+        Set<Column> columns = variables.getNonConstantColumns();
+
+
         for(int i = 0; i < childs.size(); i++)
         {
             if(i > 0)
                 builder.append(" UNION ALL ");
 
             SqlIntercode child = childs.get(i);
+            Map<Column, Column> columnMapping = columnMappings.get(i);
 
             builder.append("SELECT ");
             boolean hasSelect = false;
 
-            for(UsedVariable variable : variables.getValues())
+            for(Column column : columns)
             {
-                String varName = variable.getName();
+                appendComma(builder, hasSelect);
+                hasSelect = true;
 
-                for(ResourceClass resClass : variable.getClasses())
-                {
-                    UsedVariable childVariable = child.getVariables().get(varName);
+                Column col = columnMapping.get(column);
 
-                    Set<ResourceClass> childResClasses = childVariable != null ? childVariable.getCompatible(resClass) :
-                            new HashSet<ResourceClass>();
-
-                    for(int j = 0; j < resClass.getPatternPartsCount(); j++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        if(childResClasses.size() == 0)
-                        {
-                            builder.append("NULL::");
-                            builder.append(resClass.getSqlType(j));
-                            builder.append(" AS ");
-                        }
-                        else if(!childResClasses.contains(resClass))
-                        {
-                            if(childResClasses.size() > 1)
-                                builder.append("COALESCE(");
-
-                            boolean hasAlternative = false;
-
-                            for(ResourceClass childResClass : childResClasses)
-                            {
-                                appendComma(builder, hasAlternative);
-                                hasAlternative = true;
-
-                                //TODO: do not use CASE check if it is not needed
-                                builder.append(childResClass.getGeneralisedPatternCode(null, varName, j, true));
-                            }
-
-                            if(childResClasses.size() > 1)
-                                builder.append(")");
-
-                            builder.append(" AS ");
-                        }
-
-                        builder.append(resClass.getSqlColumn(varName, j));
-                    }
-                }
+                if(col == null)
+                    builder.append("NULL AS ").append(column);
+                else if(column.equals(col))
+                    builder.append(column);
+                else
+                    builder.append(col).append(" AS ").append(column);
             }
 
             if(!hasSelect)
                 builder.append("1");
-
 
             builder.append(" FROM (");
             builder.append(child.translate());

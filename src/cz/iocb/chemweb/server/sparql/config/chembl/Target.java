@@ -29,52 +29,77 @@ public class Target
             NodeMapping subject = config.createIriMapping("chembl:target", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:SingleProtein"), "target_type = 'SINGLE PROTEIN'");
+                    config.createIriMapping("cco:SingleProtein"),
+                    config.createAreEqualCondition("target_type", "'SINGLE PROTEIN'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:Organism"), "target_type = 'ORGANISM'");
+                    config.createIriMapping("cco:Organism"),
+                    config.createAreEqualCondition("target_type", "'ORGANISM'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:CellLineTarget"), "target_type = 'CELL-LINE'");
+                    config.createIriMapping("cco:CellLineTarget"),
+                    config.createAreEqualCondition("target_type", "'CELL-LINE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ProteinComplex"), "target_type = 'PROTEIN COMPLEX'");
+                    config.createIriMapping("cco:ProteinComplex"),
+                    config.createAreEqualCondition("target_type", "'PROTEIN COMPLEX'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ProteinFamily"), "target_type = 'PROTEIN FAMILY'");
+                    config.createIriMapping("cco:ProteinFamily"),
+                    config.createAreEqualCondition("target_type", "'PROTEIN FAMILY'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:Tissue"), "target_type = 'TISSUE'");
+                    config.createIriMapping("cco:Tissue"),
+                    config.createAreEqualCondition("target_type", "'TISSUE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ProteinSelectivityGroup"), "target_type = 'SELECTIVITY GROUP'");
+                    config.createIriMapping("cco:ProteinSelectivityGroup"),
+                    config.createAreEqualCondition("target_type", "'SELECTIVITY GROUP'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("cco:ProteinProteinInteraction"),
-                    "target_type = 'PROTEIN-PROTEIN INTERACTION'");
+                    config.createAreEqualCondition("target_type", "'PROTEIN-PROTEIN INTERACTION'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ProteinComplexGroup"), "target_type = 'PROTEIN COMPLEX GROUP'");
+                    config.createIriMapping("cco:ProteinComplexGroup"),
+                    config.createAreEqualCondition("target_type", "'PROTEIN COMPLEX GROUP'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:NucleicAcid"), "target_type = 'NUCLEIC-ACID'");
+                    config.createIriMapping("cco:NucleicAcid"),
+                    config.createAreEqualCondition("target_type", "'NUCLEIC-ACID'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:SmallMoleculeTarget"), "target_type = 'SMALL MOLECULE'");
+                    config.createIriMapping("cco:SmallMoleculeTarget"),
+                    config.createAreEqualCondition("target_type", "'SMALL MOLECULE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:UnknownTarget"), "target_type = 'UNKNOWN'");
+                    config.createIriMapping("cco:UnknownTarget"),
+                    config.createAreEqualCondition("target_type", "'UNKNOWN'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ChimericProtein"), "target_type = 'CHIMERIC PROTEIN'");
+                    config.createIriMapping("cco:ChimericProtein"),
+                    config.createAreEqualCondition("target_type", "'CHIMERIC PROTEIN'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:Macromolecule"), "target_type = 'MACROMOLECULE'");
+                    config.createIriMapping("cco:Macromolecule"),
+                    config.createAreEqualCondition("target_type", "'MACROMOLECULE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:SubCellular"), "target_type = 'SUBCELLULAR'");
+                    config.createIriMapping("cco:SubCellular"),
+                    config.createAreEqualCondition("target_type", "'SUBCELLULAR'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:OligosaccharideTarget"), "target_type = 'OLIGOSACCHARIDE'");
+                    config.createIriMapping("cco:OligosaccharideTarget"),
+                    config.createAreEqualCondition("target_type", "'OLIGOSACCHARIDE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:UnclassifiedTarget"),
-                    "target_type = 'LIPID' or target_type = 'UNCHECKED' or target_type = 'NO TARGET'");
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:Metal"), "target_type = 'METAL'");
+                    config.createIriMapping("cco:Metal"),
+                    config.createAreEqualCondition("target_type", "'METAL'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("cco:ProteinNucleicAcidComplex"),
-                    "target_type = 'PROTEIN NUCLEIC-ACID COMPLEX'");
+                    config.createAreEqualCondition("target_type", "'PROTEIN NUCLEIC-ACID COMPLEX'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:Phenotype"), "target_type = 'PHENOTYPE'");
+                    config.createIriMapping("cco:Phenotype"),
+                    config.createAreEqualCondition("target_type", "'PHENOTYPE'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:NonMolecular"), "target_type = 'NON-MOLECULAR'");
+                    config.createIriMapping("cco:NonMolecular"),
+                    config.createAreEqualCondition("target_type", "'NON-MOLECULAR'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cco:ADMET"), "target_type = 'ADMET'");
+                    config.createIriMapping("cco:ADMET"),
+                    config.createAreEqualCondition("target_type", "'ADMET'::varchar"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnclassifiedTarget"),
+                    config.createAreEqualCondition("target_type", "'LIPID'::varchar"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnclassifiedTarget"),
+                    config.createAreEqualCondition("target_type", "'UNCHECKED'::varchar"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:UnclassifiedTarget"),
+                    config.createAreEqualCondition("target_type", "'NO TARGET'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
                     config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "tax_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),
@@ -82,7 +107,8 @@ public class Target
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:isTargetForCellLine"),
                     config.createIriMapping("chembl:cell_line", "cell_line_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:isSpeciesGroup"),
-                    config.createLiteralMapping(true), "species_group_flag");
+                    config.createLiteralMapping(true),
+                    config.createAreEqualCondition("species_group_flag", "'true'::boolean"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
                     config.createLiteralMapping(xsdString, "chembl_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
@@ -110,13 +136,17 @@ public class Target
             NodeMapping subject = config.createIriMapping("chembl:target", "target_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relOverlapsWith"),
-                    config.createIriMapping("chembl:target", "related_target_id"), "relationship = 'OVERLAPS WITH'");
+                    config.createIriMapping("chembl:target", "related_target_id"),
+                    config.createAreEqualCondition("relationship", "'OVERLAPS WITH'::chembl.target_relationship_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relSubsetOf"),
-                    config.createIriMapping("chembl:target", "related_target_id"), "relationship = 'SUBSET OF'");
+                    config.createIriMapping("chembl:target", "related_target_id"),
+                    config.createAreEqualCondition("relationship", "'SUBSET OF'::chembl.target_relationship_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relHasSubset"),
-                    config.createIriMapping("chembl:target", "related_target_id"), "relationship = 'SUPERSET OF'");
+                    config.createIriMapping("chembl:target", "related_target_id"),
+                    config.createAreEqualCondition("relationship", "'SUPERSET OF'::chembl.target_relationship_type"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relEquivalentTo"),
-                    config.createIriMapping("chembl:target", "related_target_id"), "relationship = 'EQUIVALENT TO'");
+                    config.createIriMapping("chembl:target", "related_target_id"),
+                    config.createAreEqualCondition("relationship", "'EQUIVALENT TO'::chembl.target_relationship_type"));
         }
 
         {
@@ -128,9 +158,11 @@ public class Target
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:targetcomponent", "component_id"),
                     config.createIriMapping("cco:hasTarget"), subject);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
-                    config.createIriMapping("chembl:targetcomponent", "component_id"), "is_exact");
+                    config.createIriMapping("chembl:targetcomponent", "component_id"),
+                    config.createAreEqualCondition("is_exact", "'true'::boolean"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:relatedMatch"),
-                    config.createIriMapping("chembl:targetcomponent", "component_id"), "is_related");
+                    config.createIriMapping("chembl:targetcomponent", "component_id"),
+                    config.createAreEqualCondition("is_related", "'true'::boolean"));
         }
     }
 }

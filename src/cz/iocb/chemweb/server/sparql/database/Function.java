@@ -27,7 +27,8 @@ public class Function
     }
 
 
-    public String getCode()
+    @Override
+    public String toString()
     {
         return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + function.replaceAll("\"", "\"\"") + "\"";
     }
@@ -41,15 +42,15 @@ public class Function
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || getClass() != obj.getClass())
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        Function other = (Function) obj;
+        Function other = (Function) object;
 
         return schema.equals(other.schema) && function.equals(other.function);
     }

@@ -1,6 +1,6 @@
 package cz.iocb.chemweb.server.sparql.parser;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.Collection;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
@@ -71,7 +71,7 @@ public abstract class ElementVisitor<T>
     @SafeVarargs
     protected final T aggregateResult(T... results)
     {
-        return aggregateResult(Arrays.asList(results));
+        return aggregateResult(asList(results));
     }
 
     /**

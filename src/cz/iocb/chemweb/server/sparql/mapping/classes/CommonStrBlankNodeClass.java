@@ -1,9 +1,10 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import java.util.Arrays;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
+import static java.util.Arrays.asList;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -11,59 +12,54 @@ public class CommonStrBlankNodeClass extends StrBlankNodeClass
 {
     CommonStrBlankNodeClass()
     {
-        super("str_blanknode", Arrays.asList("varchar"));
+        super("str_blanknode", asList("varchar"));
     }
 
 
     @Override
-    public String getPatternCode(Node node, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(!(node instanceof VariableOrBlankNode))
-            throw new IllegalArgumentException();
-
-        return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
-            return column;
+            return asList(column);
 
-        return "sparql.rdfbox_extract_str_blanknode" + "(" + column + ")";
+        return asList(new ExpressionColumn("sparql.rdfbox_extract_str_blanknode" + "(" + column + ")"));
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        String code = variableAccessor.getSqlVariableAccess(variable, this, 0);
+        if(!rdfbox)
+            return columns.get(0);
 
-        if(rdfbox)
-            code = "sparql.cast_as_rdfbox_from_str_blanknode(" + code + ")";
-
-        return code;
+        return new ExpressionColumn("sparql.cast_as_rdfbox_from_str_blanknode(" + columns.get(0) + ")");
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        return getSqlColumn(variable, part);
+        return columns;
     }
 }

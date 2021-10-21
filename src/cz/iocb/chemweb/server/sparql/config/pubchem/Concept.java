@@ -42,14 +42,14 @@ public class Concept
                     config.createIriMapping("pubchem:concept", "scheme"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:broader"),
                     config.createIriMapping("pubchem:concept", "broader"));
-
             config.addQuadMapping(table, graph, subject, config.createIriMapping("<http://purl.org/pav/importedFrom>"),
-                    config.createIriMapping("source:WHO"),
-                    "iri like 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC%'");
+                    config.createIriMapping("source:WHO"), config.createAreEqualCondition(
+                            "(iri like 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC%')", "'true'::boolean"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("skos:Concept"),
-                    "(iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/SubstanceCategorization'"
-                            + " and iri <> 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC')");
+                    config.createAreNotEqualCondition("iri",
+                            "'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC'::varchar",
+                            "'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/SubstanceCategorization'::varchar"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),

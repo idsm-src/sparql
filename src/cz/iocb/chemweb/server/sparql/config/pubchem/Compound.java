@@ -122,55 +122,58 @@ public class Compound
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:hydrogen_bond_acceptor_count", "compound"),
-                    "hydrogen_bond_acceptor_count is not null");
+                    config.createIsNotNullCondition("hydrogen_bond_acceptor_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:tautomer_count", "compound"), "tautomer_count is not null");
+                    config.createIriMapping("pubchem:tautomer_count", "compound"),
+                    config.createIsNotNullCondition("tautomer_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:defined_atom_stereo_count", "compound"),
-                    "defined_atom_stereo_count is not null");
+                    config.createIsNotNullCondition("defined_atom_stereo_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:defined_bond_stereo_count", "compound"),
-                    "defined_bond_stereo_count is not null");
+                    config.createIsNotNullCondition("defined_bond_stereo_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:undefined_bond_stereo_count", "compound"),
-                    "undefined_bond_stereo_count is not null");
+                    config.createIsNotNullCondition("undefined_bond_stereo_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:isotope_atom_count", "compound"),
-                    "isotope_atom_count is not null");
+                    config.createIsNotNullCondition("isotope_atom_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:covalent_unit_count", "compound"),
-                    "covalent_unit_count is not null");
+                    config.createIsNotNullCondition("covalent_unit_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:hydrogen_bond_donor_count", "compound"),
-                    "hydrogen_bond_donor_count is not null");
+                    config.createIsNotNullCondition("hydrogen_bond_donor_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:non_hydrogen_atom_count", "compound"),
-                    "non_hydrogen_atom_count is not null");
+                    config.createIsNotNullCondition("non_hydrogen_atom_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:rotatable_bond_count", "compound"),
-                    "rotatable_bond_count is not null");
+                    config.createIsNotNullCondition("rotatable_bond_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:undefined_atom_stereo_count", "compound"),
-                    "undefined_atom_stereo_count is not null");
+                    config.createIsNotNullCondition("undefined_atom_stereo_count"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:total_formal_charge", "compound"),
-                    "total_formal_charge is not null");
+                    config.createIsNotNullCondition("total_formal_charge"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:structure_complexity", "compound"),
-                    "structure_complexity is not null");
+                    config.createIsNotNullCondition("structure_complexity"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:mono_isotopic_weight", "compound"),
-                    "mono_isotopic_weight is not null");
+                    config.createIsNotNullCondition("mono_isotopic_weight"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:xlogp3_aa", "compound"), "xlogp3_aa is not null");
+                    config.createIriMapping("pubchem:xlogp3_aa", "compound"), config.createIsNotNullCondition("xlogp3_aa"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:xlogp3", "compound"), "xlogp3 is not null");
+                    config.createIriMapping("pubchem:xlogp3", "compound"), config.createIsNotNullCondition("xlogp3"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:exact_mass", "compound"), "exact_mass is not null");
+                    config.createIriMapping("pubchem:exact_mass", "compound"),
+                    config.createIsNotNullCondition("exact_mass"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:molecular_weight", "compound"), "molecular_weight is not null");
+                    config.createIriMapping("pubchem:molecular_weight", "compound"),
+                    config.createIsNotNullCondition("molecular_weight"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:tpsa", "compound"), "tpsa is not null");
+                    config.createIriMapping("pubchem:tpsa", "compound"), config.createIsNotNullCondition("tpsa"));
         }
 
         {

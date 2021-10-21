@@ -3,6 +3,8 @@ package cz.iocb.chemweb.server.sparql.translator;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -14,19 +16,16 @@ public class UsedPairedVariable
         private final ResourceClass leftClass;
         private final ResourceClass rightClass;
 
-
         public PairedClass(ResourceClass leftClass, ResourceClass rightClass)
         {
             this.leftClass = leftClass;
             this.rightClass = rightClass;
         }
 
-
         public final ResourceClass getLeftClass()
         {
             return leftClass;
         }
-
 
         public final ResourceClass getRightClass()
         {
@@ -46,6 +45,57 @@ public class UsedPairedVariable
         this.name = name;
         this.leftVariable = leftVariable;
         this.rightVariable = rightVariable;
+
+        if(leftVariable == null)
+        {
+            for(ResourceClass resClass : rightVariable.getClasses())
+                addClasses(null, resClass);
+        }
+        else if(rightVariable == null)
+        {
+            for(ResourceClass resClass : leftVariable.getClasses())
+                addClasses(resClass, null);
+        }
+        else
+        {
+            for(ResourceClass leftClass : leftVariable.getClasses())
+            {
+                if(rightVariable.getClasses().contains(leftClass))
+                {
+                    addClasses(leftClass, leftClass);
+                }
+                else if(rightVariable.getClasses().contains(leftClass.getGeneralClass()))
+                {
+                    addClasses(leftClass, leftClass.getGeneralClass());
+                }
+                else if(rightVariable.getClasses().stream().noneMatch(r -> r.getGeneralClass() == leftClass))
+                {
+                    addClasses(leftClass, null);
+                }
+            }
+
+            for(ResourceClass rightClass : rightVariable.getClasses())
+            {
+                if(leftVariable.getClasses().contains(rightClass))
+                {
+
+                }
+                else if(leftVariable.getClasses().contains(rightClass.getGeneralClass()))
+                {
+                    addClasses(rightClass.getGeneralClass(), rightClass);
+                }
+                else if(leftVariable.getClasses().stream().noneMatch(r -> r.getGeneralClass() == rightClass))
+                {
+                    addClasses(null, rightClass);
+                }
+            }
+        }
+    }
+
+
+    public UsedPairedVariable(UsedVariable leftVariable, UsedVariable rightVariable)
+    {
+        this(null, leftVariable, rightVariable);
     }
 
 
@@ -66,65 +116,52 @@ public class UsedPairedVariable
             varNames.add(variable.getName());
 
 
-        ArrayList<UsedPairedVariable> pairs = new ArrayList<UsedPairedVariable>();
+        ArrayList<UsedPairedVariable> pairs = new ArrayList<UsedPairedVariable>(varNames.size());
 
         for(String varName : varNames)
-        {
-            UsedVariable leftVar = left.get(varName);
-            UsedVariable rightVar = right.get(varName);
-
-
-            UsedPairedVariable paired = new UsedPairedVariable(varName, leftVar, rightVar);
-
-            if(leftVar == null)
-            {
-                for(ResourceClass resClass : rightVar.getClasses())
-                    paired.addClasses(null, resClass);
-            }
-            else if(rightVar == null)
-            {
-                for(ResourceClass resClass : leftVar.getClasses())
-                    paired.addClasses(resClass, null);
-            }
-            else
-            {
-                for(ResourceClass leftClass : leftVar.getClasses())
-                {
-                    if(rightVar.getClasses().contains(leftClass))
-                    {
-                        paired.addClasses(leftClass, leftClass);
-                    }
-                    else if(rightVar.getClasses().contains(leftClass.getGeneralClass()))
-                    {
-                        paired.addClasses(leftClass, leftClass.getGeneralClass());
-                    }
-                    else if(rightVar.getClasses().stream().noneMatch(r -> r.getGeneralClass() == leftClass))
-                    {
-                        paired.addClasses(leftClass, null);
-                    }
-                }
-
-                for(ResourceClass rightClass : rightVar.getClasses())
-                {
-                    if(leftVar.getClasses().contains(rightClass))
-                    {
-
-                    }
-                    else if(leftVar.getClasses().contains(rightClass.getGeneralClass()))
-                    {
-                        paired.addClasses(rightClass.getGeneralClass(), rightClass);
-                    }
-                    else if(leftVar.getClasses().stream().noneMatch(r -> r.getGeneralClass() == rightClass))
-                    {
-                        paired.addClasses(null, rightClass);
-                    }
-                }
-            }
-
-            pairs.add(paired);
-        }
+            pairs.add(new UsedPairedVariable(varName, left.get(varName), right.get(varName)));
 
         return pairs;
+    }
+
+
+    public boolean isJoinable()
+    {
+        if(leftVariable == null || rightVariable == null)
+            return true;
+
+        if(leftVariable.canBeNull() || rightVariable.canBeNull())
+            return true;
+
+        for(PairedClass pairedClass : classes)
+        {
+            if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
+            {
+                if(pairedClass.getLeftClass() == pairedClass.getRightClass())
+                {
+                    List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass());
+                    List<Column> rightCols = rightVariable.getMapping(pairedClass.getLeftClass());
+
+                    if(!isJoinable(leftCols, rightCols))
+                        continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    private static boolean isJoinable(List<Column> leftCols, List<Column> rightCols)
+    {
+        for(int i = 0; i < leftCols.size(); i++)
+            if(leftCols.get(i) instanceof ConstantColumn && rightCols.get(i) instanceof ConstantColumn
+                    && !leftCols.get(i).equals(rightCols.get(i)))
+                return false;
+
+        return true;
     }
 
 

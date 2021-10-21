@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -27,9 +27,9 @@ public class SqlUnaryLogical extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        SqlExpressionIntercode operand = getOperand().optimize(variableAccessor);
+        SqlExpressionIntercode operand = getOperand().optimize(variables);
         return create(operand);
     }
 

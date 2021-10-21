@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import java.util.HashSet;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -24,7 +24,7 @@ public class SqlNull extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         return singleton;
     }

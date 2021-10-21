@@ -15,7 +15,7 @@ public abstract class SqlUnary extends SqlExpressionIntercode
         super(resourceClasses, canBeNull, operand.isDeterministic());
         this.operand = operand;
 
-        this.variables.addAll(operand.getVariables());
+        this.referencedVariables.addAll(operand.getReferencedVariables());
     }
 
 

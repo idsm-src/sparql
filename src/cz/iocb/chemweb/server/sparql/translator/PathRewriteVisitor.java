@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -82,7 +82,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         if(sequences.size() == 1)
             return new SequencePath(sequences.get(0));
 
-        return new AlternativePath(sequences.stream().map(p -> new SequencePath(p)).collect(Collectors.toList()));
+        return new AlternativePath(sequences.stream().map(p -> new SequencePath(p)).collect(toList()));
     }
 
 
@@ -92,11 +92,11 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         Path child = path.getChild();
 
         if(child instanceof AlternativePath)
-            return visitElement(new AlternativePath(((AlternativePath) child).getChildren().stream()
-                    .map(p -> new InversePath(p)).collect(Collectors.toList())));
+            return visitElement(new AlternativePath(
+                    ((AlternativePath) child).getChildren().stream().map(p -> new InversePath(p)).collect(toList())));
         else if(child instanceof SequencePath)
-            return visitElement(new SequencePath(Lists.reverse(((SequencePath) child).getChildren().stream()
-                    .map(p -> new InversePath(p)).collect(Collectors.toList()))));
+            return visitElement(new SequencePath(Lists.reverse(
+                    ((SequencePath) child).getChildren().stream().map(p -> new InversePath(p)).collect(toList()))));
         else if(child instanceof InversePath)
             return visitElement(child);
         else if(child instanceof RepeatedPath)
@@ -130,7 +130,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         if(rewrite.getKind() == Kind.OneOrMore)
             return rewrite;
 
-        return new AlternativePath(Arrays.asList(rewrite, new SequencePath(new LinkedList<Path>())));
+        return new AlternativePath(asList(rewrite, new SequencePath(new LinkedList<Path>())));
     }
 
 

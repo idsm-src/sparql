@@ -1,10 +1,10 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import static java.util.stream.Collectors.toSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -12,7 +12,7 @@ public class SqlExpressionError extends SqlExpressionIntercode
 {
     public static SqlExpressionError create()
     {
-        return new SqlExpressionError(BuiltinClasses.getClasses().stream().collect(Collectors.toSet()), true);
+        return new SqlExpressionError(BuiltinClasses.getClasses().stream().collect(toSet()), true);
     }
 
 
@@ -23,7 +23,7 @@ public class SqlExpressionError extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         return this;
     }

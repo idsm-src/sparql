@@ -1,44 +1,43 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
+import java.util.List;
 import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
 public class SqlVariable extends SqlNodeValue
 {
-    private final UsedVariable usedVariable;
-    private final VariableAccessor variableAccessor;
+    private final UsedVariable variable;
 
 
-    protected SqlVariable(UsedVariable usedVariable, VariableAccessor variableAccessor,
-            Set<ResourceClass> resourceClasses, boolean canBeNull)
+    protected SqlVariable(UsedVariable variable, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(resourceClasses, canBeNull);
-        this.usedVariable = usedVariable;
-        this.variableAccessor = variableAccessor;
+        this.variable = variable;
 
-        this.variables.add(usedVariable.getName());
+        this.referencedVariables.add(variable.getName());
     }
 
 
-    public static SqlExpressionIntercode create(String variable, VariableAccessor variableAccessor)
+    public static SqlExpressionIntercode create(String variable, UsedVariables variables)
     {
-        UsedVariable usedVariable = variableAccessor.getUsedVariable(variable);
+        UsedVariable usedVariable = variables.get(variable);
 
         if(usedVariable == null)
             return SqlNull.get();
 
-        return new SqlVariable(usedVariable, variableAccessor, usedVariable.getClasses(), usedVariable.canBeNull());
+        return new SqlVariable(usedVariable, usedVariable.getClasses(), usedVariable.canBeNull());
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        return create(usedVariable.getName(), variableAccessor);
+        return create(variable.getName(), variables);
     }
 
 
@@ -52,27 +51,27 @@ public class SqlVariable extends SqlNodeValue
     }
 
 
-    String getExpressionValue(ResourceClass resourceClass, boolean isBoxed)
+    Column getExpressionValue(ResourceClass resourceClass, boolean isBoxed)
     {
-        return resourceClass.getExpressionCode(usedVariable.getName(), variableAccessor, isBoxed);
+        return resourceClass.toExpression(variable.getMapping(resourceClass), isBoxed);
     }
 
 
     @Override
-    public String getNodeAccess(ResourceClass resourceClass, int part)
+    public List<Column> asResource(ResourceClass resourceClass)
     {
-        return variableAccessor.getSqlVariableAccess(usedVariable.getName(), resourceClass, part);
+        return variable.toResource(resourceClass);
     }
 
 
     public String getName()
     {
-        return usedVariable.getName();
+        return variable.getName();
     }
 
 
-    public VariableAccessor getVariableAccessor()
+    public UsedVariable getUsedVariable()
     {
-        return variableAccessor;
+        return variable;
     }
 }

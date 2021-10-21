@@ -15,6 +15,13 @@ public class Table
     }
 
 
+    public Table(String table)
+    {
+        this.schema = null;
+        this.table = table;
+    }
+
+
     public String getSchema()
     {
         return schema;
@@ -27,9 +34,13 @@ public class Table
     }
 
 
-    public String getCode()
+    @Override
+    public String toString()
     {
-        return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + table.replaceAll("\"", "\"\"") + "\"";
+        if(schema != null)
+            return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + table.replaceAll("\"", "\"\"") + "\"";
+        else
+            return "\"" + table.replaceAll("\"", "\"\"") + "\"";
     }
 
 
@@ -41,16 +52,16 @@ public class Table
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(obj == null || getClass() != obj.getClass())
+        if(object == null || getClass() != object.getClass())
             return false;
 
-        Table other = (Table) obj;
+        Table other = (Table) object;
 
-        return schema.equals(other.schema) && table.equals(other.table);
+        return (schema == other.schema || schema != null && schema.equals(other.schema)) && table.equals(other.table);
     }
 }

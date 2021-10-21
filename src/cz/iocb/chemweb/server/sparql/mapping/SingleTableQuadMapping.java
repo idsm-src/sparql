@@ -1,13 +1,14 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
 public class SingleTableQuadMapping extends QuadMapping
 {
     private final Table table;
-    private final String condition;
+    private final Condition condition;
 
 
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject,
@@ -18,7 +19,7 @@ public class SingleTableQuadMapping extends QuadMapping
 
 
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object, String condition)
+            ConstantIriMapping predicate, NodeMapping object, Condition condition)
     {
         super(graph, subject, predicate, object);
 
@@ -33,22 +34,22 @@ public class SingleTableQuadMapping extends QuadMapping
     }
 
 
-    public final String getCondition()
+    public final Condition getCondition()
     {
         return condition;
     }
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(!super.equals(obj))
+        if(!super.equals(object))
             return false;
 
-        SingleTableQuadMapping mapping = (SingleTableQuadMapping) obj;
+        SingleTableQuadMapping mapping = (SingleTableQuadMapping) object;
 
         if(table == null ? mapping.table != null : !table.equals(mapping.table))
             return false;

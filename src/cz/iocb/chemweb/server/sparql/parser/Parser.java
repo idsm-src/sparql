@@ -35,7 +35,7 @@ public class Parser
      */
     public ParserRuleContext parse(String query)
     {
-        StringBuffer buffer = new StringBuffer(query.length() + 128);
+        StringBuilder builder = new StringBuilder();
 
         for(int i = 0; i < query.length() - 1; i++)
         {
@@ -45,7 +45,7 @@ public class Parser
 
                 if(substr.matches("^[0-9a-fA-F]{4}$"))
                 {
-                    buffer.append((char) Integer.parseInt(substr, 16));
+                    builder.append((char) Integer.parseInt(substr, 16));
 
                     i += 5;
                     continue;
@@ -57,18 +57,18 @@ public class Parser
 
                 if(substr.matches("^(000[0-9a-fA-F]{5})|(0010[0-9a-fA-F]{4})$"))
                 {
-                    buffer.appendCodePoint(Integer.parseInt(substr, 16));
+                    builder.appendCodePoint(Integer.parseInt(substr, 16));
 
                     i += 9;
                     continue;
                 }
             }
 
-            buffer.append(query.charAt(i));
+            builder.append(query.charAt(i));
         }
 
-        buffer.append(query.charAt(query.length() - 1));
-        query = buffer.toString();
+        builder.append(query.charAt(query.length() - 1));
+        query = builder.toString();
 
 
         return parse(new ANTLRInputStream(query));

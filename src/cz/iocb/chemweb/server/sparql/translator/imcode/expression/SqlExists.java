@@ -1,13 +1,21 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
-import cz.iocb.chemweb.server.sparql.translator.expression.SimpleVariableAccessor;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlEmptySolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlNoSolution;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
@@ -16,214 +24,112 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlUnion;
 
 public class SqlExists extends SqlExpressionIntercode
 {
-    private static final String table = "tabcnd";
     private final boolean negated;
     private final SqlIntercode pattern;
-    private final VariableAccessor variableAccessor;
+    private final UsedVariables variables;
 
 
-    protected SqlExists(boolean negated, SqlIntercode pattern, VariableAccessor variableAccessor)
+    protected SqlExists(boolean negated, SqlIntercode pattern, UsedVariables variables)
     {
         super(asSet(xsdBoolean), false, pattern.isDeterministic());
         this.negated = negated;
         this.pattern = pattern;
-        this.variableAccessor = variableAccessor;
+        this.variables = variables;
 
-        this.variables.addAll(pattern.getVariables().getNames());
+        this.referencedVariables.addAll(pattern.getVariables().getNames());
     }
 
 
-    public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern,
-            VariableAccessor variableAccessor)
+    public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern, UsedVariables variables)
     {
+        if(pattern == SqlNoSolution.get())
+            return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
+
+        if(pattern == SqlEmptySolution.get())
+            return negated ? SqlEffectiveBooleanValue.falseValue : SqlEffectiveBooleanValue.trueValue;
+
+
         if(pattern instanceof SqlUnion)
         {
             SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode child : ((SqlUnion) pattern).getChilds())
             {
-                ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(),
-                        variableAccessor.getUsedVariables());
+                ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(), variables);
 
-                for(UsedPairedVariable pair : pairs)
-                {
-                    if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
-                    {
-                        boolean isJoinable = false;
-
-                        for(PairedClass pairedClass : pair.getClasses())
-                        {
-                            if((pairedClass.getLeftClass() != null || pair.getLeftVariable().canBeNull())
-                                    && (pairedClass.getRightClass() != null || pair.getRightVariable().canBeNull()))
-
-                                isJoinable = true;
-                        }
-
-                        if(isJoinable)
-                            union = SqlUnion.union(union, child);
-                    }
-                }
+                if(pairs.stream().allMatch(p -> p.isJoinable()))
+                    union = SqlUnion.union(union, child);
             }
 
-            if(union == SqlNoSolution.get())
-                return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
-
-            return new SqlExists(negated, union, variableAccessor);
+            return new SqlExists(negated, union, variables);
         }
-        else
-        {
-            ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
-                    variableAccessor.getUsedVariables());
 
-            for(UsedPairedVariable pair : pairs)
-            {
-                if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
-                {
-                    boolean isJoinable = false;
 
-                    for(PairedClass pairedClass : pair.getClasses())
-                    {
-                        if((pairedClass.getLeftClass() != null || pair.getLeftVariable().canBeNull())
-                                && (pairedClass.getRightClass() != null || pair.getRightVariable().canBeNull()))
+        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(), variables);
 
-                            isJoinable = true;
-                    }
+        if(pairs.stream().anyMatch(p -> !p.isJoinable()))
+            return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
 
-                    if(!isJoinable)
-                        return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
-                }
-            }
-
-            return new SqlExists(negated, pattern, variableAccessor);
-        }
+        return new SqlExists(negated, pattern, variables);
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        return create(negated, pattern, variableAccessor);
+        return create(negated, pattern, variables);
     }
 
 
     @Override
     public String translate()
     {
+        //NOTE: rename pattern columns to prevent collisions
+
+        Map<Column, Column> map = new HashMap<Column, Column>();
+        pattern.getVariables().getNonConstantColumns().forEach(c -> map.put(c, new TableColumn("@cnd" + map.size())));
+
+        UsedVariables cndvariables = new UsedVariables();
+
+        for(UsedVariable var : pattern.getVariables().getValues())
+        {
+            UsedVariable cndvar = new UsedVariable(var.getName(), var.canBeNull());
+
+            for(Entry<ResourceClass, List<Column>> entry : var.getMappings().entrySet())
+                cndvar.addMapping(entry.getKey(),
+                        entry.getValue().stream().map(c -> map.containsKey(c) ? map.get(c) : c).collect(toList()));
+
+            cndvariables.add(cndvar);
+        }
+
+
         StringBuilder builder = new StringBuilder();
 
         if(negated)
             builder.append("NOT ");
 
-        builder.append("EXISTS ( SELECT 1 FROM (");
+        builder.append("EXISTS ( SELECT 1 FROM (SELECT ");
+
+        Set<Column> columns = pattern.getVariables().getNonConstantColumns();
+
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(c -> c + " AS " + map.get(c)).collect(joining(", ")));
+        else
+            builder.append("1");
+
+        builder.append("FROM (");
 
         builder.append(pattern.translate());
 
-        builder.append(") AS ");
-        builder.append(table);
-        builder.append(" WHERE ");
+        builder.append(") AS tab) AS tabcnd");
 
-        boolean hasWhere = false;
+        String condition = SqlIntercode.generateJoinCondition(cndvariables, variables, null, null);
 
-        VariableAccessor patternVariableAccessor = new SimpleVariableAccessor(pattern.getVariables(), table);
-
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(),
-                variableAccessor.getUsedVariables());
-
-        for(UsedPairedVariable pair : pairs)
+        if(condition != null)
         {
-            String var = pair.getName();
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-            if(leftVariable != null && rightVariable != null)
-            {
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
-
-                builder.append("(");
-                boolean restricted = false;
-
-                if(leftVariable.canBeNull())
-                {
-                    boolean use = false;
-                    builder.append("(");
-
-                    for(ResourceClass resClass : leftVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, use);
-                            use = true;
-
-                            builder.append(patternVariableAccessor.getSqlVariableAccess(var, resClass, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
-                    builder.append(")");
-
-                    assert use;
-                    restricted = true;
-                }
-
-                if(rightVariable.canBeNull())
-                {
-                    appendOr(builder, restricted);
-                    restricted = true;
-
-                    boolean use = false;
-                    builder.append("(");
-
-                    for(ResourceClass resClass : rightVariable.getClasses())
-                    {
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, use);
-                            use = true;
-
-                            builder.append(variableAccessor.getSqlVariableAccess(var, resClass, i));
-                            builder.append(" IS NULL");
-                        }
-                    }
-
-                    builder.append(")");
-
-                    assert use;
-                }
-
-                for(PairedClass pairedClass : pair.getClasses())
-                {
-                    if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                    {
-                        appendOr(builder, restricted);
-                        restricted = true;
-
-                        builder.append("(");
-
-                        ResourceClass resClass = pairedClass.getLeftClass() == pairedClass.getRightClass() ?
-                                pairedClass.getLeftClass() : pairedClass.getLeftClass().getGeneralClass();
-
-                        for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, i > 0);
-
-                            builder.append(patternVariableAccessor.getSqlVariableAccess(var, resClass, i));
-                            builder.append(" = ");
-                            builder.append(variableAccessor.getSqlVariableAccess(var, resClass, i));
-                        }
-
-                        builder.append(")");
-                    }
-                }
-
-                builder.append(")");
-
-                assert restricted;
-            }
+            builder.append(" WHERE ");
+            builder.append(condition);
         }
-
-        if(!hasWhere)
-            builder.append("true");
 
         builder.append(")");
 

@@ -3,17 +3,65 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATETIME;
 import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateTimeIri;
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.SignStyle;
+import java.time.temporal.ChronoField;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
 public class DateTimeClass extends LiteralClass
 {
+    @SuppressWarnings("serial") private static final Map<Long, String> era = new HashMap<Long, String>()
+    {
+        {
+            put(0l, " BC");
+            put(1l, "");
+        }
+    };
+
+    private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()//
+            .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
+            .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
+            .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
+            .appendValue(ChronoField.HOUR_OF_DAY, 2).appendLiteral(":")//
+            .appendValue(ChronoField.MINUTE_OF_HOUR, 2).appendLiteral(":")//
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
+            .appendOffset("+HH:MM", "Z")//
+            .appendText(ChronoField.ERA, era)//
+            .toFormatter(Locale.ENGLISH);
+
+    private static final DateTimeFormatter localDateTimeFormatter = new DateTimeFormatterBuilder()//
+            .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
+            .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
+            .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
+            .appendValue(ChronoField.HOUR_OF_DAY, 2).appendLiteral(":")//
+            .appendValue(ChronoField.MINUTE_OF_HOUR, 2).appendLiteral(":")//
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
+            .appendLiteral("Z")//
+            .appendText(ChronoField.ERA, era)//
+            .toFormatter(Locale.ENGLISH);
+
+
     DateTimeClass()
     {
-        super("datetime", Arrays.asList("timestamptz", "int4"), Arrays.asList(DATETIME), xsdDateTimeIri);
+        super("datetime", asList("timestamptz", "int4"), asList(DATETIME), xsdDateTimeIri);
     }
 
 
@@ -25,59 +73,83 @@ public class DateTimeClass extends LiteralClass
 
 
     @Override
-    public String getLiteralPatternCode(Literal literal, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(part == 0)
-            return "sparql.zoneddatetime_datetime('" + literal.getStringValue().trim() + "'::sparql.zoneddatetime)";
-        else
-            return "sparql.zoneddatetime_zone('" + literal.getStringValue().trim() + "'::sparql.zoneddatetime)";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ConstantColumn("'" + getDateTime((Literal) node) + "'::timestamptz"));
+        result.add(new ConstantColumn("'" + getZone((Literal) node) + "'::int4"));
+
+        return result;
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
-        if(isBoxed)
-            return "sparql.rdfbox_extract_datetime_" + (part == 0 ? "datetime" : "zone") + "(" + column + ")";
-        else
-            return "sparql.zoneddatetime_" + (part == 0 ? "datetime" : "zone") + "(" + column + ")";
+        String prefix = isBoxed ? "sparql.rdfbox_extract_datetime" : "sparql.zoneddatetime";
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn(prefix + "_date(" + column + ")"));
+        result.add(new ExpressionColumn(prefix + "_zone(" + column + ")"));
+
+        return result;
     }
 
 
     @Override
-    public String getExpressionCode(Literal literal)
+    public Column toExpression(Node node)
     {
-        return "'" + literal.getStringValue().trim() + "'::sparql.zoneddatetime";
+        return new ConstantColumn("'" + ((Literal) node).getValue() + "'::sparql.zoneddatetime");
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        return (rdfbox ? "sparql.cast_as_rdfbox_from_datetime" : "sparql.zoneddatetime_create") + "("
-                + variableAccessor.getSqlVariableAccess(variable, this, 0) + ", "
-                + variableAccessor.getSqlVariableAccess(variable, this, 1) + ")";
+        String function = rdfbox ? "sparql.cast_as_rdfbox_from_datetime" : "sparql.zoneddatetime_create";
+
+        return new ExpressionColumn(function + "(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
         // xsdDateTime is returned as zoneddatetime because there are many discrepancies in timestamp interpretations
-        return "sparql.zoneddatetime_create(" + getSqlColumn(variable, 0) + ", " + getSqlColumn(variable, 1) + ")";
+        return asList(
+                new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+    }
+
+
+    public static String getDateTime(Literal literal)
+    {
+        if(literal.getValue() instanceof OffsetDateTime)
+            return ((OffsetDateTime) literal.getValue()).atZoneSameInstant(ZoneOffset.UTC).format(dateTimeFormatter);
+        else
+            return ((LocalDateTime) literal.getValue()).format(localDateTimeFormatter);
+    }
+
+
+    public static int getZone(Literal literal)
+    {
+        if(literal.getValue() instanceof OffsetDateTime)
+            return ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds();
+
+        return Integer.MIN_VALUE;
     }
 }

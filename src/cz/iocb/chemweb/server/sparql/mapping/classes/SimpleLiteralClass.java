@@ -1,9 +1,13 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
+import java.util.List;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 
 
@@ -11,7 +15,7 @@ public class SimpleLiteralClass extends LiteralClass
 {
     protected SimpleLiteralClass(ResultTag resultTag, String sqlType, IRI sparqlTypeIri)
     {
-        super(resultTag.getTag(), Arrays.asList(sqlType), Arrays.asList(resultTag), sparqlTypeIri);
+        super(resultTag.getTag(), asList(sqlType), asList(resultTag), sparqlTypeIri);
     }
 
 
@@ -23,62 +27,66 @@ public class SimpleLiteralClass extends LiteralClass
 
 
     @Override
-    public String getLiteralPatternCode(Literal literal, int part)
+    public List<Column> toColumns(Node node)
     {
-        Object value = literal.getValue();
+        Object value = ((Literal) node).getValue();
 
         if(value instanceof String)
-            return "'" + ((String) value).replace("'", "''") + "'::varchar";
+            return asList(new ConstantColumn("'" + ((String) value).replace("'", "''") + "'::varchar"));
         else
-            return "'" + value.toString() + "'::" + sqlTypes.get(part);
+            return asList(new ConstantColumn("'" + value + "'::" + sqlTypes.get(0)));
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
             throw new IllegalArgumentException();
 
-        return "sparql.rdfbox_extract_" + getName() + "(" + column + ")";
+        return asList(new ExpressionColumn("sparql.rdfbox_extract_" + getName() + "(" + column + ")"));
     }
 
 
     @Override
-    public String getExpressionCode(Literal literal)
+    public Column toExpression(Node node)
     {
-        return getPatternCode(literal, 0);
+        Object value = ((Literal) node).getValue();
+
+        if(value instanceof String)
+            return new ConstantColumn("'" + ((String) value).replace("'", "''") + "'::varchar");
+        else
+            return new ConstantColumn("'" + value + "'::" + sqlTypes.get(0));
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
         if(!rdfbox)
-            return variableAccessor.getSqlVariableAccess(variable, this, 0);
+            return columns.get(0);
 
-        return "sparql.cast_as_rdfbox_from_" + name + "(" + variableAccessor.getSqlVariableAccess(variable, this, 0)
-                + ")";
+        return new ExpressionColumn("sparql.cast_as_rdfbox_from_" + name + "(" + columns.get(0) + ")");
     }
 
 
     @Override
-    public String getResultCode(String variable, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        return getSqlColumn(variable, part);
+        return columns;
     }
 }

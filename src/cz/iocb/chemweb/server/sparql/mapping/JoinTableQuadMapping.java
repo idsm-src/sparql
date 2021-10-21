@@ -1,10 +1,10 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.database.TableColumn;
+import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -23,30 +23,10 @@ public class JoinTableQuadMapping extends QuadMapping
             assert leftColumns.size() == rightColumns.size();
         }
 
-        public JoinColumns(String leftColumn, String rightColumn)
+        public JoinColumns(Column leftColumn, Column rightColumn)
         {
-            this.leftColumns = Arrays.asList(new TableColumn(leftColumn));
-            this.rightColumns = Arrays.asList(new TableColumn(rightColumn));
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if(this == obj)
-                return true;
-
-            if(obj == null || getClass() != obj.getClass())
-                return false;
-
-            JoinColumns pair = (JoinColumns) obj;
-
-            if(!leftColumns.equals(pair.leftColumns))
-                return false;
-
-            if(!rightColumns.equals(pair.rightColumns))
-                return false;
-
-            return true;
+            this.leftColumns = asList(leftColumn);
+            this.rightColumns = asList(rightColumn);
         }
 
         public List<Column> getLeftColumns()
@@ -58,16 +38,42 @@ public class JoinTableQuadMapping extends QuadMapping
         {
             return rightColumns;
         }
+
+        @Override
+        public int hashCode()
+        {
+            return leftColumns.hashCode() ^ rightColumns.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object object)
+        {
+            if(this == object)
+                return true;
+
+            if(object == null || getClass() != object.getClass())
+                return false;
+
+            JoinColumns pair = (JoinColumns) object;
+
+            if(!leftColumns.equals(pair.leftColumns))
+                return false;
+
+            if(!rightColumns.equals(pair.rightColumns))
+                return false;
+
+            return true;
+        }
     }
 
 
     private final List<Table> tables;
     private final List<JoinColumns> joinColumnsPairs;
-    private final List<String> conditions;
+    private final List<Condition> conditions;
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<String> conditions)
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Condition> conditions)
     {
         super(graph, subject, predicate, object);
 
@@ -98,22 +104,22 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
-    public final List<String> getConditions()
+    public final List<Condition> getConditions()
     {
         return conditions;
     }
 
 
     @Override
-    public boolean equals(Object obj)
+    public boolean equals(Object object)
     {
-        if(this == obj)
+        if(this == object)
             return true;
 
-        if(!super.equals(obj))
+        if(!super.equals(object))
             return false;
 
-        JoinTableQuadMapping mapping = (JoinTableQuadMapping) obj;
+        JoinTableQuadMapping mapping = (JoinTableQuadMapping) object;
 
         if(!tables.equals(mapping.tables))
             return false;

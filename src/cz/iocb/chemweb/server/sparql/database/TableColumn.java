@@ -6,13 +6,24 @@ public class TableColumn extends Column
 {
     public TableColumn(String value)
     {
+        //TODO: check whether the parameter is a valid SQL column name
         super(value);
     }
 
 
     @Override
-    public String getCode()
+    public String toString()
     {
-        return "\"" + value.replaceAll("\"", "\"\"") + "\"";
+        return "\"" + value + "\"";
+    }
+
+
+    @Override
+    public Column fromTable(Table table)
+    {
+        if(table == null)
+            return this;
+
+        return new ExpressionColumn(table + "." + this);
     }
 }

@@ -1,13 +1,13 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import java.util.Arrays;
+import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
 
 
 
@@ -15,78 +15,64 @@ public class CommonIriClass extends IriClass
 {
     CommonIriClass()
     {
-        super("iri", Arrays.asList("varchar"), Arrays.asList(ResultTag.IRI));
+        super("iri", asList("varchar"), asList(ResultTag.IRI));
     }
 
 
     @Override
-    public String getPatternCode(Node node, int part)
+    public List<Column> toColumns(Node node)
     {
-        if(node instanceof VariableOrBlankNode)
-            return getSqlColumn(((VariableOrBlankNode) node).getSqlName(), part);
-
-        IRI iri = (IRI) node;
-
-        return "'" + iri.getValue().replaceAll("'", "''") + "'::varchar";
+        return asList(new ConstantColumn("'" + (((IRI) node).getValue()).replaceAll("'", "''") + "'::varchar"));
     }
 
 
     @Override
-    public String getGeneralisedPatternCode(String table, String var, int part, boolean check)
+    public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getSpecialisedPatternCode(String table, String var, int part)
+    public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return (table != null ? table + "." : "") + getSqlColumn(var, part);
+        return columns;
     }
 
 
     @Override
-    public String getPatternCode(String column, int part, boolean isBoxed)
+    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
     {
         if(isBoxed == false)
             throw new IllegalArgumentException();
 
-        return "sparql.rdfbox_extract_iri" + "(" + column + ")";
+        return asList(new ExpressionColumn("sparql.rdfbox_extract_iri" + "(" + column + ")"));
     }
 
 
     @Override
-    public String getExpressionCode(String variable, VariableAccessor variableAccessor, boolean rdfbox)
+    public Column toExpression(List<Column> columns, boolean rdfbox)
     {
-        String code = variableAccessor.getSqlVariableAccess(variable, this, 0);
+        if(!rdfbox)
+            return columns.get(0);
 
-        if(rdfbox)
-            code = "sparql.cast_as_rdfbox_from_iri(" + code + ")";
-
-        return code;
+        return new ExpressionColumn("sparql.cast_as_rdfbox_from_iri(" + columns.get(0) + ")");
     }
 
 
     @Override
-    public String getResultCode(String var, int part)
+    public List<Column> toResult(List<Column> columns)
     {
-        return getSqlColumn(var, 0);
+        return columns;
     }
 
 
     @Override
-    public boolean match(Node node, Request request)
+    public boolean match(Node node)
     {
         if(node instanceof VariableOrBlankNode || node instanceof IRI)
             return true;
 
         return false;
-    }
-
-
-    @Override
-    public String getIriValueCode(List<Column> columns)
-    {
-        return columns.get(0).getCode();
     }
 }

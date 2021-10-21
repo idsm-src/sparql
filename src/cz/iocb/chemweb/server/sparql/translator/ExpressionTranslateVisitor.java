@@ -1,6 +1,5 @@
-package cz.iocb.chemweb.server.sparql.translator.expression;
+package cz.iocb.chemweb.server.sparql.translator;
 
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +24,6 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.FunctionCallExpress
 import cz.iocb.chemweb.server.sparql.parser.model.expression.InExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
-import cz.iocb.chemweb.server.sparql.translator.TranslateVisitor;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryArithmetic;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
@@ -48,22 +46,18 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionIntercode>
 {
-    private final VariableAccessor variableAccessor;
-    private final TranslateVisitor parentTranslator;
-    private final Request request;
+    private final UsedVariables variables;
+    private final TranslateVisitor parent;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
-    private final HashMap<String, FunctionDefinition> functions;
 
 
-    public ExpressionTranslateVisitor(VariableAccessor variableAccessor, TranslateVisitor parentTranslator)
+    public ExpressionTranslateVisitor(UsedVariables variables, TranslateVisitor parent)
     {
-        this.variableAccessor = variableAccessor;
-        this.parentTranslator = parentTranslator;
-        this.request = parentTranslator.getRequest();
-        this.prologue = parentTranslator.getPrologue();
-        this.messages = parentTranslator.getMessages();
-        this.functions = parentTranslator.getRequest().getConfiguration().getFunctions(parentTranslator.getService());
+        this.variables = variables;
+        this.parent = parent;
+        this.prologue = parent.getPrologue();
+        this.messages = parent.getMessages();
     }
 
 
@@ -160,11 +154,10 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             arguments.add(visitElement(expression));
 
         if(function.equalsIgnoreCase("iri") || function.equalsIgnoreCase("uri"))
-            arguments.add(SqlIri.create(prologue.getBase(), request));
+            arguments.add(SqlIri.create(prologue.getBase()));
 
         if(function.equalsIgnoreCase("count") && builtInCallExpression.isDistinct() && arguments.size() == 0)
-            variableAccessor.getUsedVariables().getValues().stream()
-                    .forEach(v -> arguments.add(SqlVariable.create(v.getName(), variableAccessor)));
+            variables.getValues().stream().forEach(v -> arguments.add(SqlVariable.create(v.getName(), variables)));
 
         return SqlBuiltinCall.create(function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
     }
@@ -173,8 +166,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
-        SqlIntercode pattern = parentTranslator.visitElement(existsExpression.getPattern());
-        return SqlExists.create(existsExpression.isNegated(), pattern, variableAccessor);
+        SqlIntercode pattern = parent.visitElement(existsExpression.getPattern());
+        return SqlExists.create(existsExpression.isNegated(), pattern, variables);
     }
 
 
@@ -205,7 +198,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         }
 
 
-        FunctionDefinition definition = functions.get(iri.getValue());
+        FunctionDefinition definition = Request.currentRequest().getConfiguration().getFunctions(parent.getService())
+                .get(iri.getValue());
 
         if(definition == null)
         {
@@ -230,7 +224,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(IRI iri)
     {
-        return SqlIri.create(iri, request);
+        return SqlIri.create(iri);
     }
 
 
@@ -244,6 +238,6 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(Variable variable)
     {
-        return SqlVariable.create(variable.getSqlName(), variableAccessor);
+        return SqlVariable.create(variable.getSqlName(), variables);
     }
 }

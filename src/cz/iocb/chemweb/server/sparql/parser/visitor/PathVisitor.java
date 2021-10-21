@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
+import static java.util.stream.Collectors.toList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
@@ -41,7 +41,7 @@ public class PathVisitor extends BaseVisitor<Path>
 
     private List<Path> visitPathList(List<? extends ParserRuleContext> pathSequenceContexts)
     {
-        return pathSequenceContexts.stream().map(this::visit).collect(Collectors.toList());
+        return pathSequenceContexts.stream().map(this::visit).collect(toList());
     }
 
 

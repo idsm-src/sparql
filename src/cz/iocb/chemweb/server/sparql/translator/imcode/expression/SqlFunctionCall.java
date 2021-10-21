@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -21,7 +21,7 @@ public class SqlFunctionCall extends SqlExpressionIntercode
         super(asSet(definition.getResultClass()), canBeNull, isDeterministic);
 
         for(SqlExpressionIntercode argument : arguments)
-            this.variables.addAll(argument.getVariables());
+            this.referencedVariables.addAll(argument.getReferencedVariables());
 
         this.definition = definition;
         this.arguments = arguments;
@@ -55,12 +55,12 @@ public class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
-            optimized.add(argument.optimize(variableAccessor));
+            optimized.add(argument.optimize(variables));
 
         return create(definition, optimized);
     }
@@ -71,7 +71,7 @@ public class SqlFunctionCall extends SqlExpressionIntercode
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append(definition.getSqlFunction().getCode());
+        builder.append(definition.getSqlFunction());
         builder.append("(");
 
         for(int i = 0; i < arguments.size(); i++)

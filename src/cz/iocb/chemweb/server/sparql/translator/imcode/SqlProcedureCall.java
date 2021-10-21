@@ -1,24 +1,24 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
+import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
-import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -28,33 +28,41 @@ public class SqlProcedureCall extends SqlIntercode
 {
     private static final String resultName = "@res";
 
+    private final SqlIntercode child;
     private final ProcedureDefinition procedure;
     private final LinkedHashMap<ParameterDefinition, Node> parameters;
-    private final LinkedHashMap<ResultDefinition, Node> results;
-    private final SqlIntercode context;
+    private final LinkedHashMap<ResultDefinition, VariableOrBlankNode> results;
+    private final Map<Column, Column> columnMap;
 
 
     protected SqlProcedureCall(UsedVariables variables, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
-            SqlIntercode context)
+            LinkedHashMap<ParameterDefinition, Node> parameters,
+            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child,
+            Map<Column, Column> columnMap)
     {
-        super(variables, context.isDeterministic()); //TODO: is procedure deterministic?
+        super(variables, child.isDeterministic()); //TODO: is procedure deterministic?
+
+        this.child = child;
         this.procedure = procedure;
         this.parameters = parameters;
         this.results = results;
-        this.context = context;
+        this.columnMap = columnMap;
     }
 
 
     public static SqlIntercode create(ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters, LinkedHashMap<ResultDefinition, Node> results,
-            SqlIntercode context, Request request, HashSet<String> restrictions)
+            LinkedHashMap<ParameterDefinition, Node> parameters,
+            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child)
+    {
+        return create(procedure, parameters, results, child, null);
+    }
+
+
+    protected static SqlIntercode create(ProcedureDefinition procedure,
+            LinkedHashMap<ParameterDefinition, Node> parameters,
+            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child, Set<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
-        HashSet<String> parameterVariables = new HashSet<String>();
-        boolean hasSolution = true;
-        boolean useContext = false;
-
 
         for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
         {
@@ -63,361 +71,101 @@ public class SqlProcedureCall extends SqlIntercode
 
             if(node instanceof VariableOrBlankNode)
             {
-                useContext = true;
-
                 String name = ((VariableOrBlankNode) node).getSqlName();
-                UsedVariable usedVariable = callVariables.get(name);
-                parameterVariables.add(name);
+                ResourceClass resClass = definition.getParameterClass();
 
-                if(usedVariable == null)
-                {
-                    callVariables.add(new UsedVariable(name, definition.getParameterClass(), false));
-                }
-                else if(usedVariable.getClasses().contains(definition.getParameterClass().getGeneralClass()))
-                {
-                    usedVariable.getClasses().remove(definition.getParameterClass().getGeneralClass());
-                    usedVariable.getClasses().add(definition.getParameterClass());
-                }
-                else if(!usedVariable.getClasses().contains(definition.getParameterClass()))
-                {
-                    hasSolution = false;
-                    usedVariable.getClasses().add(definition.getParameterClass());
-                }
+                UsedVariable variable = callVariables.get(name);
+
+                if(variable != null && !variable.getClasses().contains(definition.getParameterClass()))
+                    return SqlNoSolution.get();
+
+                List<Column> columns = getColumns(child, name, resClass);
+
+                if(columns == null)
+                    return SqlNoSolution.get();
+
+                callVariables.add(new UsedVariable(name, resClass, columns, false));
             }
-            else if(node == null || !definition.getParameterClass().match(node, request))
+            else if(node == null || !definition.getParameterClass().match(node))
             {
-                hasSolution = false;
+                return SqlNoSolution.get();
             }
         }
 
 
-        for(Entry<ResultDefinition, Node> entry : results.entrySet())
+        for(Entry<ResultDefinition, VariableOrBlankNode> entry : results.entrySet())
         {
             ResultDefinition definition = entry.getKey();
-            Node node = entry.getValue();
+            VariableOrBlankNode node = entry.getValue();
 
-            if(node instanceof VariableOrBlankNode)
-            {
-                String name = ((VariableOrBlankNode) node).getSqlName();
-                UsedVariable usedVariable = callVariables.get(name);
-
-                if(usedVariable == null)
-                {
-                    callVariables.add(new UsedVariable(name, definition.getResultClass(), false));
-                }
-                else if(usedVariable.getClasses().contains(definition.getResultClass().getGeneralClass()))
-                {
-                    usedVariable.getClasses().remove(definition.getResultClass().getGeneralClass());
-                    usedVariable.getClasses().add(definition.getResultClass());
-                }
-                else if(!usedVariable.getClasses().contains(definition.getResultClass()))
-                {
-                    hasSolution = false;
-                    usedVariable.getClasses().add(definition.getResultClass());
-                }
-            }
-            else if(node == null || !definition.getResultClass().match(node, request))
-            {
-                hasSolution = false;
-            }
-        }
-
-
-        if(!hasSolution)
-            return SqlNoSolution.get();
-
-
-        SqlIntercode originalContext = null;
-
-        if(!useContext && context != SqlEmptySolution.get())
-        {
-            originalContext = context;
-            context = SqlEmptySolution.get();
-        }
-
-
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(callVariables, context.getVariables());
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedPairedVariable pair : pairs)
-        {
-            UsedVariable leftVariable = pair.getLeftVariable();
-            UsedVariable rightVariable = pair.getRightVariable();
-
-
-            String var = pair.getName();
-            boolean canBeLeftNull = leftVariable == null ? true : leftVariable.canBeNull();
-            boolean canBeRightNull = rightVariable == null ? true : rightVariable.canBeNull();
-
-            UsedVariable variable = new UsedVariable(var, canBeLeftNull && canBeRightNull);
-            variables.add(variable);
-
-
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() == null)
-                {
-                    if(leftVariable != null)
-                        continue;
-
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else if(pairedClass.getRightClass() == null)
-                {
-                    if(parameterVariables.contains(leftVariable.getName())
-                            || rightVariable != null && !rightVariable.canBeNull())
-                        continue;
-
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-                else if(pairedClass.getLeftClass() == pairedClass.getRightClass().getGeneralClass()
-                        && (!rightVariable.canBeNull() || parameterVariables.contains(leftVariable.getName())))
-                {
-                    variable.addClass(pairedClass.getRightClass());
-                }
-                else
-                {
-                    variable.addClass(pairedClass.getLeftClass());
-                }
-            }
-
-            if(variable.getClasses().isEmpty())
+            if(node == null)
                 return SqlNoSolution.get();
+
+            String name = node.getSqlName();
+            ResourceClass resClass = definition.getResultClass();
+
+            List<Column> columns = getSqlResultColumns(definition.getSqlTypeFields());
+            callVariables.add(new UsedVariable(name, resClass, columns, false));
         }
 
 
-        SqlProcedureCall call = new SqlProcedureCall(variables, procedure, parameters, results, context);
+        SqlIntercode originalChild = null;
 
-        if(originalContext == null)
+        if(parameters.values().stream().noneMatch(n -> n instanceof VariableOrBlankNode)
+                && child != SqlEmptySolution.get())
+        {
+            originalChild = child;
+            child = SqlEmptySolution.get();
+        }
+
+
+        Map<Column, Column> columnMap = new HashMap<Column, Column>();
+        UsedVariables variables = getJoinUsedVariables(callVariables, child.getVariables(), null, null, null,
+                columnMap);
+
+        SqlProcedureCall call = new SqlProcedureCall(variables, procedure, parameters, results, child, columnMap);
+
+        if(originalChild == null)
             return call;
 
-        return SqlJoin.join(null, call, originalContext);
+        return SqlJoin.join(call, originalChild);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, HashSet<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
+        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
         for(Node paramater : parameters.values())
             if(paramater instanceof VariableOrBlankNode)
-                contextRestrictions.add(((VariableOrBlankNode) paramater).getSqlName());
+                childRestrictions.add(((VariableOrBlankNode) paramater).getSqlName());
 
         //FIXME: is procedure deterministic?
-        SqlIntercode optimized = context.optimize(request, contextRestrictions, reduced);
+        SqlIntercode optimized = child.optimize(childRestrictions, reduced);
 
-        return create(procedure, parameters, results, optimized, request, restrictions);
+        return create(procedure, parameters, results, optimized, restrictions);
     }
 
 
     @Override
     public String translate()
     {
+        Set<Column> columns = variables.getNonConstantColumns();
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
-        boolean hasSelect = false;
-        HashSet<String> usedInSelect = new HashSet<String>();
 
-        for(Entry<ResultDefinition, Node> entry : results.entrySet())
-        {
-            Node node = entry.getValue();
-
-            if(!(node instanceof VariableOrBlankNode))
-                continue;
-
-
-            String name = ((VariableOrBlankNode) node).getSqlName();
-
-            if(variables.get(name) == null)
-                continue;
-
-            ResultDefinition definition = entry.getKey();
-            ResourceClass resultClass = definition.getResultClass();
-
-            if(context.getVariables().contains(name, resultClass))
-                continue;
-
-            if(!getVariables().contains(name, resultClass))
-                continue;
-
-            if(usedInSelect.contains(name))
-                continue;
-
-            usedInSelect.add(name);
-
-
-            List<Column> fields = definition.getSqlTypeFields();
-
-            for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-            {
-                appendComma(builder, hasSelect);
-                hasSelect = true;
-
-                builder.append(getSqlResultColumn(fields, i));
-                builder.append(" AS ");
-                builder.append(resultClass.getSqlColumn(name, i));
-            }
-        }
-
-
-        for(UsedVariable variable : variables.getValues())
-        {
-            if(variables.get(variable.getName()) == null)
-                continue;
-
-            for(ResourceClass resClass : variables.get(variable.getName()).getClasses())
-            {
-                if(context.getVariables().contains(variable.getName(), resClass))
-                {
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append(resClass.getSqlColumn(variable.getName(), i));
-                    }
-                }
-            }
-        }
-
-        if(!hasSelect)
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
+                    .collect(joining(", ")));
+        else
             builder.append("1");
-
 
         builder.append(" FROM (");
         generateInnerSelect(builder);
         builder.append(" ) AS tab ");
-
-
-        builder.append(" WHERE ");
-        boolean hasWhere = false;
-
-
-        HashMap<String, ResultDefinition> notUsedInWhere = new HashMap<String, ResultDefinition>();
-
-        for(Entry<ResultDefinition, Node> entry : results.entrySet())
-        {
-            Node node = entry.getValue();
-
-            if(node == null)
-                continue;
-
-
-            ResultDefinition definition = entry.getKey();
-            List<Column> fields = definition.getSqlTypeFields();
-            ResourceClass resultClass = definition.getResultClass();
-
-            if(node instanceof VariableOrBlankNode)
-            {
-                String name = ((VariableOrBlankNode) node).getSqlName();
-                ResultDefinition previousDefinition = notUsedInWhere.get(name);
-
-                UsedVariable variable = context.getVariables().get(name);
-
-                if(variable != null)
-                {
-                    String varName = variable.getName();
-
-                    if(variable.getClasses().contains(resultClass))
-                    {
-                        for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, hasWhere);
-                            hasWhere = true;
-
-                            builder.append(getSqlResultColumn(fields, i));
-                            builder.append(" = ");
-                            builder.append(resultClass.getSqlColumn(varName, i));
-                        }
-                    }
-                    else if(variable.getClasses().contains(resultClass.getGeneralClass()))
-                    {
-                        for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, hasWhere);
-                            hasWhere = true;
-
-                            builder.append(getSqlResultColumn(fields, i));
-                            builder.append(" = ");
-                            builder.append(resultClass.getSpecialisedPatternCode(null, varName, i));
-                        }
-                    }
-                    else
-                    {
-                        Set<ResourceClass> compatibleClasses = variable.getCompatible(resultClass);
-
-                        for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, hasWhere);
-                            hasWhere = true;
-
-                            builder.append(getSqlResultColumn(fields, i));
-                            builder.append(" = ");
-
-                            if(compatibleClasses.size() > 1)
-                                builder.append("COALESCE(");
-
-                            boolean hasVariant = false;
-
-                            for(ResourceClass compatibleClass : compatibleClasses)
-                            {
-                                appendComma(builder, hasVariant);
-                                hasVariant = true;
-
-                                builder.append(compatibleClass.getGeneralisedPatternCode(null, varName, i,
-                                        compatibleClasses.size() > 1));
-                            }
-
-                            if(compatibleClasses.size() > 1)
-                                builder.append(")");
-                        }
-                    }
-                }
-                else if(previousDefinition != null)
-                {
-                    if(previousDefinition.getResultClass() == definition.getResultClass())
-                    {
-                        for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-                        {
-                            appendAnd(builder, hasWhere);
-                            hasWhere = true;
-
-                            builder.append(getSqlResultColumn(fields, i));
-                            builder.append(" = ");
-                            builder.append(getSqlResultColumn(previousDefinition.getSqlTypeFields(), i));
-                        }
-                    }
-                    else
-                    {
-                        //TODO: At this time, we do not use any procedure that has two result values having two
-                        //      different types that are compatible.
-                        assert false;
-                    }
-                }
-                else
-                {
-                    notUsedInWhere.put(name, entry.getKey());
-                }
-            }
-            else
-            {
-                for(int i = 0; i < resultClass.getPatternPartsCount(); i++)
-                {
-                    appendAnd(builder, hasWhere);
-                    hasWhere = true;
-
-                    builder.append(getSqlResultColumn(fields, i));
-                    builder.append(" = ");
-                    builder.append(resultClass.getPatternCode(node, i));
-                }
-            }
-        }
-
-
-        if(!hasWhere)
-            builder.append("true");
 
         return builder.toString();
     }
@@ -427,7 +175,7 @@ public class SqlProcedureCall extends SqlIntercode
     {
         builder.append("SELECT ");
 
-        builder.append(procedure.getSqlProcedure().getCode());
+        builder.append(procedure.getSqlProcedure());
 
         boolean hasParameter = false;
         builder.append("(");
@@ -443,57 +191,23 @@ public class SqlProcedureCall extends SqlIntercode
             if(node instanceof VariableOrBlankNode)
             {
                 String varName = ((VariableOrBlankNode) node).getSqlName();
-                UsedVariable variable = context.getVariables().get(varName);
+                UsedVariable variable = child.getVariables().get(varName);
+                List<Column> columns = variable.toResource(resClass);
 
-                if(variable.getClasses().contains(resClass))
+                for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, i > 0);
-                        builder.append(resClass.getSqlColumn(varName, i));
-                    }
-                }
-                else if(variable.getClasses().contains(resClass.getGeneralClass()))
-                {
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, i > 0);
-                        builder.append(resClass.getSpecialisedPatternCode(null, varName, i));
-                    }
-                }
-                else
-                {
-                    Set<ResourceClass> compatibleClasses = variable.getCompatible(resClass);
-
-                    for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                    {
-                        appendComma(builder, i > 0);
-
-                        if(compatibleClasses.size() > 1)
-                            builder.append("COALESCE(");
-
-                        boolean hasVariant = false;
-
-                        for(ResourceClass compatibleClass : compatibleClasses)
-                        {
-                            appendComma(builder, hasVariant);
-                            hasVariant = true;
-
-                            builder.append(compatibleClass.getGeneralisedPatternCode(null, varName, i,
-                                    compatibleClasses.size() > 1));
-                        }
-
-                        if(compatibleClasses.size() > 1)
-                            builder.append(")");
-                    }
+                    appendComma(builder, i > 0);
+                    builder.append(columns.get(i));
                 }
             }
             else
             {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
+                List<Column> columns = resClass.toColumns(entry.getValue());
+
+                for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
                     appendComma(builder, i > 0);
-                    builder.append(resClass.getPatternCode(entry.getValue(), i));
+                    builder.append(columns.get(i));
                 }
             }
         }
@@ -504,40 +218,58 @@ public class SqlProcedureCall extends SqlIntercode
         builder.append(resultName);
         builder.append('"');
 
-        for(UsedVariable variable : context.getVariables().getValues())
+        for(Column column : child.getVariables().restrict(this.getVariables().getNames()).getNonConstantColumns())
         {
-            if(variables.get(variable.getName()) == null)
-                continue;
-
-            for(ResourceClass resClass : context.getVariables().get(variable.getName()).getClasses())
-            {
-                for(int i = 0; i < resClass.getPatternPartsCount(); i++)
-                {
-                    appendComma(builder, true);
-                    builder.append(resClass.getSqlColumn(variable.getName(), i));
-                }
-            }
+            builder.append(", ");
+            builder.append(column);
         }
 
-
-        if(context != SqlEmptySolution.get())
+        if(child != SqlEmptySolution.get())
         {
             builder.append(" FROM (");
-            builder.append(context.translate());
+            builder.append(child.translate());
             builder.append(" ) AS tab");
         }
     }
 
 
-    private static String getSqlResultColumn(List<Column> fields, int i)
+    private static List<Column> getColumns(SqlIntercode child, String name, ResourceClass resClass)
     {
+        UsedVariable variable = child.getVariables().get(name);
+
+        if(variable == null)
+            return null;
+
+        Set<ResourceClass> classes = variable.getCompatibleClasses(resClass);
+
+        if(classes.isEmpty())
+            return null;
+
+        return variable.toResource(resClass);
+    }
+
+
+    private static List<Column> getSqlResultColumns(List<Column> fields)
+    {
+        List<Column> result = new ArrayList<Column>();
+
         if(fields == null)
-            return "\"" + resultName + "\"";
-        else if(fields.get(i) instanceof TableColumn)
-            return "(\"" + resultName + "\")." + fields.get(i).getCode();
-        else if(fields.get(i) instanceof ConstantColumn)
-            return fields.get(i).getCode();
+        {
+            result.add(new ExpressionColumn("\"" + resultName + "\""));
+        }
         else
-            throw new IllegalArgumentException();
+        {
+            for(Column field : fields)
+            {
+                if(field instanceof TableColumn)
+                    result.add(new ExpressionColumn("(\"" + resultName + "\")." + field));
+                else if(field instanceof ConstantColumn)
+                    result.add(field);
+                else
+                    throw new IllegalArgumentException();
+            }
+        }
+
+        return result;
     }
 }

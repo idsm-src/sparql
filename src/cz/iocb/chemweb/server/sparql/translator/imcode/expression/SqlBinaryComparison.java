@@ -20,11 +20,12 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdSh
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
@@ -42,7 +43,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
-import cz.iocb.chemweb.server.sparql.translator.expression.VariableAccessor;
+import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 
 
@@ -195,10 +196,10 @@ public class SqlBinaryComparison extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(VariableAccessor variableAccessor)
+    public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variableAccessor);
-        SqlExpressionIntercode right = getRight().optimize(variableAccessor);
+        SqlExpressionIntercode left = getLeft().optimize(variables);
+        SqlExpressionIntercode right = getRight().optimize(variables);
         return create(operator, left, right);
     }
 
@@ -235,7 +236,7 @@ public class SqlBinaryComparison extends SqlBinary
         else if(different.size() == 0 && (!getLeft().isBoxed() || !getRight().isBoxed()))
         {
             Set<ResourceClass> cmpClasses = comparable.stream()
-                    .map(r -> determineComparisonClass(r.getKey(), r.getValue())).collect(Collectors.toSet());
+                    .map(r -> determineComparisonClass(r.getKey(), r.getValue())).collect(toSet());
 
             if(cmpClasses.size() == 1)
             {
@@ -262,12 +263,12 @@ public class SqlBinaryComparison extends SqlBinary
 
 
         Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
-        leftSet.addAll(comparable.stream().map(r -> r.getKey()).collect(Collectors.toSet()));
-        leftSet.addAll(different.stream().map(r -> r.getKey()).collect(Collectors.toSet()));
+        leftSet.addAll(comparable.stream().map(r -> r.getKey()).collect(toSet()));
+        leftSet.addAll(different.stream().map(r -> r.getKey()).collect(toSet()));
 
         Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
-        rightSet.addAll(comparable.stream().map(r -> r.getValue()).collect(Collectors.toSet()));
-        rightSet.addAll(different.stream().map(r -> r.getValue()).collect(Collectors.toSet()));
+        rightSet.addAll(comparable.stream().map(r -> r.getValue()).collect(toSet()));
+        rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
 
         builder.append("sparql.");
         builder.append(operator.getName());
@@ -291,7 +292,7 @@ public class SqlBinaryComparison extends SqlBinary
         boolean hasAlternative = false;
 
         if(comparable.size() + different.size() > 1)
-            builder.append("COALESCE(");
+            builder.append("coalesce(");
 
 
         for(Pair<ResourceClass, ResourceClass> pair : comparable)
@@ -302,11 +303,14 @@ public class SqlBinaryComparison extends SqlBinary
             ResourceClass leftClass = pair.getKey();
             ResourceClass rightClass = pair.getValue();
 
+            List<Column> leftCols = leftNode.asResource(leftClass);
+            List<Column> rightCols = rightNode.asResource(rightClass);
+
 
             if(leftClass instanceof BlankNodeClass)
             {
-                String left = leftNode.getNodeAccess(leftClass, 0);
-                String right = rightNode.getNodeAccess(rightClass, 0);
+                String left = leftCols.get(0).toString();
+                String right = rightCols.get(0).toString();
 
                 if(leftClass != rightClass)
                 {
@@ -339,8 +343,8 @@ public class SqlBinaryComparison extends SqlBinary
             else if(leftClass == xsdBoolean || leftClass == xsdString || leftClass == xsdDayTimeDuration
                     || isNumeric(leftClass))
             {
-                String left = leftNode.getNodeAccess(leftClass, 0);
-                String right = rightNode.getNodeAccess(rightClass, 0);
+                String left = leftCols.get(0).toString();
+                String right = rightCols.get(0).toString();
 
                 ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
 
@@ -351,26 +355,39 @@ public class SqlBinaryComparison extends SqlBinary
                     right = "sparql.cast_as_" + cmpClass.getName() + "_from_" + rightClass.getName() + "(" + right
                             + ")";
 
-                builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());
-                builder.append("(" + left + ", " + right + ")");
+                if(cmpClass != xsdFloat && cmpClass != xsdDouble)
+                {
+                    builder.append("(" + left + " " + operator.getText() + " " + right + ")");
+                }
+                else if(leftNode instanceof SqlNodeValue && rightNode instanceof SqlNodeValue)
+                {
+                    String nan = "'NaN'::" + cmpClass.getSqlTypes().get(0);
+                    builder.append("(" + left + " != " + nan + " AND " + right + " != " + nan + " AND " + left + " "
+                            + operator.getText() + " " + right + ")");
+                }
+                else
+                {
+                    builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());
+                    builder.append("(" + left + ", " + right + ")");
+                }
             }
             else if(isDateTime(leftClass))
             {
                 builder.append("sparql." + operator.getName() + "_datetime(");
-                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                builder.append(leftCols.get(0));
                 builder.append(", ");
 
                 if(leftClass instanceof DateTimeClass)
-                    builder.append(leftNode.getNodeAccess(leftClass, 1));
+                    builder.append(leftCols.get(1));
                 else
                     builder.append("'" + ((DateTimeConstantZoneClass) leftClass).getZone() + "'::int4");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                builder.append(rightCols.get(0));
                 builder.append(", ");
 
                 if(rightClass instanceof DateTimeClass)
-                    builder.append(rightNode.getNodeAccess(rightClass, 1));
+                    builder.append(rightCols.get(1));
                 else
                     builder.append("'" + ((DateTimeConstantZoneClass) rightClass).getZone() + "'::int4");
 
@@ -379,20 +396,20 @@ public class SqlBinaryComparison extends SqlBinary
             else if(isDate(leftClass))
             {
                 builder.append("sparql." + operator.getName() + "_date(");
-                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                builder.append(leftCols.get(0));
                 builder.append(", ");
 
                 if(leftClass instanceof DateClass)
-                    builder.append(leftNode.getNodeAccess(leftClass, 1));
+                    builder.append(leftCols.get(1));
                 else
                     builder.append("'" + ((DateConstantZoneClass) leftClass).getZone() + "'::int4");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                builder.append(rightCols.get(0));
                 builder.append(", ");
 
                 if(rightClass instanceof DateClass)
-                    builder.append(rightNode.getNodeAccess(rightClass, 1));
+                    builder.append(rightCols.get(1));
                 else
                     builder.append("'" + ((DateConstantZoneClass) rightClass).getZone() + "'::int4");
 
@@ -401,20 +418,20 @@ public class SqlBinaryComparison extends SqlBinary
             else if(isLangString(leftClass))
             {
                 builder.append("sparql." + operator.getName() + "_lang_string(");
-                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                builder.append(leftCols.get(0));
                 builder.append(", ");
 
                 if(leftClass instanceof LangStringClass)
-                    builder.append(leftNode.getNodeAccess(leftClass, 1));
+                    builder.append(leftCols.get(1));
                 else
                     builder.append("'" + ((LangStringConstantTagClass) leftClass).getTag() + "'::varchar");
 
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                builder.append(rightCols.get(0));
                 builder.append(", ");
 
                 if(rightClass instanceof LangStringClass)
-                    builder.append(rightNode.getNodeAccess(rightClass, 1));
+                    builder.append(rightCols.get(1));
                 else
                     builder.append("'" + ((LangStringConstantTagClass) rightClass).getTag() + "'::varchar");
 
@@ -426,21 +443,21 @@ public class SqlBinaryComparison extends SqlBinary
                 {
                     builder.append("(");
 
-                    for(int i = 0; i < leftClass.getPatternPartsCount(); i++)
+                    for(int i = 0; i < leftClass.getColumnCount(); i++)
                     {
                         if(operator == Operator.Equals)
                         {
                             appendAnd(builder, i > 0);
-                            builder.append(leftNode.getNodeAccess(leftClass, i));
+                            builder.append(leftCols.get(i));
                             builder.append(" = ");
-                            builder.append(rightNode.getNodeAccess(rightClass, i));
+                            builder.append(rightCols.get(i));
                         }
                         else if(operator == Operator.NotEquals)
                         {
                             appendOr(builder, i > 0);
-                            builder.append(leftNode.getNodeAccess(leftClass, i));
+                            builder.append(leftCols.get(i));
                             builder.append(" != ");
-                            builder.append(rightNode.getNodeAccess(rightClass, i));
+                            builder.append(rightCols.get(i));
                         }
                         else
                         {
@@ -452,15 +469,13 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    String left = getLeft() instanceof SqlIri ?
-                            leftClass.getPatternCode(((SqlIri) getLeft()).getIri(), 0) :
-                            leftClass.getExpressionCode(((SqlVariable) getLeft()).getName(),
-                                    ((SqlVariable) getLeft()).getVariableAccessor(), false);
+                    Column left = getLeft() instanceof SqlIri ? iri.toColumns(((SqlIri) getLeft()).getIri()).get(0) :
+                            leftClass.toExpression(((SqlVariable) getLeft()).getUsedVariable().getMapping(leftClass),
+                                    false);
 
-                    String right = getRight() instanceof SqlIri ?
-                            rightClass.getPatternCode(((SqlIri) getRight()).getIri(), 0) :
-                            rightClass.getExpressionCode(((SqlVariable) getRight()).getName(),
-                                    ((SqlVariable) getRight()).getVariableAccessor(), false);
+                    Column right = getRight() instanceof SqlIri ? iri.toColumns(((SqlIri) getRight()).getIri()).get(0) :
+                            rightClass.toExpression(((SqlVariable) getRight()).getUsedVariable().getMapping(rightClass),
+                                    false);
 
                     builder.append("sparql." + operator.getName() + "_iri");
                     builder.append("(" + left + ", " + right + ")");
@@ -469,13 +484,13 @@ public class SqlBinaryComparison extends SqlBinary
             else if(leftClass == unsupportedLiteral)
             {
                 builder.append("sparql." + operator.getName() + "_typed_literal(");
-                builder.append(leftNode.getNodeAccess(leftClass, 0));
+                builder.append(leftCols.get(0));
                 builder.append(", ");
-                builder.append(leftNode.getNodeAccess(leftClass, 1));
+                builder.append(leftCols.get(1));
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(rightClass, 0));
+                builder.append(rightCols.get(0));
                 builder.append(", ");
-                builder.append(rightNode.getNodeAccess(rightClass, 1));
+                builder.append(rightCols.get(1));
                 builder.append(")");
             }
             else
@@ -493,6 +508,9 @@ public class SqlBinaryComparison extends SqlBinary
             ResourceClass leftClass = pair.getKey();
             ResourceClass rightClass = pair.getValue();
 
+            List<Column> leftCols = leftNode.asResource(leftClass);
+            List<Column> rightCols = rightNode.asResource(rightClass);
+
             assert operator == Operator.Equals || operator == Operator.NotEquals;
 
             boolean hasVariants = false;
@@ -501,7 +519,7 @@ public class SqlBinaryComparison extends SqlBinary
 
             if(getLeft().canBeNull() || leftNode.getResourceClasses().size() > 1)
             {
-                for(int i = 0; i < leftClass.getPatternPartsCount(); i++)
+                for(int i = 0; i < leftClass.getColumnCount(); i++)
                 {
                     if(operator == Operator.Equals)
                         appendOr(builder, hasVariants);
@@ -509,14 +527,14 @@ public class SqlBinaryComparison extends SqlBinary
                         appendAnd(builder, hasVariants);
 
                     hasVariants = true;
-                    builder.append(leftNode.getNodeAccess(leftClass, i));
+                    builder.append(leftCols.get(i));
                     builder.append(operator == Operator.Equals ? " IS NULL" : " IS NOT NULL");
                 }
             }
 
             if(getRight().canBeNull() || rightNode.getResourceClasses().size() > 1)
             {
-                for(int i = 0; i < rightClass.getPatternPartsCount(); i++)
+                for(int i = 0; i < rightClass.getColumnCount(); i++)
                 {
                     if(operator == Operator.Equals)
                         appendOr(builder, hasVariants);
@@ -524,7 +542,7 @@ public class SqlBinaryComparison extends SqlBinary
                         appendAnd(builder, hasVariants);
 
                     hasVariants = true;
-                    builder.append(rightNode.getNodeAccess(rightClass, i));
+                    builder.append(rightCols.get(i));
                     builder.append(operator == Operator.Equals ? " IS NULL" : " IS NOT NULL");
                 }
             }
