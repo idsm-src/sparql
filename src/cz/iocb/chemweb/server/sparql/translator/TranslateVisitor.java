@@ -1785,7 +1785,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     protected Variable createVariable(String prefix)
     {
-        return new Variable(variablePrefix + variableId++);
+        return new Variable(prefix + variableId++);
     }
 
 
