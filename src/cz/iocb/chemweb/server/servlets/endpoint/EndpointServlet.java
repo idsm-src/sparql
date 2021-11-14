@@ -88,6 +88,8 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private static String context = null;
+
     private static final long timeout = 15 * 60 * 1000000000l; // 15 minutes
     private static int processLimit = 100000000;
 
@@ -98,6 +100,8 @@ public class EndpointServlet extends HttpServlet
     @Override
     public void init(ServletConfig config) throws ServletException
     {
+        context = config.getServletContext().getContextPath();
+
         String resourceName = config.getInitParameter("resource");
 
         if(resourceName == null || resourceName.isEmpty())
@@ -152,9 +156,9 @@ public class EndpointServlet extends HttpServlet
         String[] defaultGraphs = req.getParameterValues("default-graph-uri");
         String[] namedGraphs = req.getParameterValues("named-graph-uri");
 
-        if(req.getContentType().matches("application/x-www-form-urlencoded.*"))
+        if(req.getContentType() != null && req.getContentType().matches("application/x-www-form-urlencoded.*"))
             query = req.getParameter("query");
-        else if(req.getContentType().matches("application/sparql-query.*"))
+        else if(req.getContentType() != null && req.getContentType().matches("application/sparql-query.*"))
             query = IOUtils.toString(req.getInputStream());
 
         process(req, res, query, defaultGraphs, namedGraphs);
@@ -388,9 +392,9 @@ public class EndpointServlet extends HttpServlet
                 "    <meta charset='utf-8'>\n" +
                 "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n" +
                 "    <title>YASGUI</title>\n" +
-                "    <link href='/chemweb/css/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
-                "    <script src='/chemweb/js/yasgui.min.js'></script>\n" +
-                "    <script src='/chemweb/js/endpoint.js'></script>\n" +
+                "    <link href='" + context +"/css/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
+                "    <script src='" + context +"/js/yasgui.min.js'></script>\n" +
+                "    <script src='" + context +"/js/endpoint.js'></script>\n" +
                 "  </head>\n" +
                 "  <body>\n" +
                 "    <div id='yasgui'></div>\n" +
