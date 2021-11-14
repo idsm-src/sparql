@@ -88,6 +88,13 @@ public class SqlJoin extends SqlIntercode
 
         /* standard join */
 
+        if(restrictions == null)
+        {
+            restrictions = new HashSet<String>();
+            restrictions.addAll(left.getVariables().getNames());
+            restrictions.addAll(right.getVariables().getNames());
+        }
+
         ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
         if(left instanceof SqlJoin)
