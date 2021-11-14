@@ -71,6 +71,14 @@ public class Gene
         }
 
         {
+            Table table = new Table(schema, "gene_ncit_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("ontology:resource", Ontology.unitNCIT, "match"));
+        }
+
+        {
             Table table = new Table(schema, "gene_processes");
             NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
 

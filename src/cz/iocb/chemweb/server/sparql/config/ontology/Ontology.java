@@ -34,6 +34,7 @@ public class Ontology
     public static final String unitCLO = "'77'::smallint";
     public static final String unitEFO = "'92'::smallint";
     public static final String unitStar = "'95'::smallint";
+    public static final String unitNCIT = "'100'::smallint";
 
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config) throws SQLException
