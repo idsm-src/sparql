@@ -93,7 +93,8 @@ public class PropertiesPart extends ResizeComposite implements HasSelectionHandl
 
 
             String query = "SELECT ?Property ?Value WHERE { " + "<" + propertiesIri + "> ?Property ?Value. "
-                    + "OPTIONAL { ?Property rdf:type rdf:Property; rdfs:label ?Label. }} ORDER BY ?Label";
+                    + "OPTIONAL { ?Property rdf:type rdf:Property; rdfs:label ?Label. }} "
+                    + "ORDER BY (! bound(?Label)) str(?Label)";
 
             runningQuery = QueryServiceStub.query(query, start, length, new AsyncCallback<QueryResult>()
             {
@@ -125,7 +126,7 @@ public class PropertiesPart extends ResizeComposite implements HasSelectionHandl
                 }
             });
         }
-    };
+    }
 
 
     private static final int minimalColumnWidth = 250;
