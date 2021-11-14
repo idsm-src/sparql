@@ -1145,6 +1145,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(pattern instanceof Service)
             {
+                translatedGroupPattern = translateFilters(filters, translatedGroupPattern);
+                filters.clear();
+
                 translatedGroupPattern = translateService((Service) pattern, translatedGroupPattern);
                 inScopeVariables.addAll(pattern.getVariablesInScope());
             }
