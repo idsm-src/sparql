@@ -128,9 +128,9 @@ public class Common
         config.addIriClass(new StringUserIriClass("reference:plantcyc-pathway", "https://pmn.plantcyc.org/",
                 "[^/]*/new-image\\?object=.*"));
         config.addIriClass(new StringUserIriClass("reference:pid-pathway",
-                "http://pid.nci.nih.gov/search/pathway_landing.shtml\\?pathway_id=", ".*"));
+                "http://pid.nci.nih.gov/search/pathway_landing.shtml?pathway_id=", ".*"));
         config.addIriClass(new StringUserIriClass("reference:inoh-pathway",
-                "http://www.inoh.org/inohviewer/inohclient.jnlp\\?id=", ".*"));
+                "http://www.inoh.org/inohviewer/inohclient.jnlp?id=", ".*"));
         config.addIriClass(new StringUserIriClass("reference:plantreactome-pathway",
                 "http://plantreactome.gramene.org/content/detail/", "R-OSA-[0-9]{7}"));
         config.addIriClass(new StringUserIriClass("reference:pharmgkb-pathway", "https://www.pharmgkb.org/pathway/",
@@ -138,7 +138,7 @@ public class Common
         config.addIriClass(
                 new StringUserIriClass("reference:fairdomhub-model", "https://fairdomhub.org/models/", "[0-9]+"));
         config.addIriClass(new StringUserIriClass("reference:lipidmaps-pathway",
-                "http://www.lipidmaps.org/data/IntegratedPathwaysData/SetupIntegratedPathways.pl\\?imgsize=730&Mode=BMDMATPS11&DataType=",
+                "http://www.lipidmaps.org/data/IntegratedPathwaysData/SetupIntegratedPathways.pl?imgsize=730&Mode=BMDMATPS11&DataType=",
                 ".*"));
     }
 
