@@ -6,7 +6,6 @@ import java.util.Optional;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.parser.Element;
@@ -181,7 +180,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             arguemnts.add(visitElement(expression));
 
 
-        Optional<LiteralClass> resourceClass = BuiltinClasses.getLiteralClasses().stream()
+        Optional<LiteralClass> resourceClass = SqlCast.getSupportedClasses().stream()
                 .filter(r -> r.getTypeIri().equals(iri)).findFirst();
 
         if(resourceClass.isPresent())

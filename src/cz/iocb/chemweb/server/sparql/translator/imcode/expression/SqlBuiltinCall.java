@@ -16,6 +16,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDo
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
 import static java.util.stream.Collectors.joining;
@@ -27,7 +28,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -78,7 +80,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "count":
             {
                 if(!arguments.isEmpty() && arguments.stream().allMatch(r -> r == SqlNull.get()))
-                    return SqlLiteral.create(new Literal("0", xsdInteger.getTypeIri()));
+                    return SqlLiteral.create(new Literal("0", xsdIntegerType));
 
                 return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdInteger), false);
             }
@@ -89,7 +91,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode argument = arguments.get(0);
 
                 if(argument == SqlNull.get())
-                    return SqlLiteral.create(new Literal("0", xsdInteger.getTypeIri()));
+                    return SqlLiteral.create(new Literal("0", xsdIntegerType));
 
                 ResourceClass baseType = function.equals("avg") ? xsdDecimal : xsdInteger;
                 Set<ResourceClass> resourceClass = argument.getResourceClasses().stream().filter(r -> isNumeric(r))
@@ -317,9 +319,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(type instanceof SqlIri)
                 {
                     IRI iri = ((SqlIri) type).getIri();
-
-                    ResourceClass resourceClass = BuiltinClasses.getLiteralClasses().stream()
-                            .filter(r -> r.getTypeIri().equals(iri)).findFirst().orElse(null);
+                    DataType datatype = Request.currentRequest().getConfiguration().getDataType(iri);
+                    ResourceClass resourceClass = datatype == null ? null : datatype.getGeneralLiteralClass();
 
                     boolean canBeNull = operand.canBeNull() || operand.getResourceClasses().size() > 1;
 
@@ -336,7 +337,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 else
                 {
                     Set<ResourceClass> resourceClasses = asSet(unsupportedLiteral);
-                    resourceClasses.addAll(BuiltinClasses.getLiteralClasses());
+                    Request.currentRequest().getConfiguration().getDataTypes()
+                            .forEach(d -> resourceClasses.add(d.getGeneralLiteralClass()));
 
                     return new SqlBuiltinCall(function, arguments, resourceClasses,
                             operand.canBeNull() || operand.getResourceClasses().size() > 1 || type.canBeNull()
@@ -1567,6 +1569,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         translateAsUnboxedOperand(arguments.get(0), xsdString);
 
             case "strdt":
+                if(getExpressionResourceClass() == xsdString)
+                    return translateAsUnboxedOperand(arguments.get(0), xsdString);
+
                 return "sparql.cast_as_rdfbox_from_typed_literal("
                         + translateAsUnboxedOperand(arguments.get(0), xsdString) + ", "
                         + translateAsUnboxedOperand(arguments.get(1), iri) + ")";

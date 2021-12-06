@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,7 +40,6 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnaryLiteralExpression
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnaryNegationExpressionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.UnarySignedLiteralExpressionContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.VarContext;
-import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.Position;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
@@ -475,7 +475,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         result.add(expressionVisitor.visit(ctx.expression()));
 
         if(ctx.string() != null)
-            result.add(withRange(new Literal(LiteralVisitor.unquote(ctx.string().getText()), BuiltinTypes.xsdStringIri),
+            result.add(withRange(new Literal(LiteralVisitor.unquote(ctx.string().getText()), xsdStringType),
                     ctx.string()));
 
         return result;

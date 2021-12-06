@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import java.io.IOException;
@@ -49,7 +50,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.AskQuery;
@@ -1687,7 +1687,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         else if(datatype != null)
                             node = new Literal(data.toString(), new IRI(datatype));
                         else
-                            node = new Literal(data.toString(), BuiltinTypes.xsdStringIri);
+                            node = new Literal(data.toString(), xsdStringType);
 
 
                         if(defaulResult.get(varIndex) instanceof BlankNodeLiteral)

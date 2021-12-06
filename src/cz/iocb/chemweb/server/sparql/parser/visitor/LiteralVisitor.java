@@ -1,10 +1,10 @@
 package cz.iocb.chemweb.server.sparql.parser.visitor;
 
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.rdfLangStringType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDecimalType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
@@ -13,6 +13,7 @@ import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralNegativeContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.NumericLiteralPositiveContext;
 import cz.iocb.chemweb.server.sparql.grammar.SparqlParser.RdfLiteralContext;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.parser.Range;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Prologue;
@@ -61,7 +62,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
 
             Literal literal = new Literal(value, type);
 
-            if(type.equals(rdfLangStringIri))
+            if(type.equals(rdfLangStringType.getTypeIri()))
                 messages.add(new TranslateMessage(MessageType.invalidDatatype, Range.compute(ctx.iri()),
                         type.toString(prologue)));
             else if(!literal.isTypeSupported())
@@ -102,14 +103,14 @@ public class LiteralVisitor extends BaseVisitor<Literal>
 
     private static Literal createNumericLiteral(String text)
     {
-        IRI type;
+        DataType type;
 
         if(text.contains("e") || text.contains("E"))
-            type = xsdDoubleIri;
+            type = xsdDoubleType;
         else if(text.contains("."))
-            type = xsdDecimalIri;
+            type = xsdDecimalType;
         else
-            type = xsdIntegerIri;
+            type = xsdIntegerType;
 
         return new Literal(text, type);
     }
@@ -139,6 +140,6 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new Literal(ctx.getText(), xsdBooleanIri);
+        return new Literal(ctx.getText(), xsdBooleanType);
     }
 }

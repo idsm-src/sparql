@@ -114,6 +114,12 @@ public class Request implements AutoCloseable
     public Result execute(String query, List<DataSet> dataSets, int offset, int limit, long timeout)
             throws TranslateExceptions, SQLException
     {
+        Request previous = requests.get();
+        requests.set(this);
+
+        getConnection(); // time is measured after a connection is established
+
+
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
         Parser parser = new Parser(messages);
@@ -130,7 +136,6 @@ public class Request implements AutoCloseable
             syntaxTree.getSelect().setDataSets(dataSets);
 
 
-        getConnection(); // time is measured after a connection is established
         this.timeout = timeout;
         this.begin = System.nanoTime();
 
@@ -146,9 +151,6 @@ public class Request implements AutoCloseable
         else if(syntaxTree instanceof ConstructQuery)
             type = ResultType.CONSTRUCT;
 
-
-        Request previous = requests.get();
-        requests.set(this);
 
         try
         {

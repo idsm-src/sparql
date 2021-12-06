@@ -1,17 +1,17 @@
 package cz.iocb.chemweb.server.sparql.engine;
 
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateTimeIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDayTimeDurationIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdLongIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdShortIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateTimeType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDayTimeDurationType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDecimalType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdFloatType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdLongType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdShortType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
@@ -134,54 +134,55 @@ public class SelectResult extends Result
                         break;
 
                     case BOOLEAN:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanIri);
+                        rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
                         break;
 
                     case SHORT:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdShortIri);
+                        rowData[idx] = new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
                         break;
 
                     case INT:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdIntIri);
+                        rowData[idx] = new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
                         break;
 
                     case LONG:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdLongIri);
+                        rowData[idx] = new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
                         break;
 
                     case FLOAT:
                         Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
-                        rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatIri);
+                        rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatType.getTypeIri());
                         break;
 
                     case DOUBLE:
-                        rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleIri);
+                        rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
                         break;
 
                     case INTEGER:
                         rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdIntegerIri);
+                                xsdIntegerType.getTypeIri());
                         break;
 
                     case DECIMAL:
                         rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdDecimalIri);
+                                xsdDecimalType.getTypeIri());
                         break;
 
                     case DATETIME:
-                        rowData[idx] = new TypedLiteral(lexical, xsdDateTimeIri);
+                        rowData[idx] = new TypedLiteral(lexical, xsdDateTimeType.getTypeIri());
                         break;
 
                     case DATE:
-                        rowData[idx] = new TypedLiteral(lexical, xsdDateIri);
+                        rowData[idx] = new TypedLiteral(lexical, xsdDateType.getTypeIri());
                         break;
 
                     case DAYTIMEDURATION:
-                        rowData[idx] = new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
+                        rowData[idx] = new TypedLiteral(durationToString((Long) value),
+                                xsdDayTimeDurationType.getTypeIri());
                         break;
 
                     case STRING:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdStringIri);
+                        rowData[idx] = new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
                         break;
 
                     case LANGSTRING:

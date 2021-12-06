@@ -1,11 +1,24 @@
 package cz.iocb.chemweb.server.sparql.config;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateTimeType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDayTimeDurationType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDecimalType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdFloatType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdLongType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdShortType;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static java.util.Arrays.asList;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +43,7 @@ import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -38,7 +52,6 @@ import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
@@ -54,6 +67,7 @@ public abstract class SparqlDatabaseConfiguration
     protected boolean autoAddToDefaultGraph;
 
     protected HashMap<String, String> prefixes = new HashMap<String, String>();
+    protected HashMap<IRI, DataType> dataTypeMap = new HashMap<IRI, DataType>();
     protected ArrayList<UserIriClass> iriClasses = new ArrayList<UserIriClass>();
     protected HashMap<String, UserIriClass> iriClassMap = new HashMap<String, UserIriClass>();
 
@@ -75,6 +89,19 @@ public abstract class SparqlDatabaseConfiguration
         this.autoAddToDefaultGraph = autoAddToDefaultGraph;
 
         addEmptyService(serviceIri);
+
+        addDataType(xsdBooleanType);
+        addDataType(xsdShortType);
+        addDataType(xsdIntType);
+        addDataType(xsdLongType);
+        addDataType(xsdIntegerType);
+        addDataType(xsdDecimalType);
+        addDataType(xsdFloatType);
+        addDataType(xsdDoubleType);
+        addDataType(xsdStringType);
+        addDataType(xsdDayTimeDurationType);
+        addDataType(xsdDateType);
+        addDataType(xsdDateTimeType);
     }
 
 
@@ -94,6 +121,21 @@ public abstract class SparqlDatabaseConfiguration
         else if(!previous.equals(iri))
             throw new IllegalArgumentException(
                     "prefix definition conflict: " + prefix + ": " + iri + " != " + previous);
+    }
+
+
+    public void addDataType(DataType dataType)
+    {
+        DataType previous = dataTypeMap.get(dataType.getTypeIri());
+
+        if(previous == null)
+        {
+            dataTypeMap.put(dataType.getTypeIri(), dataType);
+        }
+        else if(!previous.equals(dataType))
+        {
+            throw new IllegalArgumentException("datatype definition conflict for '" + dataType.getTypeIri() + "'");
+        }
     }
 
 
@@ -186,49 +228,44 @@ public abstract class SparqlDatabaseConfiguration
 
     public NodeMapping createLiteralMapping(String value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdString, new Literal(value, BuiltinTypes.xsdStringIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdString, new Literal(value, xsdStringType));
     }
 
 
     public NodeMapping createLiteralMapping(boolean value)
     {
         return new ConstantLiteralMapping(BuiltinClasses.xsdBoolean,
-                new Literal(Boolean.toString(value), BuiltinTypes.xsdBooleanIri));
+                new Literal(Boolean.toString(value), xsdBooleanType));
     }
 
 
     public NodeMapping createLiteralMapping(short value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdShort,
-                new Literal(Short.toString(value), BuiltinTypes.xsdShortIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdShort, new Literal(Short.toString(value), xsdShortType));
     }
 
 
     public NodeMapping createLiteralMapping(int value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdInt,
-                new Literal(Integer.toString(value), BuiltinTypes.xsdIntIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdInt, new Literal(Integer.toString(value), xsdIntType));
     }
 
 
     public NodeMapping createLiteralMapping(long value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdLong,
-                new Literal(Long.toString(value), BuiltinTypes.xsdLongIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdLong, new Literal(Long.toString(value), xsdLongType));
     }
 
 
     public NodeMapping createLiteralMapping(float value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdFloat,
-                new Literal(Float.toString(value), BuiltinTypes.xsdFloatIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdFloat, new Literal(Float.toString(value), xsdFloatType));
     }
 
 
     public NodeMapping createLiteralMapping(double value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdDouble,
-                new Literal(Double.toString(value), BuiltinTypes.xsdDoubleIri));
+        return new ConstantLiteralMapping(BuiltinClasses.xsdDouble, new Literal(Double.toString(value), xsdDoubleType));
     }
 
 
@@ -477,6 +514,30 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public HashMap<String, String> getPrefixes()
+    {
+        return prefixes;
+    }
+
+
+    public Collection<DataType> getDataTypes()
+    {
+        return dataTypeMap.values();
+    }
+
+
+    public DataType getDataType(IRI iri)
+    {
+        return dataTypeMap.get(iri);
+    }
+
+
+    public List<UserIriClass> getIriClasses()
+    {
+        return iriClasses;
+    }
+
+
     public UserIriClass getIriClass(String name)
     {
         UserIriClass iriClass = iriClassMap.get(name);
@@ -485,18 +546,6 @@ public abstract class SparqlDatabaseConfiguration
             throw new IllegalArgumentException("unknown iri class: '" + name + "'");
 
         return iriClass;
-    }
-
-
-    public HashMap<String, String> getPrefixes()
-    {
-        return prefixes;
-    }
-
-
-    public List<UserIriClass> getIriClasses()
-    {
-        return iriClasses;
     }
 
 

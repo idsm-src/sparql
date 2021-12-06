@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import java.util.List;
-import cz.iocb.chemweb.server.sparql.parser.BuiltinTypes;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -46,7 +46,7 @@ public abstract class LiteralClass extends ResourceClass
             if(!typeIri.equals(literalTypeIri))
                 return false;
 
-            if(typeIri.equals(BuiltinTypes.rdfLangStringIri) && literal.getLanguageTag() == null)
+            if(typeIri.equals(rdfLangString.getTypeIri()) && literal.getLanguageTag() == null)
                 return false;
         }
 

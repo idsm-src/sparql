@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,11 +15,7 @@ import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
@@ -222,33 +217,10 @@ public class SqlValues extends SqlIntercode
         if(value instanceof Literal)
         {
             Literal literal = (Literal) value;
+            DataType datatype = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
 
-            if(literal.getLanguageTag() != null)
-            {
-                return LangStringConstantTagClass.get(literal.getLanguageTag());
-            }
-            else
-            {
-                ResourceClass valueType = BuiltinClasses.unsupportedLiteral;
-
-                if(literal.getValue() != null)
-                {
-                    IRI iri = literal.getTypeIri();
-
-                    if(iri != null)
-                        for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
-                            if(literalClass.getTypeIri().equals(iri))
-                                valueType = literalClass;
-
-                    if(valueType == xsdDateTime)
-                        valueType = DateTimeConstantZoneClass.get(DateTimeClass.getZone(literal));
-
-                    if(valueType == xsdDate)
-                        valueType = DateConstantZoneClass.get(DateClass.getZone(literal));
-                }
-
-                return valueType;
-            }
+            return resourceClass;
         }
         else if(value instanceof IRI)
         {

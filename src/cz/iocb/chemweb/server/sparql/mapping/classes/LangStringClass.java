@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.rdfLangStringIri;
 import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;

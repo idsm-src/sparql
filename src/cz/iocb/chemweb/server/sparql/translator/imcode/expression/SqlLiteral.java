@@ -1,16 +1,10 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.chemweb.server.sparql.engine.Request;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -34,23 +28,8 @@ public class SqlLiteral extends SqlNodeValue
 
     public static SqlExpressionIntercode create(Literal literal)
     {
-        LiteralClass resourceClass = unsupportedLiteral;
-
-        if(literal.getLanguageTag() != null)
-        {
-            resourceClass = LangStringConstantTagClass.get(literal.getLanguageTag());
-        }
-        else if(literal.getValue() != null && literal.getTypeIri() != null)
-        {
-            for(LiteralClass literalClass : BuiltinClasses.getLiteralClasses())
-                if(literalClass.getTypeIri().equals(literal.getTypeIri()))
-                    resourceClass = literalClass;
-
-            if(resourceClass == xsdDateTime)
-                resourceClass = DateTimeConstantZoneClass.get(DateTimeClass.getZone(literal));
-            else if(resourceClass == xsdDate)
-                resourceClass = DateConstantZoneClass.get(DateClass.getZone(literal));
-        }
+        DataType datatype = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+        LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
 
         return new SqlLiteral(literal, resourceClass);
     }

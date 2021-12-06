@@ -1,5 +1,15 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDayTimeDurationIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDecimalIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdFloatIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdLongIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdShortIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.BOOLEAN;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DAYTIMEDURATION;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DECIMAL;
@@ -10,18 +20,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.INTEGER;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LONG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.SHORT;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.STRING;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdBooleanIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDayTimeDurationIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDecimalIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDoubleIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdFloatIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdIntegerIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdLongIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdShortIri;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdStringIri;
-import static java.util.Arrays.asList;
-import java.util.List;
 
 
 
@@ -51,24 +49,4 @@ public class BuiltinClasses
 
     public static final IntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass();
     public static final StrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass();
-
-
-    private static final List<LiteralClass> literalClasses = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
-            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
-
-    private static final List<ResourceClass> classes = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
-            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString, rdfLangString,
-            unsupportedLiteral, intBlankNode, strBlankNode, iri);
-
-
-    public static List<LiteralClass> getLiteralClasses()
-    {
-        return literalClasses;
-    }
-
-
-    public static List<ResourceClass> getClasses()
-    {
-        return classes;
-    }
 }

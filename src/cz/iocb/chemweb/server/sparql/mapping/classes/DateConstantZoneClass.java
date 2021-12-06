@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATE;
-import static cz.iocb.chemweb.server.sparql.parser.BuiltinTypes.xsdDateIri;
 import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.Hashtable;

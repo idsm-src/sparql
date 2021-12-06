@@ -15,11 +15,11 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
+import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toSet;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
@@ -31,6 +31,10 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlCast extends SqlUnary
 {
+    private static final List<LiteralClass> supportedClasses = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
+            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
+
+
     private final ResourceClass resourceClass;
 
 
@@ -292,7 +296,7 @@ public class SqlCast extends SqlUnary
 
     private static ResourceClass resultCastClass(ResourceClass from, ResourceClass to)
     {
-        assert BuiltinClasses.getLiteralClasses().contains(to);
+        assert getSupportedClasses().contains(to);
 
         if(from == rdfLangString || from == unsupportedLiteral)
             return null;
@@ -300,7 +304,7 @@ public class SqlCast extends SqlUnary
         if(isIri(from) && to == xsdString)
             return xsdString;
 
-        if(!BuiltinClasses.getLiteralClasses().contains(from) && !isDateTime(from) && !isDate(from))
+        if(!getSupportedClasses().contains(from) && !isDateTime(from) && !isDate(from))
             return null;
 
         if(from == to)
@@ -357,7 +361,7 @@ public class SqlCast extends SqlUnary
         if(from == iri && to == xsdString)
             return false;
 
-        if(!BuiltinClasses.getLiteralClasses().contains(from))
+        if(!getSupportedClasses().contains(from))
             return true;
 
         if(from == to)
@@ -391,5 +395,11 @@ public class SqlCast extends SqlUnary
             return false;
 
         return true;
+    }
+
+
+    public static List<LiteralClass> getSupportedClasses()
+    {
+        return supportedClasses;
     }
 }
