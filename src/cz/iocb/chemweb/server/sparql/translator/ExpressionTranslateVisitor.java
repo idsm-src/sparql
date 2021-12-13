@@ -205,15 +205,16 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             messages.add(
                     new TranslateMessage(MessageType.unimplementedFunction, iri.getRange(), iri.toString(prologue)));
 
-            return SqlNull.get();
+            return SqlExpressionError.create();
         }
 
-        if(arguemnts.size() != definition.getArgumentClasses().size())
+        if(arguemnts.size() < definition.getRequiredArgumentCount()
+                && arguemnts.size() > definition.getArgumentClasses().size())
         {
             messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
                     iri.toString(prologue), definition.getArgumentClasses().size()));
 
-            return SqlNull.get();
+            return SqlExpressionError.create();
         }
 
         return SqlFunctionCall.create(definition, arguemnts);

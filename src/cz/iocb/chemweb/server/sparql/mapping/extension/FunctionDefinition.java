@@ -19,19 +19,28 @@ public class FunctionDefinition
     private final Function sqlFunction;
     private final ResourceClass result;
     private final List<ResourceClass> arguments;
+    private final int requiredArgumentCount;
     private final boolean canBeNull;
     private final boolean isDeterministic;
 
 
     public FunctionDefinition(String functionName, Function sqlFunction, ResourceClass result,
-            List<ResourceClass> arguments, boolean canBeNull, boolean isDeterministic)
+            List<ResourceClass> arguments, int requiredArgumentCount, boolean canBeNull, boolean isDeterministic)
     {
         this.functionName = functionName;
         this.sqlFunction = sqlFunction;
         this.result = result;
         this.arguments = arguments;
+        this.requiredArgumentCount = requiredArgumentCount;
         this.canBeNull = canBeNull;
         this.isDeterministic = isDeterministic;
+    }
+
+
+    public FunctionDefinition(String functionName, Function sqlFunction, ResourceClass result,
+            List<ResourceClass> arguments, boolean canBeNull, boolean isDeterministic)
+    {
+        this(functionName, sqlFunction, result, arguments, arguments.size(), canBeNull, isDeterministic);
     }
 
 
@@ -68,5 +77,11 @@ public class FunctionDefinition
     public boolean isDeterministic()
     {
         return isDeterministic;
+    }
+
+
+    public int getRequiredArgumentCount()
+    {
+        return requiredArgumentCount;
     }
 }
