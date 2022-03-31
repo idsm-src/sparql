@@ -336,6 +336,26 @@ public class SqlTableAccess extends SqlIntercode
 
             return columns;
         }
+
+        public Set<Column> getIsNotNull()
+        {
+            return isNotNull;
+        }
+
+        public Set<Column> getIsNull()
+        {
+            return isNull;
+        }
+
+        public Map<Column, Column> getAreEqual()
+        {
+            return areEqual;
+        }
+
+        public Set<ColumnPair> getAreNotEqual()
+        {
+            return areNotEqual;
+        }
     }
 
 
