@@ -191,7 +191,7 @@ public abstract class SparqlDatabaseConfiguration
         }
         else
         {
-            String[] parts = value.split(":");
+            String[] parts = value.split(":", 2);
 
             if(parts.length != 2 && !(parts.length == 1 && value.endsWith(":")))
                 throw new IllegalArgumentException("invalid iri value: '" + value + "'");
