@@ -89,7 +89,7 @@ public class SqlMinus extends SqlIntercode
         builder.append(") AS ");
         builder.append(leftTable);
 
-        builder.append(" WHERE (SELECT 1 FROM (");
+        builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
         builder.append(right.translate());
         builder.append(") AS ");
         builder.append(rightTable);
@@ -102,7 +102,7 @@ public class SqlMinus extends SqlIntercode
             builder.append(condition);
         }
 
-        builder.append(" LIMIT 1) IS NULL");
+        builder.append(")");
 
         return builder.toString();
     }
