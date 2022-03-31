@@ -230,6 +230,7 @@ public class PiwikFilter implements Filter
             }
             catch(Throwable error)
             {
+                e.printStackTrace();
             }
 
             tracker = new PiwikAsyncTracker(this.address, 20000);
