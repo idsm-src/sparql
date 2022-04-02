@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.servlets.endpoint;
 
 import static java.util.stream.Collectors.joining;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
+import com.google.common.io.ByteStreams;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.engine.BNode;
 import cz.iocb.chemweb.server.sparql.engine.Engine;
@@ -88,33 +90,37 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static String context = null;
-
-    private static final long timeout = 15 * 60 * 1000000000l; // 15 minutes
-    private static int processLimit = 100000000;
-
     private Engine engine;
     private SparqlDatabaseConfiguration sparqlConfig;
+    private long timeout = 1000 * 1000000000l;
+    private int processLimit = 100000000;
 
 
     @Override
     public void init(ServletConfig config) throws ServletException
     {
-        context = config.getServletContext().getContextPath();
-
-        String resourceName = config.getInitParameter("resource");
-
-        if(resourceName == null || resourceName.isEmpty())
-            throw new IllegalArgumentException("Resource name is not set");
-
-
         try
         {
+            String resourceName = config.getInitParameter("resource");
+
+            if(resourceName == null || resourceName.isEmpty())
+                throw new IllegalArgumentException("resource name is not set");
+
+            String timeoutValue = config.getInitParameter("timeout");
+
+            if(timeoutValue != null)
+                timeout = Integer.parseInt(timeoutValue) * 1000000000l;
+
+            String limitValue = config.getInitParameter("limit");
+
+            if(limitValue != null)
+                processLimit = Integer.parseInt(limitValue);
+
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
             engine = new Engine(sparqlConfig);
         }
-        catch(NamingException e)
+        catch(NamingException | NumberFormatException e)
         {
             throw new ServletException(e);
         }
@@ -385,16 +391,40 @@ public class EndpointServlet extends HttpServlet
         res.setContentType("text/html");
 
         // @formatter:off
-        res.getWriter().append(
+        res.getOutputStream().print(
                 "<!DOCTYPE html>\n" +
                 "<html lang='en'>\n" +
                 "  <head>\n" +
                 "    <meta charset='utf-8'>\n" +
                 "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n" +
                 "    <title>YASGUI</title>\n" +
-                "    <link href='" + context +"/css/yasgui.min.css' rel='stylesheet' type='text/css'/>\n" +
-                "    <script src='" + context +"/js/yasgui.min.js'></script>\n" +
-                "    <script src='" + context +"/js/endpoint.js'></script>\n" +
+                "    <style>\n");
+
+                try(InputStream stream = getClass().getResourceAsStream("yasgui.min.css"))
+                {
+                    ByteStreams.copy(stream, res.getOutputStream());
+                }
+
+        res.getOutputStream().print(
+                "    </style>\n" +
+                "    <script>\n");
+
+        try(InputStream stream = getClass().getResourceAsStream("yasgui.min.js"))
+        {
+            ByteStreams.copy(stream, res.getOutputStream());
+        }
+
+        res.getOutputStream().print(
+                "    </script>\n" +
+                "    <script>\n");
+
+        try(InputStream stream = getClass().getResourceAsStream("endpoint.js"))
+        {
+            ByteStreams.copy(stream, res.getOutputStream());
+        }
+
+        res.getOutputStream().print(
+                "  </script>\n" +
                 "  </head>\n" +
                 "  <body>\n" +
                 "    <div id='yasgui'></div>\n" +
@@ -1431,7 +1461,7 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static Graph processResult(Result result) throws SQLException
+    private Graph processResult(Result result) throws SQLException
     {
         Graph data = new Graph();
 
