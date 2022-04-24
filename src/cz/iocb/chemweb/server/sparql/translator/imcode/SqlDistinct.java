@@ -30,21 +30,29 @@ public class SqlDistinct extends SqlIntercode
     }
 
 
-    protected static SqlIntercode create(SqlIntercode child, Set<String> distinct, Set<String> restrictions)
+    protected static SqlIntercode create(SqlIntercode child, Set<String> distinctVariables, Set<String> restrictions)
     {
+        /* special cases */
+
         if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(child instanceof SqlTableAccess && ((SqlTableAccess) child).isDistinct(distinct))
-            return child.restrict(restrictions);
+        if(child == SqlEmptySolution.get())
+            return SqlEmptySolution.get();
+
+        if(child instanceof SqlTableAccess && ((SqlTableAccess) child).isDistinct(distinctVariables))
+            return restrictions == null ? child : child.optimize(restrictions, true);
+
+
+        /* standard distinct */
 
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable var : child.getVariables().getValues())
-            if(distinct.contains(var.getName()) && (restrictions == null || restrictions.contains(var.getName())))
+            if(distinctVariables.contains(var.getName()) && restrictions.contains(var.getName()))
                 variables.add(var);
 
-        return new SqlDistinct(variables, child, distinct);
+        return new SqlDistinct(variables, child, distinctVariables);
     }
 
 

@@ -100,8 +100,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(object instanceof VariableOrBlankNode)
             restrictions.add(((VariableOrBlankNode) object).getSqlName());
 
-        // strip path variables
-        return intercode.restrict(restrictions);
+        return intercode;
     }
 
 

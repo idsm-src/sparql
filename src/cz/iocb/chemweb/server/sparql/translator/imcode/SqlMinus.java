@@ -33,11 +33,12 @@ public class SqlMinus extends SqlIntercode
 
     public static SqlIntercode minus(SqlIntercode left, SqlIntercode right)
     {
-        return minus(left, right, null);
+        return minus(left, right, null, false);
     }
 
 
-    protected static SqlIntercode minus(SqlIntercode left, SqlIntercode right, Set<String> restrictions)
+    protected static SqlIntercode minus(SqlIntercode left, SqlIntercode right, Set<String> restrictions,
+            boolean reduced)
     {
         boolean shareVariables = false;
 
@@ -47,11 +48,11 @@ public class SqlMinus extends SqlIntercode
                 shareVariables = true;
 
             if(!pair.isJoinable())
-                return left.restrict(restrictions);
+                return restrictions == null ? left : left.optimize(restrictions, reduced);
         }
 
         if(shareVariables == false)
-            return left.restrict(restrictions);
+            return restrictions == null ? left : left.optimize(restrictions, reduced);
 
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
@@ -60,13 +61,17 @@ public class SqlMinus extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        reduced = reduced & right.isDeterministic;
+
         HashSet<String> childRestrictions = new HashSet<String>();
         childRestrictions.addAll(left.getVariables().getNames());
         childRestrictions.retainAll(right.getVariables().getNames());
         childRestrictions.addAll(restrictions);
 
-        return minus(left.optimize(childRestrictions, reduced), right.optimize(childRestrictions, reduced),
-                restrictions);
+        SqlIntercode optimizedLeft = left.optimize(childRestrictions, reduced);
+        SqlIntercode optimizedRight = right.optimize(childRestrictions, true);
+
+        return minus(optimizedLeft, optimizedRight, restrictions, reduced);
     }
 
 

@@ -52,15 +52,6 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    public SqlIntercode restrict(Set<String> restrictions)
-    {
-        if(restrictions == null)
-            return this;
-
-        return optimize(restrictions, false);
-    }
-
-
     protected static UsedVariables getJoinUsedVariables(UsedVariables left, UsedVariables right, Table leftTable,
             Table rightTable, Set<String> restrictions, Map<Column, Column> map)
     {

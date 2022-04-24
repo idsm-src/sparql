@@ -1,14 +1,14 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import com.google.common.collect.Lists;
+import java.util.Stack;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
@@ -40,204 +40,31 @@ public class SqlJoin extends SqlIntercode
 
     public static SqlIntercode join(SqlIntercode left, SqlIntercode right)
     {
-        return join(left, right, null);
-    }
-
-
-    protected static SqlIntercode join(SqlIntercode left, SqlIntercode right, Set<String> restrictions)
-    {
-        /* special cases */
-
-        if(left == SqlNoSolution.get() || right == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(left == SqlEmptySolution.get())
-            return right.restrict(restrictions);
-
-        if(right == SqlEmptySolution.get())
-            return left.restrict(restrictions);
-
-
-        if(left instanceof SqlUnion || right instanceof SqlUnion)
-        {
-            List<SqlIntercode> leftChilds;
-
-            if(left instanceof SqlUnion)
-                leftChilds = ((SqlUnion) left).getChilds();
-            else
-                leftChilds = Lists.newArrayList(left);
-
-
-            List<SqlIntercode> rightChilds;
-
-            if(right instanceof SqlUnion)
-                rightChilds = ((SqlUnion) right).getChilds();
-            else
-                rightChilds = Lists.newArrayList(right);
-
-
-            SqlIntercode union = SqlNoSolution.get();
-
-            for(SqlIntercode leftChild : leftChilds)
-                for(SqlIntercode rightChild : rightChilds)
-                    union = SqlUnion.union(union, join(leftChild, rightChild, restrictions));
-
-            return union;
-        }
-
-
-        /* standard join */
-
-        if(restrictions == null)
-        {
-            restrictions = new HashSet<String>();
-            restrictions.addAll(left.getVariables().getNames());
-            restrictions.addAll(right.getVariables().getNames());
-        }
-
-        ArrayList<SqlIntercode> childs = new ArrayList<SqlIntercode>();
-
-        if(left instanceof SqlJoin)
-            childs.addAll(((SqlJoin) left).childs);
-        else
-            childs.add(left);
-
-        if(right instanceof SqlJoin)
-            childs.addAll(((SqlJoin) right).childs);
-        else
-            childs.add(right);
-
-        return join(childs, restrictions);
-    }
-
-
-    private static SqlIntercode join(List<SqlIntercode> childs, Set<String> restrictions)
-    {
-        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
-
-        loop:
-        while(true)
-        {
-            for(int i = 0; i < childs.size(); i++)
-            {
-                for(int j = i + 1; j < childs.size(); j++)
-                {
-                    SqlIntercode iSql = childs.get(i);
-                    SqlIntercode jSql = childs.get(j);
-
-                    if(!(iSql instanceof SqlTableAccess))
-                        continue;
-
-                    if(!(jSql instanceof SqlTableAccess))
-                        continue;
-
-                    SqlTableAccess left = (SqlTableAccess) iSql;
-                    SqlTableAccess right = (SqlTableAccess) jSql;
-
-                    //TODO: add unjoinable check
-                    //if(!SqlTableAccess.areCompatible(schema, left, right))
-                    //    return SqlNoSolution.get();
-
-                    List<ColumnPair> variantA = SqlTableAccess.canBeDroped(schema, left, right);
-
-                    if(variantA != null)
-                    {
-                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
-                        SqlIntercode merge = SqlTableAccess.merge(left, right, variantA, subrestrictions);
-
-                        if(merge == SqlNoSolution.get())
-                            return SqlNoSolution.get();
-
-                        childs.set(j, merge);
-                        childs.remove(i);
-                        continue loop;
-                    }
-
-
-                    List<ColumnPair> variantB = SqlTableAccess.canBeDroped(schema, right, left);
-
-                    if(variantB != null)
-                    {
-                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
-                        SqlIntercode merge = SqlTableAccess.merge(right, left, variantB, subrestrictions);
-
-                        if(merge == SqlNoSolution.get())
-                            return SqlNoSolution.get();
-
-                        childs.set(i, merge);
-                        childs.remove(j);
-                        continue loop;
-                    }
-
-
-                    if(SqlTableAccess.canBeMerged(schema, left, right))
-                    {
-                        HashSet<String> subrestrictions = getRestrictions(childs, i, j, restrictions);
-                        SqlIntercode merge = SqlTableAccess.merge(left, right, subrestrictions);
-
-                        if(merge == SqlNoSolution.get())
-                            return SqlNoSolution.get();
-
-                        childs.set(i, merge);
-                        childs.remove(j);
-                        continue loop;
-                    }
-                }
-            }
-
-            break loop;
-        }
-
-        if(childs.size() == 1)
-            return childs.get(0);
-
-        UsedVariables variables = childs.get(0).getVariables();
-        List<UsedVariables> variablesChain = new ArrayList<UsedVariables>(childs.size() - 1);
-        List<Map<Column, Column>> columnMaps = new ArrayList<Map<Column, Column>>(childs.size() - 1);
-
-        for(int i = 1; i < childs.size(); i++)
-        {
-            Map<Column, Column> map = new HashMap<Column, Column>();
-            variables = getJoinUsedVariables(variables, childs.get(i).getVariables(), leftTable, rightTable, null, map);
-
-            if(variables == null)
-                return SqlNoSolution.get();
-
-            if(i == childs.size() - 1)
-                variables = variables.restrict(restrictions);
-
-            variablesChain.add(variables);
-            columnMaps.add(map);
-        }
-
-        return new SqlJoin(childs, variablesChain, columnMaps);
+        return convertToIntercode(expand(asList(left, right)), null);
     }
 
 
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+        Set<String> childRestrictions = getRestrictions(childs, restrictions);
 
-        HashMap<String, Integer> variableCounts = new HashMap<String, Integer>();
+        List<List<SqlIntercode>> unionList = expand(optimize(childs, childRestrictions, reduced));
+        unionList = reoptimizeUnion(unionList, restrictions, reduced);
+        unionList = reduceUnion(unionList, restrictions);
 
-        for(SqlIntercode child : childs)
-            for(String var : child.getVariables().getNames())
-                variableCounts.put(var, variableCounts.get(var) == null ? 1 : variableCounts.get(var) + 1);
-
-        for(Entry<String, Integer> entry : variableCounts.entrySet())
-            if(entry.getValue() > 1)
-                childRestrictions.add(entry.getKey());
+        return convertToIntercode(unionList, restrictions);
+    }
 
 
-        SqlIntercode result = SqlEmptySolution.get();
+    private static SqlIntercode convertToIntercode(List<List<SqlIntercode>> unionList, Set<String> restrictions)
+    {
+        SqlIntercode union = SqlNoSolution.get();
 
-        for(int i = 0; i < childs.size() - 1; i++)
-            result = join(result, childs.get(i).optimize(childRestrictions, reduced), childRestrictions);
+        for(List<SqlIntercode> joinList : unionList)
+            union = SqlUnion.union(union, join(joinList, restrictions));
 
-        result = join(result, childs.get(childs.size() - 1).optimize(childRestrictions, reduced), restrictions);
-
-        return result;
+        return union;
     }
 
 
@@ -300,5 +127,269 @@ public class SqlJoin extends SqlIntercode
                 subrestrictions.addAll(childs.get(k).getVariables().getNames());
 
         return subrestrictions;
+    }
+
+
+    public static List<SqlIntercode> optimize(List<SqlIntercode> childs, Set<String> restrictions, boolean reduced)
+    {
+        List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
+
+        for(SqlIntercode child : childs)
+            optimized.add(child.optimize(restrictions, reduced));
+
+        return optimized;
+    }
+
+
+    public static List<List<SqlIntercode>> reoptimizeUnion(List<List<SqlIntercode>> unionList, Set<String> restrictions,
+            boolean reduced)
+    {
+        List<List<SqlIntercode>> optUnionList = new ArrayList<List<SqlIntercode>>();
+        Stack<List<SqlIntercode>> unionStack = new Stack<List<SqlIntercode>>();
+        unionStack.addAll(unionList);
+
+        while(!unionStack.isEmpty())
+        {
+            List<SqlIntercode> joinList = unionStack.pop();
+
+            Set<String> newRestrictions = getRestrictions(joinList, restrictions);
+
+            if(!newRestrictions.containsAll(getVariables(joinList)))
+                unionStack.addAll(expand(reoptimizeJoin(joinList, newRestrictions, reduced)));
+            else
+                optUnionList.add(joinList);
+        }
+
+        return optUnionList;
+    }
+
+
+    private static List<SqlIntercode> reoptimizeJoin(List<SqlIntercode> childs, Set<String> restrictions,
+            boolean reduced)
+    {
+        List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
+
+        for(SqlIntercode child : childs)
+            if(restrictions.containsAll(child.getVariables().getNames()))
+                optimized.add(child);
+            else
+                optimized.add(child.optimize(restrictions, reduced));
+
+        return optimized;
+    }
+
+
+    public static List<List<SqlIntercode>> expand(List<SqlIntercode> childs)
+    {
+        List<List<SqlIntercode>> unionList = new ArrayList<List<SqlIntercode>>();
+        unionList.add(new ArrayList<SqlIntercode>());
+
+        for(SqlIntercode child : childs)
+        {
+            if(child == SqlNoSolution.get())
+                return new ArrayList<List<SqlIntercode>>(0);
+
+            if(child instanceof SqlUnion)
+            {
+                List<List<SqlIntercode>> newUnionList = new ArrayList<List<SqlIntercode>>();
+
+                for(SqlIntercode unionChild : ((SqlUnion) child).getChilds())
+                {
+                    List<SqlIntercode> itemList = getJoinList(unionChild);
+
+                    for(List<SqlIntercode> joinList : unionList)
+                    {
+                        List<SqlIntercode> newJoinList = new ArrayList<SqlIntercode>(joinList.size() + itemList.size());
+                        newJoinList.addAll(joinList);
+                        newJoinList.addAll(itemList);
+                        newUnionList.add(newJoinList);
+                    }
+                }
+
+                unionList = newUnionList;
+            }
+            else if(child != SqlEmptySolution.get())
+            {
+                List<SqlIntercode> itemList = getJoinList(child);
+
+                for(List<SqlIntercode> joinList : unionList)
+                    joinList.addAll(itemList);
+            }
+        }
+
+        return unionList;
+    }
+
+
+    private List<List<SqlIntercode>> reduceUnion(List<List<SqlIntercode>> childs, Set<String> restrictions)
+    {
+        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
+
+        List<List<SqlIntercode>> newChilds = new ArrayList<List<SqlIntercode>>();
+
+        for(List<SqlIntercode> child : childs)
+        {
+            List<SqlIntercode> reduced = reduceJoin(child, restrictions, schema);
+
+            if(reduced != null)
+                newChilds.add(reduced);
+        }
+
+        return newChilds;
+    }
+
+
+
+    private static ArrayList<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Set<String> restrictions,
+            DatabaseSchema schema)
+    {
+        ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
+
+        for(int i = 0; i < optChilds.size(); i++)
+        {
+            if(!(optChilds.get(i) instanceof SqlTableAccess))
+                continue;
+
+            SqlTableAccess left = (SqlTableAccess) optChilds.get(i);
+
+
+            for(int j = i + 1; j < optChilds.size(); j++)
+            {
+                if(!(optChilds.get(j) instanceof SqlTableAccess))
+                    continue;
+
+                SqlTableAccess right = (SqlTableAccess) optChilds.get(j);
+
+
+                List<ColumnPair> dropLeft = SqlTableAccess.canBeDroped(schema, left, right);
+
+                if(dropLeft != null)
+                {
+                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                    SqlIntercode merged = SqlTableAccess.merge(left, right, dropLeft, mergeRestrictions);
+
+                    if(merged == SqlNoSolution.get())
+                        return null;
+
+                    left = (SqlTableAccess) merged;
+                    optChilds.set(i, merged);
+                    optChilds.remove(j--);
+                    continue;
+                }
+
+
+                List<ColumnPair> dropRight = SqlTableAccess.canBeDroped(schema, right, left);
+
+                if(dropRight != null)
+                {
+                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                    SqlIntercode merged = SqlTableAccess.merge(right, left, dropRight, mergeRestrictions);
+
+                    if(merged == SqlNoSolution.get())
+                        return null;
+
+                    left = (SqlTableAccess) merged;
+                    optChilds.set(i, merged);
+                    optChilds.remove(j--);
+                    continue;
+                }
+
+
+                if(SqlTableAccess.canBeMerged(schema, left, right))
+                {
+                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                    SqlIntercode merged = SqlTableAccess.merge(left, right, mergeRestrictions);
+
+                    if(merged == SqlNoSolution.get())
+                        return null;
+
+                    left = (SqlTableAccess) merged;
+                    optChilds.set(i, merged);
+                    optChilds.remove(j--);
+                    continue;
+                }
+            }
+        }
+
+        return optChilds;
+    }
+
+
+
+    private static SqlIntercode join(List<SqlIntercode> childs, Set<String> restrictions)
+    {
+        if(childs.size() == 0)
+            return SqlEmptySolution.get();
+
+        if(childs.size() == 1)
+            return childs.get(0);
+
+        UsedVariables variables = childs.get(0).getVariables();
+        List<UsedVariables> variablesChain = new ArrayList<UsedVariables>(childs.size() - 1);
+        List<Map<Column, Column>> columnMaps = new ArrayList<Map<Column, Column>>(childs.size() - 1);
+
+        for(int i = 1; i < childs.size(); i++)
+        {
+            Map<Column, Column> map = new HashMap<Column, Column>();
+            variables = getJoinUsedVariables(variables, childs.get(i).getVariables(), leftTable, rightTable, null, map);
+
+            if(variables == null)
+                return SqlNoSolution.get();
+
+            if(i == childs.size() - 1)
+                variables = variables.restrict(restrictions);
+
+            variablesChain.add(variables);
+            columnMaps.add(map);
+        }
+
+        return new SqlJoin(childs, variablesChain, columnMaps);
+    }
+
+
+    private static Set<String> getVariables(List<SqlIntercode> childs)
+    {
+        Set<String> allVariables = new HashSet<String>();
+
+        for(SqlIntercode child : childs)
+            allVariables.addAll(child.getVariables().getNames());
+
+        return allVariables;
+    }
+
+
+    private static Set<String> getRestrictions(List<SqlIntercode> childs, Set<String> restrictions)
+    {
+        Set<String> allVariables = new HashSet<String>();
+        Set<String> childRestrictions = new HashSet<String>(restrictions);
+
+        for(SqlIntercode child : childs)
+        {
+            for(String variable : child.getVariables().getNames())
+            {
+                if(allVariables.contains(variable))
+                    childRestrictions.add(variable);
+                else
+                    allVariables.add(variable);
+            }
+        }
+
+        return childRestrictions;
+    }
+
+
+    public final static List<SqlIntercode> getJoinList(SqlIntercode child)
+    {
+        if(child instanceof SqlJoin)
+            return new ArrayList<SqlIntercode>(((SqlJoin) child).getChilds());
+        else
+            return asList(child);
+    }
+
+
+
+    public final List<SqlIntercode> getChilds()
+    {
+        return childs;
     }
 }

@@ -48,30 +48,29 @@ public class SqlBind extends SqlIntercode
 
     public static SqlIntercode bind(String variableName, SqlExpressionIntercode expression, SqlIntercode child)
     {
-        return bind(variableName, expression, child, null);
+        return bind(variableName, expression, child, null, false);
     }
 
 
     protected static SqlIntercode bind(String variableName, SqlExpressionIntercode expression, SqlIntercode child,
-            Set<String> restrictions)
+            Set<String> restrictions, boolean reduced)
     {
         /* special cases */
 
         if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(expression == SqlNull.get())
-            return child.restrict(restrictions);
+        if(expression == SqlNull.get() || restrictions != null && !restrictions.contains(variableName))
+            return restrictions == null ? child : child.optimize(restrictions, reduced);
 
         if(child instanceof SqlUnion)
         {
             SqlIntercode union = SqlNoSolution.get();
 
             for(SqlIntercode intercode : ((SqlUnion) child).getChilds())
-                union = SqlUnion.union(union,
-                        bind(variableName, expression.optimize(intercode.getVariables()), intercode, restrictions));
+                union = SqlUnion.union(union, bind(variableName, expression, intercode, restrictions, reduced));
 
-            return union;
+            return restrictions == null ? union : union.optimize(restrictions, reduced);
         }
 
 
@@ -105,9 +104,7 @@ public class SqlBind extends SqlIntercode
         }
 
         UsedVariables variables = child.getVariables().restrict(restrictions);
-
-        if(restrictions == null || restrictions.contains(variableName))
-            variables.add(variable);
+        variables.add(variable);
 
         return new SqlBind(variables, variableName, expression, child);
     }
@@ -119,13 +116,24 @@ public class SqlBind extends SqlIntercode
         if(!restrictions.contains(variableName))
             return child.optimize(restrictions, reduced);
 
-        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
-        childRestrictions.addAll(expression.getReferencedVariables());
+        SqlExpressionIntercode optExpression = expression;
+        SqlIntercode optChild = child;
 
-        SqlIntercode optimizedChild = child.optimize(childRestrictions, reduced && expression.isDeterministic());
-        SqlExpressionIntercode optimizedExpression = expression.optimize(optimizedChild.getVariables());
+        while(true)
+        {
+            Set<String> expressionVariables = optExpression.getReferencedVariables();
 
-        return bind(variableName, optimizedExpression, optimizedChild, restrictions);
+            HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+            childRestrictions.addAll(expressionVariables);
+
+            optChild = optChild.optimize(childRestrictions, reduced && optExpression.isDeterministic());
+            optExpression = optExpression.optimize(optChild.getVariables());
+
+            if(optExpression.getReferencedVariables().equals(expressionVariables))
+                break;
+        }
+
+        return bind(variableName, optExpression, optChild, restrictions, reduced);
     }
 
 
