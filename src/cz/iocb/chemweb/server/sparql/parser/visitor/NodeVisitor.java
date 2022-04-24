@@ -33,12 +33,14 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.RdfCollection;
 public class NodeVisitor extends BaseVisitor<ComplexNode>
 {
     private final Prologue prologue;
+    private final VariableScopes scopes;
     private final List<TranslateMessage> messages;
 
 
-    public NodeVisitor(Prologue prologue, List<TranslateMessage> messages)
+    public NodeVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
+        this.scopes = scopes;
         this.messages = messages;
     }
 
@@ -55,7 +57,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public Variable visitVar(VarContext ctx)
     {
-        return new Variable(ctx.getText());
+        return new Variable(scopes.addToScope(ctx.getText()), ctx.getText());
     }
 
 
@@ -118,8 +120,8 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public BlankNodePropertyList visitBlankNodePropertyListPath(BlankNodePropertyListPathContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListPathNotEmpty())
-                .collect(toList());
+        List<Property> properties = new PropertiesVisitor(prologue, scopes, messages)
+                .visit(ctx.propertyListPathNotEmpty()).collect(toList());
 
         return new BlankNodePropertyList(properties);
     }
@@ -128,7 +130,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public BlankNodePropertyList visitBlankNodePropertyList(BlankNodePropertyListContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(prologue, messages).visit(ctx.propertyListNotEmpty())
+        List<Property> properties = new PropertiesVisitor(prologue, scopes, messages).visit(ctx.propertyListNotEmpty())
                 .collect(toList());
 
         return new BlankNodePropertyList(properties);

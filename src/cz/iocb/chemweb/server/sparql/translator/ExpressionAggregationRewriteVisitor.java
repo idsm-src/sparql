@@ -21,9 +21,14 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expression>
 {
     private static final String variablePrefix = "@aggregationvar";
-    private int variableId = 0;
-
+    private final TranslateVisitor parent;
     private final LinkedHashMap<Variable, BuiltInCallExpression> aggregations = new LinkedHashMap<>();
+
+
+    public ExpressionAggregationRewriteVisitor(TranslateVisitor parent)
+    {
+        this.parent = parent;
+    }
 
 
     @Override
@@ -72,7 +77,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     {
         if(builtInCallExpression.isAggregateFunction())
         {
-            Variable result = new Variable(variablePrefix + variableId++);
+            Variable result = parent.createVariable(variablePrefix);
             aggregations.put(result, builtInCallExpression);
             result.setRange(builtInCallExpression.getRange());
             return result;

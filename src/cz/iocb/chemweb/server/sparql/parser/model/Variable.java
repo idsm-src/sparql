@@ -12,13 +12,15 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 public final class Variable extends BaseComplexNode implements VarOrIri, Verb, VariableOrBlankNode
 {
     private final String name;
+    private final String scope;
 
 
-    public Variable(String name)
+    public Variable(String scope, String name)
     {
         if(name.startsWith("$") || name.startsWith("?"))
             name = name.substring(1);
 
+        this.scope = scope;
         this.name = name;
     }
 
@@ -32,7 +34,10 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
     @Override
     public String getSqlName()
     {
-        return name;
+        if(scope == null || scope.isEmpty())
+            return name;
+
+        return name + "@" + scope;
     }
 
 
@@ -54,7 +59,13 @@ public final class Variable extends BaseComplexNode implements VarOrIri, Verb, V
 
         Variable variable = (Variable) object;
 
-        return name.equals(variable.name);
+        if(!name.equals(variable.name))
+            return false;
+
+        if(scope == null && variable.scope != null || !scope.equals(variable.scope))
+            return false;
+
+        return true;
     }
 
 

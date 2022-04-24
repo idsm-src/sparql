@@ -64,16 +64,18 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
+    private final VariableScopes scopes;
     private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
 
 
     public ExpressionVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.scopes = scopes;
         this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
@@ -281,7 +283,8 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         if(superResult != null)
             return superResult;
 
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, usedBlankNodes, messages);
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
+                messages);
 
         ParseTree functionNameNode = ctx.children.get(0);
         String functionName = functionNameNode.getChildCount() == 0 ? functionNameNode.getText() :
@@ -300,22 +303,45 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public ExistsExpression visitExistsFunction(ExistsFunctionContext ctx)
     {
-        return new ExistsExpression(new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
-                .visit(ctx.groupGraphPattern()), false);
+        scopes.addScope();
+
+        try
+        {
+            return new ExistsExpression(
+                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
+                            .visit(ctx.groupGraphPattern()),
+                    false);
+        }
+        finally
+        {
+            scopes.popScope();
+        }
     }
 
 
     @Override
     public ExistsExpression visitNotExistsFunction(NotExistsFunctionContext ctx)
     {
-        return new ExistsExpression(new GraphPatternVisitor(config, prologue, services, usedBlankNodes, messages)
-                .visit(ctx.groupGraphPattern()), true);
+        scopes.addScope();
+
+        try
+        {
+            return new ExistsExpression(
+                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
+                            .visit(ctx.groupGraphPattern()),
+                    true);
+        }
+        finally
+        {
+            scopes.popScope();
+        }
     }
 
 
     private FunctionCallExpression parseFunctionCall(IRI iri, ArgListContext ctx)
     {
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, usedBlankNodes, messages);
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
+                messages);
 
         List<Expression> arguments = argumentsVisitor.visit(ctx);
 
@@ -350,7 +376,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public Variable visitVar(VarContext ctx)
     {
-        return new Variable(ctx.getText());
+        return new Variable(scopes.addToScope(ctx.getText(), true), ctx.getText());
     }
 
 
@@ -395,16 +421,18 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
+    private final VariableScopes scopes;
     private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
     private boolean foundDistinct = false;
 
     public ArgumentsVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
         this.config = config;
         this.prologue = prologue;
         this.services = services;
+        this.scopes = scopes;
         this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
     }
@@ -418,7 +446,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
-        return contexts.stream().map(new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages)::visit)
+        return contexts.stream()
+                .map(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)::visit)
                 .collect(toList());
     }
 
@@ -444,7 +473,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         if(ctx.var() != null)
         {
             List<Expression> result = new ArrayList<>();
-            result.add(new ExpressionVisitor(config, prologue, services, usedBlankNodes, messages).visit(ctx.var()));
+            result.add(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
+                    .visit(ctx.var()));
             return result;
         }
 
@@ -462,7 +492,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     @Override
     public List<Expression> visitAggregate(AggregateContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, usedBlankNodes,
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes,
                 messages);
 
         if(ctx.DISTINCT() != null)

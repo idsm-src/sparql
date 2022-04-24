@@ -30,12 +30,14 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Verb;
 class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 {
     private final Prologue prologue;
+    private final VariableScopes scopes;
     private final List<TranslateMessage> messages;
 
 
-    public PropertiesVisitor(Prologue prologue, List<TranslateMessage> messages)
+    public PropertiesVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
+        this.scopes = scopes;
         this.messages = messages;
     }
 
@@ -43,14 +45,16 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     private Verb parseVerb(VerbPathContext verbPathCtx, VerbSimpleContext verbSimpleCtx)
     {
         if(verbPathCtx == null && verbSimpleCtx == null)
-            return new Variable("");
+            return new Variable(scopes.addToScope(""), "");
 
         if(verbPathCtx != null)
         {
             return new PathVisitor(prologue, messages).visit(verbPathCtx.path());
         }
 
-        return withRange(new Variable(verbSimpleCtx.var().getText()), verbSimpleCtx);
+        return withRange(
+                new Variable(scopes.addToScope(verbSimpleCtx.var().getText()), verbSimpleCtx.var().getText()),
+                verbSimpleCtx);
     }
 
 
@@ -59,7 +63,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         if(ctx == null)
             return new LinkedList<ComplexNode>();
 
-        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, scopes, messages);
 
         return mapList(ctx.objectPath(), nodeVisitor::visit);
     }
@@ -70,7 +74,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         if(ctx == null)
             return new LinkedList<ComplexNode>();
 
-        NodeVisitor nodeVisitor = new NodeVisitor(prologue, messages);
+        NodeVisitor nodeVisitor = new NodeVisitor(prologue, scopes, messages);
 
         return mapList(ctx.object(), nodeVisitor::visit);
     }
@@ -102,7 +106,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     @Override
     public Stream<Property> visitPropertyListNotEmpty(PropertyListNotEmptyContext ctx)
     {
-        VerbVisitor verbVisitor = new VerbVisitor(prologue, messages);
+        VerbVisitor verbVisitor = new VerbVisitor(prologue, scopes, messages);
 
         List<Property> properties = new ArrayList<>();
 
@@ -132,12 +136,14 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 class VerbVisitor extends BaseVisitor<Verb>
 {
     private final Prologue prologue;
+    private final VariableScopes scopes;
     private final List<TranslateMessage> messages;
 
 
-    public VerbVisitor(Prologue prologue, List<TranslateMessage> messages)
+    public VerbVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
+        this.scopes = scopes;
         this.messages = messages;
     }
 
@@ -155,7 +161,7 @@ class VerbVisitor extends BaseVisitor<Verb>
     @Override
     public Variable visitVar(VarContext ctx)
     {
-        return new Variable(ctx.getText());
+        return new Variable(scopes.addToScope(ctx.getText()), ctx.getText());
     }
 
 

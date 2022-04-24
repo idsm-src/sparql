@@ -171,7 +171,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         prologue = askQuery.getPrologue();
         datasets = askQuery.getSelect().getDataSets();
 
-        Variable variable = new Variable("@ask");
+        Variable variable = new Variable(null, "@ask");
 
         LinkedHashSet<String> variablesInScope = new LinkedHashSet<String>();
         variablesInScope.add(variable.getName());
@@ -190,9 +190,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         prologue = describeQuery.getPrologue();
         datasets = describeQuery.getSelect().getDataSets();
 
-        Variable subject = new Variable("@subject");
-        Variable predicate = new Variable("@predikate");
-        Variable object = new Variable("@object");
+        Variable subject = new Variable(null, "@subject");
+        Variable predicate = new Variable(null, "@predikate");
+        Variable object = new Variable(null, "@object");
 
         Set<String> restrictions = new LinkedHashSet<String>();
         restrictions.add(subject.getSqlName());
@@ -365,7 +365,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(select.isInAggregateMode())
         {
-            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor();
+            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor(this);
 
             List<Filter> havingConditions = select.getHavingConditions().stream()
                     .map(e -> new Filter(rewriter.visitElement(e))).collect(toList());
@@ -572,7 +572,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         VarOrIri graphVariable = graph.getName();
 
         if(rename)
-            graphVariable = new Variable("@graph" + ((Variable) graphVariable).getName());
+            graphVariable = createVariable("@graph");
 
         graphRestrictions.push(graphVariable);
 
@@ -680,7 +680,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             lines.add(line);
         }
 
-        return SqlValues.create(variables, lines);
+        return SqlValues.create(values.getVariables().stream().map(v -> v.getSqlName()).collect(toList()), lines);
     }
 
 
@@ -1785,7 +1785,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     protected Variable createVariable(String prefix)
     {
-        return new Variable(prefix + variableId++);
+        return new Variable(null, prefix + variableId++);
     }
 
 
