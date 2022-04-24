@@ -75,6 +75,9 @@ public class Pathway
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:lipidmaps-pathway", "reference"),
                     config.createAreEqualCondition("reference_type", "'LIPIDMAPS'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
+                    config.createIriMapping("reference:pantherdb-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PANTHERDB'::pubchem.pathway_reference_type"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),

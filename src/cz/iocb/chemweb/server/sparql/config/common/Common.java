@@ -140,6 +140,8 @@ public class Common
         config.addIriClass(new StringUserIriClass("reference:lipidmaps-pathway",
                 "http://www.lipidmaps.org/data/IntegratedPathwaysData/SetupIntegratedPathways.pl?imgsize=730&Mode=BMDMATPS11&DataType=",
                 ".*"));
+        config.addIriClass(new StringUserIriClass("reference:pantherdb-pathway",
+                "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=", "P[0-9]{5}"));
     }
 
 
