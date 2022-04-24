@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
+import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
@@ -50,6 +51,15 @@ public class Compound
                     config.createIriMapping("pubchem:compound", "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdString, "molfile"));
+        }
+
+        {
+            Table table = new Table(schema, "compound_titles");
+            NodeMapping subject = config.createIriMapping("pubchem:compound", "compound");
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
+                    config.createLiteralMapping(rdfLangStringEn, "title"));
         }
 
         {
@@ -163,7 +173,8 @@ public class Compound
                     config.createIriMapping("pubchem:mono_isotopic_weight", "compound"),
                     config.createIsNotNullCondition("mono_isotopic_weight"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
-                    config.createIriMapping("pubchem:xlogp3_aa", "compound"), config.createIsNotNullCondition("xlogp3_aa"));
+                    config.createIriMapping("pubchem:xlogp3_aa", "compound"),
+                    config.createIsNotNullCondition("xlogp3_aa"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:xlogp3", "compound"), config.createIsNotNullCondition("xlogp3"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
