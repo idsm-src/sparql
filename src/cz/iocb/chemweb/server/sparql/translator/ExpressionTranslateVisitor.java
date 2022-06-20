@@ -155,8 +155,19 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         if(function.equalsIgnoreCase("iri") || function.equalsIgnoreCase("uri"))
             arguments.add(SqlIri.create(prologue.getBase()));
 
-        if(function.equalsIgnoreCase("count") && builtInCallExpression.isDistinct() && arguments.size() == 0)
-            variables.getValues().stream().forEach(v -> arguments.add(SqlVariable.create(v.getName(), variables)));
+        if(function.equalsIgnoreCase("count") && arguments.size() == 0)
+        {
+            if(builtInCallExpression.isDistinct())
+            {
+                //FIXME: use better approach to detect in-scope variables
+                //TODO: filter out group by variables
+                for(UsedVariable variable : variables.getValues())
+                    if(!variable.getName().startsWith("@"))
+                        arguments.add(SqlVariable.create(variable.getName(), variables));
+            }
+
+            return SqlBuiltinCall.create("card", builtInCallExpression.isDistinct(), arguments);
+        }
 
         return SqlBuiltinCall.create(function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
     }

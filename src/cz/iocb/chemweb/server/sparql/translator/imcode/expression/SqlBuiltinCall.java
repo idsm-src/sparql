@@ -77,9 +77,16 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         switch(function)
         {
             // aggregate functions
+            case "card":
+            {
+                return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdInteger), false);
+            }
+
             case "count":
             {
-                if(!arguments.isEmpty() && arguments.stream().allMatch(r -> r == SqlNull.get()))
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(argument == SqlNull.get())
                     return SqlLiteral.create(new Literal("0", xsdIntegerType));
 
                 return new SqlBuiltinCall(function, distinct, arguments, asSet(xsdInteger), false);
@@ -737,9 +744,39 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         switch(function)
         {
             // aggregate functions
+            case "card":
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.append("count(");
+
+                if(distinct)
+                    builder.append("DISTINCT ");
+
+                Set<Column> columns = new HashSet<Column>();
+
+                for(int i = 0; i < arguments.size(); i++)
+                    columns.addAll(((SqlVariable) arguments.get(i)).getUsedVariable().getNonConstantColumns());
+
+                if(columns.size() > 1)
+                    builder.append("row(");
+
+                if(columns.size() > 0)
+                    builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+                else
+                    builder.append("1");
+
+                if(columns.size() > 1)
+                    builder.append(")");
+
+                builder.append(")::decimal");
+
+                return builder.toString();
+            }
+
             case "count":
             {
-                boolean allCanBeNull = arguments.stream().allMatch(a -> a.canBeNull());
+                SqlExpressionIntercode argument = arguments.get(0);
 
                 StringBuilder builder = new StringBuilder();
 
@@ -748,22 +785,19 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(distinct)
                     builder.append("DISTINCT ");
 
-                if(arguments.size() == 0 || !allCanBeNull && !distinct)
+                if(!argument.canBeNull() && !distinct)
                 {
                     builder.append("1");
                 }
-                else if(arguments.size() == 1 && !(arguments.get(0) instanceof SqlVariable))
+                else if(!(argument instanceof SqlVariable))
                 {
-                    builder.append(arguments.get(0).translate());
+                    builder.append(argument.translate());
                 }
                 else
                 {
-                    Set<Column> columns = new HashSet<Column>();
+                    Set<Column> columns = ((SqlVariable) argument).getUsedVariable().getNonConstantColumns();
 
-                    for(int i = 0; i < arguments.size(); i++)
-                        columns.addAll(((SqlVariable) arguments.get(i)).getUsedVariable().getNonConstantColumns());
-
-                    if(allCanBeNull && columns.size() > 1)
+                    if(argument.canBeNull() && columns.size() > 1)
                     {
                         builder.append("CASE WHEN ");
                         builder.append(columns.stream().map(c -> c + " IS NOT NULL").collect(joining(" OR ")));
@@ -781,7 +815,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     if(columns.size() > 1)
                         builder.append(")");
 
-                    if(allCanBeNull && columns.size() > 1)
+                    if(argument.canBeNull() && columns.size() > 1)
                         builder.append(" END");
                 }
 
