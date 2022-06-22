@@ -54,14 +54,6 @@ public class SqlProcedureCall extends SqlIntercode
             LinkedHashMap<ParameterDefinition, Node> parameters,
             LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child)
     {
-        return create(procedure, parameters, results, child, null);
-    }
-
-
-    protected static SqlIntercode create(ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters,
-            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child, Set<String> restrictions)
-    {
         UsedVariables callVariables = new UsedVariables();
 
         for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
@@ -135,6 +127,13 @@ public class SqlProcedureCall extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        LinkedHashMap<ResultDefinition, VariableOrBlankNode> restrictedResults = new LinkedHashMap<>();
+
+        for(Entry<ResultDefinition, VariableOrBlankNode> result : results.entrySet())
+            if(restrictions.contains(result.getValue().getSqlName()))
+                restrictedResults.put(result.getKey(), result.getValue());
+
+
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
         for(Node paramater : parameters.values())
@@ -144,7 +143,8 @@ public class SqlProcedureCall extends SqlIntercode
         //FIXME: is procedure deterministic?
         SqlIntercode optimized = child.optimize(childRestrictions, reduced);
 
-        return create(procedure, parameters, results, optimized, restrictions);
+
+        return create(procedure, parameters, restrictedResults, optimized);
     }
 
 
