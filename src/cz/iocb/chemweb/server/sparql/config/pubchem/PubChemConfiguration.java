@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import java.sql.SQLException;
 import javax.sql.DataSource;
@@ -173,9 +174,10 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
         /* fulltext:compoundSearch */
         ProcedureDefinition compoundSearch = new ProcedureDefinition(fulltext + "compoundSearch",
-                new Function("pubchem", "compound"));
+                new Function("pubchem", "compound_fulltext"));
         compoundSearch.addParameter(new ParameterDefinition(fulltext + "query", xsdString, null));
         compoundSearch.addResult(new ResultDefinition(fulltext + "compound", compound, "compound"));
+        compoundSearch.addResult(new ResultDefinition(fulltext + "score", xsdFloat, "score"));
         compoundSearch.addResult(new ResultDefinition(fulltext + "name", rdfLangStringEn, "name"));
         addProcedure(compoundSearch);
     }
