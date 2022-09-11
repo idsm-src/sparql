@@ -92,6 +92,7 @@ public class EndpointServlet extends HttpServlet
 
     private Engine engine;
     private SparqlDatabaseConfiguration sparqlConfig;
+    private int fetchSize = 1000;
     private long timeout = 1000 * 1000000000l;
     private int processLimit = 100000000;
 
@@ -106,15 +107,24 @@ public class EndpointServlet extends HttpServlet
             if(resourceName == null || resourceName.isEmpty())
                 throw new IllegalArgumentException("resource name is not set");
 
+
+            String fetchSizeValue = config.getInitParameter("fetch-size");
+
+            if(fetchSizeValue != null)
+                fetchSize = Integer.parseInt(fetchSizeValue);
+
+
             String timeoutValue = config.getInitParameter("timeout");
 
             if(timeoutValue != null)
                 timeout = Integer.parseInt(timeoutValue) * 1000000000l;
 
+
             String limitValue = config.getInitParameter("limit");
 
             if(limitValue != null)
                 processLimit = Integer.parseInt(limitValue);
+
 
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
             sparqlConfig = (SparqlDatabaseConfiguration) context.lookup(resourceName);
@@ -240,7 +250,7 @@ public class EndpointServlet extends HttpServlet
 
             try(Request request = engine.getRequest())
             {
-                try(Result result = request.execute(query, dataSets, 0, limit, timeout))
+                try(Result result = request.execute(query, dataSets, 0, limit, fetchSize, timeout))
                 {
                     OutputType format = detectOutputType(req, result.getResultType());
                     res.setContentType(format.getMime());

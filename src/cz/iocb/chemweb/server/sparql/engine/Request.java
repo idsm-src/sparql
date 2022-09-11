@@ -38,7 +38,6 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlQuery;
 public class Request implements AutoCloseable
 {
     private static ThreadLocal<Request> requests = new ThreadLocal<Request>();
-    private static int fetchSize = 1000;
 
     private final SparqlDatabaseConfiguration config;
 
@@ -49,6 +48,7 @@ public class Request implements AutoCloseable
 
     private long begin;
     private long timeout;
+    private int fetchSize;
     private boolean canceled;
 
 
@@ -111,7 +111,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, long timeout)
+    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
             throws TranslateExceptions, SQLException
     {
         Request previous = requests.get();
@@ -136,6 +136,7 @@ public class Request implements AutoCloseable
             syntaxTree.getSelect().setDataSets(dataSets);
 
 
+        this.fetchSize = fetchSize;
         this.timeout = timeout;
         this.begin = System.nanoTime();
 
@@ -213,19 +214,19 @@ public class Request implements AutoCloseable
 
     public Result execute(String query) throws TranslateExceptions, SQLException
     {
-        return execute(query, null, 0, -1, 0);
+        return execute(query, null, 0, -1, 0, 0);
     }
 
 
     public Result execute(String query, List<DataSet> dataSets) throws TranslateExceptions, SQLException
     {
-        return execute(query, dataSets, 0, -1, 0);
+        return execute(query, dataSets, 0, -1, 0, 0);
     }
 
 
     public Result execute(String query, int offset, int limit, long timeout) throws TranslateExceptions, SQLException
     {
-        return execute(query, null, offset, limit, timeout);
+        return execute(query, null, offset, limit, 0, timeout);
     }
 
 
