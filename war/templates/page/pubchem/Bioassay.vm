@@ -27,7 +27,7 @@
   #sparql($description)
     SELECT ?VALUE FROM pubchem:bioassay WHERE
     {
-      <${uri}_Description> sio:has-value ?VALUE
+      <${uri}_Description> sio:SIO_000300 ?VALUE
     }
   #end
 
@@ -42,7 +42,7 @@
   #sparql($protocol)
     SELECT ?VALUE FROM pubchem:bioassay WHERE
     {
-      <${uri}_Protocol> sio:has-value ?VALUE
+      <${uri}_Protocol> sio:SIO_000300 ?VALUE
     }
   #end
 
@@ -57,7 +57,7 @@
   #sparql($comment)
     SELECT ?VALUE FROM pubchem:bioassay WHERE
     {
-      <${uri}_Comment> sio:has-value ?VALUE
+      <${uri}_Comment> sio:SIO_000300 ?VALUE
     }
   #end
 

@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
@@ -38,8 +38,12 @@ public class Synonym
             Table table = new Table(schema, "synonym_values");
             NodeMapping subject = config.createIriMapping("pubchem:synonym", "synonym");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "value"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
-                    config.createLiteralMapping(rdfLangStringEn, "value"));
+                    config.createLiteralMapping(xsdString, "value"));
         }
 
         {
@@ -54,6 +58,10 @@ public class Synonym
             Table table = new Table(schema, "synonym_compounds");
             NodeMapping subject = config.createIriMapping("pubchem:synonym", "synonym");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
+                    config.createIriMapping("pubchem:compound", "compound"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:compound", "compound"));
         }

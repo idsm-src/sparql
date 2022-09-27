@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.Arrays.asList;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
@@ -47,18 +47,38 @@ public class Endpoint
             Table table = new Table(schema, "endpoint_measurements");
             NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000221"),
+                    config.createIriMapping("obo:UO_0000064"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-unit"),
                     config.createIriMapping("obo:UO_0000064"));
+        }
+
+        {
+            Table table = new Table(schema, "endpoint_measurement_types");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology:resource", Ontology.unitBAO, "type_id"));
+        }
+
+        {
+            Table table = new Table(schema, "endpoint_measurement_labels");
+            NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
+
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
-                    config.createLiteralMapping(rdfLangStringEn, "label"));
+                    config.createLiteralMapping(xsdString, "label"));
         }
 
         {
             Table table = new Table(schema, "endpoint_measurement_values");
             NodeMapping subject = config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
+                    config.createLiteralMapping(xsdFloat, "value"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(xsdFloat, "value"));
         }

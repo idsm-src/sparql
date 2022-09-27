@@ -10,7 +10,7 @@
 #sparql($organism)
   SELECT ?NAME FROM pubchem:protein FROM dataset:ontology WHERE
   {
-    $entity bp:organism / rdfs:label ?NAME
+    $entity up:organism / rdfs:label ?NAME
   }
 #end
 

@@ -27,10 +27,16 @@ public class Common
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
+        config.addIriClass(new IntegerUserIriClass("pubchem:taxonomy", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/taxonomy/TAXID"));
+        config.addIriClass(
+                new IntegerUserIriClass("pubchem:cell", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/cell/CELLID"));
+        config.addIriClass(new StringUserIriClass("pubchem:patent", "http://rdf.ncbi.nlm.nih.gov/pubchem/patent/"));
+
+        config.addIriClass(new IntegerUserIriClass("ncbi:gene", "integer", "https://www.ncbi.nlm.nih.gov/gene/"));
         config.addIriClass(new StringUserIriClass("ncbi:protein", "https://www.ncbi.nlm.nih.gov/protein/"));
-        config.addIriClass(new IntegerUserIriClass("ncbi:taxonomy", "integer",
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/taxonomy/TAXID", 0));
         config.addIriClass(new StringUserIriClass("purl:uniprot", "http://purl.uniprot.org/uniprot/"));
+        config.addIriClass(new StringUserIriClass("purl:enzyme", "http://purl.uniprot.org/enzyme/"));
 
         config.addIriClass(new IntegerUserIriClass("linkedchemistry:chembl", "integer",
                 "http://linkedchemistry.info/chembl/chemblid/CHEMBL"));
@@ -142,6 +148,29 @@ public class Common
                 ".*"));
         config.addIriClass(new StringUserIriClass("reference:pantherdb-pathway",
                 "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=", "P[0-9]{5}"));
+
+        config.addIriClass(
+                new IntegerUserIriClass("ctdbase:gene", "integer", "https://ctdbase.org/detail.go?type=gene&acc="));
+        config.addIriClass(new StringUserIriClass("expasy:enzyme", "https://enzyme.expasy.org/EC/"));
+        config.addIriClass(new StringUserIriClass("medlineplus:gene", "https://medlineplus.gov/genetics/gene/"));
+        config.addIriClass(new IntegerUserIriClass("omim:entry", "integer", "https://omim.org/entry/"));
+        config.addIriClass(new StringUserIriClass("alliancegenome:gene", "https://www.alliancegenome.org/gene/"));
+        config.addIriClass(new IntegerUserIriClass("genenames:gene", "integer",
+                "https://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=HGNC:"));
+        config.addIriClass(new StringUserIriClass("kegg:entry", "https://www.kegg.jp/entry/"));
+
+        config.addIriClass(new IntegerUserIriClass("guidetopharmacology:target", "integer",
+                "https://guidetopharmacology.org/GRAC/ObjectDisplayForward?objectId="));
+        config.addIriClass(new IntegerUserIriClass("drugbank:bio_entities", "integer",
+                "https://www.drugbank.ca/bio_entities/BE", 7));
+        config.addIriClass(new IntegerUserIriClass("chembl:target_report_card", "integer",
+                "https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL"));
+        config.addIriClass(new StringUserIriClass("glygen:protein", "https://glygen.org/protein/"));
+        config.addIriClass(
+                new StringUserIriClass("glycosmos:glycoproteins", "https://glycosmos.org/glycoproteins/show/uniprot/"));
+        config.addIriClass(new StringUserIriClass("alphafold:entry", "https://alphafold.ebi.ac.uk/entry/"));
+
+        config.addIriClass(new IntegerUserIriClass("pfam:family", "integer", "https://pfam.xfam.org/family/PF"));
     }
 
 

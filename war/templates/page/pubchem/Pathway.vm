@@ -30,7 +30,7 @@
   #sparql($organism)
     SELECT ?NAME FROM pubchem:pathway FROM dataset:ontology WHERE
     {
-      $entity bp:organism / rdfs:label ?NAME
+      $entity up:organism / rdfs:label ?NAME
     }
   #end
 
@@ -61,7 +61,7 @@
 
       OPTIONAL
       {
-        ?COMPONENT bp:organism / rdfs:label ?ORGANISM
+        ?COMPONENT up:organism / rdfs:label ?ORGANISM
       }
     }
     ORDER BY (?COMPONENT)

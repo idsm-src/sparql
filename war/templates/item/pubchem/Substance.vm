@@ -13,7 +13,7 @@
   #sparql($value)
     SELECT ?VALUE FROM descriptor:compound WHERE
     {
-      descriptor:CID${CID}_Preferred_IUPAC_Name sio:has-value ?VALUE
+      descriptor:CID${CID}_Preferred_IUPAC_Name sio:SIO_000300 ?VALUE
     }
   #end
 
@@ -21,8 +21,8 @@
     SELECT (true as ?R) WHERE
     {
       ?S rdf:type sio:SIO_011120.
-      ?S sio:is-attribute-of compound:CID$CID.
-      ?S sio:has-value ?V.
+      ?S sio:SIO_000011 compound:CID$CID.
+      ?S sio:SIO_000300 ?V.
     }
   #end
 #end

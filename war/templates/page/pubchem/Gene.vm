@@ -14,21 +14,21 @@
   #sparql($symbol)
     SELECT ?SYMBOL FROM pubchem:gene WHERE
     {
-      $entity sio:gene-symbol ?SYMBOL
+      $entity bao:BAO_0002870 ?SYMBOL
     }
   #end
 
   #sparql($title)
     SELECT ?TITLE FROM pubchem:gene WHERE
     {
-      $entity dcterms:title ?TITLE
+      $entity skos:prefLabel ?TITLE
     }
   #end
 
   #sparql($organism)
     SELECT ?NAME FROM pubchem:gene FROM dataset:ontology WHERE
     {
-      $entity bp:organism / rdfs:label ?NAME
+      $entity up:organism / rdfs:label ?NAME
     }
   #end
 
@@ -48,7 +48,7 @@
   #sparql($alternatives)
     SELECT ?TITLE FROM pubchem:gene WHERE
     {
-      $entity dcterms:alternative $TITLE
+      $entity skos:altLabel $TITLE
     }
   #end
 
@@ -79,7 +79,7 @@
 
       OPTIONAL
       {
-        ?PATHWAY bp:organism / rdfs:label ?ORGANISM
+        ?PATHWAY up:organism / rdfs:label ?ORGANISM
       }
     }
   #end

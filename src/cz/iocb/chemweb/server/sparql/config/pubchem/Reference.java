@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.xsdDateM4;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
@@ -32,11 +32,11 @@ public class Reference
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology:resource", Ontology.unitUncategorized, "type_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(rdfLangStringEn, "title"));
+                    config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:date"),
                     config.createLiteralMapping(xsdDateM4, "dcdate"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:bibliographicCitation"),
-                    config.createLiteralMapping(rdfLangStringEn, "citation"));
+                    config.createLiteralMapping(xsdString, "citation"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),

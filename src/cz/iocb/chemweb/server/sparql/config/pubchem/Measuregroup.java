@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.Arrays.asList;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
@@ -34,7 +34,7 @@ public class Measuregroup
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("pubchem:source", "source"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(rdfLangStringEn, "title"));
+                    config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
                     config.createIriMapping("bao:BAO_0000209"), subject);
 
@@ -65,6 +65,22 @@ public class Measuregroup
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
                     config.createIriMapping("pubchem:protein", "protein"));
+        }
+
+        {
+            Table table = new Table(schema, "measuregroup_taxonomies");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
+                    config.createIriMapping("pubchem:taxonomy", "taxonomy"));
+        }
+
+        {
+            Table table = new Table(schema, "measuregroup_cells");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
+                    config.createIriMapping("pubchem:cell", "cell"));
         }
     }
 }

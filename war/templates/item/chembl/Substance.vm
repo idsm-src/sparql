@@ -4,8 +4,8 @@
   SELECT (true as ?R) WHERE
   {
     ?S rdf:type sio:SIO_011120.
-    ?S sio:is-attribute-of $entity.
-    ?S sio:has-value ?V.
+    ?S sio:SIO_000011 $entity.
+    ?S sio:SIO_000300 ?V.
   }
 #end
 

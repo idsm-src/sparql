@@ -102,6 +102,10 @@ public class Substance
             Table table = new Table(schema, "substance_synonyms");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
+                    config.createIriMapping("pubchem:synonym", "synonym"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:synonym", "synonym"));
         }
@@ -110,6 +114,10 @@ public class Substance
             Table table = new Table(schema, "descriptor_substance_bases");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
+                    config.createIriMapping("pubchem:substance_version", "substance"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:substance_version", "substance"));
         }

@@ -3,7 +3,7 @@
 #sparql($data)
   SELECT ?VALUE FROM descriptor:compound WHERE
   {
-    $entity sio:has-value ?VALUE.
+    $entity sio:SIO_000300 ?VALUE.
   }
 #end
 

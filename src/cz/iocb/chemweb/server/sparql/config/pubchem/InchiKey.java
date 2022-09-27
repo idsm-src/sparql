@@ -31,6 +31,10 @@ public class InchiKey
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:CHEMINF_000399"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
+                    config.createLiteralMapping(rdfLangStringEn, "inchikey"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),
                     config.createLiteralMapping(rdfLangStringEn, "inchikey"));
         }
@@ -39,6 +43,10 @@ public class InchiKey
             Table table = new Table(schema, "inchikey_compounds");
             NodeMapping subject = config.createIriMapping("pubchem:inchikey", "inchikey");
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
+                    config.createIriMapping("pubchem:compound", "compound"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:compound", "compound"));
         }

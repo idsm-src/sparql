@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
@@ -32,11 +32,56 @@ public class Pathway
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Pathway"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(rdfLangStringEn, "title"));
+                    config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:source"),
                     config.createIriMapping("pubchem:source", "source"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
+                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:pathbank-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PATHBANK'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:biocyc-image-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'BIOCYC_IMAGE'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("identifiers:reactome", "reference"),
+                    config.createAreEqualCondition("reference_type", "'REACTOME'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("identifiers:wikipathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'WIKIPATHWAY'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:biocyc-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'BIOCYC'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:plantcyc-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PLANTCYC'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:pid-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PID'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:inoh-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'INOH'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:plantreactome-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type",
+                            "'PLANTREACTOME'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:pharmgkb-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PHARMGKB'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:fairdomhub-model", "reference"),
+                    config.createAreEqualCondition("reference_type", "'FAIRDOMHUB'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:lipidmaps-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'LIPIDMAPS'::pubchem.pathway_reference_type"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("reference:pantherdb-pathway", "reference"),
+                    config.createAreEqualCondition("reference_type", "'PANTHERDB'::pubchem.pathway_reference_type"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ncbi:taxonomy", "organism_id"));
+                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("reference:pathbank-pathway", "reference"),
@@ -84,6 +129,10 @@ public class Pathway
                     config.createLiteralMapping("pubchem/Pathway.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Pathway.vm"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
+
+            // deprecated extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
                     config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
         }

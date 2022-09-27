@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.pubchem;
 
-import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
@@ -41,9 +41,9 @@ public class Source
             config.addQuadMapping(table, graph, subject, config.createIriMapping("foaf:homepage"),
                     config.createIriMapping("pubchem:source-homepage", "homepage"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
-                    config.createLiteralMapping(rdfLangStringEn, "title"));
+                    config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:rights"),
-                    config.createLiteralMapping(rdfLangStringEn, "rights"));
+                    config.createLiteralMapping(xsdString, "rights"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
@@ -63,7 +63,7 @@ public class Source
             NodeMapping subject = config.createIriMapping("pubchem:source", "source");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:alternative"),
-                    config.createLiteralMapping(rdfLangStringEn, "alternative"));
+                    config.createLiteralMapping(xsdString, "alternative"));
         }
     }
 }

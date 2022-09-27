@@ -19,10 +19,10 @@ WHERE
      obo:RO_0000056 ?mg.
   ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein.
+  ?protein rdf:type sio:SIO_010043.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
-    sio:has-value ?value.
+    sio:SIO_000300 ?value.
 
   filter (?value < 10)
 }
@@ -72,9 +72,9 @@ WHERE
     a owl:Restriction;
     owl:onProperty obo:RO_0000087;
     owl:someValuesFrom obo:CHEBI_35475 ].
-  ?compound sio:has-attribute ?MW.
+  ?compound sio:SIO_000008 ?MW.
   ?MW rdf:type sio:CHEMINF_000334.
-  ?MW sio:has-value ?MWValue.
+  ?MW sio:SIO_000300 ?MWValue.
 
   filter (?MWValue < 250)
 }
@@ -130,10 +130,10 @@ WHERE
     obo:RO_0000056 ?mg.
   ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein.
+  ?protein rdf:type sio:SIO_010043.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
-    sio:has-value ?value.
+    sio:SIO_000300 ?value.
 
   filter (?value < 10)
 }
@@ -163,7 +163,7 @@ WHERE
   ?measuregroup obo:OBI_0000299 ?endpoint.
   ?endpoint obo:IAO_0000136 ?substance.
   ?endpoint rdf:type bao:BAO_0000190.
-  ?endpoint sio:has-value ?value.
+  ?endpoint sio:SIO_000300 ?value.
 }
     ]]></code>
   </example>
@@ -187,10 +187,10 @@ WHERE
     obo:RO_0000056 ?mg.
   ?mg obo:RO_0000057 ?protein;
     obo:OBI_0000299 ?ep.
-  ?protein rdf:type bp:Protein.
+  ?protein rdf:type sio:SIO_010043.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
-    sio:has-value ?value.
+    sio:SIO_000300 ?value.
 
   filter (?value < 10)
 }
@@ -216,14 +216,14 @@ WHERE
 {
   ?substance obo:RO_0000056 ?measuregroup.
   ?measuregroup obo:RO_0000057 ?protein.
-  ?protein rdf:type bp:Protein.
+  ?protein rdf:type sio:SIO_010043.
   ?protein up:encodedBy ?gene .
-  ?gene rdf:type bp:Gene .
+  ?gene rdf:type sio:SIO_010035 .
   ?gene obo:RO_0000056 obo:GO_0001516 .
   ?measuregroup obo:OBI_0000299 ?endpoint.
   ?endpoint obo:IAO_0000136 ?substance.
   ?endpoint rdf:type bao:BAO_0000190.
-  ?endpoint sio:has-value ?value.
+  ?endpoint sio:SIO_000300 ?value.
 
   filter (?value < 10)
 }
@@ -255,7 +255,7 @@ WHERE
     owl:someValuesFrom ?role ].
   ?ep obo:IAO_0000136 ?sub;
     rdf:type bao:BAO_0000190;
-    sio:has-value ?value.
+    sio:SIO_000300 ?value.
 
   filter (?value < 10)
 }
@@ -279,11 +279,11 @@ WHERE
 {
   ?sub obo:RO_0000056 ?mg.
   ?mg obo:RO_0000057 ?protein.
-  ?protein rdf:type bp:Protein.
+  ?protein rdf:type sio:SIO_010043.
   ?mg obo:OBI_0000299 ?ep.
   ?ep rdf:type bao:BAO_0000190;
     obo:IAO_0000136 ?sub;
-    sio:has-value ?value.
+    sio:SIO_000300 ?value.
 }
 GROUP BY ?protein
 ORDER BY DESC(count(?sub))

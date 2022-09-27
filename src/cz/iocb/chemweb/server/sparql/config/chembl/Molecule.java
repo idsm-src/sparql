@@ -582,6 +582,12 @@ public class Molecule
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_011120"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
+                    config.createIriMapping("chembl:compound", "id"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "molfile"));
+
+            // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("chembl:compound", "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-value"),

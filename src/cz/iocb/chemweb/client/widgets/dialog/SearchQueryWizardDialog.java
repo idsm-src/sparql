@@ -735,16 +735,18 @@ public class SearchQueryWizardDialog extends DialogBox
 
             if(geneCheckBox.getValue() && !proteinCheckBox.getValue())
             {
-                query.append("\n  ?PARTICIPANT rdf:type bp:Gene.");
+                query.append("\n  ?PARTICIPANT rdf:type sio:SIO_010035.");
             }
             else if(!geneCheckBox.getValue() && proteinCheckBox.getValue())
             {
+                //FIXME: se another type instead of bp:Protein
                 query.append("\n  ?PARTICIPANT rdf:type bp:Protein.");
             }
             else if(!searchCompounds && !searchBioassays)
             {
+                //FIXME: se another type instead of bp:Protein
                 query.append("\n  ?PARTICIPANT rdf:type ?PARTICIPANT_TYPE.");
-                query.append("\n  FILTER(?PARTICIPANT_TYPE in (bp:Gene, bp:Protein))");
+                query.append("\n  FILTER(?PARTICIPANT_TYPE in (sio:SIO_010035, bp:Protein))");
             }
 
             if(!participantTextBox.getValue().trim().isEmpty())
