@@ -13,6 +13,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
 
 public class Target
 {
+    private static String targetRelationshipType = schema + ".target_relationship_type";
+
+
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new IntegerUserIriClass("chembl:target", "integer",
@@ -137,16 +140,16 @@ public class Target
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relOverlapsWith"),
                     config.createIriMapping("chembl:target", "related_target_id"),
-                    config.createAreEqualCondition("relationship", "'OVERLAPS WITH'::chembl.target_relationship_type"));
+                    config.createAreEqualCondition("relationship", "'OVERLAPS WITH'::" + targetRelationshipType));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relSubsetOf"),
                     config.createIriMapping("chembl:target", "related_target_id"),
-                    config.createAreEqualCondition("relationship", "'SUBSET OF'::chembl.target_relationship_type"));
+                    config.createAreEqualCondition("relationship", "'SUBSET OF'::" + targetRelationshipType));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relHasSubset"),
                     config.createIriMapping("chembl:target", "related_target_id"),
-                    config.createAreEqualCondition("relationship", "'SUPERSET OF'::chembl.target_relationship_type"));
+                    config.createAreEqualCondition("relationship", "'SUPERSET OF'::" + targetRelationshipType));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:relEquivalentTo"),
                     config.createIriMapping("chembl:target", "related_target_id"),
-                    config.createAreEqualCondition("relationship", "'EQUIVALENT TO'::chembl.target_relationship_type"));
+                    config.createAreEqualCondition("relationship", "'EQUIVALENT TO'::" + targetRelationshipType));
         }
 
         {

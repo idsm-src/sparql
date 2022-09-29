@@ -60,8 +60,6 @@ public class Common
                 "R-[A-Z]{3}-[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("identifiers:ec-code", "http://identifiers.org/ec-code/",
                 "((-|[1-9][0-9]*)\\.){3}(-|n?[1-9][0-9]*)"));
-        config.addIriClass(
-                new StringUserIriClass("identifiers:ensembl", "http://identifiers.org/ensembl/", "ENSG[0-9]{11}"));
         config.addIriClass(new StringUserIriClass("identifiers:lincs.smallmolecule",
                 "http://identifiers.org/lincs.smallmolecule/", "LSM-[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("identifiers:mesh", "http://identifiers.org/mesh/",
@@ -95,8 +93,6 @@ public class Common
         config.addIriClass(new StringUserIriClass("reference:emolecules",
                 "https://www.emolecules.com/cgi-bin/more?vid=", "[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("reference:mcule", "https://mcule.com/", "MCULE-[1-9][0-9]*"));
-        config.addIriClass(new StringUserIriClass("reference:ibm_patent_structure",
-                "http://www-935.ibm.com/services/us/gbs/bao/siip/nih/?sid=", "[A-F0-9]+"));
         config.addIriClass(new StringUserIriClass("reference:nikkaji",
                 "http://jglobal.jst.go.jp/en/redirect?Nikkaji_No=", "[A-Z0-9.]+"));
         config.addIriClass(new StringUserIriClass("reference:actor", "http://actor.epa.gov/actor/chemical.xhtml?casrn=",
@@ -122,7 +118,7 @@ public class Common
         config.addIriClass(new StringUserIriClass("reference:recon", "https://vmh.uni.lu/#metabolite/", "[^/]+"));
         config.addIriClass(new StringUserIriClass("reference:wikipedia", "http://en.wikipedia.org/wiki/", ".+"));
         config.addIriClass(new StringUserIriClass("reference:fda_srs",
-                "http://fdasis.nlm.nih.gov/srs/ProxyServlet?mergeData=true&objectHandle=DBMaint&APPLICATION_NAME=fdasrs&actionHandle=default&nextPage=jsp/srs/ResultScreen.jsp&TXTSUPERLISTID=",
+                "https://fdasis.nlm.nih.gov/srs/ProxyServlet?mergeData=true&objectHandle=DBMaint&APPLICATION_NAME=fdasrs&actionHandle=default&nextPage=jsp/srs/ResultScreen.jsp&TXTSUPERLISTID=",
                 "[A-Z0-9]{10}"));
 
         config.addIriClass(

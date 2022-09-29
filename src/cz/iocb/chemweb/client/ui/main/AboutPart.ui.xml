@@ -93,8 +93,8 @@
               <tr><td>PubChem Compounds</td><td>111,895,158</td></tr>
               <tr><td>PubChem BioAssays</td><td>1,506,766</td></tr>
 
-              <tr><td>ChEMBL Substances</td><td>2,105,464</td></tr>
-              <tr><td>ChEMBL Assays</td><td>1,383,553</td></tr>
+              <tr><td>ChEMBL Substances</td><td>2,331,700</td></tr>
+              <tr><td>ChEMBL Assays</td><td>1,498,681</td></tr>
 
               <tr><td>ChEBI Entities</td><td>156,098</td></tr>
             </table>
@@ -106,7 +106,7 @@
           <div>
             <ul>
               <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a>: 2022-09-14</li>
-              <li><a href="https://www.ebi.ac.uk/chembl/" target="_blank">ChEMBL</a>: 29</li>
+              <li><a href="https://www.ebi.ac.uk/chembl/" target="_blank">ChEMBL</a>: 31</li>
               <li><a href="https://www.ebi.ac.uk/chebi/" target="_blank">ChEBI Ontology</a>: 198</li>
               <li><a href="https://id.nlm.nih.gov/mesh/" target="_blank">Medical Subject Headings (MESH)</a>: 2021-04-03</li>
               <li><a href="http://bioassayontology.org/bioassayontology/" target="_blank">BioAssay Ontology (BAO)</a>: 2.7</li>

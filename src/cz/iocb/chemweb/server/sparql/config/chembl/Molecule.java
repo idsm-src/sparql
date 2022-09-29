@@ -21,8 +21,8 @@ public class Molecule
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL"));
         config.addIriClass(new IntegerUserIriClass("chembl:molfile", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "_Molfile"));
-        config.addIriClass(new IntegerUserIriClass("chembl:displayimage", "integer",
-                "https://www.ebi.ac.uk/chembl/compound/displayimage_large/CHEMBL"));
+        config.addIriClass(new IntegerUserIriClass("chembl:image", "integer",
+                "https://www.ebi.ac.uk/chembl/api/data/image/CHEMBL", ".svg"));
         config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_most_apka", "integer",
                 "http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL", "#cx_most_apka"));
         config.addIriClass(new IntegerUserIriClass("chembl:molecule_cx_most_bpka", "integer",
@@ -109,7 +109,7 @@ public class Molecule
                     config.createIriMapping("cco:UnclassifiedMolecule"),
                     config.createAreEqualCondition("molecule_type", "'Gene'::varchar"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("foaf:depiction"),
-                    config.createIriMapping("chembl:displayimage", "id"));
+                    config.createIriMapping("chembl:image", "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "chebi_par_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:highestDevelopmentPhase"),
@@ -122,11 +122,11 @@ public class Molecule
                     config.createLiteralMapping(xsdString, "(coalesce(pref_name, chembl_id))"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:substanceType"),
                     config.createLiteralMapping(xsdString, "molecule_type"));
-            config.addQuadMapping(table, graph, config.createIriMapping("chembl:displayimage", "id"),
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:image", "id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("foaf:Image"));
-            config.addQuadMapping(table, graph, config.createIriMapping("chembl:displayimage", "id"),
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:image", "id"),
                     config.createIriMapping("rdfs:label"),
-                    config.createLiteralMapping(xsdString, "('PNG Image Depiction of ' || chembl_id)"));
+                    config.createLiteralMapping(xsdString, "('SVG Image Depiction of ' || chembl_id)"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
