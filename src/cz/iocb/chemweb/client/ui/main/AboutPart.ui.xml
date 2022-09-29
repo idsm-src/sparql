@@ -96,7 +96,7 @@
               <tr><td>ChEMBL Substances</td><td>2,331,700</td></tr>
               <tr><td>ChEMBL Assays</td><td>1,498,681</td></tr>
 
-              <tr><td>ChEBI Entities</td><td>156,098</td></tr>
+              <tr><td>ChEBI Entities</td><td>181,043</td></tr>
             </table>
           </div>
         </div>
@@ -107,53 +107,65 @@
             <ul>
               <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a>: 2022-09-14</li>
               <li><a href="https://www.ebi.ac.uk/chembl/" target="_blank">ChEMBL</a>: 31</li>
-              <li><a href="https://www.ebi.ac.uk/chebi/" target="_blank">ChEBI Ontology</a>: 198</li>
-              <li><a href="https://id.nlm.nih.gov/mesh/" target="_blank">Medical Subject Headings (MESH)</a>: 2021-04-03</li>
-              <li><a href="http://bioassayontology.org/bioassayontology/" target="_blank">BioAssay Ontology (BAO)</a>: 2.7</li>
-              <li><a href="https://proconsortium.org/" target="_blank">Protein Ontology (PRO)</a>: 62.0</li>
-              <li><a href="http://geneontology.org/" target="_blank">Gene Ontology (GO)</a>: 2021-02-01</li>
-              <li><a href="https://github.com/The-Sequence-Ontology/SO-Ontologies" target="_blank">Sequence Ontology</a>: 2021-02-16</li>
+              <li><a href="https://www.ebi.ac.uk/chebi/" target="_blank">ChEBI Ontology</a>: 213</li>
+              <li><a href="https://id.nlm.nih.gov/mesh/" target="_blank">Medical Subject Headings (MESH)</a>: 2022-09-27</li>
+
+              <li><a href="http://bioassayontology.org/bioassayontology/" target="_blank">BioAssay Ontology (BAO)</a>: 2.7.2</li>
+              <li><a href="https://proconsortium.org" target="_blank">Protein Ontology (PRO)</a>: 67.0</li>
+              <li><a href="http://geneontology.org" target="_blank">Gene Ontology (GO)</a>: 2022-09-19</li>
+              <li><a href="http://www.sequenceontology.org" target="_blank">Sequence Ontology (SO)</a>: 2021-11-22</li>
+              <li><a href="http://www.clo-ontology.org" target="_blank">Cell Line Ontology (CLO)</a>: 2.1.178</li>
+              <li><a href="https://obophenotype.github.io/cell-ontology/" target="_blank">Cell Ontology (CL)</a>: 2022-09-15</li>
+              <li><a href="https://disease-ontology.org" target="_blank">Disease Ontology (DO)</a>: 2022-09-29</li>
+              <li><a href="http://symptomontologywiki.igs.umaryland.edu/mediawiki/index.php" target="_blank">Symptom Ontology (SYMP)</a>: 2022-09-06</li>
+              <li><a href="https://github.com/DiseaseOntology/PathogenTransmissionOntology" target="_blank">Pathogen Transmission Ontology (TRANS)</a>: 2020-08-04</li>
+              <li><a href="http://www.human-phenotype-ontology.org" target="_blank">The Human Phenotype Ontology (HP)</a>: 2022-06-11</li>
+              <li><a href="https://github.com/pato-ontology/pato/" target="_blank">Phenotype And Trait Ontology (PATO)</a>: 2022-08-31</li>
+              <li><a href="https://github.com/bio-ontology-research-group/unit-ontology" target="_blank">Units of Measurement Ontology (UO)</a>: 2022-04-30</li>
+              <li><a href="http://obi-ontology.org" target="_blank">Ontology for Biomedical Investigations (OBI)</a>: 2022-07-11</li>
+              <li><a href="https://github.com/information-artifact-ontology/IAO/" target="_blank">Information Artifact Ontology (IAO)</a>: 2020-12-09</li>
+              <li><a href="http://obophenotype.github.io/uberon/" target="_blank">Uber-anatomy Ontology (UBERON)</a>: 2022-09-30</li>
+              <li><a href="https://www.ncbi.nlm.nih.gov/taxonomy" target="_blank">NCBI Taxonomy Database</a>: 2022-08-18</li>
+              <li><a href="https://github.com/NCI-Thesaurus/thesaurus-obo-edition" target="_blank">National Center Institute Thesaurus (OBO Edition)</a>: 22.07d</li>
+              <li><a href="https://oborel.github.io" target="_blank">OBO Relations Ontology</a>: 2022-09-07</li>
+              <li><a href="https://basic-formal-ontology.org" target="_blank">Basic Formal Ontology (BFO)</a>: 2.0</li>
+              <li><a href="http://foodon.org" target="_blank">Food Ontology (FOODON)</a>: 2022-09-27</li>
+              <li><a href="http://evidenceontology.org" target="_blank">Evidence &amp; Conclusion Ontology (ECO)</a>: 2022-08-05</li>
+              <li><a href="http://www.disease-ontology.org" target="_blank">Disease Drivers Ontology (DISDRIV)</a>: 2021-09-29</li>
+              <li><a href="https://github.com/monarch-initiative/GENO-ontology/" target="_blank">Genotype Ontology (GENO)</a>: 2022-08-10</li>
+              <li><a href="https://github.com/obophenotype/caro/" target="_blank">Common Anatomy Reference Ontology (CARO)</a>: 2022-02-18</li>
+              <li><a href="http://environmentontology.org" target="_blank">Environment Ontology (ENVO)</a>: 2021-05-14</li>
+              <li><a href="https://github.com/OGMS/ogms" target="_blank">Ontology for General Medical Science (OGMS)</a>: 2021-08-19</li>
+              <li><a href="https://github.com/obophenotype/upheno" target="_blank">Unified phenotype ontology (uPheno)</a>: 2.0</li>
+              <li><a href="https://github.com/information-artifact-ontology/ontology-metadata" target="_blank">OBO Metadata Ontology</a>: 2022-04-27</li>
               <li><a href="http://www.biopax.org/" target="_blank">Biological Pathway Exchange (BioPAX)</a>: 1.0</li>
-              <li><a href="http://www.clo-ontology.org/" target="_blank">Cell Line Ontology (CLO)</a>: 2.1.172</li>
-              <li><a href="http://obofoundry.org/ontology/cl.html" target="_blank">Cell Ontology</a>: 2021-03-05</li>
-              <li><a href="https://disease-ontology.org/" target="_blank">Disease Ontology (DO)</a>: 2021-03-29</li>
-              <li><a href="https://github.com/DiseaseOntology/SymptomOntology" target="_blank">Symptom Ontology</a>: 2020-08-04</li>
-              <li><a href="https://github.com/DiseaseOntology/PathogenTransmissionOntology" target="_blank">Pathogen Transmission Ontology</a>: 2020-08-04</li>
-              <li><a href="http://www.human-phenotype-ontology.org" target="_blank">The Human Phenotype Ontology</a>: 2021-02-28</li>
-              <li><a href="http://obofoundry.org/ontology/pato.html" target="_blank">Phenotype And Trait Ontology (PATO)</a>: 2020-08-02</li>
-              <li><a href="https://pdbj.org/" target="_blank">PDBx ontology</a>: 5.341</li>
-              <li><a href="https://github.com/bio-ontology-research-group/unit-ontology" target="_blank">Units of Measurement Ontology (UO)</a>: 2020-12-24</li>
-              <li><a href="http://qudt.org" target="_blank">Quantities, Units, Dimensions and Types Ontology (QUDT)</a>: 2.1.9</li>
+              <li><a href="https://pdbj.org/" target="_blank">PDBx ontology</a>: 5.360</li>
+              <li><a href="http://qudt.org" target="_blank">Quantities, Units, Dimensions and Types Ontology (QUDT)</a>: 2.1.20</li>
               <li><a href="http://www.openphacts.org/specs/units/" target="_blank">Open PHACTS Units extending QUDT</a>: 2013-09-18</li>
+              <li><a href="https://www.w3.org/TR/shacl/">Shapes Constraint Language (SHACL)</a>: 2017-07-20</li>
               <li><a href="http://www.linkedmodel.org/" target="_blank">Linked Models: Datatype Ontology (DTYPE)</a>: 1.1</li>
               <li><a href="http://www.linkedmodel.org/" target="_blank">Linked Models: Vocabulary for Attaching Essential Metadata (VAEM)</a>: 2.0</li>
-              <li><a href="https://github.com/obi-ontology/obi" target="_blank">Ontology for Biomedical Investigations (OBI)</a>: 2020-12-16</li>
-              <li><a href="https://github.com/semanticchemistry/semanticchemistry" target="_blank">Chemical Information Ontology (CHEMINF)</a>: 2.0</li>
-              <li><a href="https://github.com/MaastrichtU-IDS/semanticscience" target="_blank">Semanticscience integrated ontology (SIO)</a>: 1.51</li>
-              <li><a href="https://github.com/information-artifact-ontology/IAO/" target="_blank">Information Artifact Ontology (IAO)</a>: 2020-12-09</li>
-              <li><a href="http://uberon.github.io/" target="_blank">Uber-anatomy Ontology (UBERON)</a>: 2021-02-12</li>
-              <li><a href="https://www.ncbi.nlm.nih.gov/taxonomy" target="_blank">NCBI Organismal Classification</a>: 2021-02-15</li>
-              <li><a href="https://www.oit.va.gov/Services/TRM/StandardPage.aspx?tid=5221" target="_blank">National Drug File-Reference Terminology (NDF-RT)</a>: NDF-RT2 [Public Edition]</li>
-              <li><a href="http://ncit.nci.nih.gov/" target="_blank">National Center Institute Thesaurus (NCIt)</a>: 21.02d</li>
-              <li><a href="https://github.com/NCI-Thesaurus/thesaurus-obo-edition" target="_blank">National Center Institute Thesaurus (OBO Edition)</a>: 21.01d</li>
-              <li><a href="https://github.com/oborel/obo-relations" target="_blank">OBO Relations Ontology</a>: 2021-03-08</li>
-              <li><a href="https://basic-formal-ontology.org/" target="_blank">Basic Formal Ontology (BFO)</a>: 2014-05-03</li>
-              <li><a href="https://www.ebi.ac.uk/efo/" target="_blank">Experimental Factor Ontology (EFO)</a>: 3.28.0</li>
+              <li><a href="http://semanticchemistry.github.io/semanticchemistry/" target="_blank">Chemical Information Ontology (CHEMINF)</a>: 2.1.0</li>
+              <li><a href="https://sio.semanticscience.org/" target="_blank">Semanticscience integrated ontology (SIO)</a>: 1.54</li>
+              <li><a href="https://www.oit.va.gov/Services/TRM/StandardPage.aspx?tid=5221" target="_blank">National Drug File-Reference Terminology (NDF-RT)</a>: 2011-10-14</li>
+              <li><a href="http://ncit.nci.nih.gov/" target="_blank">National Center Institute Thesaurus (NCIt)</a>: 22.08e</li>
+              <li><a href="https://www.ebi.ac.uk/efo/" target="_blank">Experimental Factor Ontology (EFO)</a>: 3.46.0</li>
               <li><a href="https://www.eagle-i.net/" target="_blank">Eagle-i Resource Ontology (ERO)</a>: 2015-06-30</li>
               <li><a href="https://sparontologies.github.io/cito/current/cito.html" target="_blank">Citation Typing Ontology (CiTO)</a>: 2.8.1</li>
               <li><a href="https://sparontologies.github.io/fabio/current/fabio.html" target="_blank">FRBR-aligned Bibliographic Ontology (FaBiO)</a>: 2.1</li>
-              <li><a href="https://dublincore.org/specifications/dublin-core/dcmi-terms/" target="_blank">Dublin Core Metadata Initiative Terms (DCMI)</a>: 2012-06-14</li>
-              <li><a href="https://www.w3.org/2009/08/skos-reference/skos.html" target="_blank">Simple Knowledge Organization System (SKOS)</a>: 2009-08-18</li>
-              <li><a href="http://foodon.org" target="_blank">Food Ontology</a>: 2021-03-20</li>
-              <li><a href="http://evidenceontology.org/" target="_blank">Evidence &amp; Conclusion Ontology (ECO)</a>: 2021-03-05</li>
               <li><a href="https://sparontologies.github.io/frbr/current/frbr.html" target="_blank">Essential FRBR in OWL2 DL Ontology (FRBR)</a>: 1.0.1</li>
-              <li><a href="https://github.com/ewilderj/doap/wiki" target="_blank">Description of a Project (DOAP) vocabulary</a>: 2018-02-23</li>
-              <li><a href="http://xmlns.com/foaf/spec/" target="_blank">FOAF Vocabulary</a>: 0.99</li>
+              <li><a href="https://dublincore.org/specifications/dublin-core/dcmi-terms/" target="_blank">Dublin Core Metadata Initiative Terms (DCMI)</a>: 2020-01-20</li>
+              <li><a href="https://www.dublincore.org/specifications/bibo/" target="_blank">Bibliographic Ontology (BIBO)</a>: 1.3</li>
+              <li><a href="https://www.w3.org/2009/08/skos-reference/skos.html" target="_blank">Simple Knowledge Organization System (SKOS)</a>: 2009-08-18</li>
+              <li><a href="https://github.com/ewilderj/doap/wiki" target="_blank">Description of a Project Vocabulary (DOAP)</a>: 2022-03-13</li>
+              <li><a href="http://xmlns.com/foaf/0.1/" target="_blank">FOAF Vocabulary</a>: 0.1</li>
               <li><a href="http://pav-ontology.github.io/pav/" target="_blank">Provenance, Authoring and Versioning (PAV)</a>: 2.3.1</li>
               <li><a href="https://www.w3.org/2003/06/sw-vocab-status/note.html" target="_blank">SemWeb Vocab Status Ontology</a>: 2011-12-12</li>
               <li><a href="http://vocab.deri.ie/void.html" target="_blank">Vocabulary of Interlinked Datasets (VoID)</a>: 2011-03-06</li>
-              <li><a href="https://www.w3.org/TR/rdf-schema/" target="_blank">RDF Schema (RDFS)</a>: 1.1</li>
+              <li><a href="http://ontologydesignpatterns.org/wiki/Submissions:Situation" target="_blank">Situation Ontology</a>: 1.1</li>
               <li><a href="https://www.w3.org/TR/owl2-overview/" target="_blank">OWL 2 Schema (OWL 2)</a>: 2009-10-16</li>
+              <li><a href="https://www.w3.org/TR/rdf-schema/" target="_blank">RDF Schema (RDFS)</a>: 1.1</li>
+              <li><a href="https://www.w3.org/TR/rdf11-concepts/" target="_blank">RDF Vocabulary Terms</a>: 1.1</li>
             </ul>
           </div>
         </div>
