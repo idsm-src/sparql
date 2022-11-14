@@ -152,12 +152,17 @@ public class QueryVisitor extends BaseVisitor<Query>
             @Override
             public Void visitBlankNode(BlankNodeContext ctx)
             {
-                String name = ctx.getText().replaceFirst("^:_", "");
+                if(ctx.BLANK_NODE_LABEL() != null)
+                {
+                    String name = ctx.getText().replaceFirst("^:_", "");
 
-                if(usedBlankNodes.contains(name))
-                    messages.add(new TranslateMessage(MessageType.reuseOfBlankNode, Range.compute(ctx), ctx.getText()));
+                    if(usedBlankNodes.contains(name))
+                        messages.add(
+                                new TranslateMessage(MessageType.reuseOfBlankNode, Range.compute(ctx), ctx.getText()));
 
-                patternBlankNodes.add(name);
+                    patternBlankNodes.add(name);
+                }
+
                 return null;
             }
 
