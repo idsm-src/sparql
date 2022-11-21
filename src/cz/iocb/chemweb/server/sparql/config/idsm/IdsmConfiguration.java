@@ -21,12 +21,14 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
 {
     public IdsmConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
     {
-        super(service, connectionPool, schema);
+        super(service != null ? service : "https://idsm.elixir-czech.cz/sparql/endpoint/idsm", connectionPool, schema);
 
         addPrefixes();
         addServices();
 
         setConstraints();
+
+        addServiceDescription();
     }
 
 

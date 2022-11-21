@@ -20,6 +20,10 @@ public class Common
         config.addPrefix("owl", "http://www.w3.org/2002/07/owl#");
         config.addPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
 
+        config.addPrefix("sd", "http://www.w3.org/ns/sparql-service-description#");
+        config.addPrefix("ent", "http://www.w3.org/ns/entailment/");
+        config.addPrefix("format", "http://www.w3.org/ns/formats/");
+
         config.addPrefix("template", "http://bioinfo.iocb.cz/0.9/template#");
         config.addPrefix("fulltext", "http://bioinfo.uochb.cas.cz/rdf/v1.0/fulltext#");
     }

@@ -150,16 +150,29 @@ public class EndpointServlet extends HttpServlet
     {
         setBasicHttpHeaders(req, res);
 
-        String query = req.getParameter("query");
-        String[] defaultGraphs = req.getParameterValues("default-graph-uri");
-        String[] namedGraphs = req.getParameterValues("named-graph-uri");
-
         if(isHtmlRequest(req))
+        {
             processHtmlRequest(res);
+        }
         else if(isInfoRequest(req))
+        {
             processInfoRequest(res);
+        }
         else
+        {
+            String query = req.getParameter("query");
+            String[] defaultGraphs = req.getParameterValues("default-graph-uri");
+            String[] namedGraphs = req.getParameterValues("named-graph-uri");
+
+            if(query == null)
+            {
+                query = "construct {?s ?p ?o} where { graph " + sparqlConfig.getDescriptionGraphIri() + " {?s ?p ?o}}";
+                defaultGraphs = null;
+                namedGraphs = null;
+            }
+
             process(req, res, query, defaultGraphs, namedGraphs);
+        }
     }
 
 
@@ -462,14 +475,15 @@ public class EndpointServlet extends HttpServlet
         out.append("  },\n");
         out.append("  \"properties\": [\n");
 
-        out.append(sparqlConfig.getMappings(null).stream().map(m -> ((IRI) m.getPredicate().getValue()).getValue())
-                .distinct().sorted().map(i -> "    \"" + i + "\"").collect(joining(",\n")));
+        out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
+                .map(m -> ((IRI) m.getPredicate().getValue()).getValue()).distinct().sorted()
+                .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
         out.append("  ],\n");
         out.append("  \"classes\": [\n");
 
-        out.append(sparqlConfig.getMappings(null).stream()
+        out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
                 .filter(m -> m.getPredicate().getValue().equals(type) && m.getObject() instanceof ConstantIriMapping)
                 .map(m -> ((IRI) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
@@ -493,9 +507,6 @@ public class EndpointServlet extends HttpServlet
     {
         if(req.getParameter("info") != null)
             return false;
-
-        if(req.getParameter("query") == null)
-            return true;
 
         if(req.getParameter("format") != null)
             return false;
@@ -524,7 +535,7 @@ public class EndpointServlet extends HttpServlet
                 if(parts[i].matches("q=(0(\\.[0-9]{0,3})?|1(\\.0{0,3})?)[\\t ]*"))
                     qvalue = Double.parseDouble(parts[i].substring(2).replaceAll("[\t ]", ""));
 
-            if(qvalue == 0 || qvalue < quality)
+            if(qvalue == 0 || qvalue <= quality)
                 continue;
 
             String mime = parts[0].replaceAll("[\t ]", "");
@@ -586,23 +597,23 @@ public class EndpointServlet extends HttpServlet
                 if(parts[i].matches("q=(0(\\.[0-9]{0,3})?|1(\\.0{0,3})?)[\\t ]*"))
                     qvalue = Double.parseDouble(parts[i].substring(2).replaceAll("[\t ]", ""));
 
-            if(qvalue == 0)
+            if(qvalue == 0 || qvalue <= quality)
                 continue;
 
             String mime = parts[0].replaceAll("[\t ]", "");
             OutputType detected = OutputType.getOutputType(mime, form);
 
-            if(detected != OutputType.NONE && qvalue >= quality)
+            if(detected != OutputType.NONE)
             {
                 type = detected;
                 quality = qvalue;
             }
-            else if(mime.equals("text/*") && qvalue > quality)
+            else if(mime.equals("text/*"))
             {
                 quality = qvalue;
                 type = OutputType.TSV;
             }
-            else if((mime.equals("*") || mime.equals("*/*") || mime.equals("application/*")) && qvalue > quality)
+            else if(mime.equals("*") || mime.equals("*/*") || mime.equals("application/*"))
             {
                 quality = qvalue;
                 type = form == ResultType.ASK || form == ResultType.SELECT ? OutputType.SPARQL_XML : OutputType.RDF_XML;

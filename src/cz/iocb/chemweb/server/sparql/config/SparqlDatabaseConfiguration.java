@@ -61,6 +61,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 public abstract class SparqlDatabaseConfiguration
 {
     private final IRI serviceIri;
+    private final IRI descriptionGraphIri;
 
     protected DatabaseSchema databaseSchema;
     protected DataSource connectionPool;
@@ -82,8 +83,10 @@ public abstract class SparqlDatabaseConfiguration
             boolean autoAddToDefaultGraph) throws SQLException
     {
         IRI serviceIri = service == null ? null : new IRI(service);
+        IRI descriptionGraphIri = service == null ? null : new IRI(service + "#ServiceDescription");
 
         this.serviceIri = serviceIri;
+        this.descriptionGraphIri = descriptionGraphIri;
         this.connectionPool = connectionPool;
         this.databaseSchema = schema;
         this.autoAddToDefaultGraph = autoAddToDefaultGraph;
@@ -178,6 +181,12 @@ public abstract class SparqlDatabaseConfiguration
     public NodeMapping createIriMapping(String iriClassName, String... columns)
     {
         return new ParametrisedIriMapping(getIriClass(iriClassName), getColumns(columns));
+    }
+
+
+    public ConstantIriMapping createIriMapping(IRI iri)
+    {
+        return new ConstantIriMapping(iri);
     }
 
 
@@ -339,6 +348,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public void addQuadMapping(ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
+    {
+        addQuadMapping(null, graph, subject, predicate, object);
+    }
+
+
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
@@ -413,7 +429,7 @@ public abstract class SparqlDatabaseConfiguration
 
         for(IRI service : other.getServices())
         {
-            IRI target = service == other.getServiceIri() && merge ? getServiceIri() : service;
+            IRI target = service == null && merge ? getServiceIri() : service;
 
             for(QuadMapping original : other.getMappings(service))
             {
@@ -480,6 +496,83 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public void addServiceDescription()
+    {
+        //FIXME: Code depends on prefix definitions.
+
+        ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
+        ConstantIriMapping endpoint = createIriMapping(serviceIri);
+
+
+        addQuadMapping(graph, endpoint, createIriMapping("rdf:type"), createIriMapping("sd:Service"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:endpoint"), endpoint);
+
+        addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:BasicFederatedQuery"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:EmptyGraphs"));
+
+        if(autoAddToDefaultGraph)
+            addQuadMapping(graph, endpoint, createIriMapping("sd:feature"), createIriMapping("sd:UnionDefaultGraph"));
+
+        addQuadMapping(graph, endpoint, createIriMapping("sd:defaultEntailmentRegime"), createIriMapping("ent:Simple"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:supportedLanguage"), createIriMapping("sd:SPARQL11Query"));
+
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
+                createIriMapping("format:SPARQL_Results_XML"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
+                createIriMapping("format:SPARQL_Results_JSON"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
+                createIriMapping("format:SPARQL_Results_CSV"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"),
+                createIriMapping("format:SPARQL_Results_TSV"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:RDF_JSON"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:RDF_XML"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:Turtle"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:TriG"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:N-Triples"));
+        addQuadMapping(graph, endpoint, createIriMapping("sd:resultFormat"), createIriMapping("format:N-Quads"));
+
+        for(FunctionDefinition def : functions.get(serviceIri).values())
+        {
+            ConstantIriMapping function = createIriMapping(new IRI(def.getFunctionName()));
+            addQuadMapping(graph, endpoint, createIriMapping("sd:extensionFunction"), function);
+            addQuadMapping(graph, function, createIriMapping("rdf:type"), createIriMapping("sd:Function"));
+        }
+
+        for(ProcedureDefinition def : procedures.get(serviceIri).values())
+        {
+            ConstantIriMapping procedure = createIriMapping(new IRI(def.getProcedureName()));
+            addQuadMapping(graph, endpoint, createIriMapping("sd:propertyFeature"), procedure);
+            addQuadMapping(graph, procedure, createIriMapping("rdf:type"), createIriMapping("sd:Feature"));
+        }
+
+        //FIXME: use blank node
+        ConstantIriMapping defaultDataset = createIriMapping("<" + serviceIri.getValue() + "#DefaultDataset>");
+        ConstantIriMapping defaultGraph = createIriMapping("<" + serviceIri.getValue() + "#DefaultGraph>");
+
+        addQuadMapping(graph, endpoint, createIriMapping("sd:defaultDataset"), defaultDataset);
+        addQuadMapping(graph, defaultDataset, createIriMapping("rdf:type"), createIriMapping("sd:Dataset"));
+
+        addQuadMapping(graph, defaultDataset, createIriMapping("sd:defaultGraph"), defaultGraph);
+        addQuadMapping(graph, defaultGraph, createIriMapping("rdf:type"), createIriMapping("sd:Graph"));
+
+        for(ConstantIriMapping namedGraph : graphs.get(serviceIri))
+        {
+            addQuadMapping(graph, defaultDataset, createIriMapping("sd:namedGraph"), namedGraph);
+
+            addQuadMapping(graph, namedGraph, createIriMapping("rdf:type"), createIriMapping("sd:NamedGraph"));
+            addQuadMapping(graph, namedGraph, createIriMapping("rdf:name"), namedGraph);
+            addQuadMapping(graph, namedGraph, createIriMapping("sd:entailmentRegime"), createIriMapping("ent:Simple"));
+
+            //FIXME: use blank node
+            String iri = ((IRI) namedGraph.getValue()).getValue();
+            ConstantIriMapping namedGraphGraph = createIriMapping(
+                    "<" + iri + (iri.contains("#") ? "" : "#") + "Graph>");
+            addQuadMapping(graph, namedGraph, createIriMapping("sd:graph"), namedGraphGraph);
+            addQuadMapping(graph, namedGraphGraph, createIriMapping("rdf:type"), createIriMapping("sd:Graph"));
+        }
+    }
+
+
     public static Column getColumn(String value)
     {
         if(value.startsWith("("))
@@ -505,6 +598,12 @@ public abstract class SparqlDatabaseConfiguration
     public IRI getServiceIri()
     {
         return serviceIri;
+    }
+
+
+    public IRI getDescriptionGraphIri()
+    {
+        return descriptionGraphIri;
     }
 
 
