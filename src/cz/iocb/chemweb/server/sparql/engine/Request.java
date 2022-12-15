@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.engine;
 
 import static java.util.stream.Collectors.toList;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,6 +23,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.DataSet;
 import cz.iocb.chemweb.server.sparql.parser.model.DescribeQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.Query;
+import cz.iocb.chemweb.server.sparql.parser.model.Select;
 import cz.iocb.chemweb.server.sparql.parser.model.SelectQuery;
 import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
@@ -144,13 +146,34 @@ public class Request implements AutoCloseable
         ResultType type = null;
 
         if(syntaxTree instanceof SelectQuery)
+        {
             type = ResultType.SELECT;
+
+            Select select = ((SelectQuery) syntaxTree).getSelect();
+
+            if(limit > 0 && limit <= fetchSize)
+                this.fetchSize = 0;
+
+            if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(fetchSize)) <= 0)
+                this.fetchSize = 0;
+
+            if(select.getHavingConditions().isEmpty() && select.isInAggregateMode())
+                this.fetchSize = 0;
+        }
         else if(syntaxTree instanceof AskQuery)
+        {
             type = ResultType.ASK;
+            this.fetchSize = 0;
+        }
         else if(syntaxTree instanceof DescribeQuery)
+        {
             type = ResultType.DESCRIBE;
+            this.fetchSize = 0;
+        }
         else if(syntaxTree instanceof ConstructQuery)
+        {
             type = ResultType.CONSTRUCT;
+        }
 
 
         try
