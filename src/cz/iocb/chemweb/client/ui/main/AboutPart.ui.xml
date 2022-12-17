@@ -89,9 +89,9 @@
             <table class="{style.statistics}">
               <tr><th>Data Collection</th><th>Count</th></tr>
 
-              <tr><td>PubChem Substances</td><td>297,147,064</td></tr>
-              <tr><td>PubChem Compounds</td><td>112,386,327</td></tr>
-              <tr><td>PubChem BioAssays</td><td>1,506,836</td></tr>
+              <tr><td>PubChem Substances</td><td>298,349,893</td></tr>
+              <tr><td>PubChem Compounds</td><td>112,423,424</td></tr>
+              <tr><td>PubChem BioAssays</td><td>1,506,859</td></tr>
 
               <tr><td>ChEMBL Substances</td><td>2,331,700</td></tr>
               <tr><td>ChEMBL Assays</td><td>1,498,681</td></tr>
@@ -105,7 +105,7 @@
           <div class="{style.header}">Data Sources</div>
           <div>
             <ul>
-              <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a>: 2022-10-07</li>
+              <li><a href="https://pubchemdocs.ncbi.nlm.nih.gov/rdf" target="_blank">PubChemRDF</a>: 2022-12-02</li>
               <li><a href="https://www.ebi.ac.uk/chembl/" target="_blank">ChEMBL</a>: 31</li>
               <li><a href="https://www.ebi.ac.uk/chebi/" target="_blank">ChEBI Ontology</a>: 213</li>
               <li><a href="https://id.nlm.nih.gov/mesh/" target="_blank">Medical Subject Headings (MESH)</a>: 2022-09-27</li>
