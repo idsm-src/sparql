@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.joining;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -188,7 +189,7 @@ public class EndpointServlet extends HttpServlet
         if(req.getContentType() != null && req.getContentType().matches("application/x-www-form-urlencoded.*"))
             query = req.getParameter("query");
         else if(req.getContentType() != null && req.getContentType().matches("application/sparql-query.*"))
-            query = IOUtils.toString(req.getInputStream());
+            query = IOUtils.toString(req.getInputStream(), StandardCharsets.UTF_8);
 
         process(req, res, query, defaultGraphs, namedGraphs);
     }

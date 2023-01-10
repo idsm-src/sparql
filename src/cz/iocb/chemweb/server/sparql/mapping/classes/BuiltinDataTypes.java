@@ -172,7 +172,7 @@ public class BuiltinDataTypes
     {
         try
         {
-            return new Short(s.trim());
+            return Short.parseShort(s.trim());
         }
         catch(NumberFormatException e)
         {
@@ -185,7 +185,7 @@ public class BuiltinDataTypes
     {
         try
         {
-            return new Integer(s.trim());
+            return Integer.parseInt(s.trim());
         }
         catch(NumberFormatException e)
         {
@@ -198,7 +198,7 @@ public class BuiltinDataTypes
     {
         try
         {
-            return new Long(s.trim());
+            return Long.parseLong(s.trim());
         }
         catch(NumberFormatException e)
         {
@@ -234,7 +234,7 @@ public class BuiltinDataTypes
 
             s = s.replace("INF", "Infinity");
 
-            return new Float(s);
+            return Float.parseFloat(s);
         }
         catch(NumberFormatException e)
         {
@@ -257,7 +257,7 @@ public class BuiltinDataTypes
 
             s = s.replace("INF", "Infinity");
 
-            return new Double(s);
+            return Double.parseDouble(s);
         }
         catch(NumberFormatException e)
         {
