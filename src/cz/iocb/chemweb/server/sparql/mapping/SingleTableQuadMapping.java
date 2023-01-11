@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
+import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -14,7 +14,7 @@ public class SingleTableQuadMapping extends QuadMapping
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject,
             ConstantIriMapping predicate, NodeMapping object)
     {
-        this(table, graph, subject, predicate, object, null);
+        this(table, graph, subject, predicate, object, new Condition());
     }
 
 
@@ -54,7 +54,7 @@ public class SingleTableQuadMapping extends QuadMapping
         if(table == null ? mapping.table != null : !table.equals(mapping.table))
             return false;
 
-        if(condition == null ? mapping.condition != null : !condition.equals(mapping.condition))
+        if(!condition.equals(mapping.condition))
             return false;
 
         return true;

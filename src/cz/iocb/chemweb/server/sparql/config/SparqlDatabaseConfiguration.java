@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
@@ -54,7 +55,6 @@ import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 

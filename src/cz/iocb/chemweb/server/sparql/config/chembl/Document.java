@@ -4,11 +4,11 @@ import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.sc
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -27,10 +27,7 @@ public class Document
 
         Condition valueCondition = config.createAreNotEqualCondition("id", "'1158643'::integer");
         Condition notNullCondition = config.createIsNotNullCondition("journal_id");
-
-        Condition fullCondition = new Condition();
-        fullCondition.add(valueCondition);
-        fullCondition.add(notNullCondition);
+        Condition fullCondition = Condition.and(valueCondition, notNullCondition);
 
         Table table = new Table(schema, "docs");
         NodeMapping subject = config.createIriMapping("chembl:document", "id");

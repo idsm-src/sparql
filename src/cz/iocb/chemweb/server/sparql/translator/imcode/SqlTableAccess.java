@@ -1,7 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -11,6 +10,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Condition.ColumnComparison;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
@@ -34,331 +35,6 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlTableAccess extends SqlIntercode
 {
-    public static final class Condition
-    {
-        final Set<Column> isNotNull = new HashSet<Column>();
-        final Set<Column> isNull = new HashSet<Column>();
-        final Map<Column, Column> areEqual = new HashMap<Column, Column>();
-        final Set<ColumnPair> areNotEqual = new HashSet<ColumnPair>();
-
-        public Condition()
-        {
-        }
-
-        public Condition(Condition conditions)
-        {
-            if(conditions == null)
-                return;
-
-            isNotNull.addAll(conditions.isNotNull);
-            isNull.addAll(conditions.isNull);
-            areEqual.putAll(conditions.areEqual);
-            areNotEqual.addAll(conditions.areNotEqual);
-        }
-
-        public boolean addIsNotNull(Column column)
-        {
-            if(isNull.contains(column))
-                return false;
-
-            if(areEqual.containsKey(column))
-                return true;
-
-            for(ColumnPair c : areNotEqual)
-                if(c.getLeft().equals(column) || c.getRight().equals(column))
-                    return true;
-
-            isNotNull.add(column);
-
-            return true;
-        }
-
-        public boolean addIsNull(Column column)
-        {
-            if(isNotNull.contains(column))
-                return false;
-
-            if(areEqual.containsKey(column))
-                return false;
-
-            for(ColumnPair c : areNotEqual)
-                if(c.getLeft().equals(column) || c.getRight().equals(column))
-                    return false;
-
-            isNotNull.add(column);
-
-            return true;
-        }
-
-        public boolean addAreEqual(Column col1, Column col2)
-        {
-            if(col1.equals(col2)) // ignore this condition
-                return true;
-
-            if(isNull.contains(col1) || isNull.contains(col2))
-                return false;
-
-            Column cnd1 = col1 instanceof ConstantColumn ? col1 : areEqual.get(col1);
-            Column cnd2 = col2 instanceof ConstantColumn ? col2 : areEqual.get(col2);
-
-            if(cnd1 instanceof ConstantColumn && cnd2 instanceof ConstantColumn)
-            {
-                return cnd1.equals(cnd2);
-            }
-            else if(cnd1 != null && cnd2 != null)
-            {
-                Column to = getMoreSpecific(cnd1, cnd2);
-                Column from = to == cnd1 ? cnd2 : cnd2;
-                areEqual.entrySet().stream().filter(e -> e.getValue() == from).forEach(e -> e.setValue(to));
-            }
-            else if(cnd1 == null && cnd2 == null)
-            {
-                Column col = col1 instanceof TableColumn ? col1 : col2;
-                areEqual.put(col1, col);
-                areEqual.put(col2, col);
-                isNotNull.remove(col1);
-                isNotNull.remove(col2);
-            }
-            else if(cnd1 == null && cnd2 != null)
-            {
-                areEqual.put(col1, cnd2);
-                isNotNull.remove(col1);
-            }
-            else if(cnd1 != null && cnd2 == null)
-            {
-                areEqual.put(col2, cnd1);
-                isNotNull.remove(col2);
-            }
-
-            for(ColumnPair c : areNotEqual)
-                if(areEqual.containsKey(c.getLeft()) && areEqual.get(c.getLeft()) == areEqual.get(c.getRight()))
-                    return false;
-
-            return true;
-        }
-
-        private Column getMoreSpecific(Column col1, Column col2)
-        {
-            if(col1.getClass() == col2.getClass())
-                return col1.toString().compareTo(col2.toString()) < 0 ? col1 : col2;
-
-            if(col1 instanceof ConstantColumn)
-                return col1;
-
-            if(col2 instanceof ConstantColumn)
-                return col2;
-
-            if(col1 instanceof TableColumn)
-                return col1;
-
-            if(col2 instanceof TableColumn)
-                return col2;
-
-            throw new IllegalArgumentException();
-        }
-
-        public boolean addAreNotEqual(Column col1, Column col2)
-        {
-            if(col1.equals(col2))
-                return false;
-
-            areNotEqual.add(col1.toString().compareTo(col2.toString()) < 0 ? new ColumnPair(col1, col2) :
-                    new ColumnPair(col2, col1));
-            isNotNull.remove(col1);
-            isNotNull.remove(col2);
-
-            if(isNull.contains(col1) || isNull.contains(col2))
-                return false;
-
-            if(areEqual.containsKey(col1) && areEqual.get(col1) == areEqual.get(col2))
-                return false;
-
-            return true;
-        }
-
-        public boolean addAreEqual(List<Column> cols1, List<Column> cols2)
-        {
-            assert cols1.size() == cols2.size();
-
-            for(int i = 0; i < cols1.size(); i++)
-                if(!addAreEqual(cols1.get(i), cols2.get(i)))
-                    return false;
-
-            return true;
-        }
-
-        public boolean add(Condition conditions)
-        {
-            if(conditions == null)
-                return true;
-
-            for(Column c : conditions.isNotNull)
-                if(!addIsNotNull(c))
-                    return false;
-
-            for(Column c : conditions.isNull)
-                if(!addIsNull(c))
-                    return false;
-
-            for(Entry<Column, Column> e : conditions.areEqual.entrySet())
-                if(!addAreEqual(e.getKey(), e.getValue()))
-                    return false;
-
-            for(ColumnPair p : conditions.areNotEqual)
-                if(!addAreNotEqual(p.getLeft(), p.getRight()))
-                    return false;
-
-            return true;
-        }
-
-        public boolean add(Condition conditions, Map<Column, Column> map)
-        {
-            if(conditions == null)
-                return true;
-
-            for(Column c : conditions.isNotNull)
-                if(!addIsNotNull(remap(map, c)))
-                    return false;
-
-            for(Column c : conditions.isNull)
-                if(!addIsNull(remap(map, c)))
-                    return false;
-
-            for(Entry<Column, Column> e : conditions.areEqual.entrySet())
-                if(!addAreEqual(remap(map, e.getKey()), remap(map, e.getValue())))
-                    return false;
-
-            for(ColumnPair p : conditions.areNotEqual)
-                if(!addAreNotEqual(remap(map, p.getLeft()), remap(map, p.getRight())))
-                    return false;
-
-            return true;
-        }
-
-        public Set<Column> getEquals(Column col)
-        {
-            Set<Column> result = new HashSet<Column>();
-            Column cond = areEqual.get(col);
-
-            if(cond == null)
-            {
-                result.add(col);
-            }
-            else
-            {
-                for(Entry<Column, Column> e : areEqual.entrySet())
-                    if(e.getValue() == cond)
-                        result.add(e.getKey());
-            }
-
-            return result;
-        }
-
-        public boolean hasExpressionColumn()
-        {
-            if(isNotNull.stream().anyMatch(c -> c instanceof ExpressionColumn))
-                return true;
-
-            if(isNull.stream().anyMatch(c -> c instanceof ExpressionColumn))
-                return true;
-
-            if(areEqual.keySet().stream().anyMatch(c -> c instanceof ExpressionColumn))
-                return true;
-
-            if(areNotEqual.stream()
-                    .anyMatch(c -> c.getLeft() instanceof ExpressionColumn || c.getRight() instanceof ExpressionColumn))
-                return true;
-
-            return false;
-        }
-
-        public boolean isEmpty()
-        {
-            if(!isNotNull.isEmpty())
-                return false;
-
-            if(!isNull.isEmpty())
-                return false;
-
-            if(!areEqual.isEmpty())
-                return false;
-
-            if(!areNotEqual.isEmpty())
-                return false;
-
-            return true;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return areEqual.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object object)
-        {
-            if(this == object)
-                return true;
-
-            if(object == null || getClass() != object.getClass())
-                return false;
-
-            Condition other = (Condition) object;
-
-            if(!isNotNull.equals(other.isNotNull))
-                return false;
-
-            if(!isNull.equals(other.isNull))
-                return false;
-
-            if(!areEqual.equals(other.areEqual))
-                return false;
-
-            if(!areNotEqual.equals(other.areNotEqual))
-                return false;
-
-            return true;
-        }
-
-        public Set<Column> getNonConstantColumns()
-        {
-            Set<Column> columns = new HashSet<Column>();
-
-            columns.addAll(isNotNull);
-            columns.addAll(isNull);
-
-            columns.addAll(areEqual.keySet());
-            columns.addAll(areEqual.values().stream().filter(c -> !(c instanceof ConstantColumn)).collect(toSet()));
-
-            areNotEqual.forEach(p -> columns.add(p.getLeft()));
-            areNotEqual.forEach(p -> columns.add(p.getRight()));
-
-            return columns;
-        }
-
-        public Set<Column> getIsNotNull()
-        {
-            return isNotNull;
-        }
-
-        public Set<Column> getIsNull()
-        {
-            return isNull;
-        }
-
-        public Map<Column, Column> getAreEqual()
-        {
-            return areEqual;
-        }
-
-        public Set<ColumnPair> getAreNotEqual()
-        {
-            return areNotEqual;
-        }
-    }
-
-
     private final Table table;
     private final Condition conditions;
     private final Map<String, ResourceClass> resources;
@@ -413,8 +89,7 @@ public class SqlTableAccess extends SqlIntercode
 
             for(Column column : columns)
                 if(schema.isNullableColumn(table, column))
-                    if(!conditions.addIsNotNull(column))
-                        return SqlNoSolution.get();
+                    conditions.addIsNotNull(column);
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -428,9 +103,7 @@ public class SqlTableAccess extends SqlIntercode
                 else if(resources.get(variableName) == resourceClass)
                 {
                     List<Column> current = mappings.get(variableName);
-
-                    if(!conditions.addAreEqual(columns, current))
-                        return SqlNoSolution.get();
+                    conditions.addAreEqual(columns, current);
                 }
                 else
                 {
@@ -442,19 +115,20 @@ public class SqlTableAccess extends SqlIntercode
             else if(mapping instanceof ParametrisedMapping)
             {
                 List<Column> values = mapping.getResourceClass().toColumns(node);
-
-                if(!conditions.addAreEqual(columns, values))
-                    return SqlNoSolution.get();
+                conditions.addAreEqual(columns, values);
             }
         }
 
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
+
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
         for(String name : mappings.keySet())
         {
             UsedVariable variable = new UsedVariable(name, false);
-            variable.addMapping(resources.get(name),
-                    selectColumns(conditions.areEqual, expressions, mappings.get(name)));
+            variable.addMapping(resources.get(name), selectColumns(representants, expressions, mappings.get(name)));
             variables.add(variable);
         }
 
@@ -462,14 +136,37 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static List<Column> selectColumns(Map<Column, Column> conditions, Map<Column, Column> expressions,
+    private static Map<Column, Column> selectColumnRepresentants(Condition condition)
+    {
+        Map<Column, Column> representants = new HashMap<Column, Column>();
+
+        for(ColumnComparison p : condition.getAreEqual())
+        {
+            Column r1 = representants.getOrDefault(p.getLeft(), p.getLeft());
+            Column r2 = representants.getOrDefault(p.getRight(), p.getRight());
+            Column r = r1 instanceof ConstantColumn || r2 instanceof ExpressionColumn ? r1 : r2;
+
+            representants.replaceAll((k, v) -> v.equals(r1) || v.equals(r2) ? r : v);
+
+            if(!(p.getLeft() instanceof ConstantColumn))
+                representants.put(p.getLeft(), r);
+
+            if(!(p.getRight() instanceof ConstantColumn))
+                representants.put(p.getRight(), r);
+        }
+
+        return representants;
+    }
+
+
+    private static List<Column> selectColumns(Map<Column, Column> set, Map<Column, Column> expressions,
             List<Column> columns)
     {
         ArrayList<Column> optimized = new ArrayList<Column>(columns.size());
 
         for(Column column : columns)
         {
-            column = conditions.get(column) != null ? conditions.get(column) : column;
+            column = set.get(column) != null ? set.get(column) : column;
 
             if(column instanceof ExpressionColumn)
             {
@@ -495,9 +192,14 @@ public class SqlTableAccess extends SqlIntercode
 
         Set<Column> columns = new HashSet<Column>();
 
-        for(Entry<Column, Column> entry : conditions.areEqual.entrySet())
-            if(entry.getValue() instanceof ConstantColumn)
-                columns.add(entry.getKey());
+        for(ColumnComparison p : conditions.getAreEqual())
+        {
+            if(p.getLeft() instanceof ConstantColumn && p.getRight() instanceof TableColumn)
+                columns.add(p.getRight());
+
+            if(p.getLeft() instanceof TableColumn && p.getRight() instanceof ConstantColumn)
+                columns.add(p.getLeft());
+        }
 
         for(String varName : selected)
         {
@@ -506,15 +208,8 @@ public class SqlTableAccess extends SqlIntercode
             if(variable != null)
             {
                 for(Column column : variable.getNonConstantColumns())
-                {
-                    Column cnd = conditions.areEqual.get(column);
-
-                    if(cnd == null)
-                        columns.add(column);
-                    else
-                        conditions.areEqual.entrySet().stream().filter(e -> e.getValue() == cnd)
-                                .forEach(e -> columns.add(e.getKey()));
-                }
+                    for(Column col : conditions.getEqualTableColumns(column))
+                        columns.add(col);
             }
         }
 
@@ -554,34 +249,25 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < leftCols.size(); i++)
                 {
-                    Column leftCol = leftCols.get(i);
-                    Column rightCol = rightCols.get(i);
+                    Set<Column> leftColumns = left.conditions.getEqualTableColumns(leftCols.get(i));
+                    Set<Column> rightColumns = right.conditions.getEqualTableColumns(rightCols.get(i));
 
-                    if(leftCol instanceof TableColumn && rightCol instanceof TableColumn)
-                    {
-                        Set<Column> leftColumns = left.conditions.getEquals(leftCol);
-                        Set<Column> rightColumns = right.conditions.getEquals(rightCol);
-
-                        leftColumns.retainAll(rightColumns);
-                        columns.addAll(leftColumns);
-                    }
-                    else if(leftCol instanceof ConstantColumn && rightCol instanceof TableColumn)
-                    {
-                        if(leftCol.equals(left.conditions.areEqual.get(rightCol)))
-                            columns.add(rightCol);
-                    }
-                    else if(leftCol instanceof TableColumn && rightCol instanceof ConstantColumn)
-                    {
-                        if(rightCol.equals(right.conditions.areEqual.get(leftCol)))
-                            columns.add(leftCol);
-                    }
+                    leftColumns.retainAll(rightColumns);
+                    columns.addAll(leftColumns);
                 }
             }
         }
 
-        for(Entry<Column, Column> e : left.conditions.areEqual.entrySet())
-            if(e.getValue() instanceof ConstantColumn && e.getValue().equals(right.conditions.areEqual.get(e.getKey())))
-                columns.add(e.getKey());
+        for(ColumnComparison pair : left.conditions.getAreEqual())
+        {
+            if(pair.getLeft() instanceof ConstantColumn && pair.getRight() instanceof TableColumn)
+                if(right.conditions.getAreEqual().contains(pair))
+                    columns.add(pair.getRight());
+
+            if(pair.getLeft() instanceof TableColumn && pair.getRight() instanceof ConstantColumn)
+                if(right.conditions.getAreEqual().contains(pair))
+                    columns.add(pair.getLeft());
+        }
 
         return schema.getCompatibleKey(left.table, columns) != null;
     }
@@ -595,7 +281,8 @@ public class SqlTableAccess extends SqlIntercode
         if(!parent.expressions.isEmpty())
             return null;
 
-        if(parent.conditions.hasExpressionColumn())
+        // FIXME:
+        if(parent.conditions.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
             return null;
 
 
@@ -623,37 +310,26 @@ public class SqlTableAccess extends SqlIntercode
 
                 for(int i = 0; i < parentCols.size(); i++)
                 {
-                    Column parentCol = parentCols.get(i);
-                    Column childCol = childCols.get(i);
+                    Set<Column> parentColumns = parent.conditions.getEqualTableColumns(parentCols.get(i));
+                    Set<Column> childColumns = child.conditions.getEqualTableColumns(childCols.get(i));
 
-                    if(parentCol instanceof TableColumn && childCol instanceof TableColumn)
-                    {
-                        for(Column parentColumn : parent.conditions.getEquals(parentCol))
-                            for(Column childColumn : child.conditions.getEquals(childCol))
-                                columns.add(new ColumnPair(parentColumn, childColumn));
-                    }
-                    else if(parentCol instanceof ConstantColumn && childCol instanceof TableColumn)
-                    {
-                        for(Entry<Column, Column> cond : parent.conditions.areEqual.entrySet())
-                            if(cond.getValue().equals(parentCol))
-                                columns.add(new ColumnPair(cond.getKey(), childCol));
-                    }
-                    else if(parentCol instanceof TableColumn && childCol instanceof ConstantColumn)
-                    {
-                        for(Entry<Column, Column> cond : child.conditions.areEqual.entrySet())
-                            if(cond.getValue().equals(childCol))
-                                columns.add(new ColumnPair(parentCol, cond.getKey()));
-                    }
+                    for(Column parentColumn : parentColumns)
+                        for(Column childColumn : childColumns)
+                            columns.add(new ColumnPair(parentColumn, childColumn));
                 }
             }
         }
 
-        for(Entry<Column, Column> parentEntry : parent.conditions.areEqual.entrySet())
-            if(parentEntry.getValue() instanceof ConstantColumn)
-                for(Entry<Column, Column> childEntry : child.conditions.areEqual.entrySet())
-                    if(parentEntry.getValue().equals(childEntry.getValue()))
-                        columns.add(new ColumnPair(parentEntry.getKey(), childEntry.getKey()));
+        for(ColumnComparison pair : parent.conditions.getAreEqual())
+        {
+            if(pair.getLeft() instanceof ConstantColumn && pair.getRight() instanceof TableColumn)
+                for(Column childColumn : child.conditions.getEqualTableColumns(pair.getLeft()))
+                    columns.add(new ColumnPair(pair.getRight(), childColumn));
 
+            if(pair.getLeft() instanceof TableColumn && pair.getRight() instanceof ConstantColumn)
+                for(Column childColumn : child.conditions.getEqualTableColumns(pair.getRight()))
+                    columns.add(new ColumnPair(pair.getLeft(), childColumn));
+        }
 
         Set<Column> parentColumns = new HashSet<Column>();
         parentColumns.addAll(parent.conditions.getNonConstantColumns());
@@ -668,33 +344,46 @@ public class SqlTableAccess extends SqlIntercode
         if(!canBeMerged(schema, left, right))
             return false;
 
-        Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.isNotNull);
-        extraNotNulls.removeAll(left.conditions.isNotNull);
+        Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
+        extraNotNulls.removeAll(left.conditions.getIsNotNull());
 
         if(extraNotNulls.size() > 1)
             return false;
 
-        Condition cndLeft = new Condition(left.conditions);
-        Condition cndRight = new Condition(right.conditions);
+        Condition conditions = new Condition(left.conditions);
 
-        cndRight.isNotNull.removeAll(extraNotNulls);
-        cndLeft.add(cndRight);
 
-        // check whether nothing is added by right table
-        if(!cndLeft.equals(left.conditions))
-            return false;
+        // conditions added by right table
+
+        for(Column c : right.conditions.getIsNotNull())
+            if(!extraNotNulls.contains(c))
+                conditions.addIsNotNull(c);
+
+        for(Column c : right.conditions.getIsNull())
+            conditions.addIsNull(c);
+
+        for(ColumnComparison p : right.conditions.getAreEqual())
+            conditions.addAreEqual(p.getLeft(), p.getRight());
+
+        for(ColumnComparison p : right.conditions.getAreNotEqual())
+            conditions.addAreNotEqual(p.getLeft(), p.getRight());
+
+
+        // conditions added by the join
 
         for(Entry<String, List<Column>> entry : left.mappings.entrySet())
         {
             List<Column> leftCols = entry.getValue();
             List<Column> rightCols = right.mappings.get(entry.getKey());
 
-            if(rightCols != null && !cndLeft.addAreEqual(leftCols, rightCols))
-                return false; //NOTE: join condition is always false
+            if(rightCols != null)
+                conditions.addAreEqual(leftCols, rightCols);
         }
 
-        // check whether nothing is added by join condition
-        if(!cndLeft.equals(left.conditions))
+
+        // check that nothing has been added
+
+        if(!conditions.equals(left.conditions))
             return false;
 
         return true;
@@ -703,11 +392,7 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode merge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
-        Condition conditions = new Condition(left.conditions);
-
-        if(!conditions.add(right.conditions))
-            return SqlNoSolution.get();
-
+        Condition conditions = Condition.and(left.conditions, right.conditions);
 
         for(Entry<String, List<Column>> entry : left.mappings.entrySet())
         {
@@ -715,15 +400,18 @@ public class SqlTableAccess extends SqlIntercode
             List<Column> leftCols = entry.getValue();
             List<Column> rightCols = right.mappings.get(name);
 
-            if(rightCols != null && !conditions.addAreEqual(leftCols, rightCols))
-                return SqlNoSolution.get();
+            if(rightCols != null)
+                conditions.addAreEqual(leftCols, rightCols);
         }
+
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
         Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable leftVariable : left.variables.getValues())
@@ -738,7 +426,7 @@ public class SqlTableAccess extends SqlIntercode
                 mappings.put(name, columns);
 
                 UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                 variables.add(variable);
             }
         }
@@ -757,7 +445,7 @@ public class SqlTableAccess extends SqlIntercode
                     mappings.put(name, columns);
 
                     UsedVariable variable = new UsedVariable(name, rightVariable.canBeNull());
-                    variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                     variables.add(variable);
                 }
             }
@@ -774,14 +462,10 @@ public class SqlTableAccess extends SqlIntercode
         Map<Column, Column> map = new HashMap<Column, Column>();
 
         for(ColumnPair pair : key)
-            for(Column col : parent.conditions.getEquals(pair.getLeft()))
+            for(Column col : parent.conditions.getEqualTableColumns(pair.getLeft()))
                 map.put(col, pair.getRight());
 
-
-        Condition conditions = new Condition(child.conditions);
-
-        if(!conditions.add(parent.conditions, map))
-            return SqlNoSolution.get();
+        Condition conditions = Condition.and(child.conditions, remap(map, parent.conditions));
 
         for(Entry<String, List<Column>> entry : parent.mappings.entrySet())
         {
@@ -789,15 +473,18 @@ public class SqlTableAccess extends SqlIntercode
             List<Column> parentCols = entry.getValue();
             List<Column> childCols = child.mappings.get(name);
 
-            if(childCols != null && !conditions.addAreEqual(childCols, remap(map, parentCols)))
-                return SqlNoSolution.get();
+            if(childCols != null)
+                conditions.addAreEqual(childCols, remap(map, parentCols));
         }
+
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
         Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable childVariable : child.variables.getValues())
@@ -812,7 +499,7 @@ public class SqlTableAccess extends SqlIntercode
                 mappings.put(name, columns);
 
                 UsedVariable variable = new UsedVariable(name, childVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                 variables.add(variable);
             }
         }
@@ -831,7 +518,7 @@ public class SqlTableAccess extends SqlIntercode
                     mappings.put(name, columns);
 
                     UsedVariable variable = new UsedVariable(name, parentVariable.canBeNull());
-                    variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                     variables.add(variable);
                 }
             }
@@ -845,8 +532,8 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode leftMerge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
-        Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.isNotNull);
-        extraNotNulls.removeAll(left.conditions.isNotNull);
+        Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
+        extraNotNulls.removeAll(left.conditions.getIsNotNull());
         Column extraCondition = extraNotNulls.isEmpty() ? null : extraNotNulls.iterator().next();
 
         Condition conditions = new Condition(left.conditions);
@@ -854,7 +541,7 @@ public class SqlTableAccess extends SqlIntercode
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
         Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable leftVariable : left.variables.getValues())
@@ -869,7 +556,7 @@ public class SqlTableAccess extends SqlIntercode
                 mappings.put(name, columns);
 
                 UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                 variables.add(variable);
             }
         }
@@ -905,7 +592,7 @@ public class SqlTableAccess extends SqlIntercode
                     mappings.put(name, columns);
 
                     UsedVariable variable = new UsedVariable(name, rightVariable.canBeNull() || extraCondition != null);
-                    variable.addMapping(resClass, selectColumns(conditions.areEqual, expressions, columns));
+                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
                     variables.add(variable);
                 }
             }
@@ -942,6 +629,26 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private static Condition remap(Map<Column, Column> map, Condition conditions)
+    {
+        Condition result = new Condition();
+
+        for(Column c : conditions.getIsNotNull())
+            result.addIsNotNull(remap(map, c));
+
+        for(Column c : conditions.getIsNull())
+            result.addIsNull(remap(map, c));
+
+        for(ColumnComparison e : conditions.getAreEqual())
+            result.addAreEqual(remap(map, e.getLeft()), remap(map, e.getRight()));
+
+        for(ColumnComparison p : conditions.getAreNotEqual())
+            result.addAreNotEqual(remap(map, p.getLeft()), remap(map, p.getRight()));
+
+        return result;
+    }
+
+
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
@@ -950,6 +657,7 @@ public class SqlTableAccess extends SqlIntercode
         Map<Column, Column> optExpressions = new HashMap<Column, Column>();
         Map<String, List<Column>> optMappings = new HashMap<String, List<Column>>();
         Map<String, ResourceClass> optResources = new HashMap<String, ResourceClass>();
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
 
         for(UsedVariable variable : variables.getValues())
         {
@@ -964,7 +672,7 @@ public class SqlTableAccess extends SqlIntercode
                 optMappings.put(name, columns);
 
                 UsedVariable optVariable = new UsedVariable(name, variable.canBeNull());
-                optVariable.addMapping(resClass, selectColumns(conditions.areEqual, optExpressions, columns));
+                optVariable.addMapping(resClass, selectColumns(representants, optExpressions, columns));
                 optVariables.add(optVariable);
             }
         }
@@ -1004,25 +712,23 @@ public class SqlTableAccess extends SqlIntercode
             builder.append(table);
         }
 
-        if(!conditions.isEmpty())
+        if(!conditions.isTrue())
         {
             builder.append(" WHERE ");
             boolean hasWhere = false;
 
-            for(Entry<Column, Column> entry : conditions.areEqual.entrySet())
+            // TODO: do not use derivable conditions
+            for(ColumnComparison pair : conditions.getAreEqual())
             {
-                if(entry.getKey() != entry.getValue())
-                {
-                    appendAnd(builder, hasWhere);
-                    hasWhere = true;
+                appendAnd(builder, hasWhere);
+                hasWhere = true;
 
-                    builder.append(entry.getKey());
-                    builder.append(" = ");
-                    builder.append(entry.getValue());
-                }
+                builder.append(pair.getLeft());
+                builder.append(" = ");
+                builder.append(pair.getRight());
             }
 
-            for(ColumnPair pair : conditions.areNotEqual)
+            for(ColumnComparison pair : conditions.getAreNotEqual())
             {
                 appendAnd(builder, hasWhere);
                 hasWhere = true;
@@ -1032,7 +738,8 @@ public class SqlTableAccess extends SqlIntercode
                 builder.append(pair.getRight());
             }
 
-            for(Column column : conditions.isNotNull)
+            // TODO: do not use derivable conditions
+            for(Column column : conditions.getIsNotNull())
             {
                 appendAnd(builder, hasWhere);
                 hasWhere = true;
@@ -1041,7 +748,7 @@ public class SqlTableAccess extends SqlIntercode
                 builder.append(" IS NOT NULL");
             }
 
-            for(Column column : conditions.isNull)
+            for(Column column : conditions.getIsNull())
             {
                 appendAnd(builder, hasWhere);
                 hasWhere = true;

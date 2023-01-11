@@ -1,10 +1,11 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import static java.util.Arrays.asList;
+import java.util.Collections;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.translator.imcode.SqlTableAccess.Condition;
 
 
 
@@ -88,7 +89,8 @@ public class JoinTableQuadMapping extends QuadMapping
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
-        this(tables, joinColumnsPairs, graph, subject, predicate, object, null);
+        this(tables, joinColumnsPairs, graph, subject, predicate, object,
+                Collections.nCopies(tables.size(), new Condition()));
     }
 
 
@@ -127,7 +129,7 @@ public class JoinTableQuadMapping extends QuadMapping
         if(!joinColumnsPairs.equals(mapping.joinColumnsPairs))
             return false;
 
-        if(conditions == null ? mapping.conditions != null : !conditions.equals(mapping.conditions))
+        if(!conditions.equals(mapping.conditions))
             return false;
 
         return true;
