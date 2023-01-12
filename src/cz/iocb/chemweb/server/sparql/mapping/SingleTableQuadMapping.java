@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
 import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.Table;
 
 
@@ -8,23 +9,23 @@ import cz.iocb.chemweb.server.sparql.database.Table;
 public class SingleTableQuadMapping extends QuadMapping
 {
     private final Table table;
-    private final Condition condition;
+    private final Conditions conditions;
 
 
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject,
             ConstantIriMapping predicate, NodeMapping object)
     {
-        this(table, graph, subject, predicate, object, new Condition());
+        this(table, graph, subject, predicate, object, new Conditions(new Condition()));
     }
 
 
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject,
-            ConstantIriMapping predicate, NodeMapping object, Condition condition)
+            ConstantIriMapping predicate, NodeMapping object, Conditions conditions)
     {
         super(graph, subject, predicate, object);
 
         this.table = table;
-        this.condition = condition;
+        this.conditions = conditions;
     }
 
 
@@ -34,9 +35,9 @@ public class SingleTableQuadMapping extends QuadMapping
     }
 
 
-    public final Condition getCondition()
+    public final Conditions getConditions()
     {
-        return condition;
+        return conditions;
     }
 
 
@@ -54,7 +55,7 @@ public class SingleTableQuadMapping extends QuadMapping
         if(table == null ? mapping.table != null : !table.equals(mapping.table))
             return false;
 
-        if(!condition.equals(mapping.condition))
+        if(!conditions.equals(mapping.conditions))
             return false;
 
         return true;

@@ -4,7 +4,7 @@ import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.sc
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -25,9 +25,9 @@ public class Document
     {
         ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
 
-        Condition valueCondition = config.createAreNotEqualCondition("id", "'1158643'::integer");
-        Condition notNullCondition = config.createIsNotNullCondition("journal_id");
-        Condition fullCondition = Condition.and(valueCondition, notNullCondition);
+        Conditions valueCondition = config.createAreNotEqualCondition("id", "'1158643'::integer");
+        Conditions notNullCondition = config.createIsNotNullCondition("journal_id");
+        Conditions fullCondition = Conditions.and(valueCondition, notNullCondition);
 
         Table table = new Table(schema, "docs");
         NodeMapping subject = config.createIriMapping("chembl:document", "id");

@@ -12,6 +12,7 @@ import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Condition.ColumnComparison;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
@@ -36,14 +37,14 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 public class SqlTableAccess extends SqlIntercode
 {
     private final Table table;
-    private final Condition conditions;
+    private final Conditions conditions;
     private final Map<String, ResourceClass> resources;
     private final Map<String, List<Column>> mappings;
     private final Map<Column, Column> expressions;
     private final boolean reduced;
 
 
-    public SqlTableAccess(UsedVariables variables, Table table, Condition conditions,
+    public SqlTableAccess(UsedVariables variables, Table table, Conditions conditions,
             Map<String, ResourceClass> resources, Map<String, List<Column>> mappings, Map<Column, Column> expressions,
             boolean reduced)
     {
@@ -58,20 +59,21 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(Table table, Condition extraCondition, List<MappedNode> maps)
+    public static SqlIntercode create(Table table, Conditions extraCondition, List<MappedNode> maps)
     {
         return create(table, extraCondition, maps, false);
     }
 
 
-    protected static SqlIntercode create(Table table, Condition extraCondition, List<MappedNode> maps, boolean reduced)
+    protected static SqlIntercode create(Table table, Conditions extraCondition, List<MappedNode> maps, boolean reduced)
     {
-        Condition conditions = new Condition(extraCondition);
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
 
         DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
+
+        Condition condition = new Condition();
 
         for(MappedNode map : maps)
         {
@@ -89,7 +91,7 @@ public class SqlTableAccess extends SqlIntercode
 
             for(Column column : columns)
                 if(schema.isNullableColumn(table, column))
-                    conditions.addIsNotNull(column);
+                    condition.addIsNotNull(column);
 
             if(node instanceof VariableOrBlankNode)
             {
@@ -103,7 +105,7 @@ public class SqlTableAccess extends SqlIntercode
                 else if(resources.get(variableName) == resourceClass)
                 {
                     List<Column> current = mappings.get(variableName);
-                    conditions.addAreEqual(columns, current);
+                    condition.addAreEqual(columns, current);
                 }
                 else
                 {
@@ -115,9 +117,11 @@ public class SqlTableAccess extends SqlIntercode
             else if(mapping instanceof ParametrisedMapping)
             {
                 List<Column> values = mapping.getResourceClass().toColumns(node);
-                conditions.addAreEqual(columns, values);
+                condition.addAreEqual(columns, values);
             }
         }
+
+        Conditions conditions = Conditions.and(extraCondition, condition);
 
         if(conditions.isFalse())
             return SqlNoSolution.get();
@@ -136,11 +140,25 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static Map<Column, Column> selectColumnRepresentants(Condition condition)
+    private static Map<Column, Column> selectColumnRepresentants(Conditions conditions)
     {
+        Set<ColumnComparison> equals = null;
+
+        for(Condition condition : conditions.getConditions())
+        {
+            if(equals == null)
+                equals = new HashSet<ColumnComparison>(condition.getAreEqual());
+            else
+                equals.retainAll(condition.getAreEqual());
+        }
+
+        if(equals == null)
+            return new HashMap<Column, Column>();
+
+
         Map<Column, Column> representants = new HashMap<Column, Column>();
 
-        for(ColumnComparison p : condition.getAreEqual())
+        for(ColumnComparison p : equals)
         {
             Column r1 = representants.getOrDefault(p.getLeft(), p.getLeft());
             Column r2 = representants.getOrDefault(p.getRight(), p.getRight());
@@ -350,26 +368,33 @@ public class SqlTableAccess extends SqlIntercode
         if(extraNotNulls.size() > 1)
             return false;
 
-        Condition conditions = new Condition(left.conditions);
-
 
         // conditions added by right table
+        Conditions rightConditions = new Conditions();
 
-        for(Column c : right.conditions.getIsNotNull())
-            if(!extraNotNulls.contains(c))
-                conditions.addIsNotNull(c);
+        for(Condition cnd : right.conditions.getConditions())
+        {
+            Condition condition = new Condition();
 
-        for(Column c : right.conditions.getIsNull())
-            conditions.addIsNull(c);
+            for(Column c : cnd.getIsNotNull())
+                if(!extraNotNulls.contains(c))
+                    condition.addIsNotNull(c);
 
-        for(ColumnComparison p : right.conditions.getAreEqual())
-            conditions.addAreEqual(p.getLeft(), p.getRight());
+            for(Column c : cnd.getIsNull())
+                condition.addIsNull(c);
 
-        for(ColumnComparison p : right.conditions.getAreNotEqual())
-            conditions.addAreNotEqual(p.getLeft(), p.getRight());
+            for(ColumnComparison p : cnd.getAreEqual())
+                condition.addAreEqual(p.getLeft(), p.getRight());
+
+            for(ColumnComparison p : cnd.getAreNotEqual())
+                condition.addAreNotEqual(p.getLeft(), p.getRight());
+
+            rightConditions.add(condition);
+        }
 
 
-        // conditions added by the join
+        // condition added by the join
+        Condition joinCondition = new Condition();
 
         for(Entry<String, List<Column>> entry : left.mappings.entrySet())
         {
@@ -377,11 +402,12 @@ public class SqlTableAccess extends SqlIntercode
             List<Column> rightCols = right.mappings.get(entry.getKey());
 
             if(rightCols != null)
-                conditions.addAreEqual(leftCols, rightCols);
+                joinCondition.addAreEqual(leftCols, rightCols);
         }
 
 
         // check that nothing has been added
+        Conditions conditions = Conditions.and(rightConditions, joinCondition);
 
         if(!conditions.equals(left.conditions))
             return false;
@@ -392,7 +418,10 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode merge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
-        Condition conditions = Condition.and(left.conditions, right.conditions);
+        Conditions conditions = Conditions.and(left.conditions, right.conditions);
+
+        // condition added by the join
+        Condition joinCondition = new Condition();
 
         for(Entry<String, List<Column>> entry : left.mappings.entrySet())
         {
@@ -401,8 +430,10 @@ public class SqlTableAccess extends SqlIntercode
             List<Column> rightCols = right.mappings.get(name);
 
             if(rightCols != null)
-                conditions.addAreEqual(leftCols, rightCols);
+                joinCondition.addAreEqual(leftCols, rightCols);
         }
+
+        conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
             return SqlNoSolution.get();
@@ -465,7 +496,10 @@ public class SqlTableAccess extends SqlIntercode
             for(Column col : parent.conditions.getEqualTableColumns(pair.getLeft()))
                 map.put(col, pair.getRight());
 
-        Condition conditions = Condition.and(child.conditions, remap(map, parent.conditions));
+        Conditions conditions = Conditions.and(child.conditions, remap(map, parent.conditions));
+
+        // condition added by the join
+        Condition joinCondition = new Condition();
 
         for(Entry<String, List<Column>> entry : parent.mappings.entrySet())
         {
@@ -474,8 +508,10 @@ public class SqlTableAccess extends SqlIntercode
             List<Column> childCols = child.mappings.get(name);
 
             if(childCols != null)
-                conditions.addAreEqual(childCols, remap(map, parentCols));
+                joinCondition.addAreEqual(childCols, remap(map, parentCols));
         }
+
+        conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
             return SqlNoSolution.get();
@@ -536,7 +572,7 @@ public class SqlTableAccess extends SqlIntercode
         extraNotNulls.removeAll(left.conditions.getIsNotNull());
         Column extraCondition = extraNotNulls.isEmpty() ? null : extraNotNulls.iterator().next();
 
-        Condition conditions = new Condition(left.conditions);
+        Conditions conditions = new Conditions(left.conditions);
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
@@ -649,6 +685,17 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private static Conditions remap(Map<Column, Column> map, Conditions conditions)
+    {
+        Conditions result = new Conditions();
+
+        for(Condition condition : conditions.getConditions())
+            result.add(remap(map, condition));
+
+        return result;
+    }
+
+
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
@@ -715,46 +762,58 @@ public class SqlTableAccess extends SqlIntercode
         if(!conditions.isTrue())
         {
             builder.append(" WHERE ");
+
             boolean hasWhere = false;
 
-            // TODO: do not use derivable conditions
-            for(ColumnComparison pair : conditions.getAreEqual())
+            for(Condition condition : conditions.getConditions())
             {
-                appendAnd(builder, hasWhere);
+                appendOr(builder, hasWhere);
                 hasWhere = true;
 
-                builder.append(pair.getLeft());
-                builder.append(" = ");
-                builder.append(pair.getRight());
-            }
+                builder.append("(");
+                boolean hasCondition = false;
 
-            for(ColumnComparison pair : conditions.getAreNotEqual())
-            {
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
+                // TODO: do not use derivable conditions
+                for(ColumnComparison pair : condition.getAreEqual())
+                {
+                    appendAnd(builder, hasCondition);
+                    hasCondition = true;
 
-                builder.append(pair.getLeft());
-                builder.append(" <> ");
-                builder.append(pair.getRight());
-            }
+                    builder.append(pair.getLeft());
+                    builder.append(" = ");
+                    builder.append(pair.getRight());
+                }
 
-            // TODO: do not use derivable conditions
-            for(Column column : conditions.getIsNotNull())
-            {
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
+                for(ColumnComparison pair : condition.getAreNotEqual())
+                {
+                    appendAnd(builder, hasCondition);
+                    hasCondition = true;
 
-                builder.append(column);
-                builder.append(" IS NOT NULL");
-            }
+                    builder.append(pair.getLeft());
+                    builder.append(" <> ");
+                    builder.append(pair.getRight());
+                }
 
-            for(Column column : conditions.getIsNull())
-            {
-                appendAnd(builder, hasWhere);
-                hasWhere = true;
+                // TODO: do not use derivable conditions
+                for(Column column : condition.getIsNotNull())
+                {
+                    appendAnd(builder, hasCondition);
+                    hasCondition = true;
 
-                builder.append(column);
-                builder.append(" IS NULL");
+                    builder.append(column);
+                    builder.append(" IS NOT NULL");
+                }
+
+                for(Column column : condition.getIsNull())
+                {
+                    appendAnd(builder, hasCondition);
+                    hasCondition = true;
+
+                    builder.append(column);
+                    builder.append(" IS NULL");
+                }
+
+                builder.append(")");
             }
         }
 

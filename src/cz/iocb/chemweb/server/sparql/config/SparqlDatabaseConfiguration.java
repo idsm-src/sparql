@@ -19,6 +19,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.Set;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
@@ -322,20 +324,7 @@ public abstract class SparqlDatabaseConfiguration
 
 
     public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
-    {
-        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object));
-
-        if(graph != null)
-            graphs.get(serviceIri).add(graph);
-
-        if(graph != null && autoAddToDefaultGraph)
-            mappings.get(serviceIri).add(new SingleTableQuadMapping(table, null, subject, predicate, object));
-    }
-
-
-    public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, Condition conditions)
+            NodeMapping object, Conditions conditions)
     {
         mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions));
 
@@ -348,6 +337,13 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
+    public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
+            NodeMapping object)
+    {
+        addQuadMapping(table, graph, subject, predicate, object, new Conditions(new Condition()));
+    }
+
+
     public void addQuadMapping(ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
@@ -356,22 +352,7 @@ public abstract class SparqlDatabaseConfiguration
 
 
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
-    {
-        mappings.get(serviceIri)
-                .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object));
-
-        if(graph != null)
-            graphs.get(serviceIri).add(graph);
-
-        if(graph != null && autoAddToDefaultGraph)
-            mappings.get(serviceIri)
-                    .add(new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object));
-    }
-
-
-    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Condition> conditions)
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Conditions> conditions)
     {
         mappings.get(serviceIri)
                 .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions));
@@ -382,6 +363,14 @@ public abstract class SparqlDatabaseConfiguration
         if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri).add(
                     new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object, conditions));
+    }
+
+
+    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
+    {
+        addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object,
+                Collections.nCopies(tables.size(), new Conditions(new Condition())));
     }
 
 
@@ -397,7 +386,7 @@ public abstract class SparqlDatabaseConfiguration
 
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, Condition subjectCondition, Condition objectCondition)
+            NodeMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
         addQuadMapping(asList(subjectTable, objectTable),
                 asList(new JoinColumns(new TableColumn(subjectTableJoinColumn),
@@ -439,7 +428,8 @@ public abstract class SparqlDatabaseConfiguration
 
                     SingleTableQuadMapping mapping = new SingleTableQuadMapping(map.getTable(),
                             (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
-                            (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()), map.getCondition());
+                            (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()),
+                            map.getConditions());
 
                     addQuadMapping(target, mapping);
                 }
@@ -758,37 +748,37 @@ public abstract class SparqlDatabaseConfiguration
     }
 
 
-    public Condition createAreEqualCondition(String column, String value)
+    public Conditions createAreEqualCondition(String column, String value)
     {
-        Condition conditions = new Condition();
-        conditions.addAreEqual(getColumn(column), getColumn(value));
-        return conditions;
+        Condition condition = new Condition();
+        condition.addAreEqual(getColumn(column), getColumn(value));
+        return new Conditions(condition);
     }
 
 
-    public Condition createAreNotEqualCondition(String column, String... values)
+    public Conditions createAreNotEqualCondition(String column, String... values)
     {
-        Condition conditions = new Condition();
+        Condition condition = new Condition();
 
         for(String value : values)
-            conditions.addAreNotEqual(getColumn(column), getColumn(value));
+            condition.addAreNotEqual(getColumn(column), getColumn(value));
 
-        return conditions;
+        return new Conditions(condition);
     }
 
 
-    public Condition createIsNotNullCondition(String column)
+    public Conditions createIsNotNullCondition(String column)
     {
-        Condition conditions = new Condition();
-        conditions.addIsNotNull(getColumn(column));
-        return conditions;
+        Condition condition = new Condition();
+        condition.addIsNotNull(getColumn(column));
+        return new Conditions(condition);
     }
 
 
-    public Condition createIsNullCondition(String column)
+    public Conditions createIsNullCondition(String column)
     {
-        Condition conditions = new Condition();
-        conditions.addIsNull(getColumn(column));
-        return conditions;
+        Condition condition = new Condition();
+        condition.addIsNull(getColumn(column));
+        return new Conditions(condition);
     }
 }

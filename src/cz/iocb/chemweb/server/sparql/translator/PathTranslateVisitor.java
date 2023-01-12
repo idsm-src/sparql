@@ -8,7 +8,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
-import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -434,14 +434,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             maps.add(new MappedNode(predicate, mapping.getPredicate()));
             maps.add(new MappedNode(object, mapping.getObject()));
 
-            return SqlTableAccess.create(mapping.getTable(), mapping.getCondition(), maps);
+            return SqlTableAccess.create(mapping.getTable(), mapping.getConditions(), maps);
         }
         else if(qmapping instanceof JoinTableQuadMapping)
         {
             JoinTableQuadMapping mapping = (JoinTableQuadMapping) qmapping;
 
             List<Table> tables = mapping.getTables();
-            List<Condition> conditions = mapping.getConditions();
+            List<Conditions> conditions = mapping.getConditions();
             List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
             ResourceClass resourceClass = null;
@@ -482,7 +482,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 maps.add(new MappedNode(node, nodeMapping));
 
                 Table table = tables.get(i);
-                Condition cnds = conditions != null ? conditions.get(i) : null;
+                Conditions cnds = conditions.get(i);
 
                 SqlIntercode acess = SqlTableAccess.create(table, cnds, maps);
 

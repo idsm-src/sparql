@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.Table;
 
 
@@ -70,11 +71,11 @@ public class JoinTableQuadMapping extends QuadMapping
 
     private final List<Table> tables;
     private final List<JoinColumns> joinColumnsPairs;
-    private final List<Condition> conditions;
+    private final List<Conditions> conditions;
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Condition> conditions)
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Conditions> conditions)
     {
         super(graph, subject, predicate, object);
 
@@ -90,7 +91,7 @@ public class JoinTableQuadMapping extends QuadMapping
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
-                Collections.nCopies(tables.size(), new Condition()));
+                Collections.nCopies(tables.size(), new Conditions(new Condition(new Condition()))));
     }
 
 
@@ -106,7 +107,7 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
-    public final List<Condition> getConditions()
+    public final List<Conditions> getConditions()
     {
         return conditions;
     }
