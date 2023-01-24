@@ -41,6 +41,16 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>InfoServiceServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.services.info.InfoServiceImpl</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:idsm</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>InfoServiceServlet</servlet-name>
+    <url-pattern>/chemweb/info</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>CompoundImage</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundImageServlet</servlet-class>
     <init-param><param-name>resource</param-name><param-value>jdbc:images-pubchem</param-value></init-param>
