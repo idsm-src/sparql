@@ -72,18 +72,32 @@ public class JoinTableQuadMapping extends QuadMapping
     private final List<Table> tables;
     private final List<JoinColumns> joinColumnsPairs;
     private final List<Conditions> conditions;
+    private final int subjectTableIdx;
+    private final int predicateTableIdx;
+    private final int objectTableIdx;
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Conditions> conditions)
+            int subjectTableIdx, NodeMapping subject, int predicateTableIdx, NodeMapping predicate, int objectTableIdx,
+            NodeMapping object, List<Conditions> conditions)
     {
         super(graph, subject, predicate, object);
 
         this.tables = tables;
         this.joinColumnsPairs = joinColumnsPairs;
         this.conditions = conditions;
+        this.subjectTableIdx = subjectTableIdx;
+        this.predicateTableIdx = predicateTableIdx;
+        this.objectTableIdx = objectTableIdx;
 
         assert tables.size() == joinColumnsPairs.size() + 1;
+    }
+
+
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Conditions> conditions)
+    {
+        this(tables, joinColumnsPairs, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
     }
 
 
@@ -110,6 +124,24 @@ public class JoinTableQuadMapping extends QuadMapping
     public final List<Conditions> getConditions()
     {
         return conditions;
+    }
+
+
+    public final int getSubjectTableIdx()
+    {
+        return subjectTableIdx;
+    }
+
+
+    public final int getPredicateTableIdx()
+    {
+        return predicateTableIdx;
+    }
+
+
+    public final int getObjectTableIdx()
+    {
+        return objectTableIdx;
     }
 
 

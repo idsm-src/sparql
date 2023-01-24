@@ -8,6 +8,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
@@ -17,6 +19,7 @@ import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.chemweb.server.sparql.mapping.MappedNode;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
+import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.InternalResourceClass;
@@ -374,7 +377,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(mapping.match(graph, subject, predicate, object))
             {
-                SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object);
+                SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object,
+                        new Conditions(new Condition()));
                 translatedPattern = SqlUnion.union(translatedPattern, translated);
             }
         }
@@ -408,13 +412,48 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(mapping.match(graph, subject, fakePredicate, object))
             {
-                IRI predicate = (IRI) mapping.getPredicate().getValue();
+                if(mapping.getPredicate() instanceof ConstantIriMapping)
+                {
+                    IRI predicate = (IRI) ((ConstantIriMapping) mapping.getPredicate()).getValue();
 
-                if(negatedIriSet.contains(predicate))
-                    continue;
+                    if(negatedIriSet.contains(predicate))
+                        continue;
 
-                SqlIntercode translated = translateMapping(mapping, graph, subject, null, object);
-                translatedPattern = SqlUnion.union(translatedPattern, translated);
+                    SqlIntercode translated = translateMapping(mapping, graph, subject, null, object,
+                            new Conditions(new Condition()));
+                    translatedPattern = SqlUnion.union(translatedPattern, translated);
+                }
+                else
+                {
+                    Conditions extraConditions = new Conditions(new Condition());
+
+                    for(IRI node : negatedIriSet)
+                    {
+                        if(mapping.getPredicate().match(node))
+                        {
+                            ParametrisedIriMapping pm = (ParametrisedIriMapping) mapping.getPredicate();
+                            List<Column> columns = pm.getColumns();
+                            List<Column> values = pm.getResourceClass().toColumns(node);
+                            Conditions conditions = new Conditions();
+
+                            for(int i = 0; i < columns.size(); i++)
+                            {
+                                Condition isNull = new Condition();
+                                isNull.addIsNull(columns.get(i));
+                                conditions.add(isNull);
+
+                                Condition areNotEqual = new Condition();
+                                areNotEqual.addAreNotEqual(columns.get(i), values.get(i));
+                                conditions.add(areNotEqual);
+                            }
+
+                            extraConditions = Conditions.and(extraConditions, conditions);
+                        }
+                    }
+
+                    SqlIntercode translated = translateMapping(mapping, graph, subject, null, object, extraConditions);
+                    translatedPattern = SqlUnion.union(translatedPattern, translated);
+                }
             }
         }
 
@@ -422,11 +461,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object)
+    private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object,
+            Conditions predicateConditions)
     {
         if(qmapping instanceof SingleTableQuadMapping)
         {
             SingleTableQuadMapping mapping = (SingleTableQuadMapping) qmapping;
+            Conditions conditions = Conditions.and(mapping.getConditions(), predicateConditions);
 
             List<MappedNode> maps = new ArrayList<MappedNode>();
             maps.add(new MappedNode(graph, mapping.getGraph()));
@@ -434,18 +475,16 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             maps.add(new MappedNode(predicate, mapping.getPredicate()));
             maps.add(new MappedNode(object, mapping.getObject()));
 
-            return SqlTableAccess.create(mapping.getTable(), mapping.getConditions(), maps);
+            return SqlTableAccess.create(mapping.getTable(), conditions, maps);
         }
         else if(qmapping instanceof JoinTableQuadMapping)
         {
             JoinTableQuadMapping mapping = (JoinTableQuadMapping) qmapping;
 
             List<Table> tables = mapping.getTables();
-            List<Conditions> conditions = mapping.getConditions();
             List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
             ResourceClass resourceClass = null;
-            NodeMapping nodeMapping = null;
             Node node = subject;
 
             SqlIntercode result = SqlEmptySolution.get();
@@ -455,36 +494,42 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 List<MappedNode> maps = new ArrayList<MappedNode>();
 
                 if(i == 0)
-                {
                     maps.add(new MappedNode(graph, mapping.getGraph()));
+
+                if(i == mapping.getSubjectTableIdx())
+                    maps.add(new MappedNode(subject, mapping.getSubject()));
+
+                if(i == mapping.getPredicateTableIdx())
                     maps.add(new MappedNode(predicate, mapping.getPredicate()));
+
+                if(i == mapping.getObjectTableIdx())
+                    maps.add(new MappedNode(object, mapping.getObject()));
+
+
+                if(i > 0)
+                {
+                    NodeMapping nodeMapping = new InternalNodeMapping(resourceClass,
+                            joinColumnsPairs.get(i - 1).getRightColumns());
+                    maps.add(new MappedNode(node, nodeMapping));
                 }
-
-                if(i == 0)
-                    nodeMapping = mapping.getSubject();
-                else
-                    nodeMapping = new InternalNodeMapping(resourceClass, joinColumnsPairs.get(i - 1).getRightColumns());
-
-                maps.add(new MappedNode(node, nodeMapping));
 
                 if(i < tables.size() - 1)
                 {
                     resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getLeftColumns().size());
-                    nodeMapping = new InternalNodeMapping(resourceClass, joinColumnsPairs.get(i).getLeftColumns());
+                    NodeMapping nodeMapping = new InternalNodeMapping(resourceClass,
+                            joinColumnsPairs.get(i).getLeftColumns());
                     node = parent.createVariable(variablePrefix);
-                }
-                else
-                {
-                    nodeMapping = mapping.getObject();
-                    node = object;
+                    maps.add(new MappedNode(node, nodeMapping));
                 }
 
-                maps.add(new MappedNode(node, nodeMapping));
 
                 Table table = tables.get(i);
-                Conditions cnds = conditions.get(i);
+                Conditions conditions = mapping.getConditions().get(i);
 
-                SqlIntercode acess = SqlTableAccess.create(table, cnds, maps);
+                if(i == mapping.getPredicateTableIdx())
+                    conditions = Conditions.and(conditions, predicateConditions);
+
+                SqlIntercode acess = SqlTableAccess.create(table, conditions, maps);
 
                 result = SqlJoin.join(result, acess);
             }

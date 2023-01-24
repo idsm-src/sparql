@@ -9,14 +9,13 @@ public abstract class QuadMapping
 {
     private final ConstantIriMapping graph;
     private final NodeMapping subject;
-    private final ConstantIriMapping predicate;
+    private final NodeMapping predicate;
     private final NodeMapping object;
 
 
-    public QuadMapping(ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
+    public QuadMapping(ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object)
     {
         //TODO: add support for ParametrisedIriMapping graphs
-        //TODO: add support for ParametrisedIriMapping predicates
 
         this.graph = graph;
         this.subject = subject;
@@ -102,7 +101,7 @@ public abstract class QuadMapping
     }
 
 
-    public final ConstantIriMapping getPredicate()
+    public final NodeMapping getPredicate()
     {
         return predicate;
     }

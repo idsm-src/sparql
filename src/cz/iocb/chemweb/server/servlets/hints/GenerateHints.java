@@ -116,7 +116,7 @@ public class GenerateHints extends HttpServlet
                 iris.add(((IRI) (((ConstantIriMapping) mapping.getSubject()).getValue())).getValue());
 
             if(mapping.getPredicate() instanceof ConstantIriMapping)
-                iris.add(((IRI) (mapping.getPredicate().getValue())).getValue());
+                iris.add(((IRI) (((ConstantIriMapping) mapping.getPredicate()).getValue())).getValue());
 
             if(mapping.getObject() instanceof ConstantIriMapping)
                 iris.add(((IRI) (((ConstantIriMapping) mapping.getObject()).getValue())).getValue());

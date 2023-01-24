@@ -477,7 +477,8 @@ public class EndpointServlet extends HttpServlet
         out.append("  \"properties\": [\n");
 
         out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
-                .map(m -> ((IRI) m.getPredicate().getValue()).getValue()).distinct().sorted()
+                .filter(m -> m.getPredicate() instanceof ConstantIriMapping) // FIXME:
+                .map(m -> ((IRI) ((ConstantIriMapping) m.getPredicate()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
@@ -485,7 +486,9 @@ public class EndpointServlet extends HttpServlet
         out.append("  \"classes\": [\n");
 
         out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
-                .filter(m -> m.getPredicate().getValue().equals(type) && m.getObject() instanceof ConstantIriMapping)
+                .filter(m -> m.getPredicate() instanceof ConstantIriMapping
+                        && ((ConstantIriMapping) m.getPredicate()).getValue().equals(type)
+                        && m.getObject() instanceof ConstantIriMapping)
                 .map(m -> ((IRI) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
