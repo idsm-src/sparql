@@ -17,7 +17,7 @@ public class Synonym
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("pubchem:synonym", "integer", new Table("pubchem", "synonym_bases"),
-                new TableColumn("id"), new TableColumn("md5"), "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_", 0));
+                new TableColumn("id"), new TableColumn("md5"), "http://rdf.ncbi.nlm.nih.gov/pubchem/synonym/MD5_"));
     }
 
 

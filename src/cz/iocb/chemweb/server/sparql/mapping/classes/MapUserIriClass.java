@@ -44,7 +44,7 @@ public class MapUserIriClass extends SimpleUserIriClass
             builder.append(Pattern.quote(prefix));
 
         if(pattern != null)
-            builder.append(pattern);
+            builder.append("(" + pattern + ")");
         else if(length > 0)
             builder.append(".{").append(length).append("}");
         else
@@ -107,9 +107,9 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
-    public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String pattern)
+    public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix)
     {
-        this(name, sqlType, table, from, to, null, 0, pattern, null);
+        this(name, sqlType, table, from, to, prefix, 0, null, null);
     }
 
 

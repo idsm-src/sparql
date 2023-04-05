@@ -16,8 +16,7 @@ public class Concept
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("pubchem:concept", "smallint", new Table("pubchem", "concept_bases"),
-                new TableColumn("id"), new TableColumn("iri"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/concept/.*"));
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/"));
     }
 
 

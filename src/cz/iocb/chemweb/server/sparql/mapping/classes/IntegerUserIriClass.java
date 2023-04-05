@@ -19,7 +19,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     private final int length;
 
 
-    public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String suffix)
+    public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String pattern, String suffix)
     {
         super(name, sqlType);
 
@@ -27,7 +27,9 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         builder.append(Pattern.quote(prefix));
 
-        if(length > 0)
+        if(pattern != null)
+            builder.append("(" + pattern + ")");
+        else if(length > 0)
             builder.append(String.format("[0-9]{%d}", length));
         else if(sqlType.equals("smallint"))
             builder.append(generateMaxNumberPattern("32767", -length));
@@ -48,21 +50,27 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String suffix)
+    {
+        this(name, sqlType, prefix, length, null, suffix);
+    }
+
+
     public IntegerUserIriClass(String name, String sqlType, String prefix, String suffix)
     {
-        this(name, sqlType, prefix, 0, suffix);
+        this(name, sqlType, prefix, 0, null, suffix);
     }
 
 
     public IntegerUserIriClass(String name, String sqlType, String prefix, int length)
     {
-        this(name, sqlType, prefix, length, null);
+        this(name, sqlType, prefix, length, null, null);
     }
 
 
     public IntegerUserIriClass(String name, String sqlType, String prefix)
     {
-        this(name, sqlType, prefix, 0, null);
+        this(name, sqlType, prefix, 0, null, null);
     }
 
 

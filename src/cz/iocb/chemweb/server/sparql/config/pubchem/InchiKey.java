@@ -16,8 +16,7 @@ public class InchiKey
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("pubchem:inchikey", "integer", new Table("pubchem", "inchikey_bases"),
-                new TableColumn("id"), new TableColumn("inchikey"), "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/",
-                0));
+                new TableColumn("id"), new TableColumn("inchikey"), "http://rdf.ncbi.nlm.nih.gov/pubchem/inchikey/"));
     }
 
 

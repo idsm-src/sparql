@@ -17,8 +17,7 @@ public class Source
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("pubchem:source", "smallint", new Table("pubchem", "source_bases"),
-                new TableColumn("id"), new TableColumn("iri"),
-                "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/source/.*"));
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/source/"));
         config.addIriClass(new ListUserIriClass("pubchem:source-license", new Table("pubchem", "source_bases"),
                 new TableColumn("license")));
         config.addIriClass(new ListUserIriClass("pubchem:source-homepage", new Table("pubchem", "source_bases"),

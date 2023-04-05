@@ -31,7 +31,7 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
-        builder.append(pattern);
+        builder.append("(" + pattern + ")");
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));

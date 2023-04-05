@@ -18,7 +18,7 @@ public class Protein
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("pubchem:protein", "integer", new Table("pubchem", "protein_bases"),
-                new TableColumn("id"), new TableColumn("name"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/ACC", 0));
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/ACC"));
     }
 
 
