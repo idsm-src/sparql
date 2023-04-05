@@ -127,6 +127,9 @@ public class SqlProcedureCall extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         LinkedHashMap<ResultDefinition, VariableOrBlankNode> restrictedResults = new LinkedHashMap<>();
 
         for(Entry<ResultDefinition, VariableOrBlankNode> result : results.entrySet())

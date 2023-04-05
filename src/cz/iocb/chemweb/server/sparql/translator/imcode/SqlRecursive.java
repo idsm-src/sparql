@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -56,15 +57,11 @@ public class SqlRecursive extends SqlIntercode
 
         if(next instanceof SqlUnion)
         {
-            SqlIntercode union = SqlNoSolution.get();
-
             UsedVariable initEnd = init.getVariables().get(endName);
 
-            for(SqlIntercode child : ((SqlUnion) next).getChilds())
-                if((new UsedPairedVariable(initEnd, child.getVariables().get(joinName))).isJoinable())
-                    union = SqlUnion.union(union, child);
-
-            next = union;
+            next = SqlUnion.union(((SqlUnion) next).getChilds().stream()
+                    .filter(c -> (new UsedPairedVariable(initEnd, c.getVariables().get(joinName))).isJoinable())
+                    .collect(toList()));
         }
 
         if(next == SqlNoSolution.get())
@@ -119,6 +116,9 @@ public class SqlRecursive extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         Set<String> childRestrictions = new HashSet<String>(restrictions);
 
         childRestrictions.add(endVar.getName());

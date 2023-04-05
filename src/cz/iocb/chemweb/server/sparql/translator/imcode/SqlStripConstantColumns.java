@@ -83,6 +83,9 @@ public class SqlStripConstantColumns extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         return strip(child.optimize(restrictions, reduced));
     }
 

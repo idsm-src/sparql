@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -46,14 +47,8 @@ public class SqlMerge extends SqlIntercode
             return SqlNoSolution.get();
 
         if(child instanceof SqlUnion)
-        {
-            SqlIntercode union = SqlNoSolution.get();
-
-            for(SqlIntercode intercode : ((SqlUnion) child).getChilds())
-                union = SqlUnion.union(union, create(variable1, variable2, intercode, restrictions));
-
-            return union;
-        }
+            return SqlUnion.union(((SqlUnion) child).getChilds().stream()
+                    .map(c -> create(variable1, variable2, c, restrictions)).collect(toList()));
 
 
         /* special merge */
@@ -82,6 +77,9 @@ public class SqlMerge extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
         contextRestrictions.add(variable1);
         contextRestrictions.add(variable2);

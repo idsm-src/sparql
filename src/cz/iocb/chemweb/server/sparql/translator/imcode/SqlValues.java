@@ -150,6 +150,9 @@ public class SqlValues extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         UsedVariables optimizedVariables = new UsedVariables();
         LinkedHashMap<Column, List<Column>> optimizedData = new LinkedHashMap<Column, List<Column>>();
 

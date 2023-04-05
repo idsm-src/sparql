@@ -41,7 +41,7 @@ public class SqlDistinct extends SqlIntercode
             return SqlEmptySolution.get();
 
         if(child instanceof SqlTableAccess && ((SqlTableAccess) child).isDistinct(distinctVariables))
-            return restrictions == null ? child : child.optimize(restrictions, true);
+            return child.optimize(restrictions, true);
 
 
         /* standard distinct */
@@ -59,6 +59,9 @@ public class SqlDistinct extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         HashSet<String> childRestriction = new HashSet<String>(restrictions);
         childRestriction.addAll(distinctVariables);
 

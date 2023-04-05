@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,8 +14,6 @@ import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -34,53 +34,58 @@ public class SqlUnion extends SqlIntercode
     }
 
 
-    public static SqlIntercode union(SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode union(List<SqlIntercode> branches)
     {
         /* special cases */
 
-        if(left == SqlNoSolution.get())
-            return right;
+        branches = branches.stream().filter(i -> i != SqlNoSolution.get()).collect(toList());
 
-        if(right == SqlNoSolution.get())
-            return left;
+        if(branches.isEmpty())
+            return SqlNoSolution.get();
+
+        if(branches.size() == 1)
+            return branches.get(0);
 
 
         /* standard union */
 
-        ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(left.getVariables(), right.getVariables());
+        Set<String> varNames = branches.stream().flatMap(i -> i.variables.getNames().stream()).collect(toSet());
         Map<String, Set<ResourceClass>> classes = new HashMap<String, Set<ResourceClass>>();
 
-        for(UsedPairedVariable pair : pairs)
+        for(String varName : varNames)
         {
             Set<ResourceClass> set = new HashSet<ResourceClass>();
-            classes.put(pair.getName(), set);
+            classes.put(varName, set);
 
-            for(PairedClass pairedClass : pair.getClasses())
+            Set<ResourceClass> resources = new HashSet<ResourceClass>();
+
+            for(SqlIntercode branche : branches)
             {
-                if(pairedClass.getLeftClass() == null)
-                    set.add(pairedClass.getRightClass());
-                else if(pairedClass.getRightClass() == null)
-                    set.add(pairedClass.getLeftClass());
-                else if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                    set.add(pairedClass.getLeftClass());
+                UsedVariable var = branche.getVariables().get(varName);
+
+                if(var != null)
+                    resources.addAll(var.getClasses());
+            }
+
+            for(ResourceClass res : resources)
+            {
+                if(resources.contains(res.getGeneralClass()))
+                    set.add(res.getGeneralClass());
                 else
-                    set.add(pairedClass.getLeftClass().getGeneralClass());
+                    set.add(res);
             }
         }
 
 
         List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
-        if(left instanceof SqlUnion)
-            childs.addAll(((SqlUnion) left).childs);
-        else
-            childs.add(left);
-
-
-        if(right instanceof SqlUnion)
-            childs.addAll(((SqlUnion) right).childs);
-        else
-            childs.add(right);
+        for(SqlIntercode branch : branches)
+        {
+            if(branch instanceof SqlUnion)
+                childs.addAll(((SqlUnion) branch).childs);
+            else
+                childs.add(branch);
+        }
 
 
         Map<List<Column>, Column> unionColumns = new HashMap<List<Column>, Column>();
@@ -96,8 +101,8 @@ public class SqlUnion extends SqlIntercode
         {
             String name = entry.getKey();
 
-            boolean canBeNull = left.getVariables().get(name) == null || left.getVariables().get(name).canBeNull()
-                    || right.getVariables().get(name) == null || right.getVariables().get(name).canBeNull();
+            boolean canBeNull = childs.stream()
+                    .anyMatch(i -> i.getVariables().get(name) == null || i.getVariables().get(name).canBeNull());
 
             UsedVariable variable = new UsedVariable(name, canBeNull);
 
@@ -196,12 +201,10 @@ public class SqlUnion extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
-        SqlIntercode result = SqlNoSolution.get();
+        if(restrictions == null)
+            return this;
 
-        for(SqlIntercode child : childs)
-            result = union(result, child.optimize(restrictions, reduced));
-
-        return result;
+        return union(childs.stream().map(c -> c.optimize(restrictions, reduced)).collect(toList()));
     }
 
 

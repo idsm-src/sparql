@@ -699,6 +699,9 @@ public class SqlTableAccess extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         UsedVariables optVariables = new UsedVariables();
 
         Map<Column, Column> optExpressions = new HashMap<Column, Column>();

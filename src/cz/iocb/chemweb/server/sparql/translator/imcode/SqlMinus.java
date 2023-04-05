@@ -48,11 +48,11 @@ public class SqlMinus extends SqlIntercode
                 shareVariables = true;
 
             if(!pair.isJoinable())
-                return restrictions == null ? left : left.optimize(restrictions, reduced);
+                return left.optimize(restrictions, reduced);
         }
 
         if(shareVariables == false)
-            return restrictions == null ? left : left.optimize(restrictions, reduced);
+            return left.optimize(restrictions, reduced);
 
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
@@ -61,6 +61,9 @@ public class SqlMinus extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         reduced = reduced & right.isDeterministic;
 
         HashSet<String> childRestrictions = new HashSet<String>();

@@ -51,17 +51,17 @@ public class SqlExists extends SqlExpressionIntercode
 
         if(pattern instanceof SqlUnion)
         {
-            SqlIntercode union = SqlNoSolution.get();
+            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : ((SqlUnion) pattern).getChilds())
             {
                 ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(), variables);
 
                 if(pairs.stream().allMatch(p -> p.isJoinable()))
-                    union = SqlUnion.union(union, child);
+                    unionList.add(child);
             }
 
-            return new SqlExists(negated, union, variables);
+            return new SqlExists(negated, SqlUnion.union(unionList), variables);
         }
 
 

@@ -200,8 +200,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         restrictions.add(object.getSqlName());
 
         PathTranslateVisitor visitor = new PathTranslateVisitor(this, datasets);
-        SqlIntercode result = SqlNoSolution.get();
         SqlIntercode select = visitElement(describeQuery.getSelect());
+        List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
         for(VarOrIri resource : describeQuery.getResources())
         {
@@ -212,11 +212,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 SqlIntercode subjectPattern = visitor.translate(null, iri, predicate, object);
                 subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
-                result = SqlUnion.union(result, subjectPattern);
+                unionList.add(subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, iri);
                 objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern);
-                result = SqlUnion.union(result, objectPattern);
+                unionList.add(objectPattern);
             }
             else
             {
@@ -229,16 +229,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
                 subjectPattern = SqlJoin.join(source, subjectPattern);
                 subjectPattern = SqlBind.bind(subject.getSqlName(), expression, subjectPattern);
-                result = SqlUnion.union(result, subjectPattern);
+                unionList.add(subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
                 objectPattern = SqlJoin.join(source, objectPattern);
                 objectPattern = SqlBind.bind(object.getSqlName(), expression, objectPattern);
-                result = SqlUnion.union(result, objectPattern);
+                unionList.add(objectPattern);
             }
         }
 
-        return new SqlQuery(restrictions, result).optimize();
+        return new SqlQuery(restrictions, SqlUnion.union(unionList)).optimize();
     }
 
 
@@ -605,21 +605,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
                 else if(variable == null)
                 {
-                    SqlIntercode innerPattern = translatedPattern;
-                    translatedPattern = SqlNoSolution.get();
+                    List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                        translatedPattern = SqlUnion.union(translatedPattern,
-                                SqlBind.bind(varName, SqlIri.create((IRI) g.getValue()), innerPattern));
+                        unionList.add(SqlBind.bind(varName, SqlIri.create((IRI) g.getValue()), translatedPattern));
+
+                    translatedPattern = SqlUnion.union(unionList);
                 }
                 else
                 {
-                    SqlIntercode innerPattern = translatedPattern;
-                    translatedPattern = SqlNoSolution.get();
+                    List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                        translatedPattern = SqlUnion.union(translatedPattern, SqlJoin.join(innerPattern,
+                        unionList.add(SqlJoin.join(translatedPattern,
                                 SqlValues.create(asList(varName), asList(asList(g.getValue())))));
+
+                    translatedPattern = SqlUnion.union(unionList);
                 }
             }
         }
@@ -640,15 +641,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Union union)
     {
-        SqlIntercode translatedPattern = SqlNoSolution.get();
-
-        for(GraphPattern pattern : union.getPatterns())
-        {
-            SqlIntercode translated = visitElement(pattern);
-            translatedPattern = SqlUnion.union(translatedPattern, translated);
-        }
-
-        return translatedPattern;
+        return SqlUnion.union(union.getPatterns().stream().map(p -> visitElement(p)).collect(toList()));
     }
 
 

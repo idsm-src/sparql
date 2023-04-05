@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -130,12 +131,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(AlternativePath alternativePath)
     {
-        SqlIntercode result = SqlNoSolution.get();
-
-        for(Path child : alternativePath.getChildren())
-            result = SqlUnion.union(result, visitElement(child, subject, object));
-
-        return result;
+        return SqlUnion.union(
+                alternativePath.getChildren().stream().map(c -> visitElement(c, subject, object)).collect(toList()));
     }
 
 
@@ -164,7 +161,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(graph instanceof VariableOrBlankNode)
                     distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
 
-                SqlIntercode child = SqlDistinct.create(SqlUnion.union(subjects, objects), distinctVariables);
+                SqlIntercode child = SqlDistinct.create(SqlUnion.union(asList(subjects, objects)), distinctVariables);
 
                 return SqlBind.bind(objectName, SqlVariable.create(subjectName, child.getVariables()), child);
             }
@@ -317,15 +314,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        SqlIntercode translatedPattern = SqlNoSolution.get();
+        if(!negIriSet.isEmpty() && invNegIriSet.isEmpty())
+            return translateNegatedPath(subject, negIriSet, object);
 
-        if(!negIriSet.isEmpty())
-            translatedPattern = SqlUnion.union(translatedPattern, translateNegatedPath(subject, negIriSet, object));
+        if(!invNegIriSet.isEmpty() && negIriSet.isEmpty())
+            return translateNegatedPath(object, invNegIriSet, subject);
 
-        if(!invNegIriSet.isEmpty())
-            translatedPattern = SqlUnion.union(translatedPattern, translateNegatedPath(object, invNegIriSet, subject));
-
-        return translatedPattern;
+        return SqlUnion.union(asList(translateNegatedPath(subject, negIriSet, object),
+                translateNegatedPath(object, invNegIriSet, subject)));
     }
 
 
@@ -352,7 +348,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public SqlIntercode visit(VarOrIri predicate)
     {
-        SqlIntercode translatedPattern = SqlNoSolution.get();
+        List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
         for(QuadMapping mapping : Request.currentRequest().getConfiguration().getMappings(parent.getService()))
         {
@@ -379,17 +375,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object,
                         new Conditions(new Condition()));
-                translatedPattern = SqlUnion.union(translatedPattern, translated);
+                unionList.add(translated);
             }
         }
 
-        return translatedPattern;
+        return SqlUnion.union(unionList);
     }
 
 
     private SqlIntercode translateNegatedPath(Node subject, List<IRI> negatedIriSet, Node object)
     {
-        SqlIntercode translatedPattern = SqlNoSolution.get();
+        List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
         Variable fakePredicate = parent.createVariable(variablePrefix);
 
@@ -421,7 +417,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     SqlIntercode translated = translateMapping(mapping, graph, subject, null, object,
                             new Conditions(new Condition()));
-                    translatedPattern = SqlUnion.union(translatedPattern, translated);
+                    unionList.add(translated);
                 }
                 else
                 {
@@ -452,12 +448,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                     }
 
                     SqlIntercode translated = translateMapping(mapping, graph, subject, null, object, extraConditions);
-                    translatedPattern = SqlUnion.union(translatedPattern, translated);
+                    unionList.add(translated);
                 }
             }
         }
 
-        return translatedPattern;
+        return SqlUnion.union(unionList);
     }
 
 

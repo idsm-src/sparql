@@ -58,14 +58,10 @@ public class SqlFilter extends SqlIntercode
         }
 
         if(child instanceof SqlUnion)
-        {
-            SqlIntercode union = SqlNoSolution.get();
-
-            for(SqlIntercode intercode : ((SqlUnion) child).getChilds())
-                union = SqlUnion.union(union, filter(conditions, intercode, restrictions, reduced));
-
-            return restrictions == null ? union : union.optimize(restrictions, reduced);
-        }
+            return SqlUnion
+                    .union(((SqlUnion) child).getChilds().stream()
+                            .map(c -> filter(conditions, c, restrictions, reduced)).collect(toList()))
+                    .optimize(restrictions, reduced);
 
 
         /* standard filter */
@@ -88,7 +84,7 @@ public class SqlFilter extends SqlIntercode
             return SqlNoSolution.get();
 
         if(validExpressions.isEmpty())
-            return restrictions == null ? child : child.optimize(restrictions, reduced);
+            return child.optimize(restrictions, reduced);
 
 
         UsedVariables variables = child.getVariables().restrict(restrictions);
@@ -100,6 +96,9 @@ public class SqlFilter extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         SqlIntercode optChild = child;
         List<SqlExpressionIntercode> optCnds = conditions;
 

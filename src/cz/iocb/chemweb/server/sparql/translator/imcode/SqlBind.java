@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -61,17 +62,13 @@ public class SqlBind extends SqlIntercode
             return SqlNoSolution.get();
 
         if(expression == SqlNull.get() || restrictions != null && !restrictions.contains(variableName))
-            return restrictions == null ? child : child.optimize(restrictions, reduced);
+            return child.optimize(restrictions, reduced);
 
         if(child instanceof SqlUnion)
-        {
-            SqlIntercode union = SqlNoSolution.get();
-
-            for(SqlIntercode intercode : ((SqlUnion) child).getChilds())
-                union = SqlUnion.union(union, bind(variableName, expression, intercode, restrictions, reduced));
-
-            return restrictions == null ? union : union.optimize(restrictions, reduced);
-        }
+            return SqlUnion
+                    .union(((SqlUnion) child).getChilds().stream()
+                            .map(c -> bind(variableName, expression, c, restrictions, reduced)).collect(toList()))
+                    .optimize(restrictions, reduced);
 
 
         /* standard bind */
@@ -113,6 +110,9 @@ public class SqlBind extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         if(!restrictions.contains(variableName))
             return child.optimize(restrictions, reduced);
 

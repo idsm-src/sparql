@@ -95,6 +95,9 @@ public class SqlAggregation extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         HashSet<String> childRestrictions = new HashSet<String>(groupVariables);
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())

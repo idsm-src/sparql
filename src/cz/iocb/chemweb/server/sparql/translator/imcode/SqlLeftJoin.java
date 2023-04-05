@@ -60,41 +60,39 @@ public class SqlLeftJoin extends SqlIntercode
             return SqlNoSolution.get();
 
         if(right == SqlNoSolution.get() || right == SqlEmptySolution.get() || !isJoinable(left, right, conditions))
-            return restrictions == null ? left : left.optimize(restrictions, reduce);
+            return left.optimize(restrictions, reduce);
 
         if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-            return restrictions == null ? SqlJoin.join(left, right) :
-                    SqlJoin.join(left, right).optimize(restrictions, reduce);
+            return SqlJoin.join(left, right).optimize(restrictions, reduce);
 
         if(left instanceof SqlUnion)
         {
-            SqlIntercode union = SqlNoSolution.get();
+            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : ((SqlUnion) left).getChilds())
             {
                 List<SqlExpressionIntercode> conds = optimize(conditions, child.getVariables(), right.getVariables());
-                union = SqlUnion.union(union, leftJoin(child, right, conds, restrictions, reduce));
+                unionList.add(leftJoin(child, right, conds, restrictions, reduce));
             }
 
-            return restrictions == null ? union : union.optimize(restrictions, reduce);
+            return SqlUnion.union(unionList).optimize(restrictions, reduce);
         }
 
         if(right instanceof SqlUnion)
         {
-            SqlIntercode union = SqlNoSolution.get();
+            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : ((SqlUnion) right).getChilds())
                 if(isJoinable(left, child, optimize(conditions, left.getVariables(), child.getVariables())))
-                    union = SqlUnion.union(union, child);
+                    unionList.add(child);
 
-            conditions = optimize(conditions, left.getVariables(), union.getVariables());
-            right = union;
+            right = SqlUnion.union(unionList);
+            conditions = optimize(conditions, left.getVariables(), right.getVariables());
 
-            if(!(union instanceof SqlUnion))
-                return leftJoin(left, union, conditions, restrictions, reduce);
+            if(!(right instanceof SqlUnion))
+                return leftJoin(left, right, conditions, restrictions, reduce);
             else if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-                return restrictions == null ? SqlJoin.join(left, right) :
-                        SqlJoin.join(left, right).optimize(restrictions, reduce);
+                return SqlJoin.join(left, right).optimize(restrictions, reduce);
         }
 
         if(left instanceof SqlTableAccess && right instanceof SqlTableAccess && conditions.isEmpty())
@@ -175,6 +173,9 @@ public class SqlLeftJoin extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
 
         HashSet<String> childRestrictions = new HashSet<String>();

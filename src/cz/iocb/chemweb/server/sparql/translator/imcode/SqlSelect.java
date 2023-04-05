@@ -59,6 +59,9 @@ public class SqlSelect extends SqlIntercode
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
+        if(restrictions == null)
+            return this;
+
         restrictions = new HashSet<String>(restrictions);
         restrictions.retainAll(variables.getNames());
 
@@ -79,8 +82,8 @@ public class SqlSelect extends SqlIntercode
             if(optimizedChild.getVariables().get(entry.getKey()) != null)
                 optimizedOrderByVariables.put(entry.getKey(), entry.getValue());
 
-        SqlSelect result = new SqlSelect(optimizedChild.getVariables().restrict(restrictions), optimizedChild, distinctVariables,
-                optimizedOrderByVariables);
+        SqlSelect result = new SqlSelect(optimizedChild.getVariables().restrict(restrictions), optimizedChild,
+                distinctVariables, optimizedOrderByVariables);
 
         result.setLimit(limit);
         result.setOffset(offset);
