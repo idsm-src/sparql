@@ -102,7 +102,7 @@ public class Condition
 
     public void addIsNull(Column column)
     {
-        isNotNull.add(column);
+        isNull.add(column);
     }
 
 
