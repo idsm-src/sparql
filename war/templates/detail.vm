@@ -10,46 +10,46 @@
         $entity template:pageTemplate ?TEMPLATE.
       }
     #end
-	
+
     #if($type.TEMPLATE)
       #parse("page/$type.TEMPLATE.value")
     #else
-	  
-	  #sparql($info)
-	    SELECT ?TYPE WHERE
-	    {
-	      $entity rdf:type ?TYPE.
-	    }
-	  #end
-	  
-	  #sparql($triple)
-	    SELECT ?P WHERE
-	    {
-	      $entity ?P ?O.
-	    }
-	    LIMIT 1
-	  #end
-	  
-	  
-	  <div style="margin:10px">
-	    <table cellpadding="10"><tr>
-	      <td><img width="32px" height="32px" src="images/dialog-information.png"></td>
-	      <td><b>
-	        #if($triple.P)
-	          There is no template for node #escapeIRI($entity)#if($info.TYPE) (type #escapeIRI($info.TYPE))#end.
-	        #else
-	          There is no node #escapeIRI($entity) in the database.
-	        #end  
-	        </b></td>
-	    </tr></table>
-	  </div>
-	#end
+
+      #sparql($info)
+        SELECT ?TYPE WHERE
+        {
+          $entity rdf:type ?TYPE.
+        }
+      #end
+
+      #sparql($triple)
+        SELECT ?P WHERE
+        {
+          $entity ?P ?O.
+        }
+        LIMIT 1
+      #end
+
+
+      <div style="margin:10px">
+        <table cellpadding="10"><tr>
+          <td><img width="32px" height="32px" src="images/dialog-information.png"></td>
+          <td><b>
+            #if($triple.P)
+              There is no template for node #escapeIRI($entity)#if($info.TYPE) (type #escapeIRI($info.TYPE))#end.
+            #else
+              There is no node #escapeIRI($entity) in the database.
+            #end
+            </b></td>
+        </tr></table>
+      </div>
+    #end
   #else
     ##imposible
-	<b>Literal:</b> #escapeHTML($entity)
+    <b>Literal:</b> #escapeHTML($entity)
   #end
 #else
     ##imposible
-	<b>null</b>
+    <b>null</b>
 #end
 </div>
