@@ -1,6 +1,4 @@
-#set($PMID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($title)
+#sparql($reference)
   SELECT ?TITLE FROM pubchem:reference WHERE
   {
     $entity dcterms:title ?TITLE
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$PMID</b></td>
+      #if($reference.TITLE)
+      <td>#escapeHTML($reference.TITLE)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($title.TITLE)
     <tr>
-      <td>#escapeHTML($title.TITLE)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

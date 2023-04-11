@@ -312,5 +312,25 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:preferred_iupac_name", "compound"));
         }
+
+        {
+            Table table = new Table(schema, "compound_thesaurus_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:compound", "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("ontology:resource", Ontology.unitThesaurus, "match"));
+        }
+
+        {
+            Table table = new Table(schema, "compound_wikidata_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:compound", "compound");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("wikidata:wiki", "match"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("wikidata:entity", "match"));
+        }
     }
 }

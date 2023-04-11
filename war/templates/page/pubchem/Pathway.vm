@@ -1,70 +1,82 @@
-#set($PWID = $entity.getValue().replaceAll(".*/PWID",""))
+#sparql($pathway)
+  SELECT ?TITLE FROM pubchem:pathway WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
 
+#sparql($organism)
+  SELECT ?NAME FROM pubchem:pathway FROM pubchem:taxonomy WHERE
+  {
+    $entity up:organism / skos:prefLabel ?NAME
+  }
+#end
+
+#sparql($match)
+  SELECT ?MATCH FROM pubchem:pathway WHERE
+  {
+    $entity skos:exactMatch ?MATCH
+  }
+#end
+
+#sparql($components)
+  SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:pathway FROM pubchem:taxonomy WHERE
+  {
+    $entity bp:pathwayComponent ?COMPONENT.
+
+    OPTIONAL
+    {
+      ?COMPONENT dcterms:title ?TITLE.
+    }
+
+    OPTIONAL
+    {
+      ?COMPONENT up:organism / skos:prefLabel ?ORGANISM
+    }
+  }
+  ORDER BY (?COMPONENT)
+#end
+
+#sparql($references)
+  SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:pathway FROM pubchem:reference WHERE
+  {
+    $entity cito:isDiscussedBy ?REFERENCE.
+
+    OPTIONAL
+    {
+      ?REFERENCE dcterms:title ?TITLE.
+    }
+
+    OPTIONAL
+    {
+      ?REFERENCE dcterms:bibliographicCitation ?CITATION.
+    }
+  }
+  ORDER BY (?REFERENCE)
+#end
 
 <style scoped>
 #include("css/owl.css")
 </style>
 
 <div class="VET-Page">
-  #sparql($match)
-    SELECT ?MATCH FROM pubchem:pathway WHERE
-    {
-      $entity skos:exactMatch ?MATCH
-    }
-  #end
-
   <div class="VET-TitleBox">
-    <span class="VET-Title">pathway:PWID$PWID</span>
+    <span class="VET-Title">#escapeIRI($entity)</span>
     #if($match.MATCH)
       (<a href="$match.MATCH.getValue()" target="_blank">open in source</a>)
     #end
   </div>
 
-  #sparql($title)
-    SELECT ?TITLE FROM pubchem:pathway WHERE
-    {
-      $entity dcterms:title ?TITLE
-    }
-  #end
-
-  #sparql($organism)
-    SELECT ?NAME FROM pubchem:pathway FROM dataset:ontology WHERE
-    {
-      $entity up:organism / rdfs:label ?NAME
-    }
-  #end
-
-  #if($title.TITLE || $organism.NAME)
+  #if($pathway.TITLE)
   <div class="VET-BoxedSection">
     <div>
-      #if($title.TITLE)
-      #escapeHTML($title.TITLE)
-      #end
+      #escapeHTML($pathway.TITLE)
       #if($organism.NAME)
       <br/>
       <small style="color:gray">#escapeHTML($organism.NAME)</small>
       #end
     </div>
   </div>
-  #end
-
-
-  #sparql($components)
-    SELECT ?COMPONENT ?TITLE ?ORGANISM FROM pubchem:pathway FROM dataset:ontology WHERE
-    {
-      $entity bp:pathwayComponent ?COMPONENT.
-
-      OPTIONAL
-      {
-        ?COMPONENT dcterms:title ?TITLE.
-      }
-
-      OPTIONAL
-      {
-        ?COMPONENT up:organism / rdfs:label ?ORGANISM
-      }
-    }
-    ORDER BY (?COMPONENT)
   #end
 
   #if($components.count > 0)
@@ -80,7 +92,7 @@
         #foreach($component in $components)
         <tr>
           <td>
-            #url($component.COMPONENT)$component.COMPONENT.getValue().replaceAll(".*/","")#end
+            #url($component.COMPONENT)$component.COMPONENT.getValue().replaceFirst(".*/","")#end
           </td>
           <td>
             #if($component.TITLE)
@@ -96,25 +108,6 @@
       </table>
     </div>
   </div>
-  #end  
-
-
-  #sparql($references)
-    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:pathway FROM pubchem:reference WHERE
-    {
-      $entity cito:isDiscussedBy ?REFERENCE.
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:title ?TITLE.
-      }
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:bibliographicCitation ?CITATION.
-      }
-    }
-    ORDER BY (?REFERENCE)
   #end
 
   #if($references.count > 0)
@@ -130,7 +123,7 @@
         #foreach($reference in $references)
         <tr>
           <td>
-            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceAll(".*/", "")#end
+            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceFirst(".*/", "")#end
           </td>
           <td>
             #if($reference.TITLE)
@@ -146,5 +139,4 @@
     </div>
   </div>
   #end
-
 </div>

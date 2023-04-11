@@ -1,0 +1,28 @@
+#sparql($book)
+  SELECT ?TITLE FROM pubchem:book WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
+
+#sparql($publisher)
+  SELECT ?NAME FROM pubchem:book WHERE
+  {
+    $entity dcterms:publisher ?NAME
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      #if($book.TITLE)
+      <td>#escapeHTML($book.TITLE)#if($publisher.NAME && $publisher.NAME != $book.TITLE), #escapeHTML($publisher.NAME)#end</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

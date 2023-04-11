@@ -15,7 +15,7 @@ public class Concept
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("pubchem:concept", "smallint", new Table("pubchem", "concept_bases"),
+        config.addIriClass(new MapUserIriClass("pubchem:concept", "smallint", new Table(schema, "concept_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/concept/"));
     }
 
@@ -42,13 +42,11 @@ public class Concept
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:broader"),
                     config.createIriMapping("pubchem:concept", "broader"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("<http://purl.org/pav/importedFrom>"),
-                    config.createIriMapping("source:WHO"), config.createAreEqualCondition(
-                            "(iri like 'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC%')", "'true'::boolean"));
+                    config.createIriMapping("source:WHO"),
+                    config.createAreEqualCondition("(iri like 'ATC%')", "'true'::boolean"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("skos:Concept"),
-                    config.createAreNotEqualCondition("iri",
-                            "'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/ATC'::varchar",
-                            "'http://rdf.ncbi.nlm.nih.gov/pubchem/concept/SubstanceCategorization'::varchar"));
+                    config.createAreNotEqualCondition("iri", "'ATC'::varchar", "'SubstanceCategorization'::varchar"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),

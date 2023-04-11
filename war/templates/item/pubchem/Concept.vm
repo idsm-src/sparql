@@ -11,7 +11,7 @@
       #if($concept.LABEL)
       <td>#escapeHTML($concept.LABEL)</td>
       #else
-      <td>$entity.getValue().replaceAll(".*/", "")</td>
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
       #end
     </tr>
     <tr>

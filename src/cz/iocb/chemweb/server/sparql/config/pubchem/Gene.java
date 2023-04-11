@@ -5,9 +5,11 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdSt
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntegerUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 
 
 
@@ -15,14 +17,29 @@ public class Gene
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(
-                new IntegerUserIriClass("pubchem:gene", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID"));
+        String pattern = "([0123569]|[1-9][0-9]{1,8}|[1-1][0-9]{9}|2[0-0][0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]{1}|214748364[0-7])";
+
+        config.addIriClass(new MapUserIriClass("pubchem:gene_symbol", "integer", new Table(schema, "gene_symbol_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/",
+                "(GI?D?|GID[478]|([^G]|G[^I]|GI[^D]).*)"));
+        config.addIriClass(new IntegerUserIriClass("pubchem:gene", "integer",
+                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID", 0, pattern, null));
     }
 
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("pubchem:gene");
+
+        {
+            Table table = new Table(schema, "gene_symbol_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:gene_symbol", "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("sio:SIO_001383"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
+                    config.createLiteralMapping(xsdString, "iri"));
+        }
 
         {
             Table table = new Table(schema, "gene_bases");
@@ -35,23 +52,23 @@ public class Gene
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
                     config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0002870"),
-                    config.createLiteralMapping(xsdString, "symbol"));
+                    config.createIriMapping("pubchem:gene_symbol", "gene_symbol"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
-                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
+                    config.createIriMapping("pubchem:taxonomy", "organism"));
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("bp:Gene"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(xsdString, "title"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:gene-symbol"),
-                    config.createLiteralMapping(xsdString, "symbol"));
+            config.addQuadMapping(table, new Table(schema, "gene_symbol_bases"), "gene_symbol", "id", graph, subject,
+                    config.createIriMapping("sio:gene-symbol"), config.createLiteralMapping(xsdString, "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
+                    config.createIriMapping("pubchem:taxonomy", "organism"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Gene.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
@@ -59,7 +76,7 @@ public class Gene
 
             // deprecated extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism"));
         }
 
         {

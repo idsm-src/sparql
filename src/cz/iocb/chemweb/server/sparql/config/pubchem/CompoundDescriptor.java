@@ -67,7 +67,6 @@ public class CompoundDescriptor
         ConstantIriMapping template = config.createIriMapping("template:itemTemplate");
         ConstantIriMapping value = config.createIriMapping("sio:SIO_000300");
         ConstantIriMapping unit = config.createIriMapping("sio:SIO_000221");
-        String directory = "pubchem/descriptor/";
 
         ConstantIriMapping oldValue = config.createIriMapping("sio:has-value");
         ConstantIriMapping oldUnit = config.createIriMapping("sio:has-unit");
@@ -86,7 +85,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -103,7 +103,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -120,7 +121,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -137,7 +139,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -154,7 +157,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -171,7 +175,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -188,7 +193,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -205,7 +211,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -222,7 +229,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -239,7 +247,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -256,7 +265,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -273,7 +283,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -290,7 +301,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -311,7 +323,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -328,7 +341,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -345,7 +359,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -366,7 +381,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -387,7 +403,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -408,7 +425,8 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"), config.createIsNotNullCondition(field));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"),
+                    config.createIsNotNullCondition(field));
         }
 
         {
@@ -424,7 +442,7 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
         }
 
         {
@@ -440,7 +458,7 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
         }
 
         {
@@ -456,7 +474,7 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
         }
 
         {
@@ -472,7 +490,7 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
         }
 
         {
@@ -488,7 +506,7 @@ public class CompoundDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, template,
-                    config.createLiteralMapping(directory + field + ".vm"));
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
         }
     }
 }

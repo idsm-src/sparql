@@ -1,6 +1,4 @@
-#set($PWID = $entity.getValue().replaceAll(".*/PWID", ""))
-
-#sparql($title)
+#sparql($pathway)
   SELECT ?TITLE FROM pubchem:pathway WHERE
   {
     $entity dcterms:title ?TITLE
@@ -8,26 +6,28 @@
 #end
 
 #sparql($organism)
-  SELECT ?NAME FROM pubchem:pathway FROM dataset:ontology WHERE
+  SELECT ?NAME FROM pubchem:pathway FROM pubchem:taxonomy WHERE
   {
-    $entity up:organism / rdfs:label ?NAME
+    $entity up:organism / skos:prefLabel ?NAME
   }
 #end
 
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>PWID$PWID</b></td>
+      #if($pathway.TITLE)
+      <td>#escapeHTML($pathway.TITLE)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($title.TITLE)
-    <tr>
-      <td>#escapeHTML($title.TITLE)</td>
-    </tr>
-    #end
     #if($organism.NAME)
     <tr>
-      <td><small style="color:gray">#escapeHTML($organism.NAME)</small></td>
+      <td>#escapeHTML($organism.NAME)</td>
     </tr>
     #end
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
   </tbody>
 </table>

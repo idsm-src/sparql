@@ -1,6 +1,36 @@
-#set($uri = $entity.getValue())
-#set($AID = $uri.replaceAll(".*AID",""))
+#sparql($bioassay)
+  SELECT ?TITLE FROM pubchem:bioassay WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
 
+#sparql($description)
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
+  {
+    ?D sio:SIO_000011 $entity.
+    ?D rdf:type sio:SIO_000136.
+    ?D sio:SIO_000300 ?VALUE.
+  }
+#end
+
+#sparql($protocol)
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
+  {
+    ?D sio:SIO_000011 $entity.
+    ?D rdf:type sio:SIO_001041.
+    ?D sio:SIO_000300 ?VALUE.
+  }
+#end
+
+#sparql($comment)
+  SELECT ?VALUE FROM pubchem:bioassay WHERE
+  {
+    ?D sio:SIO_000011 $entity.
+    ?D rdf:type sio:SIO_001167.
+    ?D sio:SIO_000300 ?VALUE.
+  }
+#end
 
 <style scoped>
 #include("css/owl.css")
@@ -8,27 +38,14 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">bioassay:AID$AID</span> 
-    (<a href="https://pubchem.ncbi.nlm.nih.gov/bioassay/$AID" target="_blank">open in pubchem</a>)
+    <span class="VET-Title">#escapeIRI($entity)</span>
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/bioassay/$entity.getValue().replaceFirst(".*/AID","")" target="_blank">open in pubchem</a>)
   </div>
 
-  #sparql($title)
-    SELECT ?TITLE FROM pubchem:bioassay WHERE
-    {
-      $entity dcterms:title ?TITLE
-    }
-  #end
-
+  #if($bioassay.TITLE)
   <div class="VET-BoxedSection">
-    <div>#escapeHTML($title.TITLE)</div>
+    <div>#escapeHTML($bioassay.TITLE)</div>
   </div>
-
-
-  #sparql($description)
-    SELECT ?VALUE FROM pubchem:bioassay WHERE
-    {
-      <${uri}_Description> sio:SIO_000300 ?VALUE
-    }
   #end
 
   #if($description.VALUE)
@@ -38,14 +55,6 @@
   </div>
   #end
 
-
-  #sparql($protocol)
-    SELECT ?VALUE FROM pubchem:bioassay WHERE
-    {
-      <${uri}_Protocol> sio:SIO_000300 ?VALUE
-    }
-  #end
-
   #if($protocol.VALUE)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Protocol</div>
@@ -53,19 +62,10 @@
   </div>
   #end
 
-
-  #sparql($comment)
-    SELECT ?VALUE FROM pubchem:bioassay WHERE
-    {
-      <${uri}_Comment> sio:SIO_000300 ?VALUE
-    }
-  #end
-
-  #if($comment.VALUE > 0)
+  #if($comment.VALUE)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Comment</div>
     <div style="white-space: pre-wrap">$comment.VALUE.value.trim()</div>
   </div>
   #end
-
 </div>

@@ -40,7 +40,7 @@ public class SubstanceDescriptor
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("pubchem/descriptor/version.vm"));
+                    config.createLiteralMapping("pubchem/SubstanceDescriptor.vm"));
         }
     }
 }

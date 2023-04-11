@@ -1,6 +1,4 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($title)
+#sparql($source)
   SELECT ?TITLE FROM pubchem:source WHERE
   {
     $entity dcterms:title ?TITLE
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$ID</b></td>
+      #if($source.TITLE)
+      <td>#escapeHTML($source.TITLE)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($title.TITLE)
     <tr>
-      <td>#escapeHTML($title.TITLE)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

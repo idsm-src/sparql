@@ -1,6 +1,4 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($title)
+#sparql($measuregroup)
   SELECT ?TITLE FROM pubchem:measuregroup WHERE
   {
     $entity dcterms:title ?TITLE
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$ID</b></td>
+      #if($measuregroup.TITLE)
+      <td>#escapeHTML($measuregroup.TITLE)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($title.TITLE)
     <tr>
-      <td>#escapeHTML($title.TITLE)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

@@ -1,5 +1,30 @@
-#set($PID = $entity.getValue().replaceAll(".*/ACC",""))
+#sparql($protein)
+  SELECT ?LABEL FROM pubchem:protein WHERE
+  {
+    $entity skos:prefLabel ?LABEL
+  }
+#end
 
+#sparql($organism)
+  SELECT ?NAME FROM pubchem:protein FROM pubchem:taxonomy WHERE
+  {
+    $entity up:organism / skos:prefLabel ?NAME
+  }
+#end
+
+#sparql($pathways)
+  SELECT ?PATHWAY ?TITLE ?ORGANISM FROM pubchem:protein FROM pubchem:pathway FROM pubchem:taxonomy WHERE
+  {
+    ?PATHWAY rdf:type bp:Pathway.
+    ?PATHWAY obo:RO_0000057 $entity.
+    ?PATHWAY dcterms:title ?TITLE.
+
+    OPTIONAL
+    {
+      ?PATHWAY up:organism / skos:prefLabel ?ORGANISM
+    }
+  }
+#end
 
 <style scoped>
 #include("css/owl.css")
@@ -7,54 +32,20 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">protein:ACC$PID</span>
-    #if(!$PID.contains("ACC"))
-    (<a href="https://www.ncbi.nlm.nih.gov/protein/$PID" target="_blank">open in pubchem</a>)
-    #end
+    <span class="VET-Title">#escapeIRI($entity)</span>
+    (<a href="https://www.ncbi.nlm.nih.gov/protein/$entity.getValue().replaceFirst(".*/ACC","")" target="_blank">open in pubchem</a>)
   </div>
 
-
-  #sparql($title)
-    SELECT ?TITLE FROM pubchem:protein WHERE
-    {
-      $entity dcterms:title ?TITLE
-    }
-  #end
-
-  #sparql($organism)
-    SELECT ?NAME FROM pubchem:protein FROM dataset:ontology WHERE
-    {
-      $entity up:organism / rdfs:label ?NAME
-    }
-  #end
-
-  #if($title.TITLE || $organism.NAME)
+  #if($protein.LABEL)
   <div class="VET-BoxedSection">
     <div>
-      #if($title.TITLE)
-      #escapeHTML($title.TITLE)
-      #end
+      #escapeHTML($protein.LABEL)
       #if($organism.NAME)
       <br/>
       <small style="color:gray">#escapeHTML($organism.NAME)</small>
       #end
     </div>
   </div>
-  #end
-
-
-  #sparql($pathways)
-    SELECT ?PATHWAY ?TITLE ?ORGANISM FROM pubchem:protein FROM pubchem:pathway FROM dataset:ontology WHERE
-    {
-      ?PATHWAY rdf:type bp:Pathway.
-      ?PATHWAY obo:RO_0000057 $entity.
-      ?PATHWAY dcterms:title ?TITLE.
-
-      OPTIONAL
-      {
-        ?PATHWAY up:organism / rdfs:label ?ORGANISM
-      }
-    }
   #end
 
   #if($pathways.count > 0)
@@ -70,7 +61,7 @@
         #foreach($pathway in $pathways)
         <tr>
           <td>
-            #url($pathway.PATHWAY)$pathway.PATHWAY.getValue().replaceAll(".*/", "")#end
+            #url($pathway.PATHWAY)$pathway.PATHWAY.getValue().replaceFirst(".*/", "")#end
           </td>
           <td>
             #escapeHTML($pathway.TITLE)
@@ -85,54 +76,4 @@
     </div>
   </div>
   #end
-
-
-  #sparql($references)
-    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:protein FROM pubchem:reference WHERE
-    {
-      $entity cito:isDiscussedBy ?REFERENCE.
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:title ?TITLE.
-      }
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:bibliographicCitation ?CITATION.
-      }
-    }
-    ORDER BY (?REFERENCE)
-  #end
-
-  #if($references.count > 0)
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">References</div>
-    <div>
-      <table class="VET-Table">
-        <colgroup>
-          <col style="width:100px"/>
-          <col/>
-        </colgroup>
-
-        #foreach($reference in $references)
-        <tr>
-          <td>
-            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceAll(".*/", "")#end
-          </td>
-          <td>
-            #if($reference.TITLE)
-            <b>#escapeHTML($reference.TITLE)</b>
-            #end
-            #if($reference.CITATION)
-            #escapeHTML($reference.CITATION)
-            #end
-          </td>
-        </tr>
-        #end
-      </table>
-    </div>
-  </div>
-  #end
-
 </div>

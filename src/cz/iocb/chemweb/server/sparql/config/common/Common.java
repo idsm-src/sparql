@@ -31,16 +31,15 @@ public class Common
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("pubchem:taxonomy", "integer",
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/taxonomy/TAXID"));
-        config.addIriClass(
-                new IntegerUserIriClass("pubchem:cell", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/cell/CELLID"));
-        config.addIriClass(new StringUserIriClass("pubchem:patent", "http://rdf.ncbi.nlm.nih.gov/pubchem/patent/"));
-
         config.addIriClass(new IntegerUserIriClass("ncbi:gene", "integer", "https://www.ncbi.nlm.nih.gov/gene/"));
+        config.addIriClass(new IntegerUserIriClass("ncbi:book", "integer", "https://www.ncbi.nlm.nih.gov/books/NBK"));
+        config.addIriClass(
+                new IntegerUserIriClass("ncbi:taxonomy", "integer", "https://www.ncbi.nlm.nih.gov/taxonomy/"));
         config.addIriClass(new StringUserIriClass("ncbi:protein", "https://www.ncbi.nlm.nih.gov/protein/"));
+        config.addIriClass(new StringUserIriClass("ncbi:journal", "https://www.ncbi.nlm.nih.gov/nlmcatalog/"));
         config.addIriClass(new StringUserIriClass("purl:uniprot", "http://purl.uniprot.org/uniprot/"));
         config.addIriClass(new StringUserIriClass("purl:enzyme", "http://purl.uniprot.org/enzyme/"));
+        config.addIriClass(new IntegerUserIriClass("purl:taxonomy", "integer", "http://purl.uniprot.org/taxonomy/"));
 
         config.addIriClass(new IntegerUserIriClass("linkedchemistry:chembl", "integer",
                 "http://linkedchemistry.info/chembl/chemblid/CHEMBL"));
@@ -171,6 +170,26 @@ public class Common
         config.addIriClass(new StringUserIriClass("alphafold:entry", "https://alphafold.ebi.ac.uk/entry/"));
 
         config.addIriClass(new IntegerUserIriClass("pfam:family", "integer", "https://pfam.xfam.org/family/PF"));
+
+        config.addIriClass(new StringUserIriClass("orcid:author", "https://orcid.org/"));
+        config.addIriClass(new StringUserIriClass("crossref:funder", "https://data.crossref.org/fundingdata/funder/"));
+
+        config.addIriClass(
+                new StringUserIriClass("catalogueoflife:taxon", "https://www.catalogueoflife.org/data/taxon/"));
+        config.addIriClass(new IntegerUserIriClass("itis:taxonomy", "integer",
+                "https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=TSN&search_value="));
+
+        config.addIriClass(new StringUserIriClass("expasy:cell", "https://web.expasy.org/cellosaurus/CVCL_"));
+
+        config.addIriClass(
+                new StringUserIriClass("anzsrc:term", "http://purl.org/au-research/vocabulary/anzsrc-for/2008/"));
+        config.addIriClass(new StringUserIriClass("identifier:isbn", "https://isbnsearch.org/isbn"));
+        config.addIriClass(new StringUserIriClass("identifier:issn", "https://portal.issn.org/resource/ISSN"));
+        config.addIriClass(new StringUserIriClass("identifier:doi", "https://doi.org/"));
+        config.addIriClass(new StringUserIriClass("identifier:pubmed", "https://pubmed.ncbi.nlm.nih.gov/"));
+
+        config.addIriClass(new IntegerUserIriClass("wikidata:wiki", "integer", "https://www.wikidata.org/wiki/Q"));
+        config.addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q"));
     }
 
 

@@ -15,7 +15,7 @@ public class Measuregroup
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new GeneralUserIriClass("pubchem:measuregroup", "pubchem", "measuregroup",
+        config.addIriClass(new GeneralUserIriClass("pubchem:measuregroup", schema, "measuregroup",
                 asList("integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/measuregroup/AID[0-9]+(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0)?)?"));
     }

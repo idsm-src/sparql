@@ -1,12 +1,12 @@
-#sparql($protein)
-  SELECT ?LABEL FROM pubchem:protein WHERE
+#sparql($cell)
+  SELECT ?LABEL FROM pubchem:cell WHERE
   {
     $entity skos:prefLabel ?LABEL
   }
 #end
 
 #sparql($organism)
-  SELECT ?NAME FROM pubchem:protein FROM pubchem:taxonomy WHERE
+  SELECT ?NAME FROM pubchem:cell FROM pubchem:taxonomy WHERE
   {
     $entity up:organism / skos:prefLabel ?NAME
   }
@@ -15,8 +15,8 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      #if($protein.LABEL)
-      <td>#escapeHTML($protein.LABEL)</td>
+      #if($cell.LABEL)
+      <td>#escapeHTML($cell.LABEL)</td>
       #else
       <td>$entity.getValue().replaceFirst(".*/", "")</td>
       #end

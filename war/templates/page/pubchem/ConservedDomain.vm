@@ -1,5 +1,16 @@
-#set($PSSMID = $entity.getValue().replaceAll(".*/PSSMID",""))
+#sparql($domain)
+  SELECT ?TITLE FROM pubchem:conserveddomain WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
 
+#sparql($abstract)
+  SELECT ?ABSTRACT FROM pubchem:conserveddomain WHERE
+  {
+    $entity dcterms:abstract ?ABSTRACT
+  }
+#end
 
 <style scoped>
 #include("css/owl.css")
@@ -7,29 +18,14 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">conserveddomain:PSSMID$PSSMID</span>
-    (<a href="https://www.ncbi.nlm.nih.gov/Structure/cdd/cddsrv.cgi?uid=$PSSMID" target="_blank">open in pubchem</a>)
+    <span class="VET-Title">#escapeIRI($entity)</span>
+    (<a href="https://www.ncbi.nlm.nih.gov/Structure/cdd/cddsrv.cgi?uid=$entity.getValue().replaceFirst(".*/PSSMID","")" target="_blank">open in pubchem</a>)
   </div>
 
-  #sparql($title)
-    SELECT ?TITLE FROM pubchem:conserveddomain WHERE
-    {
-      $entity dcterms:title ?TITLE
-    }
-  #end
-
-  #if($title.TITLE)
+  #if($domain.TITLE)
   <div class="VET-BoxedSection">
-    <div>#escapeHTML($title.TITLE)</div>
+    <div>#escapeHTML($domain.TITLE)</div>
   </div>
-  #end
-
-
-  #sparql($abstract)
-    SELECT ?ABSTRACT FROM pubchem:conserveddomain WHERE
-    {
-      $entity dcterms:abstract ?ABSTRACT
-    }
   #end
 
   #if($abstract.ABSTRACT)
@@ -38,54 +34,4 @@
     <div>#escapeHTML($abstract.ABSTRACT)</div>
   </div>
   #end
-
-
-  #sparql($references)
-    SELECT ?REFERENCE ?TITLE ?CITATION FROM pubchem:conserveddomain FROM pubchem:reference WHERE
-    {
-      $entity cito:isDiscussedBy ?REFERENCE.
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:title ?TITLE.
-      }
-
-      OPTIONAL
-      {
-        ?REFERENCE dcterms:bibliographicCitation ?CITATION.
-      }
-    }
-    ORDER BY (?REFERENCE)
-  #end
-
-  #if($references.count > 0)
-  <div class="VET-BoxedSection">
-    <div class="VET-Header">References</div>
-    <div>
-      <table class="VET-Table">
-        <colgroup>
-          <col style="width:100px"/>
-          <col/>
-        </colgroup>
-
-        #foreach($reference in $references)
-        <tr>
-          <td>
-            #url($reference.REFERENCE)$reference.REFERENCE.getValue().replaceAll(".*/", "")#end
-          </td>
-          <td>
-            #if($reference.TITLE)
-            <b>#escapeHTML($reference.TITLE)</b>
-            #end
-            #if($reference.CITATION)
-            #escapeHTML($reference.CITATION)
-            #end
-          </td>
-        </tr>
-        #end
-      </table>
-    </div>
-  </div>
-  #end
-
 </div>

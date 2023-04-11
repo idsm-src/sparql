@@ -104,7 +104,7 @@ public class Bioassay
             Conditions conditions = config.createAreEqualCondition("type_id", "'136'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_000136"), conditions);
+                    config.createIriMapping("sio:SIO_000136"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
@@ -123,7 +123,7 @@ public class Bioassay
             Conditions conditions = config.createAreEqualCondition("type_id", "'1041'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_001041"), conditions);
+                    config.createIriMapping("sio:SIO_001041"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
@@ -142,7 +142,7 @@ public class Bioassay
             Conditions conditions = config.createAreEqualCondition("type_id", "'1167'::smallint");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("cheminf:SIO_001167"), conditions);
+                    config.createIriMapping("sio:SIO_001167"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
@@ -156,7 +156,7 @@ public class Bioassay
         }
 
         {
-            Table table = new Table(schema, "bioassay_patents");
+            Table table = new Table(schema, "bioassay_patent_references");
             NodeMapping subject = config.createIriMapping("pubchem:bioassay", "bioassay");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),

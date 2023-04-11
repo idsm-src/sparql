@@ -1,5 +1,71 @@
-#set($SID = $entity.getValue().replaceAll(".*/SID", ""))
+#sparql($substance)
+  SELECT ?COMPOUND FROM pubchem:substance WHERE
+  {
+    $entity sio:CHEMINF_000477 ?COMPOUND
+  }
+#end
 
+#if($substance.COMPOUND)
+  #sparql($compound)
+    SELECT ?NAME FROM pubchem:compound FROM descriptor:compound WHERE
+    {
+      $substance.COMPOUND sio:SIO_000008 ?D.
+      ?D rdf:type sio:CHEMINF_000382.
+      ?D sio:SIO_000300 ?NAME.
+    }
+  #end
+
+  #sparql($structure)
+    SELECT (true as ?R) FROM pubchem:compound WHERE
+    {
+      ?S rdf:type sio:SIO_011120.
+      ?S sio:SIO_000011 $substance.COMPOUND.
+      ?S sio:SIO_000300 ?V.
+    }
+  #end
+
+  #sparql($descriptors)
+    SELECT ?TITLE ?VALUE FROM pubchem:compound FROM descriptor:compound WHERE
+    {
+      $substance.COMPOUND sio:SIO_000008 ?D.
+      ?D rdf:type ?TYPE.
+      ?D sio:SIO_000300 ?VALUE.
+    }
+    VALUES (?TYPE ?TITLE)
+    {
+      (sio:CHEMINF_000335 "molecular formula")
+      (sio:CHEMINF_000379 "isomeric SMILES")
+      (sio:CHEMINF_000376 "canonical SMILES")
+      (sio:CHEMINF_000396 "IUPAC InChI")
+      (sio:CHEMINF_000338 "exact mass")
+      (sio:CHEMINF_000334 "molecular weight")
+      (sio:CHEMINF_000337 "mono isotopic weight")
+      (sio:CHEMINF_000336 "total formal charge")
+      (sio:CHEMINF_000395 "XLogP3(-AA)")
+      (sio:CHEMINF_000392 "TPSA")
+      (sio:CHEMINF_000390 "structure complexity")
+      (sio:CHEMINF_000391 "tautomer count")
+      (sio:CHEMINF_000388 "hydrogen bond acceptor count")
+      (sio:CHEMINF_000370 "defined atom stereo count")
+      (sio:CHEMINF_000371 "defined bond stereo count")
+      (sio:CHEMINF_000375 "undefined bond stereo count")
+      (sio:CHEMINF_000372 "isotope atom count")
+      (sio:CHEMINF_000369 "covalent unit count")
+      (sio:CHEMINF_000387 "hydrogen bond donor count")
+      (sio:CHEMINF_000373 "non-hydrogen atom count")
+      (sio:CHEMINF_000389 "rotatable bond count")
+      (sio:CHEMINF_000374 "undefined atom stereo count")
+    }
+  #end
+
+  #sparql($synonyms)
+    SELECT ?NAME FROM pubchem:synonym WHERE
+    {
+      ?A sio:SIO_000011 $substance.COMPOUND.
+      ?A sio:SIO_000300 ?NAME.
+    }
+  #end
+#end
 
 <style scoped>
 #include("css/owl.css")
@@ -7,41 +73,16 @@
 
 <div class="VET-Page">
   <div class="VET-TitleBox">
-    <span class="VET-Title">substance:SID$SID</span>
-    (<a href="https://pubchem.ncbi.nlm.nih.gov/substance/$SID" target="_blank">open in pubchem</a>)
+    <span class="VET-Title">#escapeIRI($entity)</span>
+    (<a href="https://pubchem.ncbi.nlm.nih.gov/substance/$entity.getValue().replaceFirst(".*/SID", "")" target="_blank">open in pubchem</a>)
   </div>
 
-  #sparql($compound)
-    SELECT ?COMPOUND FROM pubchem:substance WHERE
-    {
-      $entity sio:CHEMINF_000477 ?COMPOUND
-    }
-  #end
+  #if($substance.COMPOUND)
 
-  #if($compound.count > 0)
-  #set($CID = $compound.COMPOUND.getValue().replaceAll(".*/CID", ""))
-
-  #sparql($iupac)
-    SELECT ?NAME FROM descriptor:compound WHERE
-    {
-      descriptor:CID${CID}_Preferred_IUPAC_Name sio:SIO_000300 ?NAME
-    }
-  #end
-
-  #if($iupac.count > 0)
+  #if($compound.NAME)
   <div class="VET-BoxedSection">
-    <div>#escapeHTML($iupac.NAME)</div>
+    <div>#escapeHTML($compound.NAME)</div>
   </div>
-  #end
-
-
-  #sparql($structure)
-    SELECT (true as ?R) WHERE
-    {
-      ?S rdf:type sio:SIO_011120.
-      ?S sio:SIO_000011 compound:CID$CID.
-      ?S sio:SIO_000300 ?V.
-    }
   #end
 
   #if($structure.count > 0)
@@ -49,45 +90,11 @@
     <table style="width:100%;">
       <tr>
         <td align="center" style="text-align: center;">
-          <img src="compound/image?w=800&id=$CID" alt="CID$CID" height="400" width="400">
+          <img src="compound/image?w=800&id=$substance.COMPOUND.getValue().replaceFirst(".*/CID", "")" height="400" width="400">
         </td>
       </tr>
     </table>
   </div>
-  #end
-
-
-  #sparql($descriptors)
-    SELECT ?TITLE ?VALUE FROM descriptor:compound WHERE
-    {
-      ?NODE sio:SIO_000300 ?VALUE
-    }
-    VALUES (?NODE ?TITLE)
-    {
-      (descriptor:CID${CID}_Molecular_Formula            "molecular formula")
-      (descriptor:CID${CID}_Isomeric_SMILES              "isomeric SMILES")
-      (descriptor:CID${CID}_Canonical_SMILES             "canonical SMILES")
-      (descriptor:CID${CID}_IUPAC_InChI                  "IUPAC InChI")
-      (descriptor:CID${CID}_Exact_Mass                   "exact mass")
-      (descriptor:CID${CID}_Molecular_Weight             "molecular weight")
-      (descriptor:CID${CID}_Mono_Isotopic_Weight         "mono isotopic weight")
-      (descriptor:CID${CID}_Total_Formal_Charge          "total formal charge")
-      (descriptor:CID${CID}_XLogP3-AA                    "XLogP3-AA")
-      (descriptor:CID${CID}_XLogP3                       "XLogP3")
-      (descriptor:CID${CID}_TPSA                         "TPSA")
-      (descriptor:CID${CID}_Structure_Complexity         "structure complexity")
-      (descriptor:CID${CID}_Tautomer_Count               "tautomer count")
-      (descriptor:CID${CID}_Hydrogen_Bond_Acceptor_Count "hydrogen bond acceptor count")
-      (descriptor:CID${CID}_Defined_Atom_Stereo_Count    "defined atom stereo count")
-      (descriptor:CID${CID}_Defined_Bond_Stereo_Count    "defined bond stereo count")
-      (descriptor:CID${CID}_Undefined_Bond_Stereo_Count  "undefined bond stereo count")
-      (descriptor:CID${CID}_Isotope_Atom_Count           "isotope atom count")
-      (descriptor:CID${CID}_Covalent_Unit_Count          "covalent unit count")
-      (descriptor:CID${CID}_Hydrogen_Bond_Donor_Count    "hydrogen bond donor count")
-      (descriptor:CID${CID}_Non-hydrogen_Atom_Count      "non-hydrogen atom count")
-      (descriptor:CID${CID}_Rotatable_Bond_Count         "rotatable bond count")
-      (descriptor:CID${CID}_Undefined_Atom_Stereo_Count  "undefined atom stereo count")
-    }
   #end
 
   #if($descriptors.count > 0)
@@ -111,15 +118,6 @@
   </div>
   #end
 
-
-  #sparql($synonyms)
-    SELECT ?NAME FROM pubchem:synonym WHERE
-    {
-      ?ATTR sio:SIO_000011 $entity.
-      ?ATTR sio:SIO_000300 ?NAME.
-    }
-  #end
-
   #if($synonyms.count > 0)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Synonyms</div>
@@ -134,6 +132,5 @@
     </div>
   </div>
   #end
-
 #end
 </div>

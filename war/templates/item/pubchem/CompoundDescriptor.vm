@@ -1,0 +1,31 @@
+#sparql($data)
+  SELECT ?VALUE ?UNIT FROM descriptor:compound WHERE
+  {
+    $entity sio:SIO_000300 ?VALUE.
+
+    OPTIONAL
+    {
+      $entity sio:SIO_000221 ?UNIT_TYPE.
+      VALUES (?UNIT_TYPE ?UNIT)
+      {
+        (obo:UO_0000324 "&#8491;<sup>2</sup>")
+        (obo:UO_0000055 "g/mol")
+      }
+    }
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      #if($data.VALUE)
+      <td>#escapeHTML($data.VALUE)#if($data.UNIT) $data.UNIT.getValue()#end</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

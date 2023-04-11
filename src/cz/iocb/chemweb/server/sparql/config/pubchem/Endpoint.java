@@ -17,7 +17,7 @@ public class Endpoint
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new GeneralUserIriClass("pubchem:endpoint", "pubchem", "endpoint",
+        config.addIriClass(new GeneralUserIriClass("pubchem:endpoint", schema, "endpoint",
                 asList("integer", "integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/endpoint/SID[1-9][0-9]*_AID[1-9][0-9]*(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?"));
     }

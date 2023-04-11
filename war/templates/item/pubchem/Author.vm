@@ -1,0 +1,45 @@
+#sparql($author)
+  SELECT ?NAME FROM pubchem:author WHERE
+  {
+    {
+      SELECT (group_concat(?FN ; separator="; ") as ?NAME) WHERE
+      {
+        $entity vcard:fn ?FN
+      }
+      HAVING (count(*) > 0)
+    }
+    UNION
+    {
+      SELECT (concat(sample(?GNAME), " ", sample(?FNAME)) as ?NAME) WHERE
+      {
+        $entity vcard:given-name ?GNAME.
+        $entity vcard:family-name ?FNAME.
+      }
+      HAVING (count(*) = 1)
+    }
+    UNION
+    {
+      SELECT (group_concat(?FNAME ; separator="; ") as ?NAME) WHERE
+      {
+        $entity vcard:family-name ?FNAME
+      }
+      HAVING (count(*) > 0)
+    }
+  }
+  LIMIT 1
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      #if($author.NAME)
+      <td>#escapeHTML($author.NAME)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

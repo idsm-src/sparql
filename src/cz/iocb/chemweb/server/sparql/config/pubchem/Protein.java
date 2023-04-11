@@ -17,7 +17,9 @@ public class Protein
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("pubchem:protein", "integer", new Table("pubchem", "protein_bases"),
+        config.addIriClass(new MapUserIriClass("pubchem:enzyme", "integer", new Table(schema, "enzyme_bases"),
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/EC_"));
+        config.addIriClass(new MapUserIriClass("pubchem:protein", "integer", new Table(schema, "protein_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/protein/ACC"));
     }
 
@@ -27,15 +29,45 @@ public class Protein
         ConstantIriMapping graph = config.createIriMapping("pubchem:protein");
 
         {
+            Table table = new Table(schema, "enzyme_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:enzyme", "id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("sio:SIO_010343"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("up:Enzyme"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
+                    config.createIriMapping("pubchem:enzyme", "parent"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
+                    config.createIriMapping("up:Enzyme"), config.createIsNullCondition("parent"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
+                    config.createIriMapping("purl:enzyme", "iri"));
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
+                    config.createLiteralMapping(xsdString, "title"));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
+                    config.createLiteralMapping("pubchem/Enzyme.vm"));
+        }
+
+        {
+            Table table = new Table(schema, "enzyme_alternatives");
+            NodeMapping subject = config.createIriMapping("pubchem:enzyme", "enzyme");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:altLabel"),
+                    config.createLiteralMapping(rdfLangStringEn, "alternative"));
+        }
+
+        {
             Table table = new Table(schema, "protein_bases");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("owl:sameAs"),
-                    config.createIriMapping("ncbi:protein", "name"));
+                    config.createIriMapping("ncbi:protein", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
                     config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
-                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
+                    config.createIriMapping("pubchem:taxonomy", "organism"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bao:BAO_0002817"),
                     config.createLiteralMapping(xsdString, "sequence"));
 
@@ -45,11 +77,11 @@ public class Protein
             config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:title"),
                     config.createLiteralMapping(xsdString, "title"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("pubchem:taxonomy", "organism_id"));
+                    config.createIriMapping("pubchem:taxonomy", "organism"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Protein.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
@@ -57,7 +89,7 @@ public class Protein
 
             // deprecated extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("bp:organism"),
-                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism_id"));
+                    config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "organism"));
         }
 
         {
@@ -66,14 +98,6 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:altLabel"),
                     config.createLiteralMapping(rdfLangStringEn, "alternative"));
-        }
-
-        {
-            Table table = new Table(schema, "protein_references");
-            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
-                    config.createIriMapping("pubchem:reference", "reference"));
         }
 
         {
@@ -105,11 +129,19 @@ public class Protein
         }
 
         {
-            Table table = new Table(schema, "protein_enzymes");
+            Table table = new Table(schema, "protein_uniprot_enzymes");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("up:enzyme"),
                     config.createIriMapping("purl:enzyme", "enzyme"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_enzymes");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("up:enzyme"),
+                    config.createIriMapping("pubchem:enzyme", "enzyme"));
         }
 
         {
@@ -142,14 +174,6 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
                     config.createIriMapping("ontology:resource", Ontology.unitThesaurus, "match"));
-        }
-
-        {
-            Table table = new Table(schema, "protein_expasy_matches");
-            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
-                    config.createIriMapping("expasy:enzyme", "match"));
         }
 
         {
