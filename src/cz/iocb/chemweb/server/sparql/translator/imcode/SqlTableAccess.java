@@ -825,4 +825,16 @@ public class SqlTableAccess extends SqlIntercode
 
         return builder.toString();
     }
+
+
+    protected Table getTable()
+    {
+        return table;
+    }
+
+
+    protected Conditions getConditions()
+    {
+        return conditions;
+    }
 }

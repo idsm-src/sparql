@@ -764,7 +764,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(columns.size() > 0)
                     builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
                 else
-                    builder.append("1");
+                    builder.append("*");
 
                 if(columns.size() > 1)
                     builder.append(")");
@@ -2369,6 +2369,18 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             return (SimpleLiteralClass) operandClass;
         else
             return xsdInteger;
+    }
+
+
+    public String getFunction()
+    {
+        return function;
+    }
+
+
+    public boolean isDistinct()
+    {
+        return distinct;
     }
 
 
