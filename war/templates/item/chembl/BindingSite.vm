@@ -1,7 +1,5 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($info)
-  SELECT ?NAME WHERE
+#sparql($site)
+  SELECT ?NAME FROM ebi:chembl WHERE
   {
     $entity cco:bindingSiteName ?NAME
   }
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>binding_site:$ID</b></td>
+      #if($site.NAME)
+      <td>#escapeHTML($site.NAME)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($info.NAME)
     <tr>
-      <td>#escapeHTML($info.NAME)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

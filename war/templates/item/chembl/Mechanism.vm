@@ -1,7 +1,5 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($info)
-  SELECT ?DESCRIPTION WHERE
+#sparql($mechanism)
+  SELECT ?DESCRIPTION FROM ebi:chembl WHERE
   {
     $entity cco:mechanismDescription ?DESCRIPTION
   }
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>mechanism:$ID</b></td>
+      #if($mechanism.DESCRIPTION)
+      <td>#escapeHTML($mechanism.DESCRIPTION)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($info.DESCRIPTION)
     <tr>
-      <td>#escapeHTML($info.DESCRIPTION)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

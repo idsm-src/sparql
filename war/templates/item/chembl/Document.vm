@@ -1,7 +1,5 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($info)
-  SELECT ?TITLE WHERE
+#sparql($document)
+  SELECT ?TITLE FROM ebi:chembl WHERE
   {
     $entity dcterms:title ?TITLE
   }
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>document:$ID</b></td>
+      #if($document.TITLE)
+      <td>#escapeHTML($document.TITLE)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($info.TITLE)
     <tr>
-      <td>#escapeHTML($info.TITLE)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

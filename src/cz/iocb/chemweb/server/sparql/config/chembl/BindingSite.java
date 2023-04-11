@@ -21,7 +21,7 @@ public class BindingSite
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         Table table = new Table(schema, "binding_sites");
         NodeMapping subject = config.createIriMapping("chembl:binding_site", "id");

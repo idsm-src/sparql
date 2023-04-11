@@ -35,6 +35,10 @@ public class Common
         config.addIriClass(new IntegerUserIriClass("ncbi:book", "integer", "https://www.ncbi.nlm.nih.gov/books/NBK"));
         config.addIriClass(
                 new IntegerUserIriClass("ncbi:taxonomy", "integer", "https://www.ncbi.nlm.nih.gov/taxonomy/"));
+        config.addIriClass(new IntegerUserIriClass("ncbi:pubchem-compound", "integer",
+                "http://pubchem.ncbi.nlm.nih.gov/compound/"));
+        config.addIriClass(new IntegerUserIriClass("ncbi:pubchem-substance", "integer",
+                "http://pubchem.ncbi.nlm.nih.gov/substance/"));
         config.addIriClass(new StringUserIriClass("ncbi:protein", "https://www.ncbi.nlm.nih.gov/protein/"));
         config.addIriClass(new StringUserIriClass("ncbi:journal", "https://www.ncbi.nlm.nih.gov/nlmcatalog/"));
         config.addIriClass(new StringUserIriClass("purl:uniprot", "http://purl.uniprot.org/uniprot/"));

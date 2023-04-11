@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.chembl;
 
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
@@ -22,7 +22,7 @@ public class DrugIndication
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         Table table = new Table(schema, "drug_indication");
         NodeMapping subject = config.createIriMapping("chembl:drug_indication", "id");
@@ -36,7 +36,7 @@ public class DrugIndication
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasMolecule"),
                 config.createIriMapping("chembl:compound", "molecule_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:highestDevelopmentPhase"),
-                config.createLiteralMapping(xsdInt, "max_phase_for_ind"));
+                config.createLiteralMapping(xsdFloat, "max_phase_for_ind"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
                 config.createLiteralMapping(xsdString, "chembl_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),

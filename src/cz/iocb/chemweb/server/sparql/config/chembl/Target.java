@@ -25,7 +25,7 @@ public class Target
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         {
             Table table = new Table(schema, "target_dictionary");

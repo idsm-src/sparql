@@ -1,7 +1,13 @@
-#set($ID = $entity.getValue().replaceAll(".*/CHEMBL", ""))
+#sparql($substance)
+  SELECT ?NAME FROM ebi:chembl WHERE
+  {
+    $entity rdfs:label ?NAME
+    filter (!strstarts(?NAME, "CHEMBL"))
+  }
+#end
 
 #sparql($structure)
-  SELECT (true as ?R) WHERE
+  SELECT (true as ?R) FROM ebi:chembl WHERE
   {
     ?S rdf:type sio:SIO_011120.
     ?S sio:SIO_000011 $entity.
@@ -9,40 +15,36 @@
   }
 #end
 
-#sparql($value)
-  SELECT ?VALUE WHERE
-  {
-    $entity rdfs:label ?VALUE
-    filter (!strstarts(?VALUE, "CHEMBL"))
-  }
-#end
-
 <table style="width:100%">
-  <tr>
-    #if($structure.count > 0)
-    <td style="width:90px">
-      <table style="width:80px">
-        <tr>
-          <td>
-            <img loading='lazy' src="chembl/compound/image?w=160&id=$ID" alt="CHEMBL$ID" height="80" width="80">
-          </td>
-        </tr>
-      </table>
-    </td>
-    #end
-    <td>
-      <table>
-        <tr>
-          <td><b>molecule:CHEMBL$ID</b></td>
-        </tr>
-        #if($value.VALUE > 0)
-        <tr>
-          <td>
-            <span style="white-space: pre-wrap; word-wrap: break-word;">#escapeHTML($value.VALUE)</span>
-          </td>
-        </tr>
-        #end
-      </table>
-    </td>
-  </tr>
+  <tbody>
+    <tr>
+      #if($structure.count > 0)
+      <td style="width:90px">
+        <table style="width:80px">
+          <tbody>
+            <tr>
+              <td><img loading='lazy' src="chembl/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/CHEMBL", "")" height="80" width="80"></td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+      #end
+      <td>
+        <table>
+          <tbody>
+            <tr>
+              #if($substance.NAME)
+              <td>#escapeHTML($substance.NAME)</td>
+              #else
+              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+              #end
+            </tr>
+            <tr>
+              <td><small style="color:gray">#escapeIRI($entity)<small></td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
 </table>

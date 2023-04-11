@@ -23,11 +23,10 @@ public class Document
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         Conditions valueCondition = config.createAreNotEqualCondition("id", "'1158643'::integer");
-        Conditions notNullCondition = config.createIsNotNullCondition("journal_id");
-        Conditions fullCondition = Conditions.and(valueCondition, notNullCondition);
+        Conditions isNullCondition = config.createIsNullCondition("journal_id");
 
         Table table = new Table(schema, "docs");
         NodeMapping subject = config.createIriMapping("chembl:document", "id");
@@ -36,9 +35,10 @@ public class Document
         config.addQuadMapping(table, graph, subject, config.createIriMapping("bibo:pmid"),
                 config.createIriMapping("identifiers:pubmed", "pubmed_id"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasJournal"),
-                config.createIriMapping("chembl_journal:CHEMBL_JRN_null"), fullCondition);
+                config.createIriMapping("chembl_journal:CHEMBL_JRN_null"),
+                Conditions.and(valueCondition, isNullCondition));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:hasJournal"),
-                config.createIriMapping("chembl:journal", "journal_id"), notNullCondition);
+                config.createIriMapping("chembl:journal", "journal_id"), valueCondition);
         config.addQuadMapping(table, graph, subject, config.createIriMapping("dcterms:date"),
                 config.createLiteralMapping(xsdInt, "year"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:chemblId"),
@@ -60,9 +60,9 @@ public class Document
         config.addQuadMapping(table, graph, subject, config.createIriMapping("bibo:issue"),
                 config.createLiteralMapping(xsdString, "issue"));
         config.addQuadMapping(table, graph, config.createIriMapping("chembl_journal:CHEMBL_JRN_null"),
-                config.createIriMapping("cco:hasDocument"), subject, fullCondition);
+                config.createIriMapping("cco:hasDocument"), subject, Conditions.and(valueCondition, isNullCondition));
         config.addQuadMapping(table, graph, config.createIriMapping("chembl:journal", "journal_id"),
-                config.createIriMapping("cco:hasDocument"), subject, fullCondition);
+                config.createIriMapping("cco:hasDocument"), subject, valueCondition);
 
         // extension
         config.addQuadMapping(table, graph, config.createIriMapping("pubchem:reference", "pubmed_id"),

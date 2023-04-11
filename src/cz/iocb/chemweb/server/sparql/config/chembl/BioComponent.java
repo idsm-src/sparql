@@ -22,7 +22,7 @@ public class BioComponent
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         Table table = new Table(schema, "bio_component_sequences");
         NodeMapping subject = config.createIriMapping("chembl:biocomponent", "id");
@@ -45,13 +45,6 @@ public class BioComponent
                 config.createLiteralMapping(xsdString, "description"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:organismName"),
                 config.createLiteralMapping(xsdString, "organism"));
-        config.addQuadMapping(table, graph,
-                config.createIriMapping("ontology:resource", Ontology.unitTaxonomy, "tax_id"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "(organism || ' (Identifiers.org)')"));
-        config.addQuadMapping(table, graph, config.createIriMapping("reference:ncbi-taxonomy", "tax_id"),
-                config.createIriMapping("rdfs:label"),
-                config.createLiteralMapping(xsdString, "(organism || ' (NCBI Taxonomy)')"));
 
         // extension
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:taxonomy"),

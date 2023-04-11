@@ -1,7 +1,5 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($info)
-  SELECT ?MESH WHERE
+#sparql($indication)
+  SELECT ?MESH FROM ebi:chembl WHERE
   {
     $entity cco:hasMeshHeading ?MESH
   }
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>indication:$ID</b></td>
+      #if($indication.MESH)
+      <td>#escapeHTML($indication.MESH)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($info.MESH)
     <tr>
-      <td>#escapeHTML($info.MESH)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

@@ -23,7 +23,7 @@ public class Activity
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         Table table = new Table(schema, "activities");
         NodeMapping subject = config.createIriMapping("chembl:activity", "id");
@@ -43,7 +43,8 @@ public class Activity
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:dataValidityIssue"),
                 config.createLiteralMapping(true), config.createIsNotNullCondition("data_validity_comment"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:potentialDuplicate"),
-                config.createLiteralMapping(true), config.createAreEqualCondition("potential_duplicate", "'true'::boolean"));
+                config.createLiteralMapping(true),
+                config.createAreEqualCondition("potential_duplicate", "'true'::boolean"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:value"),
                 config.createLiteralMapping(xsdDouble, "value"));
         config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:standardValue"),

@@ -3,7 +3,6 @@ package cz.iocb.chemweb.server.sparql.config.chembl;
 import static cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
-import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
@@ -22,18 +21,18 @@ public class MoleculeReference
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         {
             Table table = new Table(schema, "molecule_pubchem_references");
             NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                    config.createIriMapping("pubchem:compound", "compound_id"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound_id"),
+                    config.createIriMapping("ncbi:pubchem-compound", "compound_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-compound", "compound_id"),
                     config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
                             "('CHEMBL' || molecule_id || ' PubChem Reference: ' || compound_id)"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound_id"),
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-compound", "compound_id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemRef"));
 
             // extension
@@ -46,11 +45,11 @@ public class MoleculeReference
             NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                    config.createIriMapping("pubchem:substance", "substance_id"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("ncbi:pubchem-substance", "substance_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-substance", "substance_id"),
                     config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
                             "('CHEMBL' || molecule_id || ' PubChem Thomson Pharma Subset Reference: ' || substance_id)"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-substance", "substance_id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemThomPharmRef"));
         }
 
@@ -59,11 +58,11 @@ public class MoleculeReference
             NodeMapping subject = config.createIriMapping("chembl:compound", "molecule_id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                    config.createIriMapping("pubchem:substance", "substance_id"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+                    config.createIriMapping("ncbi:pubchem-substance", "substance_id"));
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-substance", "substance_id"),
                     config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString,
                             "('CHEMBL' || molecule_id || ' PubChem Drugs of the Future Subset Reference: ' || substance_id)"));
-            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance", "substance_id"),
+            config.addQuadMapping(table, graph, config.createIriMapping("ncbi:pubchem-substance", "substance_id"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemDotfRef"));
         }
 
@@ -80,8 +79,10 @@ public class MoleculeReference
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:ChebiRef"));
 
             // extension
+            /*
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "chebi_id"));
+            */
         }
 
         {

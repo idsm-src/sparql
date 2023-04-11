@@ -1,7 +1,5 @@
-#set($ID = $entity.getValue().replaceAll(".*/", ""))
-
-#sparql($info)
-  SELECT ?LABEL WHERE
+#sparql($classification)
+  SELECT ?LABEL FROM ebi:chembl WHERE
   {
     $entity skos:prefLabel ?LABEL
   }
@@ -10,12 +8,14 @@
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>protclass:$ID</b></td>
+      #if($classification.LABEL)
+      <td>#escapeHTML($classification.LABEL)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #if($info.LABEL)
     <tr>
-      <td>#escapeHTML($info.LABEL)</td>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
-    #end
   </tbody>
 </table>

@@ -23,7 +23,7 @@ public class Assay
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
-        ConstantIriMapping graph = config.createIriMapping("<http://rdf.ebi.ac.uk/dataset/chembl>");
+        ConstantIriMapping graph = config.createIriMapping("ebi:chembl");
 
         {
             Table table = new Table(schema, "assays");
@@ -89,8 +89,6 @@ public class Assay
             config.addQuadMapping(table, graph, config.createIriMapping("chembl:document", "document_id"),
                     config.createIriMapping("cco:hasAssay"), subject);
             config.addQuadMapping(table, graph, config.createIriMapping("reference:pubchem-assay", "pubchem_assay_id"),
-                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:PubchemBioassayRef"));
-            config.addQuadMapping(table, graph, config.createIriMapping("reference:pubchem-assay", "pubchem_assay_id"),
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString,
                             "(chembl_id || ' PubChem BioAssay Reference: ' || pubchem_assay_id)"),
@@ -103,6 +101,14 @@ public class Assay
                     config.createIriMapping("ontology:resource", Ontology.unitNCBITaxon, "assay_tax_id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("chembl/Assay.vm"));
+        }
+
+        {
+            Table table = new Table(schema, "pubchem_assays");
+            NodeMapping subject = config.createIriMapping("reference:pubchem-assay", "pubchem_assay_id");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("cco:PubchemBioassayRef"));
         }
 
         {

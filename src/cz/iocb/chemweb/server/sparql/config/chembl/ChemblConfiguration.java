@@ -33,6 +33,8 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
     {
         Common.addPrefixes(this);
 
+        addPrefix("ebi", "http://rdf.ebi.ac.uk/dataset/");
+
         addPrefix("bao", "http://www.bioassayontology.org/bao#");
         addPrefix("bibo", "http://purl.org/ontology/bibo/");
         addPrefix("cco", "http://rdf.ebi.ac.uk/terms/chembl#");
@@ -123,5 +125,6 @@ public class ChemblConfiguration extends SparqlDatabaseConfiguration
         TargetComponent.addQuadMappings(this);
         TargetComponentReference.addQuadMappings(this);
         Target.addQuadMappings(this);
+        Taxonomy.addQuadMappings(this);
     }
 }
