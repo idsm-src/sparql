@@ -1,6 +1,3 @@
-#parse("common/utils.vm")
-
-
 #macro(label $classPar)
 #set($class = $classPar)
 #sparql($info)

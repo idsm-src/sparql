@@ -1,11 +1,101 @@
-#parse("common/utils.vm")
-#parse("common/label.vm")
+#macro(superlevelClasses $class $label $depth $count)
+  #sparql($superclasses)
+    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
+    {
+      $class rdfs:subClassOf ?CLASS.
+      ?CLASS rdfs:label ?LABEL.
+      FILTER (?CLASS != $class) #avoid simple type cycle
+    }
+  #end
 
+  #if($superclasses.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+    #set($count = $count + $superclasses.count)
+    #set($depth = $depth + 1)
+    <ul class="hierarchy">
+      #foreach($superclass in $superclasses)
+      <li>#superlevelClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
+      #end
+    </ul>
+    #set($depth = $depth - 1)
+  #end
+#end
+
+#macro(sublevelClasses $class $label $depth $count)
+  #sparql($subclasses)
+    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
+    {
+      ?CLASS rdfs:subClassOf $class.
+      ?CLASS rdfs:label ?LABEL.
+      FILTER (?CLASS != owl:Nothing)
+      FILTER (?CLASS != $class) #avoid simple type cycle
+    }
+  #end
+
+  #if($subclasses.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+  #set($count = $count + $subclasses.count)
+  #set($depth = $depth + 1)
+  <ul class="hierarchy">
+    #foreach($subclass in $subclasses)
+    <li>#sublevelClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
+    #end
+  </ul>
+  #set($depth = $depth - 1)
+  #end
+#end
+
+#sparql($superclasses)
+  SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
+  {
+    $entity rdfs:subClassOf ?CLASS.
+    ?CLASS rdfs:label ?LABEL.
+    FILTER (?CLASS != $entity) #avoid simple type cycle
+  }
+#end
+
+#sparql($subclasses)
+  SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
+  {
+    ?CLASS rdfs:subClassOf $entity.
+    ?CLASS rdfs:label ?LABEL.
+    FILTER (?CLASS != owl:Nothing)
+    FILTER (?CLASS != $entity) #avoid simple type cycle
+  }
+#end
+
+#sparql($properties)
+  SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
+  {
+    ?PROPERTY rdfs:domain $entity.
+    ?PROPERTY rdfs:label ?LABEL.
+  }
+#end
+
+
+#parse("common/label.vm")
 
 <style scoped>
 #include("css/owl.css")
 </style>
-
 
 <div class="VET-Page">
 
@@ -17,50 +107,6 @@
       <small>#escapeIRI($entity)</small>
     </div>
   </div>
-
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-  #macro(superlevelClasses $class $label $depth $count)
-    #sparql($superclasses)
-      SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
-      {
-        $class rdfs:subClassOf ?CLASS.
-        ?CLASS rdfs:label ?LABEL.
-        FILTER (?CLASS != $class) #avoid simple type cycle
-      }
-    #end
-
-    #if($superclasses.count == 0)
-      &#9632;
-    #elseif($count < 128 && $depth < 8)
-      &#9662;
-    #else
-      &#9656;
-    #end
-
-    #url($class)#escapeIRI($class)#end (#escapeHTML($label))
-
-    #if($count < 128 && $depth < 8)
-      #set($count = $count + $superclasses.count)
-      #set($depth = $depth + 1)
-      <ul class="hierarchy">
-        #foreach($superclass in $superclasses)
-        <li>#superlevelClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
-        #end
-      </ul>
-      #set($depth = $depth - 1)
-    #end
-  #end
-
-
-  #sparql($superclasses)
-    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
-    {
-      $entity rdfs:subClassOf ?CLASS.
-      ?CLASS rdfs:label ?LABEL.
-      FILTER (?CLASS != $entity) #avoid simple type cycle
-    }
-  #end
 
   #if($superclasses.count > 0)
   <div class="VET-BoxedSection">
@@ -82,52 +128,6 @@
   </div>
   #end
 
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-  #macro(sublevelClasses $class $label $depth $count)
-    #sparql($subclasses)
-      SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
-      {
-        ?CLASS rdfs:subClassOf $class.
-        ?CLASS rdfs:label ?LABEL.
-        FILTER (?CLASS != owl:Nothing)
-        FILTER (?CLASS != $class) #avoid simple type cycle
-      }
-    #end
-
-    #if($subclasses.count == 0)
-      &#9632;
-    #elseif($count < 128 && $depth < 8)
-      &#9662;
-    #else
-      &#9656;
-    #end
-
-    #url($class)#escapeIRI($class)#end (#escapeHTML($label))
-
-    #if($count < 128 && $depth < 8)
-    #set($count = $count + $subclasses.count)
-    #set($depth = $depth + 1)
-    <ul class="hierarchy">
-      #foreach($subclass in $subclasses)
-      <li>#sublevelClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
-      #end
-    </ul>
-    #set($depth = $depth - 1)
-    #end
-  #end
-
-
-  #sparql($subclasses)
-    SELECT ?CLASS ?LABEL FROM dataset:ontology FROM ebi:chebi WHERE
-    {
-      ?CLASS rdfs:subClassOf $entity.
-      ?CLASS rdfs:label ?LABEL.
-      FILTER (?CLASS != owl:Nothing)
-      FILTER (?CLASS != $entity) #avoid simple type cycle
-    }
-  #end
-
   #if($subclasses.count > 0)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Subclass Hierarchy</div>
@@ -146,16 +146,6 @@
       </ul>
     </div>
   </div>
-  #end
-
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-  #sparql($properties)
-    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
-    {
-      ?PROPERTY rdfs:domain $entity.
-      ?PROPERTY rdfs:label ?LABEL.
-    }
   #end
 
   #if($properties.count > 0)

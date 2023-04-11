@@ -1,29 +1,33 @@
-#set($MESH = $entity.getValue().replaceAll(".*/", ""))
-
 #sparql($mesh)
-  SELECT ?TYPE ?LABEL WHERE
+  SELECT ?LABEL FROM mesh:heading WHERE
   {
-    $entity rdf:type / rdfs:label ?TYPE
+    $entity rdfs:label ?LABEL
+  }
+#end
 
-    OPTIONAL
-    {
-      $entity rdfs:label ?LABEL
-    }
+#sparql($type)
+  SELECT ?LABEL FROM mesh:heading FROM dataset:ontology WHERE
+  {
+    $entity rdf:type / rdfs:label ?LABEL
   }
 #end
 
 <table style="width:100%">
   <tbody>
     <tr>
-      <td><b>$MESH</b></td>
-    </tr>
-    #if($mesh.LABEL && $MESH != $mesh.LABEL.getValue())
-    <tr>
+      #if($mesh.LABEL)
       <td>#escapeHTML($mesh.LABEL)</td>
+      #else
+      <td>$entity.getValue().replaceFirst(".*/", "")</td>
+      #end
     </tr>
-    #end
     <tr>
-      <td><small style="color:gray">#escapeHTML($mesh.TYPE)</small></td>
+    #if($type.LABEL)
+      <td><small>#escapeHTML($type.LABEL)</small></td>
+      #end
+    </tr>
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
   </tbody>
 </table>

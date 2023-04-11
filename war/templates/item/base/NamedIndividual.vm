@@ -1,5 +1,3 @@
-#parse("common/utils.vm")
-
 #sparql($info)
   SELECT ?LABEL FROM dataset:ontology WHERE
   {

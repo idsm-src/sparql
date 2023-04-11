@@ -1,4 +1,102 @@
-#parse("common/utils.vm")
+#macro(superlevelProperties $property $label $depth $count)
+  #sparql($superproperties)
+    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
+    {
+      $property rdfs:subPropertyOf ?PROPERTY.
+      ?PROPERTY rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($superproperties.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($property)#escapeIRI($property)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+    #set($count = $count + $superproperties.count)
+    #set($depth = $depth + 1)
+    <ul class="hierarchy">
+      #foreach($superproperty in $superproperties)
+      <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL $depth $count)</li>
+      #end
+    </ul>
+    #set($depth = $depth - 1)
+  #end
+#end
+
+#macro(sublevelProperties $property $label $depth $count)
+  #sparql($subproperties)
+    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
+    {
+      ?PROPERTY rdfs:subPropertyOf $property.
+      ?PROPERTY rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($subproperties.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($property)#escapeIRI($property)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+    #set($count = $count + $subproperties.count)
+    #set($depth = $depth + 1)
+    <ul class="hierarchy">
+      #foreach($subproperty in $subproperties)
+      <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL $depth $count)</li>
+      #end
+    </ul>
+    #set($depth = $depth - 1)
+  #end
+#end
+
+#sparql($property)
+  SELECT ?LABEL FROM dataset:ontology WHERE
+  {
+    $entity rdfs:label ?LABEL.
+  }
+#end
+
+#sparql($domains)
+  SELECT ?CLASS FROM dataset:ontology WHERE
+  {
+    $entity rdfs:domain ?CLASS .
+  }
+#end
+
+#sparql($ranges)
+  SELECT ?CLASS FROM dataset:ontology WHERE
+  {
+    $entity rdfs:range ?CLASS .
+  }
+#end
+
+#sparql($superproperties)
+  SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
+  {
+    $entity rdfs:subPropertyOf ?PROPERTY.
+    ?PROPERTY rdfs:label ?LABEL.
+  }
+#end
+
+#sparql($subproperties)
+  SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
+  {
+    ?PROPERTY rdfs:subPropertyOf $entity.
+    ?PROPERTY rdfs:label ?LABEL.
+  }
+#end
+
 #parse("common/label.vm")
 
 
@@ -6,39 +104,17 @@
 #include("css/owl.css")
 </style>
 
-
 <div class="VET-Page">
-
-  #sparql($info)
-    SELECT ?LABEL FROM dataset:ontology WHERE
-    {
-      $entity rdfs:label ?LABEL.
-    }
-  #end
 
   <div class="VET-BoxedSection">
     <div class="VET-Header">Property</div>
     <div>
-      #if($info.LABEL)
-      <b>#escapeHTML($info.LABEL)</b>
+      #if($property.LABEL)
+      <b>#escapeHTML($property.LABEL)</b>
       <br/>
       <small>#escapeIRI($entity)</small>
       #else
       <b>#escapeIRI($entity)</b>
-      #end
-
-      #sparql($domains)
-        SELECT ?CLASS FROM dataset:ontology WHERE
-        {
-          $entity rdfs:domain ?CLASS .
-        }
-      #end
-
-      #sparql($ranges)
-        SELECT ?CLASS FROM dataset:ontology WHERE
-        {
-          $entity rdfs:range ?CLASS .
-        }
       #end
 
       #if( $domains.count > 0 || $ranges.count > 0 )
@@ -62,48 +138,6 @@
     </div>
   </div>
 
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-  #macro(superlevelProperties $property $label $depth $count)
-    #sparql($superproperties)
-      SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
-      {
-        $property rdfs:subPropertyOf ?PROPERTY.
-        ?PROPERTY rdfs:label ?LABEL.
-      }
-    #end
-
-    #if($superproperties.count == 0)
-      &#9632;
-    #elseif($count < 128 && $depth < 8)
-      &#9662;
-    #else
-      &#9656;
-    #end
-
-    #url($property)#escapeIRI($property)#end (#escapeHTML($label))
-
-    #if($count < 128 && $depth < 8)
-      #set($count = $count + $superproperties.count)
-      #set($depth = $depth + 1)
-      <ul class="hierarchy">
-        #foreach($superproperty in $superproperties)
-        <li>#superlevelProperties($superproperty.PROPERTY $superproperty.LABEL $depth $count)</li>
-        #end
-      </ul>
-      #set($depth = $depth - 1)
-    #end
-  #end
-
-
-  #sparql($superproperties)
-    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
-    {
-      $entity rdfs:subPropertyOf ?PROPERTY.
-      ?PROPERTY rdfs:label ?LABEL.
-    }
-  #end
-
   #if($superproperties.count > 0)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Superproperty Hierarchy</div>
@@ -111,7 +145,7 @@
       <ul class="hierarchy">
         <li>
           &#9662;
-          #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+          #url($entity)#escapeIRI($entity)#end (#if($property.LABEL)#escapeHTML($property.LABEL)#else#escapeIRI($entity)#end)
           #set($count = $superproperties.count)
           <ul class="hierarchy">
             #foreach($superproperty in $superproperties)
@@ -124,48 +158,6 @@
   </div>
   #end
 
-  <!-- ------------------------------------------------------------------------------------------- -->
-
-  #macro(sublevelProperties $property $label $depth $count)
-    #sparql($subproperties)
-      SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
-      {
-        ?PROPERTY rdfs:subPropertyOf $property.
-        ?PROPERTY rdfs:label ?LABEL.
-      }
-    #end
-
-    #if($subproperties.count == 0)
-      &#9632;
-    #elseif($count < 128 && $depth < 8)
-      &#9662;
-    #else
-      &#9656;
-    #end
-
-    #url($property)#escapeIRI($property)#end (#escapeHTML($label))
-
-    #if($count < 128 && $depth < 8)
-      #set($count = $count + $subproperties.count)
-      #set($depth = $depth + 1)
-      <ul class="hierarchy">
-        #foreach($subproperty in $subproperties)
-        <li>#sublevelProperties($subproperty.PROPERTY $subproperty.LABEL $depth $count)</li>
-        #end
-      </ul>
-      #set($depth = $depth - 1)
-    #end
-  #end
-
-
-  #sparql($subproperties)
-    SELECT ?PROPERTY ?LABEL FROM dataset:ontology WHERE
-    {
-      ?PROPERTY rdfs:subPropertyOf $entity.
-      ?PROPERTY rdfs:label ?LABEL.
-    }
-  #end
-
   #if($subproperties.count > 0)
   <div class="VET-BoxedSection">
     <div class="VET-Header">Subproperty Hierarchy</div>
@@ -173,7 +165,7 @@
       <ul class="hierarchy">
         <li>
           &#9662;
-          #url($entity)#escapeIRI($entity)#end (#if($info.LABEL)#escapeHTML($info.LABEL)#else#escapeIRI($entity)#end)
+          #url($entity)#escapeIRI($entity)#end (#if($property.LABEL)#escapeHTML($property.LABEL)#else#escapeIRI($entity)#end)
           #set($count = $subproperties.count)
           <ul class="hierarchy">
             #foreach($subproperty in $subproperties)
@@ -185,7 +177,5 @@
     </div>
   </div>
   #end
-
-  <!-- ------------------------------------------------------------------------------------------- -->
 
 </div>
