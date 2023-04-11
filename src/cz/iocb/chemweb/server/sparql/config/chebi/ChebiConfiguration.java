@@ -28,7 +28,7 @@ public class ChebiConfiguration extends SparqlDatabaseConfiguration
     {
         Common.addPrefixes(this);
 
-        addPrefix("ebi", "http://ebi.rdf.ac.uk/dataset/");
+        addPrefix("ebi", "http://rdf.ebi.ac.uk/dataset/");
         addPrefix("obo", "http://purl.obolibrary.org/obo/");
         addPrefix("chebi", "http://purl.obolibrary.org/obo/chebi/");
         addPrefix("oboInOwl", "http://www.geneontology.org/formats/oboInOwl#");
