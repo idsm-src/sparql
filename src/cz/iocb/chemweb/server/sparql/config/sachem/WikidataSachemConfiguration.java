@@ -42,7 +42,7 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
     {
         Sachem.addResourceClasses(this);
 
-        addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q", 0));
+        addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q"));
     }
 
 
