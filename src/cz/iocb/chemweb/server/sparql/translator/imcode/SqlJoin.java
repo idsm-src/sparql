@@ -244,6 +244,7 @@ public class SqlJoin extends SqlIntercode
     {
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
+        loop:
         for(int i = 0; i < optChilds.size(); i++)
         {
             if(!(optChilds.get(i) instanceof SqlTableAccess))
@@ -252,7 +253,7 @@ public class SqlJoin extends SqlIntercode
             SqlTableAccess left = (SqlTableAccess) optChilds.get(i);
 
 
-            for(int j = i + 1; j < optChilds.size(); j++)
+            for(int j = 0; j < i; j++)
             {
                 if(!(optChilds.get(j) instanceof SqlTableAccess))
                     continue;
@@ -270,10 +271,10 @@ public class SqlJoin extends SqlIntercode
                     if(merged == SqlNoSolution.get())
                         return null;
 
-                    left = (SqlTableAccess) merged;
                     optChilds.set(i, merged);
-                    optChilds.remove(j--);
-                    continue;
+                    optChilds.remove(j);
+                    i -= 2;
+                    continue loop;
                 }
 
 
@@ -287,10 +288,10 @@ public class SqlJoin extends SqlIntercode
                     if(merged == SqlNoSolution.get())
                         return null;
 
-                    left = (SqlTableAccess) merged;
                     optChilds.set(i, merged);
-                    optChilds.remove(j--);
-                    continue;
+                    optChilds.remove(j);
+                    i -= 2;
+                    continue loop;
                 }
 
 
@@ -302,10 +303,10 @@ public class SqlJoin extends SqlIntercode
                     if(merged == SqlNoSolution.get())
                         return null;
 
-                    left = (SqlTableAccess) merged;
                     optChilds.set(i, merged);
-                    optChilds.remove(j--);
-                    continue;
+                    optChilds.remove(j);
+                    i -= 2;
+                    continue loop;
                 }
             }
         }

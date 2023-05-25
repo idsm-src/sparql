@@ -116,16 +116,16 @@ public class Condition
                 if(!c1.equals(c2))
                     areEqual.add(new ColumnComparison(c1, c2));
 
-        addIsNotNull(col1);
-        addIsNotNull(col2);
+        isNotNull.remove(col1);
+        isNotNull.remove(col2);
     }
 
 
     public void addAreNotEqual(Column col1, Column col2)
     {
         areNotEqual.add(new ColumnComparison(col1, col2));
-        addIsNotNull(col1);
-        addIsNotNull(col2);
+        isNotNull.remove(col1);
+        isNotNull.remove(col2);
     }
 
 
@@ -186,6 +186,12 @@ public class Condition
             return true;
 
         if(isNull.stream().anyMatch(c -> c instanceof ConstantColumn))
+            return true;
+
+        if(areEqual.stream().anyMatch(p -> isNull.contains(p.getLeft()) || isNull.contains(p.getRight())))
+            return true;
+
+        if(areNotEqual.stream().anyMatch(p -> isNull.contains(p.getLeft()) || isNull.contains(p.getRight())))
             return true;
 
         if(areNotEqual.stream().anyMatch(p -> areEqual.contains(p)))
