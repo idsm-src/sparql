@@ -48,7 +48,7 @@ public class Measuregroup
             NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:OBI_0000299"),
-                    config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup"));
+                    config.createIriMapping("pubchem:endpoint", "substance", "bioassay", "measuregroup", "value"));
         }
 
         {

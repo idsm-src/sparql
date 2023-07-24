@@ -1,0 +1,40 @@
+#sparql($endpoint)
+  SELECT ?OUTCOME FROM pubchem:endpoint WHERE
+  {
+    $entity vocab:PubChemAssayOutcome ?OUT.
+
+    VALUES (?OUT ?OUTCOME)
+    {
+      (vocab:active "active")
+      (vocab:inactive "inactive")
+      (vocab:inconclusive "inconclusive")
+      (vocab:unspecified "unspecified")
+    }
+  }
+#end
+
+#sparql($measurement)
+  SELECT ?LABEL ?VALUE FROM pubchem:endpoint WHERE
+  {
+    $entity sio:SIO_000300 ?VALUE.
+    $entity rdfs:label ?LABEL.
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    #if($endpoint.OUTCOME)
+    <tr>
+      <td>#escapeHTML($endpoint.OUTCOME)</td>
+    </tr>
+    #end      
+    #if($measurement.VALUE)
+    <tr>
+      <td>#escapeHTML($measurement.LABEL): #escapeHTML($measurement.VALUE)</td>
+    </tr>
+    #end
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

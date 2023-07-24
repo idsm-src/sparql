@@ -53,7 +53,7 @@ public class Substance
         }
 
         {
-            Table table = new Table(schema, "endpoint_bases");
+            Table table = new Table(schema, "measuregroup_substances");
             NodeMapping subject = config.createIriMapping("pubchem:substance", "substance");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000056"),
