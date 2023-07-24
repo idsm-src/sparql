@@ -124,8 +124,7 @@ public class Common
                 "http://www.ebi.ac.uk/gxa/query?conditionQuery=", ".+"));
         config.addIriClass(new StringUserIriClass("reference:recon", "https://vmh.uni.lu/#metabolite/", "[^/]+"));
         config.addIriClass(new StringUserIriClass("reference:wikipedia", "http://en.wikipedia.org/wiki/", ".+"));
-        config.addIriClass(new StringUserIriClass("reference:fda_srs",
-                "https://fdasis.nlm.nih.gov/srs/ProxyServlet?mergeData=true&objectHandle=DBMaint&APPLICATION_NAME=fdasrs&actionHandle=default&nextPage=jsp/srs/ResultScreen.jsp&TXTSUPERLISTID=",
+        config.addIriClass(new StringUserIriClass("reference:fda_srs", "https://precision.fda.gov/uniisearch/srs/unii/",
                 "[A-Z0-9]{10}"));
 
         config.addIriClass(
