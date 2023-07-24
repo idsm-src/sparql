@@ -9,10 +9,6 @@
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
-	<classpathentry kind="lib" path="/usr/share/tomcat-servlet-api-4.0/lib/tomcat-servlet-api.jar">
-        <attributes>
-            <attribute name="org.eclipse.jst.component.nondependency" value=""/>
-        </attributes>
-    </classpathentry>
+	<classpathentry kind="lib" path="/usr/share/tomcat-9/lib/servlet-api.jar"/>
 	<classpathentry kind="output" path="war/WEB-INF/classes"/>
 </classpath>
