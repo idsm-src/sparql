@@ -25,8 +25,6 @@ public class InfoServiceImpl extends RemoteServiceServlet implements InfoService
     private static final long serialVersionUID = 1L;
 
     private DataSource connectionPool;
-    List<CountItem> counts;
-    List<SourceItem> sources;
 
 
     @Override
@@ -51,106 +49,53 @@ public class InfoServiceImpl extends RemoteServiceServlet implements InfoService
     }
 
 
+    @Override
     public List<CountItem> getCounts() throws DatabaseException
     {
-        if(counts != null)
-            return counts;
+        List<CountItem> list = new ArrayList<CountItem>();
 
-        synchronized(this)
+        try(Connection connection = connectionPool.getConnection())
         {
-            if(counts != null)
-                return counts;
-
-            List<CountItem> list = new ArrayList<CountItem>();
-
-            try(Connection connection = connectionPool.getConnection())
+            try(Statement statement = connection.createStatement())
             {
-                try(Statement statement = connection.createStatement())
+                try(ResultSet result = statement.executeQuery("select name, count from info.idsm_counts order by id"))
                 {
-                    try(ResultSet result = statement.executeQuery("select count(*) from pubchem.substance_bases"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("PubChem Substances", result.getLong(1)));
-                    }
-
-                    try(ResultSet result = statement
-                            .executeQuery("select count(*) from pubchem.compound_bases where keep"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("PubChem Compounds", result.getLong(1)));
-                    }
-
-                    try(ResultSet result = statement.executeQuery("select count(*) from pubchem.bioassay_bases"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("PubChem BioAssays", result.getLong(1)));
-                    }
-
-                    try(ResultSet result = statement.executeQuery("select count(*) from chembl.molecule_dictionary"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("ChEMBL Substances", result.getLong(1)));
-                    }
-
-                    try(ResultSet result = statement.executeQuery("select count(*) from chembl.assays"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("ChEMBL Assays", result.getLong(1)));
-                    }
-
-                    try(ResultSet result = statement.executeQuery("select count(*) from chebi.classes"))
-                    {
-                        if(result.next())
-                            list.add(new CountItem("ChEBI Entities", result.getLong(1)));
-                    }
+                    while(result.next())
+                        list.add(new CountItem(result.getString(1), result.getInt(2)));
                 }
             }
-            catch(SQLException e)
-            {
-                throw new DatabaseException(e);
-            }
-
-            counts = list;
-
-            return counts;
         }
+        catch(SQLException e)
+        {
+            throw new DatabaseException(e);
+        }
+
+        return list;
     }
 
 
+    @Override
     public List<SourceItem> getSources() throws DatabaseException
     {
-        if(sources != null)
-            return sources;
+        List<SourceItem> list = new ArrayList<SourceItem>();
 
-        synchronized(this)
+        try(Connection connection = connectionPool.getConnection())
         {
-            if(sources != null)
-                return sources;
-
-            List<SourceItem> list = new ArrayList<SourceItem>();
-
-            try(Connection connection = connectionPool.getConnection())
+            try(Statement statement = connection.createStatement())
             {
-                try(Statement statement = connection.createStatement())
+                try(ResultSet result = statement
+                        .executeQuery("select url, name, version from info.idsm_sources order by id"))
                 {
-                    try(ResultSet result = statement
-                            .executeQuery("select url, name, version from info.sources order by id"))
-                    {
-                        while(result.next())
-                        {
-                            list.add(new SourceItem(result.getString(1), result.getString(2), result.getString(3)));
-                        }
-                    }
+                    while(result.next())
+                        list.add(new SourceItem(result.getString(1), result.getString(2), result.getString(3)));
                 }
             }
-            catch(SQLException e)
-            {
-                throw new DatabaseException(e);
-            }
-
-            sources = list;
-
-            return sources;
         }
+        catch(SQLException e)
+        {
+            throw new DatabaseException(e);
+        }
+
+        return list;
     }
 }
