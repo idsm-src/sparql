@@ -49,6 +49,7 @@ import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -549,6 +550,17 @@ public class SparqlDatabaseConfiguration
 
         addQuadMapping(graph, defaultDataset, createIriMapping("sd:defaultGraph"), defaultGraph);
         addQuadMapping(graph, defaultGraph, createIriMapping("rdf:type"), createIriMapping("sd:Graph"));
+
+        {
+            Table table = new Table("info", "idsm_version");
+            DateTimeConstantZoneClass xsdDateTimeM0 = DateTimeConstantZoneClass.get(0);
+
+            addQuadMapping(table, graph, defaultDataset, createIriMapping("dcterms:issued"),
+                    createLiteralMapping(xsdDateTimeM0, "date"));
+
+            addQuadMapping(table, graph, defaultGraph, createIriMapping("dcterms:issued"),
+                    createLiteralMapping(xsdDateTimeM0, "date"));
+        }
 
         for(ConstantIriMapping namedGraph : graphs.get(serviceIri))
         {
