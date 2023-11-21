@@ -235,6 +235,26 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
+    {
+        for(UsedVariable variable : right.getVariables().getValues())
+        {
+            if(variable.canBeNull())
+                return false;
+
+            UsedVariable tableVariable = left.getVariables().get(variable.getName());
+
+            if(tableVariable == null)
+                return false;
+
+            if(tableVariable.canBeNull() /*&& right.getSize() > 1*/)
+                return false;
+        }
+
+        return true;
+    }
+
+
     public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         // only the same tables can by merged
@@ -416,7 +436,38 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlIntercode merge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    public static SqlTableAccess merge(SqlTableAccess left, SqlValues right, Set<String> restrictions)
+    {
+        Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariables()));
+
+        Map<Column, Column> expressions = new HashMap<Column, Column>();
+        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
+        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
+        UsedVariables variables = new UsedVariables();
+
+        for(UsedVariable leftVariable : left.variables.getValues())
+        {
+            if(restrictions == null || restrictions.contains(leftVariable.getName()))
+            {
+                String name = leftVariable.getName();
+
+                ResourceClass resClass = left.resources.get(name);
+                List<Column> columns = left.mappings.get(name);
+                resources.put(name, resClass);
+                mappings.put(name, columns);
+
+                UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
+                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
+                variables.add(variable);
+            }
+        }
+
+        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions, left.reduced);
+    }
+
+
+    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions, right.conditions);
 
@@ -436,7 +487,7 @@ public class SqlTableAccess extends SqlIntercode
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
-            return SqlNoSolution.get();
+            return null;
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
@@ -487,7 +538,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlIntercode merge(SqlTableAccess parent, SqlTableAccess child, List<ColumnPair> key,
+    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess child, List<ColumnPair> key,
             Set<String> restrictions)
     {
         Map<Column, Column> map = new HashMap<Column, Column>();
@@ -514,7 +565,7 @@ public class SqlTableAccess extends SqlIntercode
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
-            return SqlNoSolution.get();
+            return null;
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
@@ -566,7 +617,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlIntercode leftMerge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    public static SqlTableAccess leftMerge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
         Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
         extraNotNulls.removeAll(left.conditions.getIsNotNull());

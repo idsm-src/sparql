@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.TYPE;
 import static java.util.Arrays.asList;
+import java.util.Hashtable;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -15,9 +16,31 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class UserLiteralClass extends LiteralClass
 {
-    public UserLiteralClass(String name, String sqlType, IRI type)
+    private static final Hashtable<IRI, UserLiteralClass> instances = new Hashtable<IRI, UserLiteralClass>();
+
+
+    private UserLiteralClass(int id, String sqlType, IRI type)
     {
-        super(name, asList(sqlType), asList(LITERAL, TYPE), type);
+        super("usertype" + id, asList(sqlType), asList(LITERAL, TYPE), type);
+    }
+
+
+    public static synchronized UserLiteralClass get(String sqlType, IRI type)
+    {
+        UserLiteralClass userClass = instances.get(type);
+
+        if(userClass != null)
+        {
+            if(!userClass.sqlTypes.stream().allMatch(t -> t.equals(sqlType)))
+                throw new IllegalArgumentException();
+        }
+        else
+        {
+            userClass = new UserLiteralClass(instances.size(), sqlType, type);
+            instances.put(type, userClass);
+        }
+
+        return userClass;
     }
 
 
@@ -52,31 +75,38 @@ public class UserLiteralClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
+        return asList(column);
+    }
 
-        StringBuilder builder = new StringBuilder();
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return columns.get(0);
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        //FIXME: can cause sql exception
 
         if(check)
-        {
-            builder.append("CASE ");
-            builder.append("sparql.rdfbox_extract_typed_literal_type" + "(" + column + ")");
-            builder.append(" WHEN '");
-            builder.append(getTypeIri().getValue().replace("'", "''"));
-            builder.append("'::varchar THEN ");
-            builder.append("sparql.rdfbox_extract_typed_literal_literal" + "(" + column + ")::");
-            builder.append(sqlTypes.get(0));
-            builder.append(" END");
-        }
+            return asList(new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value_of_type(" + column + ", '"
+                    + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0))));
         else
-        {
-            builder.append(sqlTypes.get(0));
-            builder.append("sparql.rdfbox_extract_typed_literal_literal" + "(" + column + ")::");
-        }
+            return asList(
+                    new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value(" + column + ")::" + sqlTypes.get(0))));
+    }
 
-        return asList(new ExpressionColumn(builder.toString()));
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_typedliteral(" + columns.get(0) + "::varchar, '"
+                + typeIri.getValue().replaceAll("'", "''") + "'::varchar)");
     }
 
 
@@ -90,22 +120,46 @@ public class UserLiteralClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        if(!rdfbox)
-            return columns.get(0);
-
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_typed_literal(" + columns.get(0) + "::varchar, '"
-                + getTypeIri().getValue().replace("'", "''") + "'::varchar)");
-    }
-
-
-    @Override
     public List<Column> toResult(List<Column> columns)
     {
         String type = getTypeIri().getValue().replace("'", "''");
         String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + type + "'::varchar END";
 
         return asList(new ExpressionColumn(columns.get(0) + "::varchar"), new ExpressionColumn(code));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_typedliteral(" + code + "::varchar, '"
+                + typeIri.getValue().replaceAll("'", "''") + "'::varchar)";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        //FIXME: can cause sql exception
+
+        if(check)
+            return ("sparql.rdfbox_get_typedliteral_value_of_type(" + code + ", '"
+                    + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0));
+        else
+            return ("sparql.rdfbox_get_typedliteral_value(" + code + ")::" + sqlTypes.get(0));
     }
 }

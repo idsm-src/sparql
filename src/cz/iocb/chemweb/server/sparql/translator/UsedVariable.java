@@ -111,7 +111,7 @@ public class UsedVariable
             if(resClass == resourceClass)
                 columns.add(getMapping(resClass));
             else if(resClass.getGeneralClass() == resourceClass)
-                columns.add(resClass.toGeneralClass(getMapping(resClass), true));
+                columns.add(resClass.toGeneralClass(getMapping(resClass), canBeNull() || resClasses.size() > 0));
             else if(resClass == resourceClass.getGeneralClass())
                 columns.add(resourceClass.fromGeneralClass(getMapping(resClass)));
         }

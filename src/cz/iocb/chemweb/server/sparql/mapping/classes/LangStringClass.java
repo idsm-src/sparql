@@ -45,21 +45,6 @@ public class LangStringClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
-    {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
-
-        List<Column> result = new ArrayList<Column>(getColumnCount());
-
-        result.add(new ExpressionColumn("sparql.rdfbox_extract_lang_string_string(" + column + ")"));
-        result.add(new ExpressionColumn("sparql.rdfbox_extract_lang_string_lang(" + column + ")"));
-
-        return result;
-    }
-
-
-    @Override
     public List<Column> fromGeneralClass(List<Column> columns)
     {
         return columns;
@@ -74,21 +59,47 @@ public class LangStringClass extends LiteralClass
 
 
     @Override
+    public List<Column> fromExpression(Column column)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_langstring_lang(" + column + ")"));
+
+        return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn(
+                "sparql.rdfbox_create_from_langstring(" + columns.get(0) + ", " + columns.get(1) + ")");
+    }
+
+
+    @Override
     public Column toExpression(Node node)
     {
         Literal literal = (Literal) node;
 
         return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_lang_string('" + ((String) literal.getValue()).replaceAll("'", "''")
+                "sparql.rdfbox_create_from_langstring('" + ((String) literal.getValue()).replaceAll("'", "''")
                         + "'::varchar, '" + literal.getLanguageTag() + "'::varchar)");
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_lang_string(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -96,5 +107,40 @@ public class LangStringClass extends LiteralClass
     public List<Column> toResult(List<Column> columns)
     {
         return columns;
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public boolean hasExpressionType()
+    {
+        return false;
     }
 }

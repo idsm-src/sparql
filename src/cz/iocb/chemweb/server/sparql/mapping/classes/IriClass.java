@@ -29,4 +29,32 @@ public abstract class IriClass extends ResourceClass
     {
         return new ConstantColumn("'" + ((IRI) node).getValue().replaceAll("'", "''") + "'::varchar");
     }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_iri(" + code + ")";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        return "sparql.rdfbox_get_iri(" + code + ")";
+    }
 }

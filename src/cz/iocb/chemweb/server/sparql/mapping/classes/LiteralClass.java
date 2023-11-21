@@ -11,7 +11,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public abstract class LiteralClass extends ResourceClass
 {
-    private final IRI typeIri;
+    protected final IRI typeIri;
 
 
     protected LiteralClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)

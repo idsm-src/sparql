@@ -53,12 +53,30 @@ public class SimpleLiteralClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
+        return asList(column);
+    }
 
-        return asList(new ExpressionColumn("sparql.rdfbox_extract_" + getName() + "(" + column + ")"));
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return columns.get(0);
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        return asList(new ExpressionColumn("sparql.rdfbox_get_" + name + "(" + column + ")"));
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_" + name + "(" + columns.get(0) + ")");
     }
 
 
@@ -75,18 +93,36 @@ public class SimpleLiteralClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public List<Column> toResult(List<Column> columns)
     {
-        if(!rdfbox)
-            return columns.get(0);
-
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_" + name + "(" + columns.get(0) + ")");
+        return columns;
     }
 
 
     @Override
-    public List<Column> toResult(List<Column> columns)
+    public String fromGeneralExpression(String code)
     {
-        return columns;
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_" + name + "(" + code + ")";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        return "sparql.rdfbox_get_" + name + "(" + code + ")";
     }
 }

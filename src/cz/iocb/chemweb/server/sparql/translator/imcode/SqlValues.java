@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
@@ -8,13 +9,15 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.Condition;
+import cz.iocb.chemweb.server.sparql.database.Conditions;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
-import cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -173,6 +176,72 @@ public class SqlValues extends SqlIntercode
     }
 
 
+    public boolean isDistinct()
+    {
+        for(int i = 0; i < size; i++)
+        {
+            check:
+            for(int j = i + 1; j < size; j++)
+            {
+                for(List<Column> values : data.values())
+                {
+                    Column coli = values.get(i);
+                    Column colj = values.get(j);
+
+                    if(coli == null ? colj != null : !coli.equals(colj))
+                        continue check;
+                }
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    public Conditions asConditions(UsedVariables outerVariables)
+    {
+        Conditions conditions = new Conditions();
+
+        for(int i = 0; i < size; i++) // iteruji přes jednotlivé řádky ...
+        {
+            Condition condition = new Condition(); // podmínka pro daný řádek ...
+
+            for(UsedVariable variable : variables.getValues()) // iteruji přes (used) proměnné
+            {
+                UsedVariable outerVariable = outerVariables.get(variable.getName());
+
+                if(outerVariable == null)
+                    continue; // should not happen, if the SqlValues instance is correctly optimized
+
+                //TODO: support multiple resource class ...
+                assert variable.getMappings().size() == 1;
+
+                for(Entry<ResourceClass, List<Column>> mapping : variable.getMappings().entrySet())
+                {
+                    List<Column> outerCollumns = outerVariable.getMapping(mapping.getKey());
+
+                    if(outerCollumns == null)
+                        continue; // should not happen, if the SqlValues instance is correctly optimized
+
+                    for(int j = 0; j < outerCollumns.size(); j++)
+                    {
+                        if(mapping.getValue().get(j) instanceof ConstantColumn)
+                            condition.addAreEqual(outerCollumns.get(j), mapping.getValue().get(j));
+                        else
+                            condition.addAreEqual(outerCollumns.get(j), data.get(mapping.getValue().get(j)).get(i));
+                    }
+                }
+            }
+
+            conditions.add(condition);
+        }
+
+        return conditions;
+    }
+
+
     @Override
     public String translate()
     {
@@ -231,7 +300,7 @@ public class SqlValues extends SqlIntercode
                 if(resClass.match(value))
                     return resClass;
 
-            return BuiltinClasses.unsupportedIri;
+            return unsupportedIri;
         }
         else if(value instanceof BlankNodeLiteral)
         {
@@ -241,5 +310,11 @@ public class SqlValues extends SqlIntercode
         {
             return null;
         }
+    }
+
+
+    public int getSize()
+    {
+        return size;
     }
 }

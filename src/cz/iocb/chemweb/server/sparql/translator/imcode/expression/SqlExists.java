@@ -117,7 +117,7 @@ public class SqlExists extends SqlExpressionIntercode
         else
             builder.append("1");
 
-        builder.append("FROM (");
+        builder.append(" FROM (");
 
         builder.append(pattern.translate());
 

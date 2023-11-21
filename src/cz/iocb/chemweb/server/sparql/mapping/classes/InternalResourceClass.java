@@ -46,7 +46,28 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
     {
         throw new UnsupportedOperationException();
     }
@@ -60,14 +81,34 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public List<Column> toResult(List<Column> columns)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String fromGeneralExpression(String code)
     {
         throw new UnsupportedOperationException();
     }
 
 
     @Override
-    public List<Column> toResult(List<Column> columns)
+    public String toGeneralExpression(String code)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
     {
         throw new UnsupportedOperationException();
     }

@@ -55,17 +55,36 @@ public class UnsupportedLiteralClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
+        throw new IllegalArgumentException();
+    }
 
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ExpressionColumn("sparql.rdfbox_extract_typed_literal_literal(" + column + ")"));
-        result.add(new ExpressionColumn("sparql.rdfbox_extract_typed_literal_type(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_typedliteral_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_typedliteral_type(" + column + ")"));
 
         return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn(
+                "sparql.rdfbox_create_from_typedliteral(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -74,16 +93,8 @@ public class UnsupportedLiteralClass extends LiteralClass
     {
         String value = ((Literal) node).getStringValue().replaceAll("'", "''");
 
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_typed_literal('" + value + "', '"
+        return new ExpressionColumn("sparql.rdfbox_create_from_typedliteral('" + value + "', '"
                 + ((Literal) node).getTypeIri().getValue() + "')");
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_typed_literal(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -91,5 +102,40 @@ public class UnsupportedLiteralClass extends LiteralClass
     public List<Column> toResult(List<Column> columns)
     {
         return columns;
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public boolean hasExpressionType()
+    {
+        return false;
     }
 }

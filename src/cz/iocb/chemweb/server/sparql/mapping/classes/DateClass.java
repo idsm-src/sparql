@@ -56,15 +56,40 @@ public class DateClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        String prefix = isBoxed ? "sparql.rdfbox_extract_date" : "sparql.zoneddate";
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ExpressionColumn(prefix + "_date(" + column + ")"));
-        result.add(new ExpressionColumn(prefix + "_zone(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.zoneddate_get_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.zoneddate_get_zone(" + column + ")"));
 
         return result;
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.zoneddate_create(" + columns.get(0) + ", " + columns.get(1) + ")");
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn("sparql.rdfbox_get_date_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_date_zone(" + column + ")"));
+
+        return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_date(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -72,15 +97,6 @@ public class DateClass extends LiteralClass
     public Column toExpression(Node node)
     {
         return new ConstantColumn("'" + ((Literal) node).getValue() + "'::sparql.zoneddate");
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        String function = rdfbox ? "sparql.cast_as_rdfbox_from_date" : "sparql.zoneddate_create";
-
-        return new ExpressionColumn(function + "(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -95,6 +111,34 @@ public class DateClass extends LiteralClass
     public static String getDate(Literal literal)
     {
         return ((String) literal.getValue()).replaceFirst("(Z|(\\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))$", "");
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_date(" + code + ")";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        return "sparql.rdfbox_get_date(" + code + ")";
     }
 
 

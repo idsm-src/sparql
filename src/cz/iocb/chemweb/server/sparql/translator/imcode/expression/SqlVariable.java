@@ -51,9 +51,9 @@ public class SqlVariable extends SqlNodeValue
     }
 
 
-    Column getExpressionValue(ResourceClass resourceClass, boolean isBoxed)
+    Column getExpressionValue(ResourceClass resourceClass)
     {
-        return resourceClass.toExpression(variable.getMapping(resourceClass), isBoxed);
+        return resourceClass.toExpression(variable.getMapping(resourceClass));
     }
 
 

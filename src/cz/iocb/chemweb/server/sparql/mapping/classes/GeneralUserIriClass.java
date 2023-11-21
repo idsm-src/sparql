@@ -151,11 +151,11 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        String iri = isBoxed ? "sparql.rdfbox_extract_iri(" + column + ")" : column.toString();
+        String iri = column.toString();
 
         for(int part = 0; part < getColumnCount(); part++)
             result.add(new ExpressionColumn(inverseFunction.get(part) + "(" + iri + ")"));
@@ -165,12 +165,9 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public Column toExpression(List<Column> columns)
     {
         StringBuilder builder = new StringBuilder();
-
-        if(rdfbox)
-            builder.append("sparql.cast_as_rdfbox_from_iri(");
 
         builder.append(function);
         builder.append("(");
@@ -185,8 +182,44 @@ public class GeneralUserIriClass extends UserIriClass
 
         builder.append(")");
 
-        if(rdfbox)
-            builder.append(")");
+        return new ExpressionColumn(builder.toString());
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        String iri = "sparql.rdfbox_get_iri(" + column + ")";
+
+        for(int part = 0; part < getColumnCount(); part++)
+            result.add(new ExpressionColumn(inverseFunction.get(part) + "(" + iri + ")"));
+
+        return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("sparql.rdfbox_create_from_iri(");
+
+        builder.append(function);
+        builder.append("(");
+
+        for(int i = 0; i < getColumnCount(); i++)
+        {
+            if(i > 0)
+                builder.append(", ");
+
+            builder.append(columns.get(i));
+        }
+
+        builder.append(")");
+        builder.append(")");
 
         return new ExpressionColumn(builder.toString());
     }

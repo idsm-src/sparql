@@ -1,10 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBlankNode;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
@@ -23,6 +19,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
@@ -33,9 +30,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
 
@@ -57,7 +51,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     {
         this.canBeNull = canBeNull;
         this.isDeterministic = isDeterministic;
-        this.isBoxed = isBoxed(resourceClasses);
+        this.isBoxed = resourceClasses.size() > 0 ? isBoxed(resourceClasses) : false; //FIXME
         this.resourceClasses = resourceClasses;
     }
 
@@ -92,6 +86,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public Set<ResourceClass> getResourceClasses(Predicate<ResourceClass> predicate)
+    {
+        return resourceClasses.stream().filter(predicate).collect(toSet());
+    }
+
+
     public Set<String> getReferencedVariables()
     {
         return referencedVariables;
@@ -118,7 +118,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             return "plain_date";
 
         if(resourceClass instanceof LangStringConstantTagClass)
-            return "plain_lang_string";
+            return "plain_langstring";
 
         if(resourceClass instanceof IriClass)
             return "iri";
@@ -187,6 +187,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public static boolean isFloatPoint(ResourceClass resClass)
+    {
+        return resClass == xsdFloat || resClass == xsdDouble;
+    }
+
+
     public static boolean isNumericCompatibleWith(ResourceClass resClass, ResourceClass requestClass)
     {
         if(!isNumeric(resClass))
@@ -219,28 +225,17 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public static ResourceClass getExpressionResourceClass(Set<ResourceClass> resourceClasses)
     {
         if(resourceClasses.size() == 0)
-            return null;
+            return null; //throw new IllegalArgumentException();
 
-        if(resourceClasses.contains(rdfLangString) || resourceClasses.contains(unsupportedLiteral))
-            return null;
-
-        if(resourceClasses.stream().allMatch(r -> isIri(r)))
-            return iri;
+        ResourceClass resClass = null;
 
         if(resourceClasses.size() == 1)
-            return resourceClasses.iterator().next();
+            resClass = resourceClasses.iterator().next();
+        else if(resourceClasses.stream().map(c -> c.getGeneralClass()).distinct().count() == 1)
+            resClass = resourceClasses.iterator().next().getGeneralClass();
 
-        if(resourceClasses.stream().allMatch(r -> isDateTime(r)))
-            return xsdDateTime;
-
-        if(resourceClasses.stream().allMatch(r -> isDate(r)))
-            return xsdDate;
-
-        if(resourceClasses.stream().allMatch(r -> isIntBlankNode(r)))
-            return intBlankNode;
-
-        if(resourceClasses.stream().allMatch(r -> isStrBlankNode(r)))
-            return strBlankNode;
+        if(resClass != null && resClass.hasExpressionType())
+            return resClass;
 
         return null;
     }
@@ -258,25 +253,17 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         set.addAll(left);
         set.addAll(right);
 
-        if(set.contains(xsdDateTime))
-            set = set.stream().filter(r -> !(r instanceof DateTimeConstantZoneClass)).collect(toSet());
+        Set<ResourceClass> result = new HashSet<ResourceClass>();
 
-        if(set.contains(xsdDate))
-            set = set.stream().filter(r -> !(r instanceof DateConstantZoneClass)).collect(toSet());
+        for(ResourceClass resClass : set)
+        {
+            if(set.contains(resClass.getGeneralClass()))
+                result.add(resClass.getGeneralClass());
+            else
+                result.add(resClass);
+        }
 
-        if(set.contains(rdfLangString))
-            set = set.stream().filter(r -> !(r instanceof LangStringConstantTagClass)).collect(toSet());
-
-        if(set.contains(iri))
-            set = set.stream().filter(r -> !(r instanceof IriClass && r != iri)).collect(toSet());
-
-        if(set.contains(intBlankNode))
-            set = set.stream().filter(r -> !(r instanceof UserIntBlankNodeClass)).collect(toSet());
-
-        if(set.contains(strBlankNode))
-            set = set.stream().filter(r -> !(r instanceof UserStrBlankNodeClass)).collect(toSet());
-
-        return set;
+        return result;
     }
 
 
@@ -286,33 +273,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         merged.addAll(left);
         merged.addAll(right);
 
-        Set<ResourceClass> set = new HashSet<ResourceClass>();
+        Set<ResourceClass> result = new HashSet<ResourceClass>();
 
         for(ResourceClass resourceClass : merged)
         {
             if(left.contains(resourceClass) && right.contains(resourceClass))
-                set.add(resourceClass);
+                result.add(resourceClass);
 
-            if(resourceClass instanceof DateTimeConstantZoneClass && merged.contains(xsdDateTime))
-                set.add(resourceClass);
-
-            if(resourceClass instanceof DateConstantZoneClass && merged.contains(xsdDate))
-                set.add(resourceClass);
-
-            if(resourceClass instanceof LangStringConstantTagClass && merged.contains(rdfLangString))
-                set.add(resourceClass);
-
-            if((resourceClass instanceof UserIriClass || resourceClass == unsupportedIri) && merged.contains(iri))
-                set.add(resourceClass);
-
-            if(resourceClass instanceof UserIntBlankNodeClass && merged.contains(intBlankNode))
-                set.add(resourceClass);
-
-            if(resourceClass instanceof UserStrBlankNodeClass && merged.contains(strBlankNode))
-                set.add(resourceClass);
+            if(merged.contains(resourceClass.getGeneralClass()))
+                result.add(resourceClass);
         }
 
-        return set;
+        return result;
     }
 
 
@@ -397,61 +369,35 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
             for(ResourceClass compatibleClass : compatibleClasses)
             {
-                List<Column> cols = variable.getUsedVariable().getMapping(compatibleClass);
-                Column code = compatibleClass.toExpression(cols, false);
-
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                if(resourceClass == xsdDateTime && compatibleClass instanceof DateTimeConstantZoneClass)
+                List<Column> cols = variable.getUsedVariable().getMapping(compatibleClass);
+
+                if(compatibleClass == resourceClass)
                 {
-                    builder.append("sparql.zoneddatetime_create(");
-                    builder.append(code);
-                    builder.append(", '");
-                    builder.append(((DateTimeConstantZoneClass) compatibleClass).getZone());
-                    builder.append("'::int4)");
+                    builder.append(compatibleClass.toExpression(cols));
                 }
-                else if(resourceClass == xsdDate && compatibleClass instanceof DateConstantZoneClass)
+                else if(compatibleClass.getGeneralClass() == resourceClass)
                 {
-                    builder.append("sparql.zoneddate_create(");
-                    builder.append(code);
-                    builder.append(", '");
-                    builder.append(((DateConstantZoneClass) compatibleClass).getZone());
-                    builder.append("'::int4)");
+                    boolean nullCheck = operand.canBeNull() || operand.getResourceClasses().size() > 1;
+                    List<Column> c = compatibleClass.toGeneralClass(cols, nullCheck);
+                    builder.append(resourceClass.toExpression(c));
                 }
-                else if(resourceClass == intBlankNode && compatibleClass instanceof UserIntBlankNodeClass)
+                else if(compatibleClass == resourceClass.getGeneralClass())
                 {
-                    builder.append("sparql.int_blanknode_create('");
-                    builder.append(((UserIntBlankNodeClass) compatibleClass).getSegment());
-                    builder.append("'::int4, ");
-                    builder.append(code);
-                    builder.append(")");
+                    List<Column> c = resourceClass.fromGeneralClass(cols);
+                    builder.append(resourceClass.toExpression(c));
                 }
-                else if(resourceClass == strBlankNode && compatibleClass instanceof UserStrBlankNodeClass)
-                {
-                    builder.append("sparql.str_blanknode_create('");
-                    builder.append(((UserStrBlankNodeClass) compatibleClass).getSegment());
-                    builder.append("'::int4, ");
-                    builder.append(code);
-                    builder.append(")");
-                }
-                else if(resourceClass == iri && compatibleClass instanceof IriClass)
-                {
-                    builder.append(code);
-                }
-                else if(compatibleClass != resourceClass)
+                else
                 {
                     builder.append("sparql.cast_as_");
                     builder.append(resourceClass.getName());
                     builder.append("_from_");
                     builder.append(compatibleClass.getName());
                     builder.append("(");
-                    builder.append(code);
+                    builder.append(compatibleClass.toExpression(cols));
                     builder.append(")");
-                }
-                else
-                {
-                    builder.append(code);
                 }
             }
 
@@ -462,67 +408,39 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         {
             ResourceClass expressionClass = operand.getExpressionResourceClass();
 
-            if(resourceClass == xsdDateTime && expressionClass instanceof DateTimeConstantZoneClass)
+            if(operand.isBoxed() && isNumeric(resourceClass))
             {
-                builder.append("sparql.zoneddatetime_create(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) expressionClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass == xsdDate && expressionClass instanceof DateConstantZoneClass)
-            {
-                builder.append("sparql.zoneddate_create(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateConstantZoneClass) expressionClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass == iri && expressionClass instanceof IriClass)
-            {
-                builder.append(operand.translate());
-            }
-            else if(resourceClass == intBlankNode && expressionClass instanceof UserIntBlankNodeClass)
-            {
-                builder.append("sparql.int_blanknode_create('");
-                builder.append(((UserIntBlankNodeClass) expressionClass).getSegment());
-                builder.append("'::int4, ");
-                builder.append(operand.translate());
-                builder.append(")");
-            }
-            else if(resourceClass == strBlankNode && expressionClass instanceof UserStrBlankNodeClass)
-            {
-                builder.append("sparql.str_blanknode_create('");
-                builder.append(((UserStrBlankNodeClass) expressionClass).getSegment());
-                builder.append("'::int4, ");
-                builder.append(operand.translate());
-                builder.append(")");
+                builder.append("sparql.rdfbox_promote_to_" + resourceClass.getName() + "(" + operand.translate() + ")");
             }
             else if(operand.isBoxed())
             {
-                if(isNumeric(resourceClass))
-                    builder.append("sparql.rdfbox_extract_derivated_from_");
-                else
-                    builder.append("sparql.rdfbox_extract_");
+                ResourceClass genClass = resourceClass.getGeneralClass();
+                boolean check = operand.getResourceClasses().stream().filter(c -> c.getGeneralClass() == genClass)
+                        .count() > 1;
 
-                builder.append(resourceClass.getName());
-                builder.append("(");
-                builder.append(operand.translate());
-                builder.append(")");
+                builder.append(resourceClass.toUnboxedExpression(operand.translate(), check));
             }
-            else if(!operand.getResourceClasses().contains(resourceClass))
+            else if(expressionClass == resourceClass)
+            {
+                builder.append(operand.translate());
+            }
+            else if(expressionClass.getGeneralClass() == resourceClass)
+            {
+                builder.append(expressionClass.toGeneralExpression(operand.translate()));
+            }
+            else if(expressionClass == resourceClass.getGeneralClass())
+            {
+                builder.append(resourceClass.fromGeneralExpression(operand.translate()));
+            }
+            else
             {
                 builder.append("sparql.cast_as_");
                 builder.append(resourceClass.getName());
                 builder.append("_from_");
-                builder.append(operand.getResourceName());
+                builder.append(expressionClass.getName());
                 builder.append("(");
                 builder.append(operand.translate());
                 builder.append(")");
-            }
-            else
-            {
-                builder.append(operand.translate());
             }
         }
 
@@ -549,7 +467,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 hasAlternative = true;
 
                 List<Column> cols = variable.getUsedVariable().getMapping(patternClass);
-                builder.append(patternClass.toExpression(cols, true));
+                builder.append(patternClass.toBoxedExpression(cols));
             }
 
             if(requestedClasses.size() > 1)
@@ -562,40 +480,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         else
         {
             ResourceClass resourceClass = operand.getExpressionResourceClass();
-
-            if(resourceClass instanceof DateTimeConstantZoneClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_datetime(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) resourceClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass instanceof DateConstantZoneClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_date(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((DateConstantZoneClass) resourceClass).getZone());
-                builder.append("'::int4)");
-            }
-            else if(resourceClass instanceof LangStringConstantTagClass)
-            {
-                builder.append("sparql.cast_as_rdfbox_from_lang_string(");
-                builder.append(operand.translate());
-                builder.append(", '");
-                builder.append(((LangStringConstantTagClass) resourceClass).getTag());
-                builder.append("'::varchar)");
-            }
-            else
-            {
-                builder.append("sparql.cast_as_rdfbox");
-                builder.append("_from_");
-                builder.append(operand.getResourceName());
-                builder.append("(");
-                builder.append(operand.translate());
-                builder.append(")");
-            }
+            builder.append(resourceClass.toBoxedExpression(operand.translate()));
         }
 
         return builder.toString();
@@ -605,13 +490,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static String translateAsStringLiteral(SqlExpressionIntercode operand, ResourceClass resourceClass)
     {
         if(operand instanceof SqlVariable)
-            return ((SqlVariable) operand).getExpressionValue(resourceClass, false).toString();
+            return ((SqlVariable) operand).getExpressionValue(resourceClass).toString();
         else if(!operand.isBoxed())
             return operand.translate();
         else if(resourceClass == xsdString)
-            return "sparql.rdfbox_extract_string(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_string(" + operand.translate() + ")";
         else
-            return "sparql.rdfbox_extract_lang_string_string(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_langstring_value(" + operand.translate() + ")";
     }
 
 
@@ -649,7 +534,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
         else
         {
-            return "sparql.rdfbox_extract_string_literal(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_string_literal(" + operand.translate() + ")";
         }
     }
 }

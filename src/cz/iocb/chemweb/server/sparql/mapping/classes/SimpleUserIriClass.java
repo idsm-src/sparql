@@ -33,27 +33,30 @@ public abstract class SimpleUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        Column parameter = isBoxed ? new ExpressionColumn("sparql.rdfbox_extract_iri(" + column + ")") : column;
-        return asList(generateInverseFunction(parameter, check));
+        return asList(generateInverseFunction(column, false));
     }
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public Column toExpression(List<Column> columns)
     {
-        StringBuilder builder = new StringBuilder();
+        return generateFunction(columns.get(0));
+    }
 
-        if(rdfbox)
-            builder.append("sparql.cast_as_rdfbox_from_iri(");
 
-        builder.append(generateFunction(columns.get(0)));
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        return asList(generateInverseFunction(new ExpressionColumn("sparql.rdfbox_get_iri(" + column + ")"), check));
+    }
 
-        if(rdfbox)
-            builder.append(")");
 
-        return new ExpressionColumn(builder.toString());
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + generateFunction(columns.get(0)) + ")");
     }
 
 

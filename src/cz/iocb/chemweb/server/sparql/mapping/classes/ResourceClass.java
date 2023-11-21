@@ -76,19 +76,49 @@ public abstract class ResourceClass
     public abstract List<Column> toGeneralClass(List<Column> columns, boolean check);
 
 
-    public abstract List<Column> fromExpression(Column column, boolean isBoxed, boolean check);
+    public abstract List<Column> fromExpression(Column column);
+
+
+    public abstract Column toExpression(List<Column> columns);
+
+
+    public abstract List<Column> fromBoxedExpression(Column column, boolean check);
+
+
+    public abstract Column toBoxedExpression(List<Column> columns);
 
 
     public abstract Column toExpression(Node node);
 
 
-    public abstract Column toExpression(List<Column> columns, boolean rdfbox);
-
-
     public abstract List<Column> toResult(List<Column> columns);
 
 
+    public abstract String fromGeneralExpression(String code);
+
+
+    public abstract String toGeneralExpression(String code);
+
+
+    public abstract String toBoxedExpression(String code);
+
+
+    public abstract String toUnboxedExpression(String code, boolean check);
+
+
     public abstract boolean match(Node node);
+
+
+    public boolean hasExpressionType()
+    {
+        return true;
+    }
+
+
+    public boolean canBeDerivatedFromGeneral()
+    {
+        return true;
+    }
 
 
     @Override

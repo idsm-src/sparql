@@ -37,7 +37,7 @@ public class LangStringConstantTagClass extends LiteralClass
     }
 
 
-    public static LangStringConstantTagClass get(String lang)
+    public static synchronized LangStringConstantTagClass get(String lang)
     {
         lang = lang.toLowerCase();
 
@@ -115,30 +115,37 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
-
-        StringBuilder builder = new StringBuilder();
-
-        if(check)
-        {
-            builder.append("CASE ");
-            builder.append("sparql.rdfbox_extract_lang_string_lang" + "(" + column + ")");
-            builder.append(" WHEN '");
-            builder.append(getTag());
-            builder.append("'::varchar THEN ");
-            builder.append("sparql.rdfbox_extract_lang_string_string" + "(" + column + ")");
-            builder.append(" END");
-        }
-        else
-        {
-            builder.append("sparql.rdfbox_extract_lang_string_string" + "(" + column + ")");
-        }
-
-        return asList(new ExpressionColumn(builder.toString()));
+        return asList(column);
     }
+
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return columns.get(0);
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        if(check)
+            return asList(new ExpressionColumn(
+                    "sparql.rdfbox_get_langstring_value_of_lang(" + column + ", '" + lang + "'::varchar"));
+        else
+            return asList(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn(
+                "sparql.rdfbox_create_from_langstring(" + columns.get(0) + ", '" + lang + "'::varchar)");
+    }
+
 
 
     @Override
@@ -149,22 +156,42 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        if(!rdfbox)
-            return columns.get(0);
-
-        return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_lang_string(" + columns.get(0) + ", '" + lang + "'::varchar)");
-    }
-
-
-    @Override
     public List<Column> toResult(List<Column> columns)
     {
         String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + lang + "'::varchar END";
 
         return asList(columns.get(0), new ExpressionColumn(code));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_langstring(" + code + ", '" + lang + "'::varchar)";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        if(check)
+            return "sparql.rdfbox_get_langstring_value_of_lang(" + code + ", '" + lang + "'::varchar)";
+        else
+            return "sparql.rdfbox_get_langstring_value(" + code + ")";
     }
 
 

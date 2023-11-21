@@ -332,7 +332,7 @@ public class SqlAggregation extends SqlIntercode
         }
         else if(!groupVariables.isEmpty())
         {
-            builder.append(" GROUP BY true");
+            builder.append(" GROUP BY true::boolean");
         }
 
 

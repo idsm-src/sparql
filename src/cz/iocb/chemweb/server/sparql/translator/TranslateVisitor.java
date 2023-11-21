@@ -490,7 +490,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-
         UsedVariables variables = new UsedVariables();
 
         for(Projection projection : select.getProjections())
@@ -1767,6 +1766,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         try
         {
             SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
+
+            if(imcode == null)
+                return null;
+
             return (SqlQuery) imcode.optimize();
         }
         catch(SQLRuntimeException e)

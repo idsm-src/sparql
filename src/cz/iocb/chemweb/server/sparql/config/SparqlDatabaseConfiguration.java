@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.config;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.rdfLangStringType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateTimeType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateType;
@@ -60,7 +61,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 
 
 
-public abstract class SparqlDatabaseConfiguration
+public class SparqlDatabaseConfiguration
 {
     private final IRI serviceIri;
     private final IRI descriptionGraphIri;
@@ -81,7 +82,7 @@ public abstract class SparqlDatabaseConfiguration
     protected HashMap<IRI, HashMap<String, FunctionDefinition>> functions = new HashMap<IRI, HashMap<String, FunctionDefinition>>();
 
 
-    protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
+    public SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
             boolean autoAddToDefaultGraph) throws SQLException
     {
         IRI serviceIri = service == null ? null : new IRI(service);
@@ -107,6 +108,7 @@ public abstract class SparqlDatabaseConfiguration
         addDataType(xsdDayTimeDurationType);
         addDataType(xsdDateType);
         addDataType(xsdDateTimeType);
+        addDataType(rdfLangStringType);
     }
 
 

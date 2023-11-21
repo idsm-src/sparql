@@ -17,7 +17,20 @@ public class VariableScopes
         public Scope(String name, Set<String> transientNames)
         {
             this.name = name;
-            this.transientNames = transientNames;
+
+            if(transientNames != null)
+            {
+                this.transientNames = new HashSet<String>();
+
+                for(String n : transientNames)
+                {
+                    if(n.startsWith("$") || n.startsWith("?"))
+                        n = n.substring(1);
+
+                    this.transientNames.add(n);
+
+                }
+            }
         }
     }
 
@@ -52,6 +65,9 @@ public class VariableScopes
 
     public String addToScope(String name, boolean asPrivate)
     {
+        if(name.startsWith("$") || name.startsWith("?"))
+            name = name.substring(1);
+
         for(Scope scope : scopes)
         {
             if(scope.variables.contains(name))

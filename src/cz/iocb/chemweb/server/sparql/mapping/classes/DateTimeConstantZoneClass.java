@@ -36,7 +36,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     }
 
 
-    public static DateTimeConstantZoneClass get(int zone)
+    public static synchronized DateTimeConstantZoneClass get(int zone)
     {
         DateTimeConstantZoneClass instance = instances.get(zone);
 
@@ -111,28 +111,34 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        String prefix = isBoxed ? "sparql.rdfbox_extract_datetime" : "sparql.zoneddatetime";
+        return asList(column);
+    }
 
-        StringBuilder builder = new StringBuilder();
 
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return columns.get(0);
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
         if(check)
-        {
-            builder.append("CASE ");
-            builder.append(prefix + "_zone(" + column + ")");
-            builder.append(" WHEN '");
-            builder.append(getZone());
-            builder.append("'::int4 THEN ");
-            builder.append(prefix + "_datetime(" + column + ")");
-            builder.append(" END");
-        }
+            return asList(new ExpressionColumn(
+                    "sparql.rdfbox_get_datetime_value_of_zone(" + column + ", '" + zone + "'::int4)"));
         else
-        {
-            builder.append(prefix + "_datetime(" + column + ")");
-        }
+            return asList(new ExpressionColumn("sparql.rdfbox_get_datetime_value(" + column + ")"));
+    }
 
-        return asList(new ExpressionColumn(builder.toString()));
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_datetime(" + columns.get(0) + ", '" + zone + "'::int4)");
     }
 
 
@@ -140,18 +146,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     public Column toExpression(Node node)
     {
         return new ExpressionColumn(
-                "sparql.zoneddatetime_datetime('" + ((Literal) node).getValue() + "'::sparql.zoneddatetime)");
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        if(!rdfbox)
-            return columns.get(0);
-
-        return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_datetime(" + columns.get(0) + ", '" + zone + "'::int4)");
+                "sparql.zoneddatetime_get_value('" + ((Literal) node).getValue() + "'::sparql.zoneddatetime)");
     }
 
 
@@ -160,6 +155,37 @@ public class DateTimeConstantZoneClass extends LiteralClass
     {
         return asList(
                 new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", '" + zone + "'::int4)"));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return "sparql.zoneddatetime_get_value_of_zone(" + code + ", '" + zone + "'::int4)";
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return "sparql.zoneddatetime_create(" + code + ", '" + zone + "'::int4)";
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_datetime(" + code + ", '" + zone + "'::int4)";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        if(check)
+            return "sparql.rdfbox_get_datetime_value_of_zone(" + code + ", '" + zone + "'::int4)";
+        else
+            return "sparql.rdfbox_get_datetime_value(" + code + ")";
     }
 
 

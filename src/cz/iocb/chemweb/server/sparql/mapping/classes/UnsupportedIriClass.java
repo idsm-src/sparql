@@ -41,22 +41,33 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            throw new IllegalArgumentException();
-
-        return asList(new ExpressionColumn("sparql.rdfbox_extract_iri" + "(" + column + ")"));
+        return asList(column);
     }
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public Column toExpression(List<Column> columns)
     {
-        if(!rdfbox)
-            return columns.get(0);
+        return columns.get(0);
+    }
 
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_iri(" + columns.get(0) + ")");
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        if(check)
+            throw new IllegalArgumentException();
+        else
+            return asList(new ExpressionColumn("sparql.rdfbox_get_iri" + "(" + column + ")"));
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + columns.get(0) + ")");
     }
 
 
@@ -73,6 +84,13 @@ public class UnsupportedIriClass extends IriClass
         if(node instanceof VariableOrBlankNode || node instanceof IRI)
             return true;
 
+        return false;
+    }
+
+
+    @Override
+    public boolean canBeDerivatedFromGeneral()
+    {
         return false;
     }
 }

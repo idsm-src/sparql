@@ -4,7 +4,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.intBl
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.strBlankNode;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
@@ -27,19 +26,15 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateConstantZoneClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IntBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.IriClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.StrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIntBlankNodeClass;
-import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserLiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.translator.Pair;
@@ -53,6 +48,7 @@ public class SqlBinaryComparison extends SqlBinary
     private final boolean isAlwaysDifferentIfNotNull;
     private final List<Pair<ResourceClass, ResourceClass>> comparable;
     private final List<Pair<ResourceClass, ResourceClass>> different;
+    private static final int SECS_PER_DAY = 24 * 60 * 60;
 
 
     public SqlBinaryComparison(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
@@ -82,7 +78,16 @@ public class SqlBinaryComparison extends SqlBinary
         {
             for(ResourceClass rightClass : right.getResourceClasses())
             {
-                if(leftClass == xsdBoolean && rightClass == xsdBoolean
+                if(leftClass instanceof DateConstantZoneClass && rightClass instanceof DateConstantZoneClass
+                        && (operator == Operator.Equals || operator == Operator.NotEquals)
+                        && getTimezoneDiff((DateConstantZoneClass) leftClass, (DateConstantZoneClass) rightClass)
+                                % SECS_PER_DAY != 0)
+                {
+                    // is always different
+                    isAlwaysNull = false;
+                    different.add(new Pair<>(leftClass, rightClass));
+                }
+                else if(leftClass == xsdBoolean && rightClass == xsdBoolean
                         || leftClass == xsdString && rightClass == xsdString
                         || isNumeric(leftClass) && isNumeric(rightClass)
                         || isDateTime(leftClass) && isDateTime(rightClass) || isDate(leftClass) && isDate(rightClass))
@@ -104,21 +109,24 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else if(isLangString(leftClass) && isLangString(rightClass))
                 {
-                    if(leftClass instanceof LangStringConstantTagClass
-                            && rightClass instanceof LangStringConstantTagClass
-                            && !((LangStringConstantTagClass) leftClass).getTag()
-                                    .equals(((LangStringConstantTagClass) rightClass).getTag()))
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                    else
+                    if(leftClass == rightClass || leftClass == rdfLangString || rightClass == rdfLangString)
                     {
                         isAlwaysNull = false;
                         isAlwaysDifferentIfNotNull = false;
                         comparable.add(new Pair<>(leftClass, rightClass));
                     }
+                    else
+                    {
+                        // is always different
+                        isAlwaysNull = false;
+                        different.add(new Pair<>(leftClass, rightClass));
+                    }
+                }
+                else if(leftClass instanceof UserLiteralClass && leftClass == rightClass)
+                {
+                    isAlwaysNull = false;
+                    isAlwaysDifferentIfNotNull = false;
+                    comparable.add(new Pair<>(leftClass, rightClass));
                 }
                 else if(leftClass == unsupportedLiteral && rightClass == unsupportedLiteral)
                 {
@@ -133,9 +141,24 @@ public class SqlBinaryComparison extends SqlBinary
                     // is always null
                     canBeNull = true;
                 }
-                else if(leftClass instanceof BlankNodeClass && rightClass instanceof BlankNodeClass)
+                else if(leftClass instanceof StrBlankNodeClass && rightClass instanceof StrBlankNodeClass)
                 {
-                    if(leftClass == rightClass)
+                    if(leftClass == rightClass || leftClass == strBlankNode || rightClass == strBlankNode)
+                    {
+                        isAlwaysNull = false;
+                        isAlwaysDifferentIfNotNull = false;
+                        comparable.add(new Pair<>(leftClass, rightClass));
+                    }
+                    else
+                    {
+                        // is always different
+                        isAlwaysNull = false;
+                        different.add(new Pair<>(leftClass, rightClass));
+                    }
+                }
+                else if(leftClass instanceof IntBlankNodeClass && rightClass instanceof IntBlankNodeClass)
+                {
+                    if(leftClass == rightClass || leftClass == intBlankNode || rightClass == intBlankNode)
                     {
                         isAlwaysNull = false;
                         isAlwaysDifferentIfNotNull = false;
@@ -150,25 +173,17 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else if(leftClass instanceof IriClass && rightClass instanceof IriClass)
                 {
-                    if(leftClass instanceof UserIriClass && rightClass instanceof UserIriClass
-                            && leftClass != rightClass)
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                    else if((leftClass == unsupportedIri || rightClass == unsupportedIri)
-                            && (leftClass instanceof UserIriClass || rightClass instanceof UserIriClass))
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                    else
+                    if(leftClass == rightClass || leftClass == iri || rightClass == iri)
                     {
                         isAlwaysNull = false;
                         isAlwaysDifferentIfNotNull = false;
                         comparable.add(new Pair<>(leftClass, rightClass));
+                    }
+                    else
+                    {
+                        // is always different
+                        isAlwaysNull = false;
+                        different.add(new Pair<>(leftClass, rightClass));
                     }
                 }
                 else
@@ -230,54 +245,79 @@ public class SqlBinaryComparison extends SqlBinary
                 builder.append(translateAsNullCheck(getRight(), operator == Operator.NotEquals));
 
             builder.append(operator == Operator.Equals ? ", true)" : ", false)");
-
-            return builder.toString();
         }
-        else if(different.size() == 0 && (!getLeft().isBoxed() || !getRight().isBoxed()))
+        //TODO: také podporovat, když je to integer vs integer+decimal
+        else if(different.size() == 0 && SqlExpressionIntercode.getExpressionResourceClass(
+                comparable.stream().map(r -> determineComparisonClass(r.getKey(), r.getValue()))
+                        .collect(toSet())) != null/*!(getLeft().isBoxed() || getRight().isBoxed())*/)
         {
             Set<ResourceClass> cmpClasses = comparable.stream()
                     .map(r -> determineComparisonClass(r.getKey(), r.getValue())).collect(toSet());
 
-            if(cmpClasses.size() == 1)
+            ResourceClass cmpClass = SqlExpressionIntercode.getExpressionResourceClass(cmpClasses);
+
+            if(cmpClass instanceof UserLiteralClass)
             {
-                ResourceClass cmpClass = cmpClasses.iterator().next();
+                //TODO: add special treatment
 
-                //TODO: add other optimized variants
+                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(getRight(), cmpClass);
 
-                if(cmpClass != rdfLangString && cmpClass != unsupportedLiteral)
-                {
-                    builder.append("sparql.");
-                    builder.append(operator.getName());
-                    builder.append("_");
-                    builder.append(cmpClass.getName());
-                    builder.append("(");
-                    builder.append(translateAsUnboxedOperand(getLeft(), cmpClass));
-                    builder.append(", ");
-                    builder.append(translateAsUnboxedOperand(getRight(), cmpClass));
-                    builder.append(")");
+                builder.append("(");
+                builder.append(left);
+                builder.append(" ");
+                builder.append(operator.getText());
+                builder.append(" ");
+                builder.append(right);
+                builder.append(")");
+            }
+            else if(cmpClass == xsdDateTime || cmpClass == xsdDate || isFloatPoint(cmpClass))
+            {
+                //TODO: add special cases to compare xsdDate as simple date
 
-                    return builder.toString();
-                }
+                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(getRight(), cmpClass);
+
+                builder.append("(");
+                builder.append(left);
+                builder.append(" operator(sparql.");
+                builder.append(operator.getText());
+                builder.append(") ");
+                builder.append(right);
+                builder.append(")");
+            }
+            else
+            {
+                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(getRight(), cmpClass);
+
+                builder.append("(");
+                builder.append(left);
+                builder.append(" ");
+                builder.append(operator.getText());
+                builder.append(" ");
+                builder.append(right);
+                builder.append(")");
             }
         }
+        else
+        {
+            Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
+            leftSet.addAll(comparable.stream().map(r -> r.getKey()).collect(toSet()));
+            leftSet.addAll(different.stream().map(r -> r.getKey()).collect(toSet()));
 
+            Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
+            rightSet.addAll(comparable.stream().map(r -> r.getValue()).collect(toSet()));
+            rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
 
-        Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
-        leftSet.addAll(comparable.stream().map(r -> r.getKey()).collect(toSet()));
-        leftSet.addAll(different.stream().map(r -> r.getKey()).collect(toSet()));
-
-        Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
-        rightSet.addAll(comparable.stream().map(r -> r.getValue()).collect(toSet()));
-        rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
-
-        builder.append("sparql.");
-        builder.append(operator.getName());
-        builder.append("_rdfbox");
-        builder.append("(");
-        builder.append(translateAsBoxedOperand(getLeft(), leftSet));
-        builder.append(", ");
-        builder.append(translateAsBoxedOperand(getRight(), rightSet));
-        builder.append(")");
+            builder.append("(");
+            builder.append(translateAsBoxedOperand(getLeft(), leftSet));
+            builder.append(" operator(sparql.");
+            builder.append(operator.getText());
+            builder.append(") ");
+            builder.append(translateAsBoxedOperand(getRight(), rightSet));
+            builder.append(")");
+        }
 
         return builder.toString();
     }
@@ -309,35 +349,24 @@ public class SqlBinaryComparison extends SqlBinary
 
             if(leftClass instanceof BlankNodeClass)
             {
-                String left = leftCols.get(0).toString();
-                String right = rightCols.get(0).toString();
-
-                if(leftClass != rightClass)
+                if(leftClass instanceof UserIntBlankNodeClass && rightClass instanceof UserIntBlankNodeClass)
                 {
-                    if(leftClass instanceof UserIntBlankNodeClass)
-                        left = "sparql.int_blanknode_create('" + ((UserIntBlankNodeClass) leftClass).getSegment()
-                                + "'::int4, " + left + ")";
-                    else if(rightClass instanceof UserIntBlankNodeClass)
-                        right = "sparql.int_blanknode_create('" + ((UserIntBlankNodeClass) rightClass).getSegment()
-                                + "'::int4, " + right + ")";
-                    else if(leftClass instanceof UserStrBlankNodeClass)
-                        left = "sparql.str_blanknode_create('" + ((UserStrBlankNodeClass) leftClass).getSegment()
-                                + "'::int4, " + left + ")";
-                    else if(rightClass instanceof UserStrBlankNodeClass)
-                        right = "sparql.str_blanknode_create('" + ((UserStrBlankNodeClass) rightClass).getSegment()
-                                + "'::int4, " + right + ")";
-
-                    ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
-                    builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());
-                    builder.append("(" + left + ", " + right + ")");
+                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
                 }
-                else if(operator == Operator.Equals)
+                else if(leftClass instanceof UserStrBlankNodeClass && rightClass instanceof UserStrBlankNodeClass)
                 {
-                    builder.append("(" + left + " = " + right + ")");
+                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
                 }
-                else if(operator == Operator.NotEquals)
+                else
                 {
-                    builder.append("(" + left + " != " + right + ")");
+                    List<Column> lcols = leftNode.asResource(leftClass.getGeneralClass());
+                    List<Column> rcols = rightNode.asResource(rightClass.getGeneralClass());
+
+                    builder.append("(");
+                    builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
+                    builder.append(operator == Operator.Equals ? " AND " : " OR ");
+                    builder.append(lcols.get(1) + " " + operator.getText() + " " + rcols.get(1));
+                    builder.append(")");
                 }
             }
             else if(leftClass == xsdBoolean || leftClass == xsdString || leftClass == xsdDayTimeDuration
@@ -359,83 +388,98 @@ public class SqlBinaryComparison extends SqlBinary
                 {
                     builder.append("(" + left + " " + operator.getText() + " " + right + ")");
                 }
-                else if(leftNode instanceof SqlNodeValue && rightNode instanceof SqlNodeValue)
-                {
-                    String nan = "'NaN'::" + cmpClass.getSqlTypes().get(0);
-                    builder.append("(" + left + " != " + nan + " AND " + right + " != " + nan + " AND " + left + " "
-                            + operator.getText() + " " + right + ")");
-                }
                 else
                 {
-                    builder.append("sparql." + operator.getName() + "_" + cmpClass.getName());
-                    builder.append("(" + left + ", " + right + ")");
+                    builder.append("(");
+
+                    if(leftClass == xsdFloat || leftClass == xsdDouble)
+                        builder.append(leftCols.get(0) + " != 'NaN'::" + leftClass.getSqlTypes().get(0) + " AND ");
+
+                    if(rightClass == xsdFloat || rightClass == xsdDouble)
+                        builder.append(rightCols.get(0) + " != 'NaN'::" + rightClass.getSqlTypes().get(0) + " AND ");
+
+                    builder.append(left + " " + operator.getText() + " " + right + ")");
                 }
             }
             else if(isDateTime(leftClass))
             {
-                builder.append("sparql." + operator.getName() + "_datetime(");
-                builder.append(leftCols.get(0));
-                builder.append(", ");
+                String left = leftCols.get(0).toString();
+                String right = rightCols.get(0).toString();
 
-                if(leftClass instanceof DateTimeClass)
-                    builder.append(leftCols.get(1));
-                else
-                    builder.append("'" + ((DateTimeConstantZoneClass) leftClass).getZone() + "'::int4");
-
-                builder.append(", ");
-                builder.append(rightCols.get(0));
-                builder.append(", ");
-
-                if(rightClass instanceof DateTimeClass)
-                    builder.append(rightCols.get(1));
-                else
-                    builder.append("'" + ((DateTimeConstantZoneClass) rightClass).getZone() + "'::int4");
-
-                builder.append(")");
+                //NOTE: it is assumed that default timezone is UTC
+                builder.append("(" + left + " " + operator.getText() + " " + right + ")");
             }
             else if(isDate(leftClass))
             {
-                builder.append("sparql." + operator.getName() + "_date(");
-                builder.append(leftCols.get(0));
-                builder.append(", ");
+                if(leftClass instanceof DateConstantZoneClass && rightClass instanceof DateConstantZoneClass
+                        && getTimezoneDiff((DateConstantZoneClass) leftClass,
+                                (DateConstantZoneClass) rightClass) < SECS_PER_DAY)
+                {
+                    Operator effectiveOperator = operator;
 
-                if(leftClass instanceof DateClass)
-                    builder.append(leftCols.get(1));
+                    if(operator == Operator.LessThanOrEqual)
+                        effectiveOperator = Operator.LessThan;
+                    else if(operator == Operator.GreaterThanOrEqual)
+                        effectiveOperator = Operator.GreaterThan;
+
+                    String left = leftCols.get(0).toString();
+                    String right = rightCols.get(0).toString();
+
+                    builder.append("(" + left + " " + effectiveOperator.getText() + " " + right + ")");
+                }
                 else
-                    builder.append("'" + ((DateConstantZoneClass) leftClass).getZone() + "'::int4");
+                {
+                    List<Column> lcols = leftNode.asResource(xsdDate);
+                    List<Column> rcols = rightNode.asResource(xsdDate);
 
-                builder.append(", ");
-                builder.append(rightCols.get(0));
-                builder.append(", ");
+                    String left = null;
+                    String right = null;
 
-                if(rightClass instanceof DateClass)
-                    builder.append(rightCols.get(1));
-                else
-                    builder.append("'" + ((DateConstantZoneClass) rightClass).getZone() + "'::int4");
+                    //NOTE: it is assumed that default timezone is UTC
 
-                builder.append(")");
+                    if(leftClass instanceof DateConstantZoneClass && (((DateConstantZoneClass) leftClass).getZone() == 0
+                            || ((DateConstantZoneClass) leftClass).getZone() == Integer.MIN_VALUE))
+                        left = lcols.get(0) + "::timestamp";
+                    else if(leftClass instanceof DateConstantZoneClass)
+                        left = "(" + lcols.get(0) + " + make_interval(secs => "
+                                + ((DateConstantZoneClass) leftClass).getZone() + "))";
+                    else
+                        left = "(" + lcols.get(0) + " + make_interval(secs => CASE " + lcols.get(1)
+                                + " WHEN -2147483648 THEN 0 ELSE " + lcols.get(1) + " END))";
+
+                    //NOTE: it is assumed that default timezone is UTC
+
+                    if(rightClass instanceof DateConstantZoneClass
+                            && (((DateConstantZoneClass) rightClass).getZone() == 0
+                                    || ((DateConstantZoneClass) rightClass).getZone() == Integer.MIN_VALUE))
+                        right = rcols.get(0) + "::timestamp";
+                    else if(rightClass instanceof DateConstantZoneClass)
+                        right = "(" + rcols.get(0) + " + make_interval(secs => "
+                                + ((DateConstantZoneClass) rightClass).getZone() + "))";
+                    else
+                        right = "(" + rcols.get(0) + " + make_interval(secs => CASE " + rcols.get(1)
+                                + " WHEN -2147483648 THEN 0 ELSE " + rcols.get(1) + " END))";
+
+                    builder.append("(" + left + " " + operator.getText() + " " + right + ")");
+                }
             }
             else if(isLangString(leftClass))
             {
-                builder.append("sparql." + operator.getName() + "_lang_string(");
-                builder.append(leftCols.get(0));
-                builder.append(", ");
-
-                if(leftClass instanceof LangStringClass)
-                    builder.append(leftCols.get(1));
+                if(leftClass instanceof LangStringConstantTagClass && rightClass instanceof LangStringConstantTagClass)
+                {
+                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
+                }
                 else
-                    builder.append("'" + ((LangStringConstantTagClass) leftClass).getTag() + "'::varchar");
+                {
+                    List<Column> lcols = leftNode.asResource(leftClass.getGeneralClass());
+                    List<Column> rcols = rightNode.asResource(rightClass.getGeneralClass());
 
-                builder.append(", ");
-                builder.append(rightCols.get(0));
-                builder.append(", ");
-
-                if(rightClass instanceof LangStringClass)
-                    builder.append(rightCols.get(1));
-                else
-                    builder.append("'" + ((LangStringConstantTagClass) rightClass).getTag() + "'::varchar");
-
-                builder.append(")");
+                    builder.append("(");
+                    builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
+                    builder.append(operator == Operator.Equals ? " AND " : " OR ");
+                    builder.append(lcols.get(1) + " " + operator.getText() + " " + rcols.get(1));
+                    builder.append(")");
+                }
             }
             else if(leftClass instanceof IriClass)
             {
@@ -469,29 +513,39 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    Column left = getLeft() instanceof SqlIri ? iri.toColumns(((SqlIri) getLeft()).getIri()).get(0) :
-                            leftClass.toExpression(((SqlVariable) getLeft()).getUsedVariable().getMapping(leftClass),
-                                    false);
+                    Column left = leftClass.toExpression(leftCols);
+                    Column right = rightClass.toExpression(rightCols);
 
-                    Column right = getRight() instanceof SqlIri ? iri.toColumns(((SqlIri) getRight()).getIri()).get(0) :
-                            rightClass.toExpression(((SqlVariable) getRight()).getUsedVariable().getMapping(rightClass),
-                                    false);
-
-                    builder.append("sparql." + operator.getName() + "_iri");
                     builder.append("(" + left + ", " + right + ")");
                 }
             }
+            else if(leftClass instanceof UserLiteralClass)
+            {
+                //TODO: add special treatment
+
+                builder.append("(");
+                builder.append(leftCols.get(0));
+                builder.append(" ");
+                builder.append(operator.getText());
+                builder.append(" ");
+                builder.append(rightCols.get(0));
+                builder.append(")");
+            }
             else if(leftClass == unsupportedLiteral)
             {
-                builder.append("sparql." + operator.getName() + "_typed_literal(");
+                builder.append("nullif(");
                 builder.append(leftCols.get(0));
-                builder.append(", ");
-                builder.append(leftCols.get(1));
-                builder.append(", ");
+                builder.append(" ");
+                builder.append(operator.getText());
+                builder.append(" ");
                 builder.append(rightCols.get(0));
-                builder.append(", ");
+                builder.append(operator == Operator.Equals ? " AND " : " OR ");
+                builder.append(leftCols.get(1));
+                builder.append(" ");
+                builder.append(operator.getText());
+                builder.append(" ");
                 builder.append(rightCols.get(1));
-                builder.append(")");
+                builder.append(operator == Operator.Equals ? ", false)" : ", true)");
             }
             else
             {
@@ -560,6 +614,9 @@ public class SqlBinaryComparison extends SqlBinary
 
     private static ResourceClass determineComparisonClass(ResourceClass leftClass, ResourceClass rightClass)
     {
+        if(leftClass == rightClass)
+            return leftClass;
+
         if(isDateTime(leftClass) && isDateTime(rightClass))
             return xsdDateTime;
 
@@ -578,8 +635,10 @@ public class SqlBinaryComparison extends SqlBinary
         if(leftClass instanceof StrBlankNodeClass && rightClass instanceof StrBlankNodeClass)
             return strBlankNode;
 
+        /*
         if(leftClass == rightClass)
             return leftClass;
+        */
 
         if(isNumeric(leftClass) && isNumeric(rightClass))
         {
@@ -600,6 +659,22 @@ public class SqlBinaryComparison extends SqlBinary
         }
 
         throw new IllegalArgumentException();
+    }
+
+
+    private static int getTimezoneDiff(DateConstantZoneClass left, DateConstantZoneClass right)
+    {
+        int leftZone = left.getZone();
+        int rightZone = right.getZone();
+
+        //NOTE: it is assumed that default timezone is UTC
+        if(leftZone == Integer.MIN_VALUE)
+            leftZone = 0;
+
+        if(rightZone == Integer.MIN_VALUE)
+            rightZone = 0;
+
+        return Math.abs(leftZone - rightZone);
     }
 
 

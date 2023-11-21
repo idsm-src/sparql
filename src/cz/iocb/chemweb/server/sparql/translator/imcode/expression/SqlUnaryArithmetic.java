@@ -4,7 +4,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDe
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
-import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -62,14 +61,18 @@ public class SqlUnaryArithmetic extends SqlUnary
     public String translate()
     {
         ResourceClass expressionResourceClass = getExpressionResourceClass();
-        String operandCode = expressionResourceClass != null ?
-                translateAsUnboxedOperand(getOperand(), getExpressionResourceClass()) :
-                translateAsBoxedOperand(getOperand(),
-                        getOperand().getResourceClasses().stream().filter(r -> isNumeric(r)).collect(toSet()));
 
-        if(!isMinus)
-            return operandCode;
+        if(expressionResourceClass == null)
+        {
+            String code = translateAsBoxedOperand(getOperand(), getOperand().getResourceClasses(r -> isNumeric(r)));
 
-        return "sparql.uminus_" + getResourceName() + "(" + operandCode + ")";
+            return "(operator(sparql.-) " + code + ")";
+        }
+        else
+        {
+            String code = translateAsUnboxedOperand(getOperand(), getExpressionResourceClass());
+
+            return "(- " + code + ")";
+        }
     }
 }

@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static java.util.Arrays.asList;
+import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -19,14 +20,14 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
 
     public UserStrBlankNodeClass()
     {
-        super("sparql.str_blanknode_" + Integer.toHexString(counter), asList("varchar"));
+        super("sblanknode-" + Integer.toHexString(counter), asList("varchar"));
         this.segment = counter++;
     }
 
 
     public UserStrBlankNodeClass(int segment)
     {
-        super("sparql.str_blanknode_" + Integer.toHexString(segment), asList("varchar"));
+        super("sblanknode-" + Integer.toHexString(segment), asList("varchar"));
         this.segment = segment;
 
         if(segment >= 0)
@@ -46,13 +47,13 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.append("CASE WHEN sparql.str_blanknode_segment(");
+        builder.append("CASE WHEN ");
         builder.append(columns.get(1));
-        builder.append(") = '");
+        builder.append(" = '");
         builder.append(segment);
-        builder.append("'::int4 THEN sparql.str_blanknode_label(");
+        builder.append("'::int4 THEN ");
         builder.append(columns.get(0));
-        builder.append(") END");
+        builder.append(" END");
 
         return asList(new ExpressionColumn(builder.toString()));
     }
@@ -61,46 +62,61 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     @Override
     public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return asList(
-                new ExpressionColumn("sparql.str_blanknode_create('" + segment + "'::int4, " + columns.get(0) + ")"));
-    }
+        List<Column> result = new ArrayList<Column>(getGeneralClass().getColumnCount());
 
+        result.add(columns.get(0));
 
-    @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
-    {
-        String prefix = isBoxed ? "sparql.rdfbox_extract_str_blanknode" : "sparql.str_blanknode";
-
-        StringBuilder builder = new StringBuilder();
-
-        if(check)
+        if(check == false)
         {
-            builder.append("CASE ");
-            builder.append(prefix + "_segment(");
-            builder.append(column);
-            builder.append(") WHEN '");
-            builder.append(getSegment());
-            builder.append("'::int4 THEN ");
-            builder.append(prefix + "_label(" + column + ")");
-            builder.append(" END ");
+            result.add(new ConstantColumn("'" + segment + "'::int4"));
         }
         else
         {
-            builder.append(prefix + "_label(" + column + ")");
+            StringBuilder builder = new StringBuilder();
+
+            builder.append("CASE WHEN ");
+            builder.append(columns.get(0));
+            builder.append(" IS NOT NULL THEN '");
+            builder.append(segment);
+            builder.append("'::int4 END");
+
+            result.add(new ExpressionColumn(builder.toString()));
         }
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return result;
     }
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public List<Column> fromExpression(Column column)
     {
-        if(!rdfbox)
-            return columns.get(0);
+        return asList(column);
+    }
 
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return columns.get(0);
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        if(check)
+            return asList(new ExpressionColumn(
+                    "sparql.rdfbox_get_sblanknode_value_of_segment(" + column + ", '" + segment + "'::int4"));
+        else
+            return asList(new ExpressionColumn("sparql.rdfbox_get_sblanknode_value(" + column + ")"));
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
         return new ExpressionColumn(
-                "sparql.cast_as_rdfbox_from_str_blanknode('" + segment + "'::int4, " + columns.get(0) + ")");
+                "sparql.rdfbox_create_from_sblanknode(" + columns.get(0) + ", '" + segment + "'::int4)");
     }
 
 
@@ -108,7 +124,38 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     public List<Column> toResult(List<Column> columns)
     {
         return asList(
-                new ExpressionColumn("sparql.str_blanknode_create('" + segment + "'::int4, " + columns.get(0) + ")"));
+                new ExpressionColumn("sparql.sblanknode_create(" + columns.get(0) + ", '" + segment + "'::int4)"));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return "sparql.sblanknode_get_value_of_segment(" + code + ", '" + segment + "'::int4)";
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return "sparql.sblanknode_create(" + code + ", '" + segment + "'::int4)";
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_sblanknode(" + code + ", '" + segment + "'::int4)";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        if(check)
+            return "sparql.rdfbox_get_sblanknode_value_of_segment(" + code + ", '" + segment + "'::int4)";
+        else
+            return "sparql.rdfbox_get_sblanknode_value(" + code + ")";
     }
 
 

@@ -1,5 +1,6 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
@@ -18,6 +19,7 @@ import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.UserLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.OrderCondition.Direction;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
@@ -68,7 +70,6 @@ public class SqlSelect extends SqlIntercode
         if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && limit == null
                 && (offset == null || offset.equals(BigInteger.ZERO)))
             return child.optimize(restrictions, reduced);
-
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
         childRestrictions.addAll(orderByVariables.keySet());
@@ -297,7 +298,7 @@ public class SqlSelect extends SqlIntercode
                     hasVariants = true;
 
                     if(decimals.size() > 0 && decimals.size() != numerics.size())
-                        builder.append("sparql.cast_as_rdfbox_from_").append(numeric.getName()).append("(");
+                        builder.append("sparql.rdfbox_create_from_").append(numeric.getName()).append("(");
 
                     builder.append(variable.getMapping(numeric).get(0));
 
@@ -391,6 +392,80 @@ public class SqlSelect extends SqlIntercode
 
                 if(dates.size() > 1)
                     builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // user literals
+            Set<ResourceClass> others = classes.stream().filter(r -> r instanceof UserLiteralClass).collect(toSet());
+
+            if(others.size() > 0)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                if(others.size() > 1)
+                    builder.append("coalesce(");
+
+                boolean hasTypeVariants = false;
+
+                for(ResourceClass other : others)
+                {
+                    appendComma(builder, hasTypeVariants);
+                    hasTypeVariants = true;
+
+                    builder.append("'" + ((UserLiteralClass) other).getTypeIri().getValue().replaceAll("'", "''")
+                            + "'::varchar");
+                }
+
+                if(others.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+
+
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                if(others.size() > 1)
+                    builder.append("coalesce(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass other : others)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(variable.getMapping(other).get(0) + "::varchar");
+                }
+
+                if(others.size() > 1)
+                    builder.append(")");
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+
+            // unsupported literal
+            if(variable.containsClass(unsupportedLiteral))
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(variable.getMapping(unsupportedLiteral).get(1));
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(variable.getMapping(unsupportedLiteral).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");

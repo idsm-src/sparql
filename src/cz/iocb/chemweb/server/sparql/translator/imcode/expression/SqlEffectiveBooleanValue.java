@@ -121,9 +121,11 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     @Override
     public String translate()
     {
-        if(getOperand() instanceof SqlVariable)
+        SqlExpressionIntercode operand = getOperand();
+
+        if(operand instanceof SqlVariable)
         {
-            SqlVariable variable = (SqlVariable) getOperand();
+            SqlVariable variable = (SqlVariable) operand;
 
             Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> isEffectiveBooleanClass(r)).collect(toSet());
@@ -143,15 +145,21 @@ public class SqlEffectiveBooleanValue extends SqlUnary
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                Column column = variable.getExpressionValue(resourceClass, isBoxed());
+                Column column = variable.getExpressionValue(resourceClass);
 
-                if(resourceClass != xsdBoolean)
+                if(resourceClass == xsdString)
                 {
-                    builder.append("sparql.ebv_");
-                    builder.append(resourceClass.getName());
-                    builder.append("(");
-                    builder.append(column);
-                    builder.append(")");
+                    builder.append("(octet_length(" + column + ") != 0)");
+                }
+                if(resourceClass == xsdFloat || resourceClass == xsdDouble)
+                {
+                    String sqlType = resourceClass.getSqlTypes().get(0);
+                    builder.append("(" + column + " not in ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))");
+                }
+                else if(resourceClass != xsdBoolean)
+                {
+                    String sqlType = resourceClass.getSqlTypes().get(0);
+                    builder.append("(" + column + " != '0'::" + sqlType + ")");
                 }
                 else
                 {
@@ -164,13 +172,27 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
             return builder.toString();
         }
-        else if(getOperand().isBoxed() || !getOperand().getResourceClasses().contains(xsdBoolean))
+        else if(operand.isBoxed())
         {
-            return "sparql.ebv_" + getOperand().getResourceName() + "(" + getOperand().translate() + ")";
+            return "sparql.ebv_rdfbox(" + operand.translate() + ")";
+        }
+        else if(operand.getResourceClasses().contains(xsdString))
+        {
+            return "(octet_length(" + operand.translate() + ") != 0)";
+        }
+        else if(operand.getResourceClasses().contains(xsdFloat) || operand.getResourceClasses().contains(xsdDouble))
+        {
+            String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
+            return "(" + operand.translate() + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
+        }
+        else if(!operand.getResourceClasses().contains(xsdBoolean))
+        {
+            String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
+            return "(" + operand.translate() + " != '0'::" + sqlType + ")";
         }
         else
         {
-            return getOperand().translate();
+            return operand.translate();
         }
     }
 }

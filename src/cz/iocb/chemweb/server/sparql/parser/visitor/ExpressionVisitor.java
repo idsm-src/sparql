@@ -376,7 +376,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public Variable visitVar(VarContext ctx)
     {
-        return new Variable(scopes.addToScope(ctx.getText(), true), ctx.getText());
+        return new Variable(scopes.addToScope(ctx.getText().substring(1), true), ctx.getText());
     }
 
 

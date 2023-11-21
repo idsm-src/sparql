@@ -459,8 +459,10 @@ public class QueryVisitor extends BaseVisitor<Query>
     {
         if(!selectClauseCtx.selectVariable().isEmpty())
         {
-            selectClauseCtx.selectVariable().stream().forEach(c -> scopes.addToScope(c.var().getText()));
-            scopes.addScope(selectClauseCtx.selectVariable().stream().map(c -> c.var().getText()).collect(toSet()));
+            selectClauseCtx.selectVariable().stream().filter(c -> c.var() != null)
+                    .forEach(c -> scopes.addToScope(c.var().getText()));
+            scopes.addScope(selectClauseCtx.selectVariable().stream().filter(c -> c.var() != null)
+                    .map(c -> c.var().getText()).collect(toSet()));
         }
 
         try
@@ -472,7 +474,9 @@ public class QueryVisitor extends BaseVisitor<Query>
 
             if(!selectClauseCtx.selectVariable().isEmpty())
             {
-                projections.addAll(mapList(selectClauseCtx.selectVariable(), this::parseProjection));
+                for(Projection projection : mapList(selectClauseCtx.selectVariable(), this::parseProjection))
+                    if(projection != null)
+                        projections.add(projection);
             }
             else if(!isInAggregateMode(selectClauseCtx, solutionModifierCtx))
             {
@@ -585,6 +589,9 @@ public class QueryVisitor extends BaseVisitor<Query>
 
     private Projection parseProjection(SelectVariableContext variableCtx)
     {
+        if(variableCtx.var() == null)
+            return null;
+
         Variable variable = withRange(
                 new Variable(scopes.addToScope(variableCtx.var().getText()), variableCtx.var().getText()),
                 variableCtx.var());

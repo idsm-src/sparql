@@ -35,8 +35,8 @@ public class SelectResult extends Result
     private static final long USECS_PER_HOUR = 3600000000l;
     private static final long USECS_PER_MINUTE = 60000000l;
     private static final long USECS_PER_SEC = 1000000l;
-    private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
-            'E', 'F' };
+    private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd',
+            'e', 'f' };
 
     private final HashMap<String, Integer> columnNames = new HashMap<String, Integer>();
     private final ResultSet rs;
@@ -122,11 +122,11 @@ public class SelectResult extends Result
                         break;
 
                     case BLANKNODEINT:
-                        rowData[idx] = new BNode("I" + value);
+                        rowData[idx] = new BNode(encodeIBlankNodeLabel((Long) value));
                         break;
 
                     case BLANKNODESTR:
-                        rowData[idx] = new BNode(encodeBlankNodeLabel((String) value));
+                        rowData[idx] = new BNode(encodeSBlankNodeLabel((String) value));
                         break;
 
                     case IRI:
@@ -273,19 +273,25 @@ public class SelectResult extends Result
     }
 
 
-    private static String encodeBlankNodeLabel(String value)
+    private static String encodeIBlankNodeLabel(long value)
+    {
+        return String.format("i%8s", Long.toHexString(value)).replace(' ', '0');
+    }
+
+
+    private static String encodeSBlankNodeLabel(String value)
     {
         byte[] data = value.getBytes(StandardCharsets.UTF_8);
 
         StringBuilder builder = new StringBuilder();
-        builder.append('S');
+        builder.append('s');
 
         for(int j = 0; j < data.length; j++)
         {
             if((data[j] < '0' || data[j] > '9') && (data[j] < 'A' || data[j] > 'Z') && (data[j] < 'a' || data[j] > 'z'))
             {
                 int val = data[j] < 0 ? data[j] + 256 : data[j];
-                builder.append('_');
+                builder.append('-');
                 builder.append(encodeTable[val / 16]);
                 builder.append(encodeTable[val % 16]);
             }

@@ -99,15 +99,41 @@ public class DateTimeClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        String prefix = isBoxed ? "sparql.rdfbox_extract_datetime" : "sparql.zoneddatetime";
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ExpressionColumn(prefix + "_date(" + column + ")"));
-        result.add(new ExpressionColumn(prefix + "_zone(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.zoneddatetime_get_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.zoneddatetime_get_zone(" + column + ")"));
 
         return result;
+    }
+
+
+    @Override
+    public Column toExpression(List<Column> columns)
+    {
+        return new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", " + columns.get(1) + ")");
+    }
+
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn("sparql.rdfbox_get_datetime_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_datetime_zone(" + column + ")"));
+
+        return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn(
+                "sparql.rdfbox_create_from_datetime(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
@@ -119,20 +145,39 @@ public class DateTimeClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
-    {
-        String function = rdfbox ? "sparql.cast_as_rdfbox_from_datetime" : "sparql.zoneddatetime_create";
-
-        return new ExpressionColumn(function + "(" + columns.get(0) + ", " + columns.get(1) + ")");
-    }
-
-
-    @Override
     public List<Column> toResult(List<Column> columns)
     {
         // xsdDateTime is returned as zoneddatetime because there are many discrepancies in timestamp interpretations
         return asList(
                 new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_" + name + "(" + code + ")";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        return "sparql.rdfbox_get_datetime(" + code + ")";
     }
 
 

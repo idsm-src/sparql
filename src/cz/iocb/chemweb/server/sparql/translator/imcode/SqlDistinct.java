@@ -49,7 +49,8 @@ public class SqlDistinct extends SqlIntercode
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable var : child.getVariables().getValues())
-            if(distinctVariables.contains(var.getName()) && restrictions.contains(var.getName()))
+            if(distinctVariables.contains(var.getName())
+                    && (restrictions == null || restrictions.contains(var.getName())))
                 variables.add(var);
 
         return new SqlDistinct(variables, child, distinctVariables);

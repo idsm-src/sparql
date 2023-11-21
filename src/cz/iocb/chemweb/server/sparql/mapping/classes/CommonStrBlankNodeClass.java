@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static java.util.Arrays.asList;
+import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
@@ -12,7 +13,7 @@ public class CommonStrBlankNodeClass extends StrBlankNodeClass
 {
     CommonStrBlankNodeClass()
     {
-        super("str_blanknode", asList("varchar"));
+        super("sblanknode", asList("varchar", "int4"));
     }
 
 
@@ -38,28 +39,75 @@ public class CommonStrBlankNodeClass extends StrBlankNodeClass
 
 
     @Override
-    public List<Column> fromExpression(Column column, boolean isBoxed, boolean check)
+    public List<Column> fromExpression(Column column)
     {
-        if(isBoxed == false)
-            return asList(column);
+        List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        return asList(new ExpressionColumn("sparql.rdfbox_extract_str_blanknode" + "(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.sblanknode_get_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.sblanknode_get_segment(" + column + ")"));
+
+        return result;
     }
 
 
     @Override
-    public Column toExpression(List<Column> columns, boolean rdfbox)
+    public Column toExpression(List<Column> columns)
     {
-        if(!rdfbox)
-            return columns.get(0);
+        return new ExpressionColumn("sparql.sblanknode_create(" + columns.get(0) + ", " + columns.get(1) + ")");
+    }
 
-        return new ExpressionColumn("sparql.cast_as_rdfbox_from_str_blanknode(" + columns.get(0) + ")");
+
+    @Override
+    public List<Column> fromBoxedExpression(Column column, boolean check)
+    {
+        List<Column> result = new ArrayList<Column>(getColumnCount());
+
+        result.add(new ExpressionColumn("sparql.rdfbox_get_sblanknode_value(" + column + ")"));
+        result.add(new ExpressionColumn("sparql.rdfbox_get_sblanknode_segment(" + column + ")"));
+
+        return result;
+    }
+
+
+    @Override
+    public Column toBoxedExpression(List<Column> columns)
+    {
+        return new ExpressionColumn(
+                "sparql.rdfbox_create_from_sblanknode(" + columns.get(0) + ", " + columns.get(1) + ")");
     }
 
 
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return columns;
+        return asList(new ExpressionColumn("sparql.sblanknode_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+    }
+
+
+    @Override
+    public String fromGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toGeneralExpression(String code)
+    {
+        return code;
+    }
+
+
+    @Override
+    public String toBoxedExpression(String code)
+    {
+        return "sparql.rdfbox_create_from_sblanknode(" + code + ")";
+    }
+
+
+    @Override
+    public String toUnboxedExpression(String code, boolean check)
+    {
+        return "sparql.rdfbox_get_sblanknode(" + code + ")";
     }
 }

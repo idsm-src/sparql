@@ -157,7 +157,7 @@ public class Request implements AutoCloseable
             if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(fetchSize)) <= 0)
                 this.fetchSize = 0;
 
-            if(select.getHavingConditions().isEmpty() && select.isInAggregateMode())
+            if(select.getGroupByConditions().isEmpty() && select.isInAggregateMode())
                 this.fetchSize = 0;
         }
         else if(syntaxTree instanceof AskQuery)
@@ -190,6 +190,14 @@ public class Request implements AutoCloseable
             }
 
             String code = imcode.translate();
+
+            /*
+            System.err.println("=========================================================================");
+            System.err.println(query);
+            System.err.println("-------------------------------------------------------------------------");
+            System.err.println(code);
+            System.err.println("=========================================================================");
+            */
 
             checkForErrors(messages);
 

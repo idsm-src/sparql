@@ -238,11 +238,40 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-
     private static ArrayList<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Set<String> restrictions,
             DatabaseSchema schema)
     {
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
+
+        for(int i = 0; i < optChilds.size(); i++)
+        {
+            if(!(optChilds.get(i) instanceof SqlValues))
+                continue;
+
+            SqlValues values = (SqlValues) optChilds.get(i);
+
+            for(int j = 0; j < optChilds.size(); j++)
+            {
+                if(!(optChilds.get(j) instanceof SqlTableAccess))
+                    continue;
+
+                SqlTableAccess tableAccess = (SqlTableAccess) optChilds.get(j);
+
+                if(SqlTableAccess.canBeMerged(schema, tableAccess, values))
+                {
+                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                    tableAccess = SqlTableAccess.merge(tableAccess, values, mergeRestrictions);
+
+                    if(tableAccess == null)
+                        return null;
+
+                    optChilds.set(j, tableAccess);
+                    optChilds.remove(i--);
+                    break;
+                }
+            }
+        }
+
 
         loop:
         for(int i = 0; i < optChilds.size(); i++)
@@ -268,7 +297,7 @@ public class SqlJoin extends SqlIntercode
                     HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
                     SqlIntercode merged = SqlTableAccess.merge(left, right, dropLeft, mergeRestrictions);
 
-                    if(merged == SqlNoSolution.get())
+                    if(merged == null)
                         return null;
 
                     optChilds.set(i, merged);
@@ -285,7 +314,7 @@ public class SqlJoin extends SqlIntercode
                     HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
                     SqlIntercode merged = SqlTableAccess.merge(right, left, dropRight, mergeRestrictions);
 
-                    if(merged == SqlNoSolution.get())
+                    if(merged == null)
                         return null;
 
                     optChilds.set(i, merged);
@@ -300,7 +329,7 @@ public class SqlJoin extends SqlIntercode
                     HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
                     SqlIntercode merged = SqlTableAccess.merge(left, right, mergeRestrictions);
 
-                    if(merged == SqlNoSolution.get())
+                    if(merged == null)
                         return null;
 
                     optChilds.set(i, merged);
@@ -313,7 +342,6 @@ public class SqlJoin extends SqlIntercode
 
         return optChilds;
     }
-
 
 
     private static SqlIntercode join(List<SqlIntercode> childs, Set<String> restrictions)

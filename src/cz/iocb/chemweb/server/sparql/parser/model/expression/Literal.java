@@ -82,6 +82,18 @@ public class Literal extends BaseComplexNode implements Expression, Node
     }
 
 
+    public Literal(String value, DataType datatype, IRI typeIri)
+    {
+        this.stringValue = value;
+        this.languageTag = null;
+        this.type = typeIri;
+        this.isSimple = false;
+
+        this.value = datatype == null ? null : datatype.parse(value);
+        this.isTypeSupported = datatype != null;
+    }
+
+
     public Literal(String value, DataType datatype)
     {
         this.stringValue = value;
