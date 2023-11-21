@@ -1,7 +1,9 @@
 package cz.iocb.chemweb.server.sparql.mapping.extension;
 
 import static java.util.Arrays.asList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -11,33 +13,44 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 public class ResultDefinition
 {
     private final String resultName;
-    private final ResourceClass resultClass;
-    private final List<Column> sqlTypeFields;
+    private final Map<ResourceClass, List<Column>> mappings;
+
+
+    public ResultDefinition(String resultName, Map<ResourceClass, List<Column>> mappings)
+    {
+        this.resultName = resultName;
+        this.mappings = mappings;
+    }
 
 
     public ResultDefinition(String resultName, ResourceClass resultClass, List<Column> sqlTypeFields)
     {
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+        mappings.put(resultClass, sqlTypeFields);
+
         this.resultName = resultName;
-        this.resultClass = resultClass;
-        this.sqlTypeFields = sqlTypeFields;
+        this.mappings = mappings;
     }
 
 
     public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
         List<Column> sqlTypeFields = asList(new TableColumn(sqlTypeField));
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+        mappings.put(resultClass, sqlTypeFields);
 
         this.resultName = resultName;
-        this.resultClass = resultClass;
-        this.sqlTypeFields = sqlTypeFields;
+        this.mappings = mappings;
     }
 
 
     public ResultDefinition(ResourceClass resultClass)
     {
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+        mappings.put(resultClass, null);
+
         this.resultName = null;
-        this.resultClass = resultClass;
-        this.sqlTypeFields = null;
+        this.mappings = mappings;
     }
 
 
@@ -47,14 +60,8 @@ public class ResultDefinition
     }
 
 
-    public final ResourceClass getResultClass()
+    public final Map<ResourceClass, List<Column>> getMappings()
     {
-        return resultClass;
-    }
-
-
-    public final List<Column> getSqlTypeFields()
-    {
-        return sqlTypeFields;
+        return mappings;
     }
 }

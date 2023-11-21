@@ -93,11 +93,12 @@ public class SqlProcedureCall extends SqlIntercode
             if(node == null)
                 return SqlNoSolution.get();
 
-            String name = node.getSqlName();
-            ResourceClass resClass = definition.getResultClass();
+            Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
 
-            List<Column> columns = getSqlResultColumns(definition.getSqlTypeFields());
-            callVariables.add(new UsedVariable(name, resClass, columns, false));
+            for(Entry<ResourceClass, List<Column>> e : definition.getMappings().entrySet())
+                mappings.put(e.getKey(), getSqlResultColumns(e.getValue()));
+
+            callVariables.add(new UsedVariable(node.getSqlName(), mappings, false));
         }
 
 

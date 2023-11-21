@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
@@ -463,8 +464,7 @@ public class SparqlDatabaseConfiguration
                             remap(parameter.getParameterClass()), parameter.getDefaultValue()));
 
                 for(ResultDefinition result : original.getResults())
-                    definition.addResult(new ResultDefinition(result.getResultName(), remap(result.getResultClass()),
-                            result.getSqlTypeFields()));
+                    definition.addResult(new ResultDefinition(result.getResultName(), remap(result.getMappings())));
 
                 addProcedure(target, definition);
             }
@@ -729,6 +729,17 @@ public class SparqlDatabaseConfiguration
             return getIriClass(resourceClass.getName());
 
         return resourceClass;
+    }
+
+
+    private Map<ResourceClass, List<Column>> remap(Map<ResourceClass, List<Column>> mappings)
+    {
+        Map<ResourceClass, List<Column>> map = new HashMap<ResourceClass, List<Column>>();
+
+        for(Entry<ResourceClass, List<Column>> e : mappings.entrySet())
+            map.put(remap(e.getKey()), e.getValue());
+
+        return map;
     }
 
 
