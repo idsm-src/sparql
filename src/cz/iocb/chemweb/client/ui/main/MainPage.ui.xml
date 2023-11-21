@@ -11,9 +11,6 @@
   </ui:style>
 
   <g:DockLayoutPanel>
-    <g:north size="60">
-      <g:HTML/>
-    </g:north>
     <g:center>
       <g:SplitLayoutPanel addStyleNames="{style.main}" ui:field="mainSplitLayoutPanel">
 
