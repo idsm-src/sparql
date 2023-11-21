@@ -416,6 +416,9 @@ public class SparqlDatabaseConfiguration
             for(Entry<String, String> entry : other.getPrefixes().entrySet())
                 addPrefix(entry.getKey(), entry.getValue());
 
+        for(DataType dataType : other.getDataTypes())
+            addDataType(dataType);
+
         for(UserIriClass iriClass : other.getIriClasses())
             addIriClass(iriClass);
 
