@@ -50,9 +50,9 @@ public class SqlProcedureCall extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(ProcedureDefinition procedure,
+    protected static SqlIntercode create(ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, Node> parameters,
-            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child)
+            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child, Set<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
 
@@ -113,8 +113,8 @@ public class SqlProcedureCall extends SqlIntercode
 
 
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
-        UsedVariables variables = getJoinUsedVariables(callVariables, child.getVariables(), null, null, null,
-                columnMap);
+        UsedVariables variables = getJoinUsedVariables(callVariables, child.getVariables(), null, null, null, columnMap)
+                .restrict(restrictions);
 
         SqlProcedureCall call = new SqlProcedureCall(variables, procedure, parameters, results, child, columnMap);
 
@@ -122,6 +122,14 @@ public class SqlProcedureCall extends SqlIntercode
             return call;
 
         return SqlJoin.join(call, originalChild);
+    }
+
+
+    public static SqlIntercode create(ProcedureDefinition procedure,
+            LinkedHashMap<ParameterDefinition, Node> parameters,
+            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child)
+    {
+        return create(procedure, parameters, results, child, null);
     }
 
 
@@ -147,8 +155,7 @@ public class SqlProcedureCall extends SqlIntercode
         //FIXME: is procedure deterministic?
         SqlIntercode optimized = child.optimize(childRestrictions, reduced);
 
-
-        return create(procedure, parameters, restrictedResults, optimized);
+        return create(procedure, parameters, restrictedResults, optimized, restrictions);
     }
 
 
