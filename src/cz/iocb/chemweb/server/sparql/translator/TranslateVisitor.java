@@ -160,8 +160,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         prologue = selectQuery.getPrologue();
         datasets = selectQuery.getSelect().getDataSets();
 
-        SqlIntercode translatedSelect = visitElement(selectQuery.getSelect());
-        return new SqlQuery(selectQuery.getSelect().getVariablesInScope(), translatedSelect);
+        Select select = selectQuery.getSelect();
+        SqlIntercode translatedSelect = visitElement(select);
+        List<String> variables = select.getVariablesInScope().stream().map(v -> v.getSqlName()).collect(toList());
+
+        return new SqlQuery(variables, translatedSelect);
     }
 
 
@@ -248,8 +251,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         prologue = constructQuery.getPrologue();
         datasets = constructQuery.getSelect().getDataSets();
 
-        SqlIntercode translatedSelect = visitElement(constructQuery.getSelect());
-        return new SqlQuery(constructQuery.getSelect().getVariablesInScope(), translatedSelect);
+        Select select = constructQuery.getSelect();
+        SqlIntercode translatedSelect = visitElement(select);
+        List<String> variables = select.getVariablesInScope().stream().map(v -> v.getSqlName()).collect(toList());
+
+        return new SqlQuery(variables, translatedSelect);
     }
 
 
@@ -342,7 +348,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 groupByVariables.add(variable.getSqlName());
 
-                if(select.getPattern().getVariablesInScope().contains(variable.getName()))
+                if(select.getPattern().getVariablesInScope().contains(variable))
                     messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
                             groupBy.getVariable().getRange(), variable.getName()));
 
@@ -444,7 +450,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         // translate projection expressions
-        List<String> inScopeVariables = new LinkedList<String>(select.getPattern().getVariablesInScope());
+        List<Variable> inScopeVariables = new LinkedList<Variable>(select.getPattern().getVariablesInScope());
 
         for(Projection projection : projections)
         {
@@ -452,13 +458,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 Bind bind = new Bind(projection.getExpression(), projection.getVariable());
 
-                String variableName = projection.getVariable().getName();
+                Variable variable = projection.getVariable();
 
-                if(inScopeVariables.contains(variableName))
+                if(inScopeVariables.contains(variable))
                     messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind, bind.getVariable().getRange(),
-                            variableName));
+                            variable.getName()));
 
-                inScopeVariables.add(variableName);
+                inScopeVariables.add(variable);
 
                 translatedWhereClause = translateBind(bind, translatedWhereClause);
             }
@@ -1077,7 +1083,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode translatedGroupPattern = base;
 
         LinkedList<Filter> filters = new LinkedList<>();
-        LinkedList<String> inScopeVariables = new LinkedList<String>();
+        LinkedList<Variable> inScopeVariables = new LinkedList<Variable>();
 
         for(Pattern pattern : assembleProcedureCalls(patterns))
         {
@@ -1117,14 +1123,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(pattern instanceof Bind)
             {
-                String variableName = ((Bind) pattern).getVariable().getName();
+                Variable variable = ((Bind) pattern).getVariable();
 
-                if(inScopeVariables.contains(variableName))
+                if(inScopeVariables.contains(variable))
                     messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
-                            ((Bind) pattern).getVariable().getRange(), variableName));
+                            ((Bind) pattern).getVariable().getRange(), variable.getName()));
 
                 translatedGroupPattern = translateBind((Bind) pattern, translatedGroupPattern);
-                inScopeVariables.add(variableName);
+                inScopeVariables.add(variable);
             }
             else if(pattern instanceof Filter)
             {
@@ -1438,20 +1444,28 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
-        HashSet<String> serviceInScopeVars = visitor.visitElement(service.getPattern());
-        String serviceCode = visitor.getResultCode();
-
+        String serviceCode = visitor.getResultCode(service.getPattern());
 
         /* create variable lists */
 
-        HashSet<String> contextVariables = new HashSet<String>(context.getVariables().getNames());
+        LinkedHashSet<Variable> serviceInScopeVars = service.getPattern().getVariablesInScope();
 
         List<String> mergedVariables = new LinkedList<String>();
-        mergedVariables.addAll(contextVariables);
-        serviceInScopeVars.stream().filter(v -> !contextVariables.contains(v)).forEach(v -> mergedVariables.add(v));
+        List<String> sharedVariables = new LinkedList<String>();
 
-        List<String> sharedVariables = contextVariables.stream().filter(v -> serviceInScopeVars.contains(v))
-                .collect(toList());
+        HashMap<String, Integer> serviceVariables = new HashMap<String, Integer>();
+        HashSet<String> contextVariables = new HashSet<String>(context.getVariables().getNames());
+
+        for(Variable var : serviceInScopeVars)
+        {
+            mergedVariables.add(var.getSqlName());
+            serviceVariables.put(var.getName(), serviceVariables.size());
+
+            if(contextVariables.contains(var.getSqlName()))
+                sharedVariables.add(var.getSqlName());
+        }
+
+        contextVariables.stream().filter(v -> !mergedVariables.contains(v)).forEach(v -> mergedVariables.add(v));
 
 
         if(!evalSeriveces)
@@ -1621,7 +1635,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 DefaultHandler handler = new DefaultHandler()
                 {
                     ArrayList<Node> result;
-                    int varIndex;
+                    Integer varIndex;
                     StringBuilder data;
                     String datatype;
                     String lang;
@@ -1643,7 +1657,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         }
                         else if(qName.equalsIgnoreCase("binding"))
                         {
-                            varIndex = mergedVariables.indexOf(attributes.getValue("name"));
+                            String name = attributes.getValue("name");
+                            varIndex = serviceVariables.get(name);
                         }
                         else if(qName.equalsIgnoreCase("literal"))
                         {
@@ -1663,7 +1678,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         if(qName.equalsIgnoreCase("result") && result != null)
                             rowResults.add(result);
 
-                        if(varIndex == -1)
+                        if(varIndex == null)
                             return;
 
                         Node node = null;
@@ -1730,7 +1745,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
             }
         }
-
 
         return SqlValues.create(mergedVariables, results);
     }

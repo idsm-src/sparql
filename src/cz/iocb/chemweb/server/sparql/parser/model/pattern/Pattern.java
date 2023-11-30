@@ -2,6 +2,7 @@ package cz.iocb.chemweb.server.sparql.parser.model.pattern;
 
 import java.util.LinkedHashSet;
 import cz.iocb.chemweb.server.sparql.parser.Element;
+import cz.iocb.chemweb.server.sparql.parser.model.Variable;
 
 
 
@@ -13,5 +14,5 @@ import cz.iocb.chemweb.server.sparql.parser.Element;
  */
 public interface Pattern extends Element
 {
-    LinkedHashSet<String> getVariablesInScope();
+    LinkedHashSet<Variable> getVariablesInScope();
 }

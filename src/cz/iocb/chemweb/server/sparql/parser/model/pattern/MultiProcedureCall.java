@@ -32,11 +32,11 @@ public class MultiProcedureCall extends ProcedureCallBase
 
         for(Parameter result : results)
             if(result.getValue() instanceof Variable)
-                variablesInScope.add(((Variable) result.getValue()).getName());
+                variablesInScope.add((Variable) result.getValue());
 
         for(Parameter parameter : parameters)
             if(parameter.getValue() instanceof Variable)
-                variablesInScope.add(((Variable) parameter.getValue()).getName());
+                variablesInScope.add((Variable) parameter.getValue());
     }
 
 

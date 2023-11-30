@@ -24,7 +24,7 @@ public class Graph extends PatternElement implements Pattern
         this.pattern = pattern;
 
         if(name instanceof Variable)
-            variablesInScope.add(((Variable) name).getName());
+            variablesInScope.add((Variable) name);
 
         variablesInScope.addAll(pattern.getVariablesInScope());
     }

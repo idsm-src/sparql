@@ -26,7 +26,7 @@ public class Service extends PatternElement implements Pattern
         this.silent = silent;
 
         if(name instanceof Variable)
-            variablesInScope.add(((Variable) name).getName());
+            variablesInScope.add((Variable) name);
 
         variablesInScope.addAll(pattern.getVariablesInScope());
     }

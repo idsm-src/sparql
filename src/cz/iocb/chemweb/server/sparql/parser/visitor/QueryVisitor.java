@@ -261,8 +261,8 @@ public class QueryVisitor extends BaseVisitor<Query>
             if(ctx.describeQuery().describeClause().varOrIRI().isEmpty())
             {
                 if(!isInAggregateMode(ctx.describeQuery().solutionModifier()))
-                    for(String variable : pattern.getVariablesInScope())
-                        resources.add(new Variable(scopes.addToScope(variable), variable));
+                    for(Variable variable : pattern.getVariablesInScope())
+                        resources.add(new Variable(scopes.addToScope(variable.getName()), variable.getName()));
                 else
                     messages.add(new TranslateMessage(MessageType.invalidProjection,
                             Range.compute(ctx.describeQuery().describeClause())));

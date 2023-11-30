@@ -56,8 +56,7 @@ public class Values extends PatternElement implements Pattern
         this.variables = Collections.unmodifiableList(new ArrayList<>(variables));
         this.valuesLists = Collections.unmodifiableList(new ArrayList<>(valuesLists));
 
-        for(Variable variable : variables)
-            variablesInScope.add(variable.getName());
+        variablesInScope.addAll(variables);
     }
 
 

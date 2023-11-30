@@ -40,7 +40,7 @@ public class Select extends PatternElement implements GraphPattern
         this.isSubSelect = isSubSelect;
 
         for(Projection projection : projections)
-            variablesInScope.add(projection.getVariable().getName());
+            variablesInScope.add(projection.getVariable());
     }
 
 

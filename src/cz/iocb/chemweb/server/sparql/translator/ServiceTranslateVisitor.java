@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import java.util.HashSet;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.GroupCondition;
@@ -21,6 +20,7 @@ import cz.iocb.chemweb.server.sparql.parser.model.expression.UnaryExpression;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Bind;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Filter;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Graph;
+import cz.iocb.chemweb.server.sparql.parser.model.pattern.GraphPattern;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.GroupGraph;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Minus;
 import cz.iocb.chemweb.server.sparql.parser.model.pattern.Optional;
@@ -40,24 +40,21 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Triple;
 
 
 
-public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
+public class ServiceTranslateVisitor extends ElementVisitor<Void>
 {
-    private HashSet<String> empty = new HashSet<String>();
     private StringBuilder builder = new StringBuilder();
 
 
     @Override
-    protected HashSet<String> aggregateResult(List<HashSet<String>> results)
+    protected Void aggregateResult(List<Void> results)
     {
         throw new RuntimeException();
     }
 
 
     @Override
-    public HashSet<String> visit(Select select)
+    public Void visit(Select select)
     {
-        HashSet<String> result = new HashSet<String>();
-
         if(select.isSubSelect())
             builder.append("{");
 
@@ -73,14 +70,11 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             builder.append("* ");
 
         for(Projection projection : select.getProjections())
-            result.addAll(visitElement(projection));
+            visitElement(projection);
 
         builder.append(" where ");
 
-        HashSet<String> variables = visitElement(select.getPattern());
-
-        if(result.isEmpty())
-            result.addAll(variables);
+        visitElement(select.getPattern());
 
         if(!select.getGroupByConditions().isEmpty())
         {
@@ -117,17 +111,17 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
         if(select.isSubSelect())
             builder.append("}");
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Projection projection)
+    public Void visit(Projection projection)
     {
         if(projection.getExpression() != null)
             builder.append("(");
 
-        HashSet<String> result = visitElement(projection.getVariable());
+        visitElement(projection.getVariable());
 
         if(projection.getExpression() != null)
         {
@@ -136,12 +130,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             builder.append(")");
         }
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(GroupCondition groupCondition)
+    public Void visit(GroupCondition groupCondition)
     {
         builder.append("(");
 
@@ -155,136 +149,127 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(")");
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(OrderCondition orderCondition)
+    public Void visit(OrderCondition orderCondition)
     {
         builder.append(orderCondition.getDirection().getText());
         builder.append("(");
         visitElement(orderCondition.getExpression());
         builder.append(")");
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(GroupGraph groupGraph)
+    public Void visit(GroupGraph groupGraph)
     {
-        HashSet<String> result = new HashSet<String>();
-
         builder.append("{");
 
         for(Pattern pattern : groupGraph.getPatterns())
-            result.addAll(visitElement(pattern));
+            visitElement(pattern);
 
         builder.append("}");
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Union union)
+    public Void visit(Union union)
     {
-        HashSet<String> result = new HashSet<String>();
-
         for(int i = 0; i < union.getPatterns().size(); i++)
         {
             if(i > 0)
                 builder.append(" union ");
 
-            result.addAll(visitElement(union.getPatterns().get(i)));
+            visitElement(union.getPatterns().get(i));
         }
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Optional optional)
+    public Void visit(Optional optional)
     {
         builder.append(" optional ");
-        HashSet<String> result = visitElement(optional.getPattern());
+        visitElement(optional.getPattern());
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Minus minus)
+    public Void visit(Minus minus)
     {
         builder.append(" minus ");
         visitElement(minus.getPattern());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Filter filter)
+    public Void visit(Filter filter)
     {
         builder.append(" filter (");
         visitElement(filter.getConstraint());
         builder.append(")");
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Bind bind)
+    public Void visit(Bind bind)
     {
-        HashSet<String> result = new HashSet<String>();
         builder.append(" bind (");
 
         visitElement(bind.getExpression());
         builder.append(" as ");
-        result.addAll(visitElement(bind.getVariable()));
+        visitElement(bind.getVariable());
 
         builder.append(")");
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Graph graph)
+    public Void visit(Graph graph)
     {
-        HashSet<String> result = new HashSet<String>();
         builder.append(" graph ");
 
-        result.addAll(visitElement(graph.getName()));
-        result.addAll(visitElement(graph.getPattern()));
+        visitElement(graph.getName());
+        visitElement(graph.getPattern());
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Service service)
+    public Void visit(Service service)
     {
-        HashSet<String> result = new HashSet<String>();
         builder.append(" service");
 
         if(service.isSilent())
             builder.append("silent ");
 
-        result.addAll(visitElement(service.getName()));
-        result.addAll(visitElement(service.getPattern()));
+        visitElement(service.getName());
+        visitElement(service.getPattern());
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Values values)
+    public Void visit(Values values)
     {
-        HashSet<String> result = new HashSet<String>();
-
         builder.append(" values (");
 
         for(int i = 0; i < values.getVariables().size(); i++)
@@ -292,7 +277,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             if(i > 0)
                 builder.append(" ");
 
-            result.addAll(visitElement(values.getVariables().get(i)));
+            visitElement(values.getVariables().get(i));
         }
 
         builder.append(") {");
@@ -302,12 +287,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append("}");
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Values.ValuesList valuesList)
+    public Void visit(Values.ValuesList valuesList)
     {
         builder.append("(");
 
@@ -325,23 +310,23 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(")");
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(BinaryExpression binaryExpression)
+    public Void visit(BinaryExpression binaryExpression)
     {
         visitElement(binaryExpression.getLeft());
         builder.append(binaryExpression.getOperator().getText());
         visitElement(binaryExpression.getRight());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(InExpression inExpression)
+    public Void visit(InExpression inExpression)
     {
         visitElement(inExpression.getLeft());
 
@@ -357,33 +342,33 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(')');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(UnaryExpression unaryExpression)
+    public Void visit(UnaryExpression unaryExpression)
     {
         builder.append(unaryExpression.getOperator().getText());
         visitElement(unaryExpression.getOperand());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(BracketedExpression bracketedExpression)
+    public Void visit(BracketedExpression bracketedExpression)
     {
         builder.append('(');
         visitElement(bracketedExpression.getChild());
         builder.append(')');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(BuiltInCallExpression builtInCallExpression)
+    public Void visit(BuiltInCallExpression builtInCallExpression)
     {
         builder.append(' ');
         builder.append(builtInCallExpression.getFunctionName());
@@ -417,12 +402,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(')');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(ExistsExpression existsExpression)
+    public Void visit(ExistsExpression existsExpression)
     {
         if(existsExpression.isNegated())
             builder.append(" not");
@@ -430,12 +415,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
         builder.append(" exists ");
         visitElement(existsExpression.getPattern());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(FunctionCallExpression functionCallExpression)
+    public Void visit(FunctionCallExpression functionCallExpression)
     {
         visitElement(functionCallExpression.getFunction());
 
@@ -451,23 +436,23 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(')');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(IRI iri)
+    public Void visit(IRI iri)
     {
         builder.append('<');
         builder.append(iri.getValue());
         builder.append('>');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Literal literal)
+    public Void visit(Literal literal)
     {
         builder.append("'");
         builder.append(literal.getStringValue().replaceAll("(['\\\\])", "\\\\$1").replaceAll("\n", "\\\\n")
@@ -488,53 +473,48 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
 
         builder.append(' ');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Variable variable)
+    public Void visit(Variable variable)
     {
-        HashSet<String> result = new HashSet<String>();
-        result.add(variable.getSqlName());
-
         builder.append(" ?");
         builder.append(variable.getName());
         builder.append(' ');
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(Triple triple)
+    public Void visit(Triple triple)
     {
-        HashSet<String> result = new HashSet<String>();
-
-        result.addAll(visitElement(triple.getSubject()));
+        visitElement(triple.getSubject());
         builder.append(" ");
-        result.addAll(visitElement(triple.getPredicate()));
+        visitElement(triple.getPredicate());
         builder.append(" ");
-        result.addAll(visitElement(triple.getObject()));
+        visitElement(triple.getObject());
         builder.append(".");
 
-        return result;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(BlankNode blankNode)
+    public Void visit(BlankNode blankNode)
     {
         builder.append(" _:");
         builder.append(blankNode.getName());
         builder.append(' ');
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(AlternativePath alternativePath)
+    public Void visit(AlternativePath alternativePath)
     {
         for(int i = 0; i < alternativePath.getChildren().size(); i++)
         {
@@ -544,12 +524,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             visitElement(alternativePath.getChildren().get(i));
         }
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(SequencePath sequencePath)
+    public Void visit(SequencePath sequencePath)
     {
         for(int i = 0; i < sequencePath.getChildren().size(); i++)
         {
@@ -559,53 +539,54 @@ public class ServiceTranslateVisitor extends ElementVisitor<HashSet<String>>
             visitElement(sequencePath.getChildren().get(i));
         }
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(InversePath inversePath)
+    public Void visit(InversePath inversePath)
     {
         builder.append("^");
         visitElement(inversePath.getChild());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(RepeatedPath repeatedPath)
+    public Void visit(RepeatedPath repeatedPath)
     {
         visitElement(repeatedPath.getChild());
         builder.append(repeatedPath.getKind().getText());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(NegatedPath negatedPath)
+    public Void visit(NegatedPath negatedPath)
     {
         builder.append("!");
         visitElement(negatedPath.getChild());
 
-        return empty;
+        return null;
     }
 
 
     @Override
-    public HashSet<String> visit(BracketedPath bracketedPath)
+    public Void visit(BracketedPath bracketedPath)
     {
         builder.append("(");
         visitElement(bracketedPath.getChild());
         builder.append(")");
 
-        return empty;
+        return null;
     }
 
 
-    public String getResultCode()
+    public String getResultCode(GraphPattern graphPattern)
     {
+        visitElement(graphPattern);
         return builder.toString();
     }
 }

@@ -23,7 +23,7 @@ public class Bind extends PatternElement implements Pattern
         this.expression = expression;
         this.variable = variable;
 
-        variablesInScope.add(variable.getName());
+        variablesInScope.add(variable);
     }
 
 
