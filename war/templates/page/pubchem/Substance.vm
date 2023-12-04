@@ -39,7 +39,7 @@
       (sio:CHEMINF_000396 "IUPAC InChI")
       (sio:CHEMINF_000338 "exact mass")
       (sio:CHEMINF_000334 "molecular weight")
-      (sio:CHEMINF_000337 "mono isotopic weight")
+      (sio:CHEMINF_000337 "monoisotopic weight")
       (sio:CHEMINF_000336 "total formal charge")
       (sio:CHEMINF_000395 "XLogP3(-AA)")
       (sio:CHEMINF_000392 "TPSA")

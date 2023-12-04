@@ -31,7 +31,7 @@
     (sio:CHEMINF_000396 "IUPAC InChI" UNDEF)
     (sio:CHEMINF_000338 "exact mass" UNDEF)
     (sio:CHEMINF_000334 "molecular weight" UNDEF)
-    (sio:CHEMINF_000337 "mono isotopic weight" UNDEF)
+    (sio:CHEMINF_000337 "monoisotopic weight" UNDEF)
     (sio:CHEMINF_000336 "total formal charge" UNDEF)
     (sio:CHEMINF_000395 "XLogP3-AA" <$entity.getValue().replaceFirst("compound", "descriptor")_XLogP3-AA>)
     (sio:CHEMINF_000395 "XLogP3" <$entity.getValue().replaceFirst("compound", "descriptor")_XLogP3>)

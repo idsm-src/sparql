@@ -14,9 +14,10 @@
 #end
 
 #sparql($measurement)
-  SELECT ?LABEL ?VALUE FROM pubchem:endpoint WHERE
+  SELECT ?LABEL ?OPERATOR ?VALUE FROM pubchem:endpoint WHERE
   {
-    $entity sio:SIO_000300 ?VALUE.
+    VALUES (?P ?OPERATOR) {(sio:SIO_000300 ": ") (sio:SIO_000738 " = ") (sio:SIO_000734 " > ") (sio:SIO_000735 " < ") (sio:SIO_000699 " >= ") (sio:SIO_000733 " <= ")}
+    $entity ?P ?VALUE.
     $entity rdfs:label ?LABEL.
   }
 #end
@@ -30,7 +31,7 @@
     #end      
     #if($measurement.VALUE)
     <tr>
-      <td>#escapeHTML($measurement.LABEL): #escapeHTML($measurement.VALUE)</td>
+      <td>#escapeHTML($measurement.LABEL)#escapeHTML($measurement.OPERATOR)#escapeHTML($measurement.VALUE)</td>
     </tr>
     #end
     <tr>
