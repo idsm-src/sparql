@@ -21,11 +21,11 @@
       <td>$entity.getValue().replaceFirst(".*/", "")</td>
       #end
     </tr>
-    <tr>
     #if($type.LABEL)
+    <tr>
       <td><small>#escapeHTML($type.LABEL)</small></td>
-      #end
     </tr>
+    #end
     <tr>
       <td><small style="color:gray">#escapeIRI($entity)<small></td>
     </tr>
