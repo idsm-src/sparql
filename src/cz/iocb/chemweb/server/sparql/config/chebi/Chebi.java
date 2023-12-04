@@ -36,9 +36,9 @@ public class Chebi
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("base/Class.vm"));
+                    config.createLiteralMapping("chebi/Class.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
-                    config.createLiteralMapping("base/Class.vm"));
+                    config.createLiteralMapping("chebi/Class.vm"));
         }
 
         {

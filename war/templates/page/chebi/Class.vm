@@ -1,0 +1,250 @@
+#sparql($compound)
+  SELECT ?NAME FROM ebi:chebi WHERE
+  {
+    $entity rdfs:label ?NAME
+  }
+#end
+
+#sparql($structure)
+  SELECT (true as ?R) FROM ebi:chebi WHERE
+  {
+    ?S rdf:type sio:SIO_011120.
+    ?S sio:SIO_000011 $entity.
+    ?S sio:SIO_000300 ?V.
+  }
+#end
+
+#sparql($descriptors)
+  SELECT ?TITLE ?VALUE FROM ebi:chebi WHERE
+  {
+    {
+      VALUES ?TITLE {"molecular formula"}
+      $entity chebi:formula ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"average mass"}
+      $entity chebi:mass ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"monoisotopic mass"}
+      $entity chebi:monoisotopicmass ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"net charge"}
+      $entity chebi:charge ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"SMILES"}
+      $entity chebi:smiles ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"IUPAC InChI"}
+      $entity chebi:inchi ?VALUE.
+    }
+    UNION
+    {
+      VALUES ?TITLE {"IUPAC InChIKey"}
+      $entity chebi:inchikey ?VALUE.
+    }
+  }
+#end
+
+#sparql($synonyms)
+  SELECT ?NAME FROM ebi:chebi WHERE
+  {
+    $entity oboInOwl:hasRelatedSynonym | oboInOwl:hasExactSynonym ?NAME.
+  }
+#end
+
+#macro(superlevelChebiClasses $class $label $depth $count)
+  #sparql($superclasses)
+    SELECT ?CLASS ?LABEL FROM ebi:chebi WHERE
+    {
+      $class rdfs:subClassOf ?CLASS.
+      ?CLASS rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($superclasses.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+    #set($count = $count + $superclasses.count)
+    #set($depth = $depth + 1)
+    <ul class="hierarchy">
+      #foreach($superclass in $superclasses)
+      <li>#superlevelChebiClasses($superclass.CLASS $superclass.LABEL $depth $count)</li>
+      #end
+    </ul>
+    #set($depth = $depth - 1)
+  #end
+#end
+
+#macro(sublevelChebiClasses $class $label $depth $count)
+  #sparql($subclasses)
+    SELECT ?CLASS ?LABEL FROM ebi:chebi WHERE
+    {
+      ?CLASS rdfs:subClassOf $class.
+      ?CLASS rdfs:label ?LABEL.
+    }
+  #end
+
+  #if($subclasses.count == 0)
+    &#9632;
+  #elseif($count < 128 && $depth < 8)
+    &#9662;
+  #else
+    &#9656;
+  #end
+
+  #url($class)#escapeIRI($class)#end (#escapeHTML($label))
+
+  #if($count < 128 && $depth < 8)
+  #set($count = $count + $subclasses.count)
+  #set($depth = $depth + 1)
+  <ul class="hierarchy">
+    #foreach($subclass in $subclasses)
+    <li>#sublevelChebiClasses($subclass.CLASS $subclass.LABEL $depth $count)</li>
+    #end
+  </ul>
+  #set($depth = $depth - 1)
+  #end
+#end
+
+#sparql($superclasses)
+  SELECT ?CLASS ?LABEL FROM ebi:chebi WHERE
+  {
+    $entity rdfs:subClassOf ?CLASS.
+    ?CLASS rdfs:label ?LABEL.
+  }
+#end
+
+#sparql($subclasses)
+  SELECT ?CLASS ?LABEL FROM ebi:chebi WHERE
+  {
+    ?CLASS rdfs:subClassOf $entity.
+    ?CLASS rdfs:label ?LABEL.
+  }
+#end
+
+
+#parse("common/label.vm")
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+
+  <div class="VET-TitleBox">
+    <span class="VET-Title">#escapeIRI($entity)</span>
+    (<a href="https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:$entity.getValue().replaceFirst(".*/CHEBI_", "")" target="_blank">open in chebi</a>)
+  </div>
+
+  #if($compound.NAME)
+  <div class="VET-BoxedSection">
+    <div>#escapeHTML($compound.NAME)</div>
+  </div>
+  #end
+
+  #if($structure.count > 0)
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <img src="chebi/compound/image?w=800&id=$entity.getValue().replaceFirst(".*/CHEBI_", "")" height="400" width="400">
+        </td>
+      </tr>
+    </table>
+  </div>
+  #end
+
+  #if($descriptors.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($descriptor in $descriptors)
+        <tr>
+          <td>$descriptor.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+  #if($synonyms.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Synonyms</div>
+    <div>
+      <table class="VET-Table">
+        #foreach($synonym in $synonyms)
+        <tr>
+          <td>#escapeHTML($synonym.NAME)</td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+  #if($superclasses.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Superclass Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#label($entity))
+          #set($count = $superclasses.count)
+          <ul class="hierarchy">
+            #foreach($superclass in $superclasses)
+            <li>#superlevelChebiClasses($superclass.CLASS $superclass.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+  #end
+
+  #if($subclasses.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Subclass Hierarchy</div>
+    <div>
+      <ul class="hierarchy">
+        <li>
+          &#9662;
+          #url($entity)#escapeIRI($entity)#end (#label($entity))
+          #set($count = $subclasses.count)
+          <ul class="hierarchy">
+            #foreach($subclass in $subclasses)
+            <li>#sublevelChebiClasses($subclass.CLASS $subclass.LABEL 1 $count)</li>
+            #end
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+  #end
+
+</div>
