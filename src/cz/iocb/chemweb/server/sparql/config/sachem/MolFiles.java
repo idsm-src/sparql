@@ -18,21 +18,28 @@ public class MolFiles
 
 
     public static void addQuadMappings(SparqlDatabaseConfiguration config, String compoundClass, String molfileClass,
-            Table table, List<Column> compoundFields)
+            Table table, List<Column> compoundFields, String id, String molfile)
     {
-        NodeMapping subject = config.createIriMapping(molfileClass, "id");
+        NodeMapping subject = config.createIriMapping(molfileClass, id);
 
         config.addQuadMapping(table, null, subject, config.createIriMapping("rdf:type"),
                 config.createIriMapping("sio:SIO_011120"));
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:SIO_000011"),
                 config.createIriMapping(compoundClass, compoundFields));
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:SIO_000300"),
-                config.createLiteralMapping(xsdString, "molfile"));
+                config.createLiteralMapping(xsdString, molfile));
 
         // deprecated
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:is-attribute-of"),
                 config.createIriMapping(compoundClass, compoundFields));
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:has-value"),
-                config.createLiteralMapping(xsdString, "molfile"));
+                config.createLiteralMapping(xsdString, molfile));
+    }
+
+
+    public static void addQuadMappings(SparqlDatabaseConfiguration config, String compoundClass, String molfileClass,
+            Table table, List<Column> compoundFields)
+    {
+        addQuadMappings(config, compoundClass, molfileClass, table, compoundFields, "id", "molfile");
     }
 }

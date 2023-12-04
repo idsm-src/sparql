@@ -1,19 +1,34 @@
 package cz.iocb.chemweb.server.sparql.config.idsm;
 
+import static java.util.Arrays.asList;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chebi.ChebiConfiguration;
 import cz.iocb.chemweb.server.sparql.config.chembl.ChemblConfiguration;
+import cz.iocb.chemweb.server.sparql.config.drugbank.DrugBankConfiguration;
+import cz.iocb.chemweb.server.sparql.config.isdb.IsdbConfiguration;
 import cz.iocb.chemweb.server.sparql.config.mesh.MeshConfiguration;
+import cz.iocb.chemweb.server.sparql.config.mona.MonaConfiguration;
+import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration;
 import cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration;
 import cz.iocb.chemweb.server.sparql.config.sachem.ChebiOntologySachemConfiguration;
 import cz.iocb.chemweb.server.sparql.config.sachem.ChemblSachemConfiguration;
 import cz.iocb.chemweb.server.sparql.config.sachem.DrugbankSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.MonaSachemConfiguration;
 import cz.iocb.chemweb.server.sparql.config.sachem.PubChemSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.sachem.Sachem;
 import cz.iocb.chemweb.server.sparql.config.sachem.WikidataSachemConfiguration;
+import cz.iocb.chemweb.server.sparql.config.wikidata.WikidataConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.TableColumn;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
 
@@ -26,7 +41,7 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addPrefixes();
         addServices();
 
-        setConstraints();
+        //setConstraints();
 
         addServiceDescription();
     }
@@ -62,6 +77,9 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addPrefix("prn", "http://www.wikidata.org/prop/reference/value-normalized/");
         addPrefix("wdno", "http://www.wikidata.org/prop/novalue/");
         addPrefix("wdata", "http://www.wikidata.org/wiki/Special:EntityData/");
+
+
+        addPrefix("idsm", "https://idsm.elixir-czech.cz/sparql/endpoint/");
     }
 
 
@@ -72,8 +90,30 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addService(new MeshConfiguration(null, connectionPool, getDatabaseSchema()), true);
         addService(new OntologyConfiguration(null, connectionPool, getDatabaseSchema()), true);
         addService(new PubChemConfiguration(null, connectionPool, getDatabaseSchema()), true);
-        addService(new PubChemSachemConfiguration(null, connectionPool, getDatabaseSchema()), true);
+        addService(new MonaConfiguration(null, connectionPool, getDatabaseSchema()), true);
+        addService(new IsdbConfiguration(null, connectionPool, getDatabaseSchema()), true);
+        addService(new DrugBankConfiguration(null, connectionPool, getDatabaseSchema()), true);
+        addService(new WikidataConfiguration(null, connectionPool, getDatabaseSchema()), true);
 
+        Map<ResourceClass, List<Column>> mapping = new HashMap<ResourceClass, List<Column>>();
+        mapping.put(this.getIriClass("ontology:resource"),
+                asList(new ConstantColumn(Ontology.unitCHEBI), new TableColumn("chebi")));
+        mapping.put(this.getIriClass("chembl:compound"), asList(new TableColumn("chembl")));
+        mapping.put(this.getIriClass("drugbank:compound"), asList(new TableColumn("drugbank")));
+        mapping.put(this.getIriClass("isdb:compound"), asList(new TableColumn("isdb")));
+        mapping.put(this.getIriClass("mona:compound"), asList(new TableColumn("mona")));
+        mapping.put(this.getIriClass("pubchem:compound"), asList(new TableColumn("pubchem")));
+        mapping.put(this.getIriClass("wikidata:entity"), asList(new TableColumn("wikidata")));
+
+        Sachem.addResourceClasses(this);
+        Sachem.addProcedures(this, "sachem", mapping);
+        Sachem.addFunctions(this);
+
+
+        addService(new MonaSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/mona", connectionPool,
+                getDatabaseSchema()), false);
+        addService(new MonaSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/mona", connectionPool,
+                getDatabaseSchema()), false);
 
         addService(new WikidataSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/wikidata",
                 connectionPool, getDatabaseSchema()), false);

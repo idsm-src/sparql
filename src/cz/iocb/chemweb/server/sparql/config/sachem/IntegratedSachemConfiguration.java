@@ -14,6 +14,11 @@ public class IntegratedSachemConfiguration extends SparqlDatabaseConfiguration
     {
         super(service, connectionPool, schema);
 
+        addService(new MonaSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/mona", connectionPool,
+                schema), false);
+        addService(new MonaSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/mona", connectionPool,
+                schema), false);
+
         addService(new WikidataSachemConfiguration("https://idsm.elixir-czech.cz/sparql/endpoint/wikidata",
                 connectionPool, schema), false);
         addService(new WikidataSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/wikidata",
@@ -39,6 +44,6 @@ public class IntegratedSachemConfiguration extends SparqlDatabaseConfiguration
         addService(new PubChemSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/pubchem",
                 connectionPool, schema), false);
 
-        setConstraints();
+        //setConstraints();
     }
 }

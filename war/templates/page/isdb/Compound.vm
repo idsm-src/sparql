@@ -1,0 +1,57 @@
+#sparql($descriptors)
+  SELECT ?TITLE ?VALUE ?UNIT FROM isdb: WHERE
+  {
+    $entity sio:SIO_000008 ?D.
+    ?D rdf:type ?TYPE.
+    ?D sio:SIO_000300 ?VALUE.
+  }
+  VALUES (?TYPE ?TITLE ?UNIT)
+  {
+    (sio:CHEMINF_000113 "IUPAC InChI" UNDEF)
+    (sio:CHEMINF_000042 "molecular formula" UNDEF)
+    (sio:CHEMINF_000018 "SMILES" UNDEF)
+    (sio:CHEMINF_000217 "exact mass" "g/mol")
+  }
+#end
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">#escapeIRI($entity)</span>
+  </div>
+
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <img src="isdb/compound/image?w=800&id=$entity.getValue().replaceFirst(".*/CMPD_", "")" height="400" width="400">
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  #if($descriptors.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($descriptor in $descriptors)
+        <tr>
+          <td>$descriptor.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)#if($descriptor.UNIT) $descriptor.UNIT.getValue()#end</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>

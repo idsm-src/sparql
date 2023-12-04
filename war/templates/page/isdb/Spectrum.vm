@@ -1,0 +1,20 @@
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">#escapeIRI($entity)</span>
+  </div>
+
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <iframe src="./ms.html#y/isdb/$entity.getValue().replaceFirst(".*/MS_", "")" title="MS Chart" width="500" height="300" scrolling="no" style="border: none; padding-top: 20px"></iframe>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+</div>

@@ -8,13 +8,17 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsd
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
+import static java.util.Arrays.asList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.classes.EnumUserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
+import cz.iocb.chemweb.server.sparql.mapping.extension.FunctionDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
@@ -36,7 +40,7 @@ public abstract class Sachem
     {
         String sachem = config.getPrefixes().get("sachem");
 
-        config.addIriClass(new EnumUserIriClass("query_format", "sachem.query_format", new HashMap<IRI, String>()
+        config.addIriClass(new EnumUserIriClass("query_format", "varchar", new HashMap<IRI, String>()
         {
             {
                 put(new IRI(sachem + "UnspecifiedFormat"), "UNSPECIFIED");
@@ -112,13 +116,20 @@ public abstract class Sachem
     public static void addProcedures(SparqlDatabaseConfiguration config, String index, String compoundClass,
             List<Column> compoundFields)
     {
+        addProcedures(config, index, "sachem", compoundClass, compoundFields);
+    }
+
+
+    public static void addProcedures(SparqlDatabaseConfiguration config, String index, String schema,
+            String compoundClass, List<Column> compoundFields)
+    {
         String sachem = config.getPrefixes().get("sachem");
         UserIriClass compound = config.getIriClass(compoundClass);
 
 
         /* sachem:exactSearch */
         ProcedureDefinition exactsearch = new ProcedureDefinition(sachem + "exactSearch",
-                new Function("sachem", "substructure_search_stub"));
+                new Function(schema, "substructure_search_stub"));
 
         exactsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringType)));
         exactsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -150,7 +161,7 @@ public abstract class Sachem
 
         /* sachem:substructureSearch */
         ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
-                new Function("sachem", "substructure_search_stub"));
+                new Function(schema, "substructure_search_stub"));
 
         subsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringType)));
         subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -181,7 +192,7 @@ public abstract class Sachem
 
         /* sachem:scoredSubstructureSearch */
         ProcedureDefinition scoredsubsearch = new ProcedureDefinition(sachem + "scoredSubstructureSearch",
-                new Function("sachem", "substructure_search_stub"));
+                new Function(schema, "substructure_search_stub"));
 
         scoredsubsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringType)));
         scoredsubsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -215,7 +226,7 @@ public abstract class Sachem
 
         /* sachem:similaritySearch */
         ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
-                new Function("sachem", "similarity_search_stub"));
+                new Function(schema, "similarity_search_stub"));
 
         simsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringType)));
         simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -239,7 +250,7 @@ public abstract class Sachem
 
         /* sachem:similarCompoundSearch */
         ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
-                new Function("sachem", "similarity_search_stub"));
+                new Function(schema, "similarity_search_stub"));
 
         simcmpsearch.addParameter(new ParameterDefinition("#index", xsdString, new Literal(index, xsdStringType)));
         simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
@@ -259,5 +270,164 @@ public abstract class Sachem
 
         simcmpsearch.addResult(new ResultDefinition(null, compound, compoundFields));
         config.addProcedure(simcmpsearch);
+    }
+
+
+    public static void addProcedures(SparqlDatabaseConfiguration config, String schema,
+            Map<ResourceClass, List<Column>> compoundMapping)
+    {
+        String sachem = config.getPrefixes().get("sachem");
+
+
+        /* sachem:exactSearch */
+        ProcedureDefinition exactsearch = new ProcedureDefinition(sachem + "exactSearch",
+                new Function(schema, "substructure_search_all"));
+
+        exactsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "searchMode", config.getIriClass("search_mode"),
+                new IRI(sachem + "exactSearch")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", config.getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsZero")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", config.getIriClass("isotope_mode"),
+                new IRI(sachem + "defaultIsotopeAsStandard")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", config.getIriClass("radical_mode"),
+                new IRI(sachem + "defaultSpinMultiplicityAsZero")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", config.getIriClass("stereo_mode"),
+                new IRI(sachem + "strictStereo")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                config.getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", config.getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", config.getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        exactsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerType)));
+        exactsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanType)));
+        exactsearch.addParameter(new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger,
+                new Literal("0", xsdIntegerType)));
+
+        exactsearch.addResult(new ResultDefinition(null, compoundMapping));
+        config.addProcedure(exactsearch);
+
+
+        /* sachem:substructureSearch */
+        ProcedureDefinition subsearch = new ProcedureDefinition(sachem + "substructureSearch",
+                new Function(schema, "substructure_search_all"));
+
+        subsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        subsearch.addParameter(new ParameterDefinition(sachem + "searchMode", config.getIriClass("search_mode"),
+                new IRI(sachem + "substructureSearch")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", config.getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsAny")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", config.getIriClass("isotope_mode"),
+                new IRI(sachem + "ignoreIsotopes")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", config.getIriClass("radical_mode"),
+                new IRI(sachem + "ignoreSpinMultiplicity")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", config.getIriClass("stereo_mode"),
+                new IRI(sachem + "ignoreStereo")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                config.getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", config.getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", config.getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        subsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerType)));
+        subsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanType)));
+        subsearch.addParameter(new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger,
+                new Literal("0", xsdIntegerType)));
+
+        subsearch.addResult(new ResultDefinition(null, compoundMapping));
+        config.addProcedure(subsearch);
+
+
+        /* sachem:scoredSubstructureSearch */
+        ProcedureDefinition scoredsubsearch = new ProcedureDefinition(sachem + "scoredSubstructureSearch",
+                new Function(schema, "substructure_search_all"));
+
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "searchMode", config.getIriClass("search_mode"),
+                new IRI(sachem + "substructureSearch")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "chargeMode", config.getIriClass("charge_mode"),
+                new IRI(sachem + "defaultChargeAsAny")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "isotopeMode", config.getIriClass("isotope_mode"),
+                new IRI(sachem + "ignoreIsotopes")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "radicalMode", config.getIriClass("radical_mode"),
+                new IRI(sachem + "ignoreSpinMultiplicity")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "stereoMode", config.getIriClass("stereo_mode"),
+                new IRI(sachem + "ignoreStereo")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                config.getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode",
+                config.getIriClass("tautomer_mode"), new IRI(sachem + "ignoreTautomers")));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", config.getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        scoredsubsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerType)));
+        scoredsubsearch
+                .addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanType)));
+        scoredsubsearch.addParameter(new ParameterDefinition(sachem + "internalMatchingLimit", xsdInteger,
+                new Literal("0", xsdIntegerType)));
+
+        scoredsubsearch.addResult(new ResultDefinition(sachem + "compound", compoundMapping));
+        scoredsubsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
+        config.addProcedure(scoredsubsearch);
+
+
+        /* sachem:similaritySearch */
+        ProcedureDefinition simsearch = new ProcedureDefinition(sachem + "similaritySearch",
+                new Function(schema, "similarity_search_all"));
+
+        simsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        simsearch
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleType)));
+        simsearch.addParameter(
+                new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerType)));
+        simsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                config.getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", config.getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", config.getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simsearch.addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerType)));
+        simsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanType)));
+
+        simsearch.addResult(new ResultDefinition(sachem + "compound", compoundMapping));
+        simsearch.addResult(new ResultDefinition(sachem + "score", xsdDouble, "score"));
+        config.addProcedure(simsearch);
+
+
+        /* sachem:similarCompoundSearch */
+        ProcedureDefinition simcmpsearch = new ProcedureDefinition(sachem + "similarCompoundSearch",
+                new Function(schema, "similarity_search_all"));
+
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "query", xsdString, null));
+        simcmpsearch
+                .addParameter(new ParameterDefinition(sachem + "cutoff", xsdDouble, new Literal("0.8", xsdDoubleType)));
+        simcmpsearch.addParameter(
+                new ParameterDefinition(sachem + "similarityRadius", xsdInteger, new Literal("1", xsdIntegerType)));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "aromaticityMode",
+                config.getIriClass("aromaticity_mode"), new IRI(sachem + "aromaticityDetect")));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "tautomerMode", config.getIriClass("tautomer_mode"),
+                new IRI(sachem + "ignoreTautomers")));
+        simcmpsearch.addParameter(new ParameterDefinition(sachem + "queryFormat", config.getIriClass("query_format"),
+                new IRI(sachem + "UnspecifiedFormat")));
+        simcmpsearch
+                .addParameter(new ParameterDefinition(sachem + "topn", xsdInteger, new Literal("-1", xsdIntegerType)));
+        simcmpsearch.addParameter(new ParameterDefinition("#sort", xsdBoolean, new Literal("false", xsdBooleanType)));
+
+        simcmpsearch.addResult(new ResultDefinition(null, compoundMapping));
+        config.addProcedure(simcmpsearch);
+    }
+
+
+    public static void addFunctions(SparqlDatabaseConfiguration config)
+    {
+        String sachem = config.getPrefixes().get("sachem");
+
+        FunctionDefinition similarity = new FunctionDefinition(sachem + "similarity",
+                new Function("sachem", "similarity_stub"), xsdDouble,
+                asList(xsdString, xsdString, xsdInteger, config.getIriClass("aromaticity_mode")), 2, false, true);
+
+        config.addFunction(similarity);
     }
 }

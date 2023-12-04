@@ -1,0 +1,154 @@
+#sparql($names)
+  SELECT ?NAME FROM mona: WHERE
+  {
+    $entity sio:SIO_000230 / sio:SIO_000008 ?D.
+    ?D rdf:type sio:CHEMINF_000043.
+    ?D sio:SIO_000300 ?NAME.
+  }
+  ORDER BY ASC(strlen(?NAME))
+#end
+
+#sparql($structure)
+  SELECT (true as ?R) FROM mona: WHERE
+  {
+    $entity sio:SIO_000230 / sio:SIO_000008 ?S.
+    ?S rdf:type sio:SIO_011120.
+    ?S sio:SIO_000300 ?V.
+  }
+#end
+
+#sparql($parameters)
+  SELECT ?TITLE ?VALUE ?UNIT FROM mona: WHERE
+  {
+    {
+      {
+        $entity sio:SIO_000552 ?D.
+        ?D rdf:type ?TYPE.
+      }
+      VALUES (?TITLE ?TYPE ?VALUE)
+      {
+        ("scan" obo:MS_1000130 "positive")
+        ("scan" obo:MS_1000129 "negative")
+        ("ionization" obo:MS_1000070 "atmospheric pressure chemical ionization")
+        ("ionization" obo:MS_1000071 "chemical ionization")
+        ("ionization" obo:MS_1000073 "electrospray ionization")
+        ("ionization" obo:MS_1000074 "fast atom bombardment ionization")
+        ("ionization" obo:MS_1000075 "matrix-assisted laser desorption ionization")
+        ("ionization" obo:MS_1000258 "field ionization")
+        ("ionization" obo:MS_1000389 "electron ionization")
+        ("ionization" obo:MS_1000398 "nanoelectrospray")
+      }
+    }
+    UNION
+    {
+      {
+        $entity sio:SIO_000552 ?D.
+        ?D rdf:type ?TYPE.
+        ?D sio:SIO_000300 ?VALUE.
+        
+        OPTIONAL
+        {
+          ?D sio:SIO_000221 ?UNIT_TYPE.
+          VALUES (?UNIT_TYPE ?UNIT)
+          {
+            (obo:UO_0000010 "s")
+            (obo:UO_0000031 "min")
+            (obo:UO_0000218 "V")
+            (obo:UO_0000248 "kV")
+            (obo:UO_0000266 "eV")
+          }
+        }
+      }
+      VALUES (?TYPE ?TITLE)
+      {
+        (obo:MS_1000511 "ms level")
+        (obo:MS_1000894 "retention time")
+        (obo:MS_1000045 "collision energy")
+        (obo:MS_1000138 "normalized collision energy")
+        (obo:MS_1002013 "collision energy ramp start")
+        (obo:MS_1002218 "percent collision energy ramp start")
+        (obo:MS_1002014 "collision energy ramp end")
+        (obo:MS_1002219 "percent collision energy ramp end")
+        (obo:MS_1000463 "instrument")
+        (obo:MS_1000031 "instrument model")
+        (obo:MS_1002813 "precursor type")
+        (obo:MS_1000744 "precursor m/z")
+      }
+    }
+  }
+#end
+
+#sparql($tags)
+  SELECT ?VALUE FROM mona: WHERE
+  {
+    $entity sio:SIO_000255 / sio:SIO_000300 ?VALUE.
+  }
+#end
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">#escapeIRI($entity)</span>
+  </div>
+
+  #if($names.count > 0)
+  <div class="VET-BoxedSection">
+    #foreach($name in $names)
+    <div>#escapeHTML($name.NAME)</div>
+    #end
+  </div>
+  #end
+
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          #if($structure.count > 0)
+          <img src="mona/compound/image?w=360&id=$entity.getValue().replaceFirst(".*/", "")" height="180" width="180" style="vertical-align: middle;">
+          #end
+          <iframe src="./ms.html#y/mona/$entity.getValue().replaceFirst(".*/", "")" title="MS Chart" width="350" height="210" scrolling="no" style="border: none; padding-top: 20px; vertical-align: middle;"></iframe>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  #if($parameters.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Parameters</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($parameter in $parameters)
+        <tr>
+          <td>$parameter.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($parameter.VALUE)#if($parameter.UNIT) $parameter.UNIT.getValue()#end</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+  #if($tags.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Tags</div>
+    <div>
+      <table class="VET-Table">
+        #foreach($tag in $tags)
+        <tr>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($tag.VALUE)</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>

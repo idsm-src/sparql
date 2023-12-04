@@ -28,6 +28,7 @@ public class Ontology
     public static final String unitCHEBI = "'7'::smallint";
     public static final String unitThesaurus = "'10'::smallint";
     public static final String unitTaxonomy = "'11'::smallint";
+    public static final String unitClassyFire = "'12'::smallint";
     public static final String unitNCBITaxon = "'64'::smallint";
     public static final String unitCL = "'71'::smallint";
     public static final String unitUO = "'74'::smallint";
@@ -84,9 +85,11 @@ public class Ontology
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
-                    config.createLiteralMapping("base/Class.vm"));
+                    config.createLiteralMapping("base/Class.vm"),
+                    config.createAreNotEqualCondition("class_unit", Ontology.unitCHEBI));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
-                    config.createLiteralMapping("base/Class.vm"));
+                    config.createLiteralMapping("base/Class.vm"),
+                    config.createAreNotEqualCondition("class_unit", Ontology.unitCHEBI));
         }
 
         {

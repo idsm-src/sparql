@@ -1,0 +1,88 @@
+#sparql($names)
+  SELECT ?NAME FROM mona: WHERE
+  {
+    $entity sio:SIO_000008 ?D.
+    ?D rdf:type sio:CHEMINF_000043.
+    ?D sio:SIO_000300 ?NAME.
+  }
+  ORDER BY ASC(strlen(?NAME))
+#end
+
+#sparql($structure)
+  SELECT (true as ?R) FROM mona: WHERE
+  {
+    $entity sio:SIO_000008 ?S.
+    ?S rdf:type sio:SIO_011120.
+    ?S sio:SIO_000300 ?V.
+  }
+#end
+
+#sparql($descriptors)
+  SELECT ?TITLE ?VALUE ?UNIT FROM mona: WHERE
+  {
+    $entity sio:SIO_000008 ?D.
+    ?D rdf:type ?TYPE.
+    ?D sio:SIO_000300 ?VALUE.
+  }
+  VALUES (?TYPE ?TITLE ?UNIT)
+  {
+    (sio:CHEMINF_000042 "molecular formula" UNDEF)
+    (sio:CHEMINF_000018 "SMILES" UNDEF)
+    (sio:CHEMINF_000113 "IUPAC InChI" UNDEF)
+    (sio:CHEMINF_000059 "IUPAC InChIKey" UNDEF)
+    (sio:CHEMINF_000217 "exact mass" "g/mol")
+    (sio:CHEMINF_000218 "monoisotopic mass" "g/mol")
+  }
+#end
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  <div class="VET-TitleBox">
+    <span class="VET-Title">#escapeIRI($entity)</span>
+  </div>
+
+  #if($names.count > 0)
+  <div class="VET-BoxedSection">
+    #foreach($name in $names)
+    <div>#escapeHTML($name.NAME)</div>
+    #end
+  </div>
+  #end
+
+  #if($structure.count > 0)
+  <div class="VET-BoxedSection">
+    <table style="width:100%;">
+      <tr>
+        <td align="center" style="text-align: center;">
+          <img src="mona/compound/image?w=800&id=$entity.getValue().replaceFirst(".*/CMPD_", "")" height="400" width="400">
+        </td>
+      </tr>
+    </table>
+  </div>
+  #end
+
+  #if($descriptors.count > 0)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Descriptors</div>
+    <div>
+      <table class="VET-Table">
+        <colgroup>
+          <col style="width:220px"/>
+          <col/>
+        </colgroup>
+
+        #foreach($descriptor in $descriptors)
+        <tr>
+          <td>$descriptor.TITLE.getValue()</td>
+          <td><span style="white-space: pre-wrap; word-break: break-all;">#escapeHTML($descriptor.VALUE)#if($descriptor.UNIT) $descriptor.UNIT.getValue()#end</span></td>
+        </tr>
+        #end
+      </table>
+    </div>
+  </div>
+  #end
+
+</div>

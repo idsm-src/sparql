@@ -69,6 +69,14 @@
       maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
+  <Resource name="jdbc:sachem-mona" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
 
   <Resource name="jdbc:images-chebi" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
@@ -103,6 +111,39 @@
       testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
 
   <Resource name="jdbc:images-wikidata" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:images-mona" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:images-isdb" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+
+  <Resource name="jdbc:spectra-mona" auth="Container"
+      factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
+      type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
+      url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
+      initialSize="5" maxActive="5" maxIdle="5" minIdle="5"
+      maxWait="-1" testOnBorrow="true" validationQuery="SELECT 1"
+      testWhileIdle="false" removeAbandoned="false" timeBetweenEvictionRunsMillis="0" />
+
+  <Resource name="jdbc:spectra-isdb" auth="Container"
       factory="org.apache.tomcat.jdbc.pool.DataSourceFactory" closeMethod="close"
       type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
       url="jdbc:postgresql://localhost:5432/idsm" username="sparql" password="%password%"
@@ -151,5 +192,10 @@
       type="cz.iocb.chemweb.server.sparql.config.sachem.WikidataSachemConfiguration"
       factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
       datasource="jdbc:sachem-wikidata" singleton="true" />
+
+  <Resource name="sparql:sachem-mona" auth="Container"
+      type="cz.iocb.chemweb.server.sparql.config.sachem.MonaSachemConfiguration"
+      factory="cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfigurationFactory"
+      datasource="jdbc:sachem-mona" singleton="true" />
 
 </Context>

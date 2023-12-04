@@ -51,8 +51,6 @@ public class Common
         config.addIriClass(new StringUserIriClass("rdf:wwpdb_old", "http://rdf.wwpdb.org/pdb/", 4));
         config.addIriClass(new StringUserIriClass("rdf:wwpdb", "https://rdf.wwpdb.org/pdb/", 4));
         config.addIriClass(new StringUserIriClass("rdf:ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/"));
-        config.addIriClass(new IntegerUserIriClass("rdf:drugbank", "integer",
-                "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB", 5));
 
         config.addIriClass(new IntegerUserIriClass("identifiers:pubmed", "integer", "http://identifiers.org/pubmed/"));
         config.addIriClass(new StringUserIriClass("identifiers:pfam", "http://identifiers.org/pfam/", "PF[0-9]{5}"));

@@ -189,6 +189,17 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>MonaSachemEndpointServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.endpoint.EndpointServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>sparql:sachem-mona</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>MonaSachemEndpointServlet</servlet-name>
+    <url-pattern>/sachem/endpoint/mona</url-pattern>
+    <url-pattern>/sparql/endpoint/mona</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>CorsProxyServlet</servlet-name>
     <servlet-class>cz.iocb.chemweb.server.servlets.proxy.CorsProxyServlet</servlet-class>
   </servlet>
@@ -260,6 +271,51 @@
     <url-pattern>/wikidata/compound/image</url-pattern>
   </servlet-mapping>
 
+  <servlet>
+    <servlet-name>MonaCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.MonaCompoundImageServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-mona</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>MonaCompoundImage</servlet-name>
+    <url-pattern>/mona/compound/image</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>IsdbCompoundImage</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.IsdbCompoundImageServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:images-isdb</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>IsdbCompoundImage</servlet-name>
+    <url-pattern>/isdb/compound/image</url-pattern>
+  </servlet-mapping>
+
+
+  <servlet>
+    <servlet-name>MonaSpectrumServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.CompoundSpectrumServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:spectra-mona</param-value></init-param>
+    <init-param><param-name>schema</param-name><param-value>mona</param-value></init-param>
+    <init-param><param-name>table</param-name><param-value>compound_bases</param-value></init-param>
+    <init-param><param-name>id</param-name><param-value>accession</param-value></init-param>
+    <init-param><param-name>spectrum</param-name><param-value>spectrum</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>MonaSpectrumServlet</servlet-name>
+    <url-pattern>/mona/compound/spectrum</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>IsdbSpectrumServlet</servlet-name>
+    <servlet-class>cz.iocb.chemweb.server.servlets.sources.IsdbCompoundSpectrumServlet</servlet-class>
+    <init-param><param-name>resource</param-name><param-value>jdbc:spectra-isdb</param-value></init-param>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>IsdbSpectrumServlet</servlet-name>
+    <url-pattern>/isdb/compound/spectrum</url-pattern>
+  </servlet-mapping>
+
 
   <!-- Sachem Statistics Servlet -->
   <servlet>
@@ -281,6 +337,10 @@
   <filter>
     <filter-name>CacheFilter</filter-name>
     <filter-class>cz.iocb.chemweb.server.filters.cache.CacheFilter</filter-class>
+    <init-param>
+      <param-name>excludedUrls</param-name>
+      <param-value>/ms.html /css/st.css /js/st.js /js/d3.v3.min.js /js/jquery-3.5.1.min.js</param-value>
+    </init-param>
   </filter>
   <filter-mapping>
     <filter-name>CacheFilter</filter-name>

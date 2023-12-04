@@ -1,0 +1,19 @@
+#sparql($library)
+  SELECT ?TITLE FROM isdb: WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    #if($library.TITLE)
+    <tr>
+      <td>#escapeHTML($library.TITLE)</td>
+    </tr>
+    #end
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

@@ -1,0 +1,32 @@
+#sparql($family)
+  SELECT ?NAME FROM mona: WHERE
+  {
+    $entity vcard:family-name ?NAME
+  }
+#end
+
+#sparql($given)
+  SELECT ?NAME FROM mona: WHERE
+  {
+    $entity vcard:given-name ?NAME
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    #if($family.count > 0 || $given.count > 0)
+    <tr>
+      <td>
+        #if($family.count > 0)
+          #if($given.NAME)#escapeHTML($given.NAME)#end #escapeHTML($family.NAME)
+        #elseif($given.count > 0)
+          #escapeHTML($given.NAME)
+        #end
+      </td>
+    </tr>
+    #end
+    <tr>
+      <td><small style="color:gray">#escapeIRI($entity)<small></td>
+    </tr>
+  </tbody>
+</table>

@@ -1,0 +1,38 @@
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td style="width:90px">
+        <table style="width:80px">
+          <tbody>
+            <tr>
+              <td>
+                <iframe src="./ms.html#n/isdb/$entity.getValue().replaceFirst(".*/", "")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+      <td style="width:90px">
+        <table style="width:80px">
+          <tbody>
+            <tr>
+              <td><img loading='lazy' src="isdb/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/", "").substring(0, 14)" height="80" width="80"></td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+      <td>
+        <table>
+          <tbody>
+            <tr>
+              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+            </tr>
+            <tr>
+              <td><small style="color:gray">#escapeIRI($entity)<small></td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>

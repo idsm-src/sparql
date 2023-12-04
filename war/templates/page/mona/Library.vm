@@ -1,0 +1,33 @@
+#sparql($library)
+  SELECT ?TITLE FROM mona: WHERE
+  {
+    $entity dcterms:title ?TITLE
+  }
+#end
+
+#sparql($description)
+  SELECT ?VALUE FROM mona: WHERE
+  {
+    $entity dcterms:description ?VALUE
+  }
+#end
+
+<style scoped>
+#include("css/owl.css")
+</style>
+
+<div class="VET-Page">
+  #if($library.TITLE)
+  <div class="VET-BoxedSection">
+    <div>#escapeHTML($library.TITLE)</div>
+  </div>
+  #end
+
+  #if($description.VALUE)
+  <div class="VET-BoxedSection">
+    <div class="VET-Header">Description</div>
+    <div style="white-space: pre-wrap">$description.VALUE.value.trim()</div>
+  </div>
+  #end
+
+</div>

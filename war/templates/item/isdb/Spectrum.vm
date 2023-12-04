@@ -1,0 +1,36 @@
+#sparql($spectrum)
+  SELECT ?VALUE FROM isdb: WHERE
+  {
+    $entity sio:SIO_000300 ?VALUE.
+  }
+#end
+
+<table style="width:100%">
+  <tbody>
+    <tr>
+      <td style="width:90px">
+        <table style="width:80px">
+          <tbody>
+            <tr>
+              <td>
+                <iframe src="./ms.html#n/isdb/$entity.getValue().replaceFirst(".*/MS_", "")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+      <td>
+        <table>
+          <tbody>
+            <tr>
+              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+            </tr>
+            <tr>
+              <td><small style="color:gray">#escapeIRI($entity)<small></td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>

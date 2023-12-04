@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" style="width:100%; height:100%">
+<head>
+  <script src="./js/jquery-3.5.1.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="./css/st.css">
+  <script src="./js/d3.v3.min.js"></script>
+  <script src="./js/st.js"></script>
+</head>
+
+<body style="width:100%; height:100%; margin: 0">
+  <script>
+    function drawMS() {
+      const params = window.location.hash.substring(1).split('/');
+      const axes = params[0];
+      const db = params[1];
+      const id = params[2];
+
+      //const params = new URLSearchParams(window.location.search);
+      //const db = params.get('db');
+      //const id = params.get('id');
+      //const axes = params.get('axes');
+
+      fetch("./" + db + "/compound/spectrum?id=" + id, {
+        method: "GET",
+        redirect: "follow"
+      })
+      .then(response => response.json())
+      .then(json => {
+        const chart = st.chart.ms();
+        
+        if(axes === "y")
+          chart.xlabel("m/z").ylabel("Abundance").margins([10,20,65,115]);
+        else
+          chart.margins([0,0,0,0]);
+        
+        chart.render("#spectrum_canvas");
+
+        const data = st.data.set().x("peaks.mz").y("peaks.intensity");
+        chart.load(data);
+        data.add(json);
+      })
+      .catch((error) => {
+        reject(error);
+      });
+    }
+
+    $(document).ready(function () {
+      drawMS();
+    });
+  </script>
+
+  <div id="spectrum_canvas" style="width:100%; height:100%"></div>
+</body>
+</html>
