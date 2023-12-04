@@ -15,6 +15,7 @@ import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.Window;
+import com.google.gwt.user.client.Window.Location;
 import com.google.gwt.user.client.ui.ResizeComposite;
 import com.google.gwt.user.client.ui.SplitLayoutPanel;
 import com.google.gwt.user.client.ui.TabLayoutPanel;
@@ -60,7 +61,9 @@ public class MainPage extends ResizeComposite implements HasSelectionHandlers<St
 
     public MainPage()
     {
-        queryPart = new QueryPart(getDefultQuery());
+        String query = Location.getParameter("query");
+
+        queryPart = new QueryPart(query != null ? query : getDefultQuery());
 
         history = new VisitingHistory();
         detailsPart = new DetailsPart(history);
@@ -183,6 +186,11 @@ public class MainPage extends ResizeComposite implements HasSelectionHandlers<St
             {
                 resetSplitLayoutSize();
                 detailsPart.visit(getStartIri());
+
+                String query = Location.getParameter("query");
+
+                if(query != null && !query.isEmpty())
+                    queryPart.runButtonClick(null);
             }
         });
     }
