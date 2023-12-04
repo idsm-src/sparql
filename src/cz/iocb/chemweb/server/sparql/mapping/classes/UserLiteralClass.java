@@ -3,12 +3,13 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.TYPE;
 import static java.util.Arrays.asList;
-import java.util.Hashtable;
+import java.util.HashMap;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
@@ -16,31 +17,37 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class UserLiteralClass extends LiteralClass
 {
-    private static final Hashtable<IRI, UserLiteralClass> instances = new Hashtable<IRI, UserLiteralClass>();
+    private static final HashMap<IRI, UserLiteralClass> instances = new HashMap<IRI, UserLiteralClass>();
+    private final String equalOperator;
+    private final String notEqualOperator;
 
 
-    private UserLiteralClass(int id, String sqlType, IRI type)
+    private UserLiteralClass(int id, String sqlType, String equalOp, String notEqualOp, IRI type)
     {
         super("usertype" + id, asList(sqlType), asList(LITERAL, TYPE), type);
+        this.equalOperator = equalOp;
+        this.notEqualOperator = notEqualOp;
     }
 
 
-    public static synchronized UserLiteralClass get(String sqlType, IRI type)
+    public static synchronized UserLiteralClass get(String sqlType, String equalOp, String notEqualOp, IRI type)
     {
-        UserLiteralClass userClass = instances.get(type);
+        UserLiteralClass userClass = new UserLiteralClass(instances.size(), sqlType, equalOp, notEqualOp, type);
+        UserLiteralClass prevClass = instances.get(type);
 
-        if(userClass != null)
+        if(prevClass == null)
         {
-            if(!userClass.sqlTypes.stream().allMatch(t -> t.equals(sqlType)))
-                throw new IllegalArgumentException();
+            instances.put(type, userClass);
+            return userClass;
+        }
+        else if(prevClass.equals(userClass))
+        {
+            return prevClass;
         }
         else
         {
-            userClass = new UserLiteralClass(instances.size(), sqlType, type);
-            instances.put(type, userClass);
+            throw new IllegalArgumentException();
         }
-
-        return userClass;
     }
 
 
@@ -161,5 +168,19 @@ public class UserLiteralClass extends LiteralClass
                     + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0));
         else
             return ("sparql.rdfbox_get_typedliteral_value(" + code + ")::" + sqlTypes.get(0));
+    }
+
+
+    public String getOperatorCode(Operator operator)
+    {
+        switch(operator)
+        {
+            case Equals:
+                return equalOperator;
+            case NotEquals:
+                return notEqualOperator;
+            default:
+                return null;
+        }
     }
 }

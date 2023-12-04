@@ -266,7 +266,7 @@ public class SqlBinaryComparison extends SqlBinary
                 builder.append("(");
                 builder.append(left);
                 builder.append(" ");
-                builder.append(operator.getText());
+                builder.append(((UserLiteralClass) cmpClass).getOperatorCode(operator));
                 builder.append(" ");
                 builder.append(right);
                 builder.append(")");
@@ -526,7 +526,7 @@ public class SqlBinaryComparison extends SqlBinary
                 builder.append("(");
                 builder.append(leftCols.get(0));
                 builder.append(" ");
-                builder.append(operator.getText());
+                builder.append(((UserLiteralClass) leftClass).getOperatorCode(operator));
                 builder.append(" ");
                 builder.append(rightCols.get(0));
                 builder.append(")");

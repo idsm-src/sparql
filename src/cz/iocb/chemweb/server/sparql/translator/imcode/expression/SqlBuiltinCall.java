@@ -40,6 +40,7 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.SimpleLiteralClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserLiteralClass;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
+import cz.iocb.chemweb.server.sparql.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.chemweb.server.sparql.parser.model.expression.Literal;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -1056,6 +1057,19 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         for(ResourceClass rightClass : rightNode.getResourceClasses())
                         {
+                            if(leftClass == rightClass && leftClass instanceof UserLiteralClass)
+                            {
+                                appendComma(builder, variants++ > 0);
+
+                                builder.append(leftNode.asResource(leftClass).get(0));
+                                builder.append(" ");
+                                builder.append(((UserLiteralClass) leftClass).getOperatorCode(Operator.Equals));
+                                builder.append(" ");
+                                builder.append(rightNode.asResource(rightClass).get(0));
+
+                                continue;
+                            }
+
                             List<Column> leftCols = null;
                             List<Column> rightCols = null;
 
@@ -1166,6 +1180,16 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(translateAsBoxedOperand(left, left.getResourceClasses()));
                         builder.append(" operator(sparql.===) ");
                         builder.append(translateAsBoxedOperand(right, right.getResourceClasses()));
+                        builder.append(")");
+                    }
+                    else if(leftExpressionResourceClass == rightExpressionResourceClass
+                            && leftExpressionResourceClass instanceof UserLiteralClass)
+                    {
+                        builder.append("(");
+                        builder.append(left.translate());
+                        builder.append(
+                                ((UserLiteralClass) leftExpressionResourceClass).getOperatorCode(Operator.Equals));
+                        builder.append(right.translate());
                         builder.append(")");
                     }
                     else if(leftExpressionResourceClass == rightExpressionResourceClass
