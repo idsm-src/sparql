@@ -82,5 +82,13 @@ public class Measuregroup
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
                     config.createIriMapping("pubchem:cell", "cell"));
         }
+
+        {
+            Table table = new Table(schema, "measuregroup_anatomies");
+            NodeMapping subject = config.createIriMapping("pubchem:measuregroup", "bioassay", "measuregroup");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0000057"),
+                    config.createIriMapping("pubchem:anatomy", "anatomy"));
+        }
     }
 }

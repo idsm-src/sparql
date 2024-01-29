@@ -49,6 +49,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Common.addPrefixes(this);
 
         // PubChem
+        addPrefix("anatomy", "http://rdf.ncbi.nlm.nih.gov/pubchem/anatomy/");
         addPrefix("author", "http://rdf.ncbi.nlm.nih.gov/pubchem/author/");
         addPrefix("bioassay", "http://rdf.ncbi.nlm.nih.gov/pubchem/bioassay/");
         addPrefix("book", "http://rdf.ncbi.nlm.nih.gov/pubchem/book/");
@@ -139,6 +140,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
         Assay.addResourceClasses(this);
         Mechanism.addResourceClasses(this);
 
+        Anatomy.addResourceClasses(this);
         Author.addResourceClasses(this);
         Bioassay.addResourceClasses(this);
         Book.addResourceClasses(this);
