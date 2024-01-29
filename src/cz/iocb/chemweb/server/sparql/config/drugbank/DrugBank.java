@@ -47,6 +47,10 @@ public class DrugBank
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "molfile"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("drugbank:compound", "id"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("drugbank:compound", "id"));

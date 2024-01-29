@@ -61,6 +61,10 @@ public class Synonym
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000011"),
                     config.createIriMapping("pubchem:compound", "compound"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "compound"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:compound", "compound"));

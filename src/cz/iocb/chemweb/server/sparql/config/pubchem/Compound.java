@@ -51,6 +51,10 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "molfile"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound", "id"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:compound", "id"));
@@ -195,6 +199,67 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:tpsa", "compound"), config.createIsNotNullCondition("tpsa"));
 
+            // extension
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:hydrogen_bond_acceptor_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("hydrogen_bond_acceptor_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:tautomer_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("tautomer_count"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:defined_atom_stereo_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("defined_atom_stereo_count"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:defined_bond_stereo_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("defined_bond_stereo_count"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:undefined_bond_stereo_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("undefined_bond_stereo_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:isotope_atom_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("isotope_atom_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:covalent_unit_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("covalent_unit_count"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:hydrogen_bond_donor_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("hydrogen_bond_donor_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:non_hydrogen_atom_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("non_hydrogen_atom_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:rotatable_bond_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("rotatable_bond_count"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("pubchem:undefined_atom_stereo_count", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("undefined_atom_stereo_count"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:total_formal_charge", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("total_formal_charge"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:structure_complexity", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("structure_complexity"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:mono_isotopic_weight", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("mono_isotopic_weight"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:xlogp3_aa", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("xlogp3_aa"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:xlogp3", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("xlogp3"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:exact_mass", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("exact_mass"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:molecular_weight", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("molecular_weight"));
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:tpsa", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("tpsa"));
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:hydrogen_bond_acceptor_count", "compound"),
@@ -260,6 +325,10 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:molecular_formula", "compound"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:molecular_formula", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:molecular_formula", "compound"));
@@ -271,6 +340,10 @@ public class Compound
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:isomeric_smiles", "compound"));
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:isomeric_smiles", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
@@ -284,6 +357,10 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:canonical_smiles", "compound"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:canonical_smiles", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:canonical_smiles", "compound"));
@@ -296,6 +373,10 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:iupac_inchi", "compound"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:iupac_inchi", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:iupac_inchi", "compound"));
@@ -307,6 +388,10 @@ public class Compound
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:preferred_iupac_name", "compound"));
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:preferred_iupac_name", "compound"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),

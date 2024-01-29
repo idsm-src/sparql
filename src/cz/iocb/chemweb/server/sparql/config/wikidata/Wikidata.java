@@ -46,6 +46,10 @@ public class Wikidata
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "smiles"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("wikidata:entity", "id"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("wikidata:entity", "id"));

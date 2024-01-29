@@ -29,6 +29,10 @@ public class MolFiles
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:SIO_000300"),
                 config.createLiteralMapping(xsdString, molfile));
 
+        // extension
+        config.addQuadMapping(table, null, config.createIriMapping(compoundClass, compoundFields),
+                config.createIriMapping("sio:SIO_000008"), subject);
+
         // deprecated
         config.addQuadMapping(table, null, subject, config.createIriMapping("sio:is-attribute-of"),
                 config.createIriMapping(compoundClass, compoundFields));

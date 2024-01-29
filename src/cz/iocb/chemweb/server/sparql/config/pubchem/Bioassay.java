@@ -110,6 +110,10 @@ public class Bioassay
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "value"), conditions);
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
+                    config.createIriMapping("sio:SIO_000008"), subject, conditions);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
@@ -129,6 +133,10 @@ public class Bioassay
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "value"), conditions);
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
+                    config.createIriMapping("sio:SIO_000008"), subject, conditions);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
@@ -147,6 +155,10 @@ public class Bioassay
                     config.createIriMapping("pubchem:bioassay", "bioassay"), conditions);
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "value"), conditions);
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:bioassay", "bioassay"),
+                    config.createIriMapping("sio:SIO_000008"), subject, conditions);
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),

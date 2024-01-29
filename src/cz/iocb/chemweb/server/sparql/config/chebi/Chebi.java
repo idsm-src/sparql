@@ -248,6 +248,10 @@ public class Chebi
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "molfile"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "id"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
                     config.createIriMapping("ontology:resource", Ontology.unitCHEBI, "id"));

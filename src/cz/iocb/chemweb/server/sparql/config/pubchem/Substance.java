@@ -105,6 +105,10 @@ public class Substance
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:synonym", "synonym"));
 
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:synonym", "synonym"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
+
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
                     config.createIriMapping("pubchem:synonym", "synonym"));
@@ -116,6 +120,10 @@ public class Substance
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
                     config.createIriMapping("pubchem:substance_version", "substance"));
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:substance_version", "substance"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),

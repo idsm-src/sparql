@@ -495,6 +495,59 @@ public class Molecule
                     config.createLiteralMapping(xsdString,
                             "('CHEMBL' || molecule_id || ' Molecular Formula: ' || full_molformula)"),
                     config.createIsNotNullCondition("full_molformula"));
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_apka", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("cx_most_apka"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_most_bpka", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("cx_most_bpka"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logd", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("cx_logd"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_cx_logp", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("cx_logp"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_alogp", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("alogp"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_aromatic_rings", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("aromatic_rings"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hba", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("hba"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_hbd", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("hbd"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_heavy_atoms", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("heavy_atoms"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_num_ro5_violations", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("num_ro5_violations"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_psa", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("psa"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_qed_weighted", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("qed_weighted"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_rtb", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("rtb"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_mw_freebase", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("mw_freebase"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_mw_monoisotopic", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("mw_monoisotopic"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_full_mwt", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("full_mwt"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_molecular_species", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("molecular_species"));
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:molecule_ro3_pass", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject, config.createIsNotNullCondition("ro3_pass"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_full_molformula", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("full_molformula"));
         }
 
         {
@@ -552,6 +605,20 @@ public class Molecule
                     config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "('CHEMBL' || molecule_id || ' Canonical Smiles')"),
                     config.createIsNotNullCondition("canonical_smiles"));
+
+            // extension
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi_key", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("standard_inchi_key"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_standard_inchi", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("standard_inchi"));
+            config.addQuadMapping(table, graph,
+                    config.createIriMapping("chembl:molecule_canonical_smiles", "molecule_id"),
+                    config.createIriMapping("sio:SIO_000011"), subject,
+                    config.createIsNotNullCondition("canonical_smiles"));
         }
 
         {
@@ -577,6 +644,10 @@ public class Molecule
                     config.createIriMapping("chembl:compound", "id"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
                     config.createLiteralMapping(xsdString, "molfile"));
+
+            // extension
+            config.addQuadMapping(table, graph, config.createIriMapping("chembl:compound", "id"),
+                    config.createIriMapping("sio:SIO_000008"), subject);
 
             // deprecated
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:is-attribute-of"),
