@@ -165,7 +165,10 @@ public class Common
                 "https://www.drugbank.ca/bio_entities/BE", 7));
         config.addIriClass(new IntegerUserIriClass("chembl:target_report_card", "integer",
                 "https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL"));
+        config.addIriClass(new IntegerUserIriClass("chembl:tissue_report_card", "integer",
+                "https://www.ebi.ac.uk/chembl/tissue_report_card/CHEMBL"));
         config.addIriClass(new StringUserIriClass("glygen:protein", "https://glygen.org/protein/"));
+        config.addIriClass(new StringUserIriClass("glygen:glycan", "http://glygen.org/glycan/"));
         config.addIriClass(
                 new StringUserIriClass("glycosmos:glycoproteins", "https://glycosmos.org/glycoproteins/show/uniprot/"));
         config.addIriClass(new StringUserIriClass("alphafold:entry", "https://alphafold.ebi.ac.uk/entry/"));
@@ -191,6 +194,7 @@ public class Common
 
         config.addIriClass(new IntegerUserIriClass("wikidata:wiki", "integer", "https://www.wikidata.org/wiki/Q"));
         config.addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q"));
+        config.addIriClass(new IntegerUserIriClass("nextprot:term", "integer", "https://www.nextprot.org/term/TS-", 4));
     }
 
 

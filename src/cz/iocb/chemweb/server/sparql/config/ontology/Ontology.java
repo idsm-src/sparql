@@ -30,6 +30,7 @@ public class Ontology
     public static final String unitTaxonomy = "'11'::smallint";
     public static final String unitClassyFire = "'12'::smallint";
     public static final String unitNCBITaxon = "'64'::smallint";
+    public static final String unitUberon = "'65'::smallint";
     public static final String unitCL = "'71'::smallint";
     public static final String unitUO = "'74'::smallint";
     public static final String unitIAO = "'75'::smallint";

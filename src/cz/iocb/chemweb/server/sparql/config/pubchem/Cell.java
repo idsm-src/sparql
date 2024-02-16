@@ -88,5 +88,13 @@ public class Cell
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
                     config.createIriMapping("mesh:heading", "match"));
         }
+
+        {
+            Table table = new Table(schema, "cell_anatomies");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0001000"),
+                    config.createIriMapping("pubchem:anatomy", "anatomy"));
+        }
     }
 }

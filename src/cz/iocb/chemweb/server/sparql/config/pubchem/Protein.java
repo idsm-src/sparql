@@ -209,6 +209,14 @@ public class Protein
         }
 
         {
+            Table table = new Table(schema, "protein_glycan_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("glygen:glycan", "match"));
+        }
+
+        {
             Table table = new Table(schema, "protein_glycosmos_matches");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
@@ -254,6 +262,14 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("ontology:resource", "type_unit", "type_id"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_references");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("pubchem:reference", "reference"));
         }
     }
 }

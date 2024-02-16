@@ -40,5 +40,13 @@ public class ConservedDomain
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/ConservedDomain.vm"));
         }
+
+        {
+            Table table = new Table(schema, "conserveddomain_references");
+            NodeMapping subject = config.createIriMapping("pubchem:conserveddomain", "domain");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("cito:isDiscussedBy"),
+                    config.createIriMapping("pubchem:reference", "reference"));
+        }
     }
 }

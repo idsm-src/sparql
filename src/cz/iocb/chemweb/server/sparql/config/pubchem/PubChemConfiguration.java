@@ -174,6 +174,7 @@ public class PubChemConfiguration extends SparqlDatabaseConfiguration
 
     private void addQuadMappings()
     {
+        Anatomy.addQuadMappings(this);
         Author.addQuadMappings(this);
         Bioassay.addQuadMappings(this);
         Book.addQuadMappings(this);
