@@ -43,7 +43,5 @@ public class IntegratedSachemConfiguration extends SparqlDatabaseConfiguration
                 connectionPool, schema), false);
         addService(new PubChemSachemConfiguration("https://idsm.elixir-czech.cz/sachem/endpoint/pubchem",
                 connectionPool, schema), false);
-
-        //setConstraints();
     }
 }

@@ -41,8 +41,6 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addPrefixes();
         addServices();
 
-        //setConstraints();
-
         addServiceDescription();
     }
 

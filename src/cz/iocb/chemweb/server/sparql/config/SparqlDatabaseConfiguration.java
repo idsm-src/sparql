@@ -14,10 +14,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsd
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdShortType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static java.util.Arrays.asList;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -688,53 +685,6 @@ public class SparqlDatabaseConfiguration
     public DataSource getConnectionPool()
     {
         return connectionPool;
-    }
-
-
-    protected void setConstraints() throws SQLException
-    {
-        try(Connection connection = getConnectionPool().getConnection())
-        {
-            try(Statement statement = connection.createStatement())
-            {
-                try(ResultSet result = statement.executeQuery(
-                        "select parent_schema, parent_table, parent_columns, foreign_schema, foreign_table, foreign_columns "
-                                + "from constraints.foreign_keys"))
-                {
-                    while(result.next())
-                    {
-                        Table parentTable = new Table(result.getString(1), result.getString(2));
-                        List<Column> parentColumns = getColumns((String[]) result.getArray(3).getArray());
-
-                        Table foreignTable = new Table(result.getString(4), result.getString(5));
-                        List<Column> foreignColumns = getColumns((String[]) result.getArray(6).getArray());
-
-                        databaseSchema.addForeignKeys(parentTable, parentColumns, foreignTable, foreignColumns);
-                    }
-                }
-            }
-
-
-            try(Statement statement = connection.createStatement())
-            {
-                try(ResultSet result = statement.executeQuery(
-                        "select left_schema, left_table, left_columns, right_schema, right_table, right_columns "
-                                + "from constraints.unjoinable_columns"))
-                {
-                    while(result.next())
-                    {
-                        Table leftTable = new Table(result.getString(1), result.getString(2));
-                        List<Column> leftColumns = getColumns((String[]) result.getArray(3).getArray());
-
-                        Table rightTable = new Table(result.getString(4), result.getString(5));
-                        List<Column> rightColumns = getColumns((String[]) result.getArray(6).getArray());
-
-                        databaseSchema.addUnjoinableColumns(leftTable, leftColumns, rightTable, rightColumns);
-                        databaseSchema.addUnjoinableColumns(rightTable, rightColumns, leftTable, leftColumns);
-                    }
-                }
-            }
-        }
     }
 
 
