@@ -61,7 +61,7 @@ public class Mona
         Sachem.addResourceClasses(config);
 
         config.addIriClass(new MapUserIriClass("mona:experiment", "integer", new Table(schema, "compound_bases"),
-                new TableColumn("id"), new TableColumn("accession"), mona));
+                new TableColumn("id"), new TableColumn("accession"), mona, "[^#].*"));
         config.addIriClass(new MapUserIriClass("mona:compound", "integer", new Table(schema, "compound_bases"),
                 new TableColumn("id"), new TableColumn("accession"), mona + "CMPD_"));
         config.addIriClass(new MapUserIriClass("mona:spectrum", "integer", new Table(schema, "compound_bases"),
@@ -215,7 +215,7 @@ public class Mona
             Table table = new Table(schema, "compound_bases");
             NodeMapping subject = config.createIriMapping("mona:level", "id");
             NodeMapping experiment = config.createIriMapping("mona:experiment", "id");
-            Conditions condition = config.createIsNotNullCondition("ionization_type");
+            Conditions condition = config.createIsNotNullCondition("level");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("obo:MS_1000511"), // ms level
