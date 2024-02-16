@@ -27,7 +27,10 @@ import cz.iocb.chemweb.server.sparql.config.wikidata.WikidataConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 
 
@@ -39,6 +42,7 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         super(service != null ? service : "https://idsm.elixir-czech.cz/sparql/endpoint/idsm", connectionPool, schema);
 
         addPrefixes();
+        addQuadMappings();
         addServices();
 
         addServiceDescription();
@@ -76,8 +80,27 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addPrefix("wdno", "http://www.wikidata.org/prop/novalue/");
         addPrefix("wdata", "http://www.wikidata.org/wiki/Special:EntityData/");
 
-
+        addPrefix("dcterms", "http://purl.org/dc/terms/");
         addPrefix("idsm", "https://idsm.elixir-czech.cz/sparql/endpoint/");
+    }
+
+
+    private void addQuadMappings()
+    {
+        {
+            Table table = new Table("info", "idsm_version");
+            ConstantIriMapping graph = createIriMapping(getDescriptionGraphIri());
+            ConstantIriMapping defaultDataset = createIriMapping("<" + getServiceIri().getValue() + "#DefaultDataset>");
+            ConstantIriMapping defaultGraph = createIriMapping("<" + getServiceIri().getValue() + "#DefaultGraph>");
+
+            DateTimeConstantZoneClass xsdDateTimeM0 = DateTimeConstantZoneClass.get(0);
+
+            addQuadMapping(table, graph, defaultDataset, createIriMapping("dcterms:issued"),
+                    createLiteralMapping(xsdDateTimeM0, "date"));
+
+            addQuadMapping(table, graph, defaultGraph, createIriMapping("dcterms:issued"),
+                    createLiteralMapping(xsdDateTimeM0, "date"));
+        }
     }
 
 
