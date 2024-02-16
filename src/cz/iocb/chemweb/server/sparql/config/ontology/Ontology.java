@@ -3,16 +3,11 @@ package cz.iocb.chemweb.server.sparql.config.ontology;
 import static cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration.rdfLangStringEn;
 import static cz.iocb.chemweb.server.sparql.config.ontology.OntologyConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInt;
-import static java.util.Arrays.asList;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.classes.GeneralUserIriClass;
 
 
 
@@ -42,34 +37,7 @@ public class Ontology
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config) throws SQLException
     {
-        StringBuilder builder = new StringBuilder();
-
-        try(Connection connection = config.getConnectionPool().getConnection())
-        {
-            try(Statement statement = connection.createStatement())
-            {
-                try(ResultSet result = statement
-                        .executeQuery("select pattern from ontology.resource_categories__reftable"))
-                {
-                    boolean hasResult = false;
-
-                    while(result.next())
-                    {
-                        if(hasResult)
-                            builder.append("|");
-
-                        hasResult = true;
-
-                        builder.append("(" + result.getString(1) + ")");
-                    }
-                }
-            }
-        }
-
-        String ontologyPattern = builder.toString();
-
-        config.addIriClass(new GeneralUserIriClass("ontology:resource", "ontology", "ontology_resource",
-                asList("smallint", "integer"), ontologyPattern, GeneralUserIriClass.SqlCheck.IF_NOT_MATCH));
+        config.addIriClass(OntologyResource.get(config));
     }
 
 
