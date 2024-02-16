@@ -272,7 +272,7 @@ public class EndpointServlet extends HttpServlet
                     switch(result.getResultType())
                     {
                         case ASK:
-                            switch(detectOutputType(req, ResultType.ASK))
+                            switch(format)
                             {
                                 case SPARQL_JSON:
                                     writeAskJson(res.getWriter(), result, includeWarnings);
@@ -295,7 +295,7 @@ public class EndpointServlet extends HttpServlet
                             break;
 
                         case SELECT:
-                            switch(detectOutputType(req, ResultType.SELECT))
+                            switch(format)
                             {
                                 case SPARQL_JSON:
                                     writeSelectJson(res.getWriter(), result, includeWarnings);
@@ -325,7 +325,7 @@ public class EndpointServlet extends HttpServlet
                                 return;
                             }
 
-                            switch(detectOutputType(req, ResultType.CONSTRUCT))
+                            switch(format)
                             {
                                 case RDF_XML:
                                     writeGraphXml(res.getWriter(), data);
@@ -565,23 +565,70 @@ public class EndpointServlet extends HttpServlet
 
     private static OutputType detectOutputType(HttpServletRequest req, ResultType form)
     {
-        // IOCB SPARQL protocol extension
-        String accepts = req.getParameter("format");
+        String format = req.getParameter("format");
 
-        if(accepts == null)
+        if(format != null)
         {
-            accepts = req.getHeader("accept");
+            // extension for compatibility with sparqlwrapper
 
-            if(accepts == null)
+            if(form == ResultType.ASK || form == ResultType.SELECT)
             {
-                if(form == ResultType.ASK || form == ResultType.SELECT)
-                    return OutputType.SPARQL_XML;
-                else
-                    return OutputType.RDF_XML;
+                switch(format)
+                {
+                    case "xml":
+                        return OutputType.SPARQL_XML;
+                    case "json":
+                        return OutputType.SPARQL_JSON;
+                    case "csv":
+                        return OutputType.CSV;
+                    case "tsv":
+                        return OutputType.TSV;
+                }
             }
+            else if(form == ResultType.CONSTRUCT || form == ResultType.DESCRIBE)
+            {
+                switch(format)
+                {
+                    case "rdf":
+                    case "xml":
+                    case "rdf+xml":
+                        return OutputType.RDF_XML;
+                    case "json":
+                        return OutputType.RDF_JSON;
+                    case "turtle":
+                        return OutputType.TURTLE;
+                    case "n3":
+                        return OutputType.NTRIPLES;
+                    case "csv":
+                        return OutputType.CSV;
+                    case "tsv":
+                        return OutputType.TSV;
+                }
+            }
+
+
+            // IOCB SPARQL protocol extension
+
+            OutputType type = detectOutputTypeFromMIME(form, format);
+
+            if(type != OutputType.NONE)
+                return type;
         }
 
 
+        String accept = req.getHeader("accept");
+
+        if(accept != null)
+            return detectOutputTypeFromMIME(form, accept);
+        else if(form == ResultType.ASK || form == ResultType.SELECT)
+            return OutputType.SPARQL_XML;
+        else
+            return OutputType.RDF_XML;
+    }
+
+
+    private static OutputType detectOutputTypeFromMIME(ResultType form, String accepts)
+    {
         OutputType type = OutputType.NONE;
         double quality = 0;
 
