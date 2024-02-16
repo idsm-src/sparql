@@ -46,6 +46,12 @@ public class SqlSelect extends SqlIntercode
     }
 
 
+    public SqlSelect(UsedVariables variables, SqlIntercode child)
+    {
+        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>());
+    }
+
+
     public final void setLimit(BigInteger limit)
     {
         this.limit = limit;
