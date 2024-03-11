@@ -35,7 +35,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(generateInverseFunction(column, false));
+        return asList(generateInverseFunction(column, true));
     }
 
 

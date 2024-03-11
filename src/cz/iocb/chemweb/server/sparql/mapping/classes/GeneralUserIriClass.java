@@ -158,7 +158,22 @@ public class GeneralUserIriClass extends UserIriClass
         String iri = column.toString();
 
         for(int part = 0; part < getColumnCount(); part++)
-            result.add(new ExpressionColumn(inverseFunction.get(part) + "(" + iri + ")"));
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.append("CASE WHEN sparql.regex_string(");
+            builder.append(iri);
+            builder.append(", '^(");
+            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(")$', '') THEN ");
+
+            builder.append(inverseFunction.get(part));
+            builder.append("(");
+            builder.append(iri);
+            builder.append(") END");
+
+            result.add(new ExpressionColumn(builder.toString()));
+        }
 
         return result;
     }
@@ -194,7 +209,28 @@ public class GeneralUserIriClass extends UserIriClass
         String iri = "sparql.rdfbox_get_iri(" + column + ")";
 
         for(int part = 0; part < getColumnCount(); part++)
-            result.add(new ExpressionColumn(inverseFunction.get(part) + "(" + iri + ")"));
+        {
+            StringBuilder builder = new StringBuilder();
+
+            if(check)
+            {
+                builder.append("CASE WHEN sparql.regex_string(");
+                builder.append(iri);
+                builder.append(", '^(");
+                builder.append(pattern.replaceAll("'", "''"));
+                builder.append(")$', '') THEN ");
+            }
+
+            builder.append(inverseFunction.get(part));
+            builder.append("(");
+            builder.append(iri);
+            builder.append(")");
+
+            if(check)
+                builder.append(" END");
+
+            result.add(new ExpressionColumn(builder.toString()));
+        }
 
         return result;
     }

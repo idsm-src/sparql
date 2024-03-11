@@ -207,7 +207,7 @@ public class IsdbUserIriClass extends UserIriClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return generateInverseFunctions(column, false);
+        return generateInverseFunctions(column, true);
     }
 
 
