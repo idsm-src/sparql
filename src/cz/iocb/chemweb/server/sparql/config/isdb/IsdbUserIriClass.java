@@ -159,13 +159,13 @@ public class IsdbUserIriClass extends UserIriClass
     }
 
 
-
     protected List<Column> generateInverseFunctions(Column parameter, boolean check)
     {
         String access = "(SELECT id as \"@from\", accession as \"@to\" FROM isdb.compound_bases) as \"@rctab\"";
-        String col1 = String.format("(SELECT \"@from\"::integer FROM %s WHERE \"@to\" = substring(%s, %d, 14)::varchar",
-                access, parameter, prefixLen + 1);
-        String col2 = String.format("right(%s, %i)::char", parameter.toString(), suffixLen + 1);
+        String col1 = String.format(
+                "(SELECT \"@from\"::integer FROM %s WHERE \"@to\" = substring(%s, %d, 14)::varchar)", access, parameter,
+                prefixLen + 1);
+        String col2 = String.format("right(%s, %d)::char", parameter.toString(), suffixLen + 1);
 
         if(check)
         {
