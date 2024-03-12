@@ -26,7 +26,7 @@
           <tbody>
             <tr>
               <td>
-                <iframe src="./ms.html#n/mona/$entity.getValue().replaceFirst(".*/", "")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
+                <iframe src="./ms.html#n/mona/$entity.getValue().replaceFirst(".*/([^/]+)_EXP", "$1")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
               </td>
             </tr>
           </tbody>
@@ -37,7 +37,7 @@
         <table style="width:80px">
           <tbody>
             <tr>
-              <td><img loading='lazy' src="mona/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/", "")" height="80" width="80"></td>
+              <td><img loading='lazy' src="mona/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/([^/]+)_EXP", "$1")" height="80" width="80"></td>
             </tr>
           </tbody>
         </table>
@@ -50,7 +50,7 @@
               #if($compound.NAME)
               <td>#escapeHTML($compound.NAME)</td>
               #else
-              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+              <td>$entity.getValue().replaceFirst(".*/([^/]+)_EXP", "$1")</td>
               #end
             </tr>
             <tr>

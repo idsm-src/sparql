@@ -36,7 +36,7 @@
     <table style="width:100%;">
       <tr>
         <td align="center" style="text-align: center;">
-          <iframe src="./ms.html#y/mona/$entity.getValue().replaceFirst(".*/MS_", "")" title="MS Chart" width="500" height="300" scrolling="no" style="border: none; padding-top: 20px"></iframe>
+          <iframe src="./ms.html#y/mona/$entity.getValue().replaceFirst(".*/([^/]+)_MS", "$1")" title="MS Chart" width="500" height="300" scrolling="no" style="border: none; padding-top: 20px"></iframe>
         </td>
       </tr>
     </table>

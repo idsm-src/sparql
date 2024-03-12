@@ -26,7 +26,7 @@
         <table style="width:80px">
           <tbody>
             <tr>
-              <td><img loading='lazy' src="mona/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/CMPD_", "")" height="80" width="80"></td>
+              <td><img loading='lazy' src="mona/compound/image?w=160&id=$entity.getValue().replaceFirst(".*/([^/]+)_CMPD", "$1")" height="80" width="80"></td>
             </tr>
           </tbody>
         </table>
@@ -39,7 +39,7 @@
               #if($compound.NAME)
               <td>#escapeHTML($compound.NAME)</td>
               #else
-              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+              <td>$entity.getValue().replaceFirst(".*/([^/]+)_CMPD", "$1")</td>
               #end
             </tr>
             <tr>

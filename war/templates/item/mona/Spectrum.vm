@@ -13,7 +13,7 @@
           <tbody>
             <tr>
               <td>
-                <iframe src="./ms.html#n/mona/$entity.getValue().replaceFirst(".*/MS_", "")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
+                <iframe src="./ms.html#n/mona/$entity.getValue().replaceFirst(".*/([^/]+)_MS", "$1")" title="MS Chart" loading="lazy" width="100" height="60" scrolling="no" style="border: none; pointer-events: none;"></iframe>
               </td>
             </tr>
           </tbody>
@@ -23,7 +23,7 @@
         <table>
           <tbody>
             <tr>
-              <td>$entity.getValue().replaceFirst(".*/", "")</td>
+              <td>$entity.getValue().replaceFirst(".*/([^/]+)_MS", "$1")</td>
             </tr>
             <tr>
               <td><small style="color:gray">#escapeIRI($entity)<small></td>

@@ -61,11 +61,11 @@ public class Mona
         Sachem.addResourceClasses(config);
 
         config.addIriClass(new MapUserIriClass("mona:experiment", "integer", new Table(schema, "compound_bases"),
-                new TableColumn("id"), new TableColumn("accession"), mona, "[^#].*"));
+                new TableColumn("id"), new TableColumn("accession"), mona, ".*", "_EXP"));
         config.addIriClass(new MapUserIriClass("mona:compound", "integer", new Table(schema, "compound_bases"),
-                new TableColumn("id"), new TableColumn("accession"), mona + "CMPD_"));
+                new TableColumn("id"), new TableColumn("accession"), mona, ".*", "_CMPD"));
         config.addIriClass(new MapUserIriClass("mona:spectrum", "integer", new Table(schema, "compound_bases"),
-                new TableColumn("id"), new TableColumn("accession"), mona + "MS_"));
+                new TableColumn("id"), new TableColumn("accession"), mona, ".*", "_MS"));
         config.addIriClass(new IntegerUserIriClass("mona:library", "integer", bnmona + "id", "_library"));
         config.addIriClass(new IntegerUserIriClass("mona:submitter", "integer", bnmona + "id", "_submitter"));
 

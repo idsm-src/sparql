@@ -107,9 +107,9 @@
       <tr>
         <td align="center" style="text-align: center;">
           #if($structure.count > 0)
-          <img src="mona/compound/image?w=360&id=$entity.getValue().replaceFirst(".*/", "")" height="180" width="180" style="vertical-align: middle;">
+          <img src="mona/compound/image?w=360&id=$entity.getValue().replaceFirst(".*/([^/]+)_EXP", "$1")" height="180" width="180" style="vertical-align: middle;">
           #end
-          <iframe src="./ms.html#y/mona/$entity.getValue().replaceFirst(".*/", "")" title="MS Chart" width="350" height="210" scrolling="no" style="border: none; padding-top: 20px; vertical-align: middle;"></iframe>
+          <iframe src="./ms.html#y/mona/$entity.getValue().replaceFirst(".*/([^/]+)_EXP", "$1")" title="MS Chart" width="350" height="210" scrolling="no" style="border: none; padding-top: 20px; vertical-align: middle;"></iframe>
         </td>
       </tr>
     </table>

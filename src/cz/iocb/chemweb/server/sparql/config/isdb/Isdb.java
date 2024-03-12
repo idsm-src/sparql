@@ -50,10 +50,10 @@ public class Isdb
 
         config.addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q"));
 
-        config.addIriClass(new IsdbUserIriClass("isdb:experiment", isdb));
+        config.addIriClass(new IsdbUserIriClass("isdb:experiment", isdb, "_EXP"));
         config.addIriClass(new MapUserIriClass("isdb:compound", "integer", new Table(schema, "compound_bases"),
-                new TableColumn("id"), new TableColumn("accession"), isdb + "CMPD_", 14, "[A-Z]{14}"));
-        config.addIriClass(new IsdbUserIriClass("isdb:spectrum", isdb + "MS_"));
+                new TableColumn("id"), new TableColumn("accession"), isdb, 14, "[A-Z]{14}", "_CMPD"));
+        config.addIriClass(new IsdbUserIriClass("isdb:spectrum", isdb, "_MS"));
 
         config.addIriClass(new MapUserIriClass("isdb:inchi", "integer", new Table(schema, "compound_bases"),
                 new TableColumn("id"), new TableColumn("accession"), bnisdb, 14, "[A-Z]{14}", "_inchi"));
