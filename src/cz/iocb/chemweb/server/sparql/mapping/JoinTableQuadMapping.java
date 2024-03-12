@@ -105,7 +105,7 @@ public class JoinTableQuadMapping extends QuadMapping
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
-                Collections.nCopies(tables.size(), new Conditions(new Condition(new Condition()))));
+                Collections.nCopies(tables.size(), new Conditions(new Condition())));
     }
 
 
