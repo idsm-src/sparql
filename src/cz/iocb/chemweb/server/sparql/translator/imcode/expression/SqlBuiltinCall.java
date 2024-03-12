@@ -806,7 +806,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 }
                 else
                 {
-                    Set<Column> columns = ((SqlVariable) argument).getUsedVariable().getNonConstantColumns();
+                    SqlVariable variable = (SqlVariable) argument;
+                    Set<Column> columns = variable.getUsedVariable().getNonConstantColumns();
 
                     if(argument.canBeNull() && columns.size() > 1)
                     {
@@ -820,6 +821,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(columns.size() > 0)
                         builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
+                    else if(variable.getResourceClasses().size() > 0)
+                        builder.append("1");
                     else
                         builder.append("NULL");
 
