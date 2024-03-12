@@ -552,7 +552,7 @@ public class ResultTablePart extends ResizeComposite
         //resultsDataGrid.setRowCount(1000);
         //hasDataFilter.setPageSize(1000);
         hasDataFilter.setRowCount(0);
-        hasDataFilter.setVisibleRange(0, 1000);
+        hasDataFilter.setVisibleRange(0, 200);
     }
 
 
