@@ -67,6 +67,9 @@ public class Conditions
 
     public static Conditions or(Conditions left, Conditions right)
     {
+        if(left.isTrue() || right.isTrue())
+            return new Conditions(new Condition());
+
         Conditions result = new Conditions();
 
         result.add(left);
