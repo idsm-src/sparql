@@ -273,6 +273,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(operand.getResourceClasses().stream().noneMatch(r -> isLiteral(r)))
                     return SqlNull.get();
 
+                if(!operand.canBeNull() && operand.getExpressionResourceClass() instanceof LiteralClass literalClass)
+                    return SqlIri.create(literalClass.getTypeIri());
+
                 //NEXT: determine resource classes more precisely
                 return new SqlBuiltinCall(function, arguments, asSet(iri),
                         operand.canBeNull() || operand.getResourceClasses().stream().anyMatch(r -> !isLiteral(r)));
