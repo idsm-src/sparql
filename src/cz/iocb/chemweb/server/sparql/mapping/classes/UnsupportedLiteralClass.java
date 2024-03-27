@@ -33,8 +33,8 @@ public class UnsupportedLiteralClass extends LiteralClass
     {
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ConstantColumn("'" + ((Literal) node).getStringValue().replaceAll("'", "''") + "'::varchar"));
-        result.add(new ConstantColumn("'" + ((Literal) node).getTypeIri().getValue() + "'::varchar"));
+        result.add(new ConstantColumn(((Literal) node).getStringValue(), "varchar"));
+        result.add(new ConstantColumn(((Literal) node).getTypeIri().getValue(), "varchar"));
 
         return result;
     }

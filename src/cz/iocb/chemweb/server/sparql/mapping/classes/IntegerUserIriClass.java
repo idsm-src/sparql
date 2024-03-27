@@ -89,8 +89,16 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(id.isEmpty())
             id = "0";
 
-        return asList(new ConstantColumn("'" + id.replaceAll("'", "''") + "'::" + sqlTypes.get(0)));
+        return asList(new ConstantColumn(id, sqlTypes.get(0)));
     }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
+    }
+
 
 
     @Override

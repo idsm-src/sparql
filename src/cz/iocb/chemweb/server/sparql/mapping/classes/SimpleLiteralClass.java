@@ -32,9 +32,9 @@ public class SimpleLiteralClass extends LiteralClass
         Object value = ((Literal) node).getValue();
 
         if(value instanceof String)
-            return asList(new ConstantColumn("'" + ((String) value).replace("'", "''") + "'::varchar"));
+            return asList(new ConstantColumn((String) value, "varchar"));
         else
-            return asList(new ConstantColumn("'" + value + "'::" + sqlTypes.get(0)));
+            return asList(new ConstantColumn(value.toString(), sqlTypes.get(0)));
     }
 
 
@@ -86,9 +86,9 @@ public class SimpleLiteralClass extends LiteralClass
         Object value = ((Literal) node).getValue();
 
         if(value instanceof String)
-            return new ConstantColumn("'" + ((String) value).replace("'", "''") + "'::varchar");
+            return new ConstantColumn((String) value, "varchar");
         else
-            return new ConstantColumn("'" + value + "'::" + sqlTypes.get(0));
+            return new ConstantColumn(value.toString(), sqlTypes.get(0));
     }
 
 

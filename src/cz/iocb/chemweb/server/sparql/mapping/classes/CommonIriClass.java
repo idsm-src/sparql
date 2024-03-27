@@ -22,7 +22,7 @@ public class CommonIriClass extends IriClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn("'" + (((IRI) node).getValue()).replaceAll("'", "''") + "'::varchar"));
+        return asList(new ConstantColumn(((IRI) node).getValue(), "varchar"));
     }
 
 
@@ -72,6 +72,16 @@ public class CommonIriClass extends IriClass
     public List<Column> toResult(List<Column> columns)
     {
         return columns;
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        if(columns.get(0) instanceof ConstantColumn col)
+            return col.getValue();
+
+        return "";
     }
 
 

@@ -64,8 +64,7 @@ public class LangStringConstantTagClass extends LiteralClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        String code = "'" + ((String) ((Literal) node).getValue()).replaceAll("'", "''") + "'::varchar";
-        return asList(new ConstantColumn(code));
+        return asList(new ConstantColumn(((String) ((Literal) node).getValue()), "varchar"));
     }
 
 
@@ -95,7 +94,7 @@ public class LangStringConstantTagClass extends LiteralClass
 
         if(check == false)
         {
-            result.add(new ConstantColumn("'" + lang + "'::varchar"));
+            result.add(new ConstantColumn(lang, "varchar"));
         }
         else
         {
@@ -151,7 +150,7 @@ public class LangStringConstantTagClass extends LiteralClass
     @Override
     public Column toExpression(Node node)
     {
-        return new ConstantColumn("'" + ((String) ((Literal) node).getValue()).replaceAll("'", "''") + "'::varchar");
+        return new ConstantColumn(((String) ((Literal) node).getValue()), "varchar");
     }
 
 

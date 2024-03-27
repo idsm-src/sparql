@@ -61,7 +61,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn("'" + ((Literal) node).getValue() + "'::timestamptz"));
+        return asList(new ConstantColumn(((Literal) node).getValue().toString(), "timestamptz"));
     }
 
 
@@ -91,7 +91,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
         if(check == false)
         {
-            result.add(new ConstantColumn("'" + zone + "'::int4"));
+            result.add(new ConstantColumn(zone, "int4"));
         }
         else
         {

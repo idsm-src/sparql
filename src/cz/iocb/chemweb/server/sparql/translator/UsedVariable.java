@@ -117,7 +117,7 @@ public class UsedVariable
         }
 
         if(columns.size() == 0)
-            return resourceClass.getSqlTypes().stream().map(t -> new ConstantColumn("NULL::" + t)).collect(toList());
+            return resourceClass.getSqlTypes().stream().map(t -> new ConstantColumn(null, t)).collect(toList());
 
         if(columns.size() == 1)
             return columns.get(0);

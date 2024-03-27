@@ -61,7 +61,7 @@ public class DateConstantZoneClass extends LiteralClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn("'" + DateClass.getDate((Literal) node) + "'::date"));
+        return asList(new ConstantColumn(DateClass.getDate((Literal) node), "date"));
     }
 
 
@@ -91,7 +91,7 @@ public class DateConstantZoneClass extends LiteralClass
 
         if(check == false)
         {
-            result.add(new ConstantColumn("'" + zone + "'::int4"));
+            result.add(new ConstantColumn(zone, "int4"));
         }
         else
         {

@@ -38,7 +38,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn("'" + ((BlankNodeLiteral) node).getLabel() + "'::int4"));
+        return asList(new ConstantColumn(((BlankNodeLiteral) node).getLabel(), "int4"));
     }
 
 
@@ -68,7 +68,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
 
         if(check == false)
         {
-            result.add(new ConstantColumn("'" + segment + "'::int4"));
+            result.add(new ConstantColumn(segment, "int4"));
         }
         else
         {

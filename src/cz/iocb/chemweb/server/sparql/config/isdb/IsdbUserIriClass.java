@@ -72,9 +72,8 @@ public class IsdbUserIriClass extends UserIriClass
             {
                 if(result.next())
                 {
-                    List<Column> columns = asList(
-                            new ConstantColumn("'" + result.getString(1).replaceAll("'", "''") + "'::integer"),
-                            new ConstantColumn("'" + iri.getValue().charAt(prefix.length() + 15) + "'::char"));
+                    List<Column> columns = asList(new ConstantColumn(result.getString(1), "integer"),
+                            new ConstantColumn(iri.getValue().substring(prefix.length() + 15), "char"));
                     cache.storeToCache(iri, this, columns);
                     return columns;
                 }
@@ -120,9 +119,8 @@ public class IsdbUserIriClass extends UserIriClass
                 }
                 else
                 {
-                    List<Column> columns = asList(
-                            new ConstantColumn(result.getString(1).replaceAll("'", "''") + "::integer"),
-                            new ConstantColumn("'" + iri.getValue().charAt(prefixLen + 15) + "'::char"));
+                    List<Column> columns = asList(new ConstantColumn(result.getString(1), "integer"),
+                            new ConstantColumn(iri.getValue().substring(prefixLen + 15), "char"));
                     cache.storeToCache(iri, this, columns);
                 }
 
@@ -236,6 +234,13 @@ public class IsdbUserIriClass extends UserIriClass
     public List<Column> toResult(List<Column> columns)
     {
         return asList(generateFunction(columns));
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
     }
 
 

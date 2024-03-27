@@ -38,7 +38,7 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn("'" + ((BlankNodeLiteral) node).getLabel().replace("'", "''") + "'::varchar"));
+        return asList(new ConstantColumn(((BlankNodeLiteral) node).getLabel(), "varchar"));
     }
 
 
@@ -68,7 +68,7 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
 
         if(check == false)
         {
-            result.add(new ConstantColumn("'" + segment + "'::int4"));
+            result.add(new ConstantColumn(segment, "int4"));
         }
         else
         {

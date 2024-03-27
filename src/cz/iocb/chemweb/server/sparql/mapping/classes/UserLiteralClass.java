@@ -63,7 +63,7 @@ public class UserLiteralClass extends LiteralClass
     {
         Object value = ((Literal) node).getValue();
 
-        return asList(new ConstantColumn("'" + value.toString().replace("'", "''") + "'::" + sqlTypes.get(0)));
+        return asList(new ConstantColumn(value.toString(), sqlTypes.get(0)));
     }
 
 
@@ -122,7 +122,7 @@ public class UserLiteralClass extends LiteralClass
     {
         Object value = ((Literal) node).getValue();
 
-        return new ConstantColumn("'" + value.toString().replace("'", "''") + "'::" + sqlTypes.get(0));
+        return new ConstantColumn(value.toString(), sqlTypes.get(0));
     }
 
 

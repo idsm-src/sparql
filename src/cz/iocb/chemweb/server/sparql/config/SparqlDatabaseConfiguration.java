@@ -569,8 +569,9 @@ public class SparqlDatabaseConfiguration
     {
         if(value.startsWith("("))
             return new ExpressionColumn(value);
-        else if(value.matches(".*::[_a-zA-Z0-9.]+"))
-            return new ConstantColumn(value);
+        else if(value.matches("'.*'::[_a-zA-Z0-9.]+"))
+            return new ConstantColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
+                    value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1"));
         else
             return new TableColumn(value);
     }

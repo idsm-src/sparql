@@ -83,7 +83,14 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
 
-        return asList(new ConstantColumn("'" + id.replaceAll("'", "''") + "'::varchar"));
+        return asList(new ConstantColumn(id, "varchar"));
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
     }
 
 

@@ -91,10 +91,7 @@ public class GeneralUserIriClass extends UserIriClass
                 List<Column> columns = new ArrayList<Column>();
 
                 for(int i = 0; i < getColumnCount(); i++)
-                {
-                    String code = "'" + result.getString(i + 1).replaceAll("'", "''") + "'::" + sqlTypes.get(i);
-                    columns.add(new ConstantColumn(code));
-                }
+                    columns.add(new ConstantColumn(result.getString(i + 1), sqlTypes.get(i)));
 
                 cache.storeToCache(iri, this, columns);
                 return columns;
@@ -284,6 +281,20 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
+    public String getPrefix(List<Column> columns)
+    {
+        IriCache cache = Request.currentRequest().getIriCache();
+
+        IRI iri = cache.getFromCache(this, columns);
+
+        if(iri != null)
+            return iri.getValue();
+
+        return "";
+    }
+
+
+    @Override
     public boolean match(Node node)
     {
         if(node instanceof VariableOrBlankNode)
@@ -370,10 +381,7 @@ public class GeneralUserIriClass extends UserIriClass
                     List<Column> columns = new ArrayList<Column>();
 
                     for(int i = 0; i < getColumnCount(); i++)
-                    {
-                        String code = "'" + result.getString(i + 1).replaceAll("'", "''") + "'::" + sqlTypes.get(i);
-                        columns.add(new ConstantColumn(code));
-                    }
+                        columns.add(new ConstantColumn(result.getString(i + 1), sqlTypes.get(i)));
 
                     cache.storeToCache(iri, this, columns);
                 }

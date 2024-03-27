@@ -109,7 +109,7 @@ public class SqlValues extends SqlIntercode
                     else
                     {
                         for(int j = 0; j < resClass.getColumnCount(); j++)
-                            classColumns.get(j).add(new ConstantColumn("NULL::" + resClass.getSqlTypes().get(j)));
+                            classColumns.get(j).add(new ConstantColumn(null, resClass.getSqlTypes().get(j)));
                     }
                 }
 

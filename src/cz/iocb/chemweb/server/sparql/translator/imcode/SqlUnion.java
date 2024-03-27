@@ -121,7 +121,7 @@ public class SqlUnion extends SqlIntercode
 
                         if(var == null)
                         {
-                            cols.add(new ConstantColumn("NULL::" + resourceClass.getSqlTypes().get(i)));
+                            cols.add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
                         }
                         else if(var.containsClass(resourceClass))
                         {
@@ -133,7 +133,7 @@ public class SqlUnion extends SqlIntercode
 
                             if(variants.isEmpty())
                             {
-                                cols.add(new ConstantColumn("NULL::" + resourceClass.getSqlTypes().get(i)));
+                                cols.add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
                             }
                             else
                             {

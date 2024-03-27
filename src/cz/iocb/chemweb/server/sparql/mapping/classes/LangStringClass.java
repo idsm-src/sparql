@@ -37,8 +37,8 @@ public class LangStringClass extends LiteralClass
 
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ConstantColumn("'" + ((String) literal.getValue()).replaceAll("'", "''") + "'::varchar"));
-        result.add(new ConstantColumn("'" + literal.getLanguageTag() + "'::varchar"));
+        result.add(new ConstantColumn(((String) literal.getValue()), "varchar"));
+        result.add(new ConstantColumn(literal.getLanguageTag(), "varchar"));
 
         return result;
     }

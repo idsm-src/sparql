@@ -77,8 +77,8 @@ public class DateTimeClass extends LiteralClass
     {
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
-        result.add(new ConstantColumn("'" + getDateTime((Literal) node) + "'::timestamptz"));
-        result.add(new ConstantColumn("'" + getZone((Literal) node) + "'::int4"));
+        result.add(new ConstantColumn(getDateTime((Literal) node), "timestamptz"));
+        result.add(new ConstantColumn(getZone((Literal) node), "int4"));
 
         return result;
     }
@@ -140,7 +140,7 @@ public class DateTimeClass extends LiteralClass
     @Override
     public Column toExpression(Node node)
     {
-        return new ConstantColumn("'" + ((Literal) node).getValue() + "'::sparql.zoneddatetime");
+        return new ConstantColumn(((Literal) node).getValue().toString(), "sparql.zoneddatetime");
     }
 
 

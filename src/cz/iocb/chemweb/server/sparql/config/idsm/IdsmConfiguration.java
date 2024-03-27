@@ -25,10 +25,8 @@ import cz.iocb.chemweb.server.sparql.config.sachem.Sachem;
 import cz.iocb.chemweb.server.sparql.config.sachem.WikidataSachemConfiguration;
 import cz.iocb.chemweb.server.sparql.config.wikidata.WikidataConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Column;
-import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.Table;
-import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
@@ -117,14 +115,13 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addService(new WikidataConfiguration(null, connectionPool, getDatabaseSchema()), true);
 
         Map<ResourceClass, List<Column>> mapping = new HashMap<ResourceClass, List<Column>>();
-        mapping.put(this.getIriClass("ontology:resource"),
-                asList(new ConstantColumn(Ontology.unitCHEBI), new TableColumn("chebi")));
-        mapping.put(this.getIriClass("chembl:compound"), asList(new TableColumn("chembl")));
-        mapping.put(this.getIriClass("drugbank:compound"), asList(new TableColumn("drugbank")));
-        mapping.put(this.getIriClass("isdb:compound"), asList(new TableColumn("isdb")));
-        mapping.put(this.getIriClass("mona:compound"), asList(new TableColumn("mona")));
-        mapping.put(this.getIriClass("pubchem:compound"), asList(new TableColumn("pubchem")));
-        mapping.put(this.getIriClass("wikidata:entity"), asList(new TableColumn("wikidata")));
+        mapping.put(getIriClass("ontology:resource"), asList(getColumn(Ontology.unitCHEBI), getColumn("chebi")));
+        mapping.put(getIriClass("chembl:compound"), asList(getColumn("chembl")));
+        mapping.put(getIriClass("drugbank:compound"), asList(getColumn("drugbank")));
+        mapping.put(getIriClass("isdb:compound"), asList(getColumn("isdb")));
+        mapping.put(getIriClass("mona:compound"), asList(getColumn("mona")));
+        mapping.put(getIriClass("pubchem:compound"), asList(getColumn("pubchem")));
+        mapping.put(getIriClass("wikidata:entity"), asList(getColumn("wikidata")));
 
         Sachem.addResourceClasses(this);
         Sachem.addProcedures(this, "sachem", mapping);

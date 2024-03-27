@@ -42,7 +42,14 @@ public class ListUserIriClass extends SimpleUserIriClass
         IRI iri = (IRI) node;
         assert match(iri);
 
-        return asList(new ConstantColumn("'" + iri.getValue().replaceAll("'", "''") + "'::varchar"));
+        return asList(new ConstantColumn(iri.getValue(), "varchar"));
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return "";
     }
 
 
@@ -69,8 +76,7 @@ public class ListUserIriClass extends SimpleUserIriClass
                 if(!match)
                     cache.storeToCache(iri, this, IriCache.mismatch);
                 else
-                    cache.storeToCache(iri, this,
-                            asList(new ConstantColumn("'" + iri.getValue().replaceAll("'", "''") + "'::varchar")));
+                    cache.storeToCache(iri, this, asList(new ConstantColumn(iri.getValue(), "varchar")));
 
                 return match;
             }

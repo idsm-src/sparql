@@ -27,7 +27,7 @@ public abstract class IriClass extends ResourceClass
     @Override
     public Column toExpression(Node node)
     {
-        return new ConstantColumn("'" + ((IRI) node).getValue().replaceAll("'", "''") + "'::varchar");
+        return new ConstantColumn(((IRI) node).getValue(), "varchar");
     }
 
 
@@ -57,4 +57,7 @@ public abstract class IriClass extends ResourceClass
     {
         return "sparql.rdfbox_get_iri(" + code + ")";
     }
+
+
+    public abstract String getPrefix(List<Column> columns);
 }

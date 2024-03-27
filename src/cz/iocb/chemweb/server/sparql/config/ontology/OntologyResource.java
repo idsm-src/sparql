@@ -7,7 +7,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -41,16 +43,17 @@ public class OntologyResource extends GeneralUserIriClass
     private static final IriCache cache = new IriCache(1000, 10);
     private static final String sqlQuery = "select resource_id from ontology.resources__reftable where iri = ?";
     private static OntologyResource instance;
-    private static List<Unit> units;
+    private static List<Unit> units = new ArrayList<Unit>();
+    private static Map<Column, String> prefixMap = new HashMap<Column, String>();
 
-    private static final int unitUncategorized = 0;
-    private static final int unitPR0 = 31;
-    private static final int unitPR1 = 32;
-    private static final int unitPR2 = 33;
-    private static final int unitAT = 34;
-    private static final int unitZDBGENE = 35;
-    private static final int unitStar = 95;
-    private static final int unitRareDiseases = 180;
+    private static final short unitUncategorized = 0;
+    private static final short unitPR0 = 31;
+    private static final short unitPR1 = 32;
+    private static final short unitPR2 = 33;
+    private static final short unitAT = 34;
+    private static final short unitZDBGENE = 35;
+    private static final short unitStar = 95;
+    private static final short unitRareDiseases = 180;
 
 
     private OntologyResource()
@@ -125,8 +128,8 @@ public class OntologyResource extends GeneralUserIriClass
                 }
 
                 List<Column> columns = new ArrayList<Column>();
-                columns.add(new ConstantColumn("'" + unit.id + "'::" + sqlTypes.get(0)));
-                columns.add(new ConstantColumn("'" + id + "'::" + sqlTypes.get(1)));
+                columns.add(new ConstantColumn(unit.id, "smallint"));
+                columns.add(new ConstantColumn(id, "integer"));
 
                 return columns;
             }
@@ -148,8 +151,8 @@ public class OntologyResource extends GeneralUserIriClass
                 result.next();
 
                 List<Column> columns = new ArrayList<Column>();
-                columns.add(new ConstantColumn("'" + unitUncategorized + "'::" + sqlTypes.get(0)));
-                columns.add(new ConstantColumn("'" + result.getInt(1) + "'::" + sqlTypes.get(1)));
+                columns.add(new ConstantColumn(unitUncategorized, "smallint"));
+                columns.add(new ConstantColumn(result.getInt(1), "integer"));
 
                 cache.storeToCache(iri, this, columns);
                 return columns;
@@ -159,6 +162,23 @@ public class OntologyResource extends GeneralUserIriClass
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        IRI iri = cache.getFromCache(this, columns);
+
+        if(iri != null)
+            return iri.getValue();
+
+        String prefix = prefixMap.get(columns.get(0));
+
+        if(prefix != null)
+            return prefix;
+
+        return "";
     }
 
 
@@ -193,8 +213,8 @@ public class OntologyResource extends GeneralUserIriClass
                 }
 
                 List<Column> columns = new ArrayList<Column>();
-                columns.add(new ConstantColumn("'" + unitUncategorized + "'::" + sqlTypes.get(0)));
-                columns.add(new ConstantColumn("'" + result.getInt(1) + "'::" + sqlTypes.get(1)));
+                columns.add(new ConstantColumn(unitUncategorized, "smallint"));
+                columns.add(new ConstantColumn(result.getInt(1), "integer"));
 
                 cache.storeToCache(iri, this, columns);
 
@@ -219,17 +239,19 @@ public class OntologyResource extends GeneralUserIriClass
         if(instance != null)
             return instance;
 
-        units = new ArrayList<Unit>();
-
         try(Connection connection = config.getConnectionPool().getConnection())
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet result = statement.executeQuery("select unit_id, value_offset - 1, pattern "
+                try(ResultSet result = statement.executeQuery("select unit_id, value_offset - 1, pattern, prefix "
                         + "from ontology.resource_categories__reftable order by unit_id"))
                 {
                     while(result.next())
-                        units.add(new Unit(result.getShort(1), result.getInt(2), result.getString(3)));
+                    {
+                        Unit unit = new Unit(result.getShort(1), result.getInt(2), result.getString(3));
+                        units.add(unit);
+                        prefixMap.put(new ConstantColumn(Short.toString(unit.id), "smallint"), result.getString(4));
+                    }
                 }
             }
         }

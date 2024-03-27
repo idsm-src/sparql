@@ -134,8 +134,7 @@ public class MapUserIriClass extends SimpleUserIriClass
             {
                 if(result.next())
                 {
-                    String value = "'" + result.getString(1).replaceAll("'", "''") + "'";
-                    List<Column> columns = asList(new ConstantColumn(value + "::" + sqlTypes.get(0)));
+                    List<Column> columns = asList(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
                     cache.storeToCache(iri, this, columns);
                     return columns;
                 }
@@ -149,6 +148,13 @@ public class MapUserIriClass extends SimpleUserIriClass
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
     }
 
 
@@ -181,8 +187,7 @@ public class MapUserIriClass extends SimpleUserIriClass
                 }
                 else
                 {
-                    String value = "'" + result.getString(1).replaceAll("'", "''") + "'";
-                    List<Column> columns = asList(new ConstantColumn(value + "::" + sqlTypes.get(0)));
+                    List<Column> columns = asList(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
                     cache.storeToCache(iri, this, columns);
                 }
 
