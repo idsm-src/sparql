@@ -15,6 +15,7 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDe
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
@@ -760,6 +761,17 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 return new SqlBuiltinCall(function, arguments, asSet(xsdString),
                         operand.canBeNull() || operand.getResourceClasses().size() > 1);
+            }
+
+            case "_strhash":
+            {
+                SqlExpressionIntercode operand = arguments.get(0);
+
+                if(operand.getResourceClasses().stream().noneMatch(r -> isStringLiteral(r)))
+                    return SqlNull.get();
+
+                return new SqlBuiltinCall(function, arguments, asSet(xsdLong), operand.canBeNull()
+                        || operand.getResourceClasses().stream().anyMatch(r -> !isStringLiteral(r)));
             }
         }
 
@@ -2471,6 +2483,51 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 String code = translateAsUnboxedOperand(operand, xsdString);
 
                 return "substring(pgcrypto.digest(" + code + ",'" + function + "')::varchar from 3)";
+            }
+
+            case "_strhash":
+            {
+                SqlExpressionIntercode operand = arguments.get(0);
+
+                if(operand instanceof SqlVariable)
+                {
+                    SqlVariable variable = (SqlVariable) operand;
+
+                    Set<ResourceClass> applicable = operand.getResourceClasses().stream()
+                            .filter(r -> isStringLiteral(r)).collect(toSet());
+
+                    StringBuilder builder = new StringBuilder();
+
+                    builder.append("hashtextextended(");
+
+                    if(applicable.size() > 1)
+                        builder.append("coalesce(");
+
+                    boolean hasAlternative = false;
+
+                    for(ResourceClass resClass : applicable)
+                    {
+                        appendComma(builder, hasAlternative);
+                        hasAlternative = true;
+
+                        builder.append(variable.asResource(resClass).get(0));
+                    }
+
+                    if(applicable.size() > 1)
+                        builder.append(")");
+
+                    builder.append(",0)::int8");
+
+                    return builder.toString();
+                }
+                else
+                {
+                    if(operand.isBoxed())
+                        return "hashtextextended(sparql.rdfbox_get_string_literal(" + operand.translate()
+                                + "), 0)::int8";
+                    else
+                        return "hashtextextended(" + operand.translate() + ", 0)::int8";
+                }
             }
         }
 
