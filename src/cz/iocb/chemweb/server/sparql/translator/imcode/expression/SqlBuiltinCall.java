@@ -449,6 +449,35 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode left = arguments.get(0);
                 SqlExpressionIntercode right = arguments.get(1);
 
+                // try optimize strstarts(str(?iri), "constant")
+                if(function.equals("strstarts") && left instanceof SqlBuiltinCall str && str.function.equals("str")
+                        && str.getArgument() instanceof SqlVariable var && !var.canBeNull()
+                        && var.getResourceClasses().stream().allMatch(i -> i instanceof IriClass)
+                        && right instanceof SqlLiteral literal && literal.getLiteralClass() == xsdString)
+                {
+                    String value = literal.getLiteral().getStringValue();
+
+                    boolean allTrue = true;
+                    boolean allfalse = true;
+
+                    for(ResourceClass resClass : var.getResourceClasses())
+                    {
+                        String prefix = ((IriClass) resClass).getPrefix(var.getUsedVariable().getMapping(resClass));
+
+                        if(prefix.startsWith(value) || prefix.length() < value.length())
+                            allfalse = false;
+
+                        if(!prefix.startsWith(value))
+                            allTrue = false;
+                    }
+
+                    if(allTrue && !allfalse)
+                        return SqlEffectiveBooleanValue.trueValue;
+                    else if(allfalse && !allTrue)
+                        return SqlEffectiveBooleanValue.falseValue;
+                }
+
+
                 boolean isValid = false;
                 boolean canBeNull = left.canBeNull() || right.canBeNull();
 
@@ -2458,6 +2487,21 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     public String getFunction()
     {
         return function;
+    }
+
+
+    public List<SqlExpressionIntercode> getArguments()
+    {
+        return arguments;
+    }
+
+
+    public SqlExpressionIntercode getArgument()
+    {
+        if(arguments.size() != 1)
+            throw new IllegalArgumentException();
+
+        return arguments.get(0);
     }
 
 
