@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
@@ -21,6 +23,12 @@ public class SqlUnaryLogical extends SqlUnary
 
         if(operand == SqlNull.get())
             return SqlNull.get();
+
+        if(operand == falseValue)
+            return trueValue;
+
+        if(operand == trueValue)
+            return falseValue;
 
         return new SqlUnaryLogical(operand, asSet(xsdBoolean), operand.canBeNull());
     }

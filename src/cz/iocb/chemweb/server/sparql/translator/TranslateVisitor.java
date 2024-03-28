@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import java.io.IOException;
@@ -1180,7 +1181,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlExpressionIntercode expression = SqlEffectiveBooleanValue
                         .create(visitor.visitElement(filter.getConstraint()));
 
-                if(expression != SqlEffectiveBooleanValue.trueValue)
+                if(expression != trueValue)
                     conditions.add(expression);
             }
         }

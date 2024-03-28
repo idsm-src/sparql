@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -11,7 +13,6 @@ import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
-import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
@@ -70,12 +71,12 @@ public class SqlFilter extends SqlIntercode
 
         for(SqlExpressionIntercode expression : conditions)
         {
-            if(expression == SqlNull.get() || expression == SqlEffectiveBooleanValue.falseValue)
+            if(expression == SqlNull.get() || expression == falseValue)
                 isFalse = true;
             else if(expression instanceof SqlBinaryComparison
                     && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
                 isFalse = true;
-            else if(expression != SqlEffectiveBooleanValue.trueValue)
+            else if(expression != trueValue)
                 validExpressions.add(expression);
         }
 

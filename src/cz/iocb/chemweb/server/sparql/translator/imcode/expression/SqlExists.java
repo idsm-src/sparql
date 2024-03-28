@@ -1,6 +1,8 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode.expression;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
@@ -43,10 +45,10 @@ public class SqlExists extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern, UsedVariables variables)
     {
         if(pattern == SqlNoSolution.get())
-            return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
+            return negated ? trueValue : falseValue;
 
         if(pattern == SqlEmptySolution.get())
-            return negated ? SqlEffectiveBooleanValue.falseValue : SqlEffectiveBooleanValue.trueValue;
+            return negated ? falseValue : trueValue;
 
 
         if(pattern instanceof SqlUnion)
@@ -68,7 +70,7 @@ public class SqlExists extends SqlExpressionIntercode
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(), variables);
 
         if(pairs.stream().anyMatch(p -> !p.isJoinable()))
-            return negated ? SqlEffectiveBooleanValue.trueValue : SqlEffectiveBooleanValue.falseValue;
+            return negated ? trueValue : falseValue;
 
         return new SqlExists(negated, pattern, variables);
     }

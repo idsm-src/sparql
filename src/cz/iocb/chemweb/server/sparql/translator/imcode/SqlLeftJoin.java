@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,7 +17,6 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlBinaryComparison;
-import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 
@@ -120,7 +121,7 @@ public class SqlLeftJoin extends SqlIntercode
 
     private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
     {
-        if(conditions.stream().anyMatch(f -> f == SqlNull.get() || f == SqlEffectiveBooleanValue.falseValue
+        if(conditions.stream().anyMatch(f -> f == SqlNull.get() || f == falseValue
                 || (f instanceof SqlBinaryComparison && ((SqlBinaryComparison) f).isAlwaysFalseOrNull())))
             return false;
 
@@ -204,8 +205,7 @@ public class SqlLeftJoin extends SqlIntercode
 
         List<SqlExpressionIntercode> result = new ArrayList<SqlExpressionIntercode>(conditions.size());
 
-        conditions.stream().map(f -> f.optimize(variables)).filter(f -> f != SqlEffectiveBooleanValue.trueValue)
-                .forEach(f -> result.add(f));
+        conditions.stream().map(f -> f.optimize(variables)).filter(f -> f != trueValue).forEach(f -> result.add(f));
 
         return result;
     }

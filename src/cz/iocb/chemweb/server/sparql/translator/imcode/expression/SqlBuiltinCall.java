@@ -19,8 +19,8 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLo
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
-import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.falseValue;
-import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlEffectiveBooleanValue.trueValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -145,10 +145,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             case "bound":
             {
                 if(arguments.get(0) == SqlNull.get())
-                    return SqlEffectiveBooleanValue.falseValue;
+                    return falseValue;
 
                 if(!arguments.get(0).canBeNull())
-                    return SqlEffectiveBooleanValue.trueValue;
+                    return trueValue;
 
                 return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean), false);
             }
@@ -162,10 +162,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(condition == SqlNull.get() || left == SqlNull.get() && right == SqlNull.get())
                     return SqlNull.get();
 
-                if(condition == SqlEffectiveBooleanValue.trueValue)
+                if(condition == trueValue)
                     return left;
 
-                if(condition == SqlEffectiveBooleanValue.falseValue)
+                if(condition == falseValue)
                     return right;
 
                 Set<ResourceClass> resourceClasses = joinResourceClasses(left.getResourceClasses(),
@@ -213,7 +213,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(intersectResourceClasses(left.getResourceClasses(), right.getResourceClasses()).isEmpty()
                         && !left.canBeNull() && !right.canBeNull())
-                    return SqlEffectiveBooleanValue.falseValue;
+                    return falseValue;
 
                 return new SqlBuiltinCall(function, arguments, asSet(xsdBoolean),
                         left.canBeNull() || right.canBeNull());
@@ -476,9 +476,9 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     }
 
                     if(allTrue && !allfalse)
-                        return SqlEffectiveBooleanValue.trueValue;
+                        return trueValue;
                     else if(allfalse && !allTrue)
-                        return SqlEffectiveBooleanValue.falseValue;
+                        return falseValue;
                 }
 
 

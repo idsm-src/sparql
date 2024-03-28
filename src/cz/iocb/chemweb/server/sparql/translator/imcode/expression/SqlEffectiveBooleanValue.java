@@ -10,7 +10,8 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdBooleanType;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
+import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigDecimal;
@@ -30,11 +31,6 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     private static final List<IRI> ebvTypes = asList(xsdBoolean.getTypeIri(), xsdShort.getTypeIri(),
             xsdInt.getTypeIri(), xsdLong.getTypeIri(), xsdInteger.getTypeIri(), xsdDecimal.getTypeIri(),
             xsdFloat.getTypeIri(), xsdDouble.getTypeIri(), xsdString.getTypeIri());
-
-    public static final SqlEffectiveBooleanValue trueValue = new SqlEffectiveBooleanValue(
-            SqlLiteral.create(new Literal("true", xsdBooleanType)), false);
-    public static final SqlEffectiveBooleanValue falseValue = new SqlEffectiveBooleanValue(
-            SqlLiteral.create(new Literal("false", xsdBooleanType)), false);
 
 
     protected SqlEffectiveBooleanValue(SqlExpressionIntercode operand, boolean canBeNull)
