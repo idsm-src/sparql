@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Condition;
@@ -27,8 +28,6 @@ import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
-import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -235,7 +234,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
+    private static boolean canBeJoinedWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
     {
         for(UsedVariable variable : right.getVariables().getValues())
         {
@@ -255,44 +254,38 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static boolean canBeMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         // only the same tables can by merged
-        if(left.table == null && right.table != null || left.table != null && !left.table.equals(right.table))
+        if(!Objects.equals(left.table, right.table))
             return false;
 
 
         Set<Column> columns = new HashSet<Column>();
 
-        for(UsedPairedVariable paired : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
+        for(Entry<String, ResourceClass> e : left.resources.entrySet())
         {
-            if(paired.getLeftVariable() == null || paired.getRightVariable() == null)
-                continue;
+            String var = e.getKey();
 
             //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
-            if(!paired.getLeftVariable().getClasses().equals(paired.getRightVariable().getClasses()))
+            if(!e.getValue().equals(right.resources.get(var)))
                 return false;
 
             //NOTE: currently, only simple join (without IS NULL conditions) can be taken into the account
-            if(paired.getLeftVariable().canBeNull() || paired.getRightVariable().canBeNull())
-                if(!left.mappings.get(paired.getName()).equals(right.mappings.get(paired.getName())))
+            if(left.getVariable(var).canBeNull() || right.getVariable(var).canBeNull())
+                if(!left.mappings.get(var).equals(right.mappings.get(var)))
                     return false;
 
-            for(PairedClass p : paired.getClasses())
+            List<Column> leftCols = left.mappings.get(var);
+            List<Column> rightCols = right.mappings.get(var);
+
+            for(int i = 0; i < leftCols.size(); i++)
             {
-                assert p.getLeftClass() == p.getRightClass();
+                Set<Column> leftColumns = left.conditions.getEqualTableColumns(leftCols.get(i));
+                Set<Column> rightColumns = right.conditions.getEqualTableColumns(rightCols.get(i));
 
-                List<Column> leftCols = paired.getLeftVariable().getMapping(p.getLeftClass());
-                List<Column> rightCols = paired.getRightVariable().getMapping(p.getRightClass());
-
-                for(int i = 0; i < leftCols.size(); i++)
-                {
-                    Set<Column> leftColumns = left.conditions.getEqualTableColumns(leftCols.get(i));
-                    Set<Column> rightColumns = right.conditions.getEqualTableColumns(rightCols.get(i));
-
-                    leftColumns.retainAll(rightColumns);
-                    columns.addAll(leftColumns);
-                }
+                leftColumns.retainAll(rightColumns);
+                columns.addAll(leftColumns);
             }
         }
 
@@ -311,7 +304,8 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static List<ColumnPair> canBeDroped(DatabaseSchema schema, SqlTableAccess parent, SqlTableAccess child)
+    private static List<ColumnPair> canBeJoinedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
+            SqlTableAccess child)
     {
         if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table) == null)
             return null;
@@ -326,35 +320,29 @@ public class SqlTableAccess extends SqlIntercode
 
         Set<ColumnPair> columns = new HashSet<ColumnPair>();
 
-        for(UsedPairedVariable paired : UsedPairedVariable.getPairs(parent.getVariables(), child.getVariables()))
+        for(Entry<String, ResourceClass> e : parent.resources.entrySet())
         {
-            if(paired.getLeftVariable() == null || paired.getRightVariable() == null)
-                continue;
+            String var = e.getKey();
 
             //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
-            if(!paired.getLeftVariable().getClasses().equals(paired.getRightVariable().getClasses()))
+            if(!e.getValue().equals(child.resources.get(var)))
                 return null;
 
             //NOTE: currently, only simple join (without IS NULL conditions) can be taken into the account
-            if(paired.getLeftVariable().canBeNull() || paired.getRightVariable().canBeNull())
+            if(parent.getVariable(var).canBeNull() || child.getVariable(var).canBeNull())
                 return null;
 
-            for(PairedClass p : paired.getClasses())
+            List<Column> parentCols = parent.mappings.get(var);
+            List<Column> childCols = child.mappings.get(var);
+
+            for(int i = 0; i < parentCols.size(); i++)
             {
-                assert p.getLeftClass() == p.getRightClass();
+                Set<Column> parentColumns = parent.conditions.getEqualTableColumns(parentCols.get(i));
+                Set<Column> childColumns = child.conditions.getEqualTableColumns(childCols.get(i));
 
-                List<Column> parentCols = paired.getLeftVariable().getMapping(p.getLeftClass());
-                List<Column> childCols = paired.getRightVariable().getMapping(p.getRightClass());
-
-                for(int i = 0; i < parentCols.size(); i++)
-                {
-                    Set<Column> parentColumns = parent.conditions.getEqualTableColumns(parentCols.get(i));
-                    Set<Column> childColumns = child.conditions.getEqualTableColumns(childCols.get(i));
-
-                    for(Column parentColumn : parentColumns)
-                        for(Column childColumn : childColumns)
-                            columns.add(new ColumnPair(parentColumn, childColumn));
-                }
+                for(Column parentColumn : parentColumns)
+                    for(Column childColumn : childColumns)
+                        columns.add(new ColumnPair(parentColumn, childColumn));
             }
         }
 
@@ -377,9 +365,9 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static boolean canBeLeftMerged(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    private static boolean canBeLeftJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
-        if(!canBeMerged(schema, left, right))
+        if(!canBeJoinedByPrimaryKey(schema, left, right))
             return false;
 
         Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
@@ -436,9 +424,12 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess left, SqlValues right, Set<String> restrictions)
+    private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Set<String> restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariables()));
+
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
         Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
@@ -467,7 +458,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    private static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions, right.conditions);
 
@@ -487,7 +478,7 @@ public class SqlTableAccess extends SqlIntercode
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
-            return null;
+            return SqlNoSolution.get();
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
@@ -538,7 +529,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess merge(SqlTableAccess parent, SqlTableAccess child, List<ColumnPair> key,
+    private static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, List<ColumnPair> key,
             Set<String> restrictions)
     {
         Map<Column, Column> map = new HashMap<Column, Column>();
@@ -565,7 +556,7 @@ public class SqlTableAccess extends SqlIntercode
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
-            return null;
+            return SqlNoSolution.get();
 
 
         Map<Column, Column> expressions = new HashMap<Column, Column>();
@@ -617,7 +608,8 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public static SqlTableAccess leftMerge(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    private static SqlTableAccess leftJoinByPrimaryKey(SqlTableAccess left, SqlTableAccess right,
+            Set<String> restrictions)
     {
         Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
         extraNotNulls.removeAll(left.conditions.getIsNotNull());
@@ -690,6 +682,48 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    public static SqlIntercode tryReduceJoinWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right,
+            HashSet<String> mergeRestrictions)
+    {
+        if(SqlTableAccess.canBeJoinedWithValues(schema, left, right))
+            return joinWithValues(left, right, mergeRestrictions);
+
+        return null;
+    }
+
+
+    public static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
+            Set<String> restrictions)
+    {
+        List<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(schema, left, right);
+
+        if(dropLeft != null)
+            return SqlTableAccess.joinByForeignKey(left, right, dropLeft, restrictions);
+
+
+        List<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(schema, right, left);
+
+        if(dropRight != null)
+            return SqlTableAccess.joinByForeignKey(right, left, dropRight, restrictions);
+
+
+        if(SqlTableAccess.canBeJoinedByPrimaryKey(schema, left, right))
+            return SqlTableAccess.joinByPrimaryKey(left, right, restrictions);
+
+        return null;
+    }
+
+
+    public static SqlIntercode tryReduceLeftJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
+            Set<String> restrictions)
+    {
+        if(SqlTableAccess.canBeLeftJoinedByPrimaryKey(schema, left, right))
+            return SqlTableAccess.leftJoinByPrimaryKey(left, right, restrictions);
+
+        return null;
+    }
+
+
     private static List<Column> remap(Map<Column, Column> map, List<Column> columns)
     {
         List<Column> result = new ArrayList<Column>();
@@ -752,6 +786,9 @@ public class SqlTableAccess extends SqlIntercode
     {
         if(restrictions == null)
             return this;
+
+        if(this.reduced)
+            reduced = true;
 
         UsedVariables optVariables = new UsedVariables();
 

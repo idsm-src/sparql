@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.Stack;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
-import cz.iocb.chemweb.server.sparql.database.DatabaseSchema.ColumnPair;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
@@ -238,104 +237,63 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static ArrayList<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Set<String> restrictions,
+    private static List<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Set<String> restrictions,
             DatabaseSchema schema)
     {
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
         for(int i = 0; i < optChilds.size(); i++)
         {
-            if(!(optChilds.get(i) instanceof SqlValues))
-                continue;
-
-            SqlValues values = (SqlValues) optChilds.get(i);
-
-            for(int j = 0; j < optChilds.size(); j++)
+            if(optChilds.get(i) instanceof SqlValues left)
             {
-                if(!(optChilds.get(j) instanceof SqlTableAccess))
-                    continue;
-
-                SqlTableAccess tableAccess = (SqlTableAccess) optChilds.get(j);
-
-                if(SqlTableAccess.canBeMerged(schema, tableAccess, values))
+                for(int j = 0; j < optChilds.size(); j++)
                 {
-                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                    tableAccess = SqlTableAccess.merge(tableAccess, values, mergeRestrictions);
+                    if(optChilds.get(j) instanceof SqlTableAccess right)
+                    {
+                        HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                        SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(schema, right, left, mergeRestrictions);
 
-                    if(tableAccess == null)
-                        return null;
+                        if(merged == SqlNoSolution.get())
+                            return List.of(SqlNoSolution.get());
 
-                    optChilds.set(j, tableAccess);
-                    optChilds.remove(i--);
-                    break;
+                        if(merged != null)
+                        {
+                            optChilds.set(j, merged);
+                            optChilds.remove(i);
+
+                            if(j < i)
+                                i--;
+
+                            break;
+                        }
+                    }
                 }
             }
         }
 
 
-        loop:
         for(int i = 0; i < optChilds.size(); i++)
         {
-            if(!(optChilds.get(i) instanceof SqlTableAccess))
-                continue;
-
-            SqlTableAccess left = (SqlTableAccess) optChilds.get(i);
-
-
-            for(int j = 0; j < i; j++)
+            if(optChilds.get(i) instanceof SqlTableAccess left)
             {
-                if(!(optChilds.get(j) instanceof SqlTableAccess))
-                    continue;
-
-                SqlTableAccess right = (SqlTableAccess) optChilds.get(j);
-
-
-                List<ColumnPair> dropLeft = SqlTableAccess.canBeDroped(schema, left, right);
-
-                if(dropLeft != null)
+                for(int j = 0; j < i; j++)
                 {
-                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                    SqlIntercode merged = SqlTableAccess.merge(left, right, dropLeft, mergeRestrictions);
+                    if(optChilds.get(j) instanceof SqlTableAccess right)
+                    {
+                        Set<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                        SqlIntercode merged = SqlTableAccess.tryReduceJoin(schema, left, right, mergeRestrictions);
 
-                    if(merged == null)
-                        return null;
+                        if(merged == SqlNoSolution.get())
+                            return List.of(SqlNoSolution.get());
 
-                    optChilds.set(i, merged);
-                    optChilds.remove(j);
-                    i -= 2;
-                    continue loop;
-                }
-
-
-                List<ColumnPair> dropRight = SqlTableAccess.canBeDroped(schema, right, left);
-
-                if(dropRight != null)
-                {
-                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                    SqlIntercode merged = SqlTableAccess.merge(right, left, dropRight, mergeRestrictions);
-
-                    if(merged == null)
-                        return null;
-
-                    optChilds.set(i, merged);
-                    optChilds.remove(j);
-                    i -= 2;
-                    continue loop;
-                }
-
-
-                if(SqlTableAccess.canBeMerged(schema, left, right))
-                {
-                    HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                    SqlIntercode merged = SqlTableAccess.merge(left, right, mergeRestrictions);
-
-                    if(merged == null)
-                        return null;
-
-                    optChilds.set(i, merged);
-                    optChilds.remove(j);
-                    i -= 2;
-                    continue loop;
+                        if(merged != null)
+                        {
+                            optChilds.set(i, merged);
+                            optChilds.remove(j);
+                            i -= 2;
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -413,7 +371,6 @@ public class SqlJoin extends SqlIntercode
         else
             return asList(child);
     }
-
 
 
     public final List<SqlIntercode> getChilds()

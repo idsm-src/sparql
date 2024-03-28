@@ -46,6 +46,12 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    public final UsedVariable getVariable(String variable)
+    {
+        return variables.get(variable);
+    }
+
+
     public boolean isDeterministic()
     {
         return isDeterministic;

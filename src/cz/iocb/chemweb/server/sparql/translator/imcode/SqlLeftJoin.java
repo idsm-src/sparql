@@ -95,12 +95,14 @@ public class SqlLeftJoin extends SqlIntercode
                 return SqlJoin.join(left, right).optimize(restrictions, reduce);
         }
 
-        if(left instanceof SqlTableAccess && right instanceof SqlTableAccess && conditions.isEmpty())
+        if(left instanceof SqlTableAccess l && right instanceof SqlTableAccess r && conditions.isEmpty())
         {
             DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
 
-            if(SqlTableAccess.canBeLeftMerged(schema, (SqlTableAccess) left, (SqlTableAccess) right))
-                return SqlTableAccess.leftMerge((SqlTableAccess) left, (SqlTableAccess) right, restrictions);
+            SqlIntercode merge = SqlTableAccess.tryReduceLeftJoin(schema, l, r, restrictions);
+
+            if(merge != null)
+                return merge;
         }
 
 
