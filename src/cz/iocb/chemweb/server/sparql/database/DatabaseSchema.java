@@ -288,6 +288,32 @@ public class DatabaseSchema
     }
 
 
+    public List<ColumnPair> isPartOfForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
+            Set<Column> extra)
+    {
+        List<List<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
+
+        if(keys == null)
+            return null;
+
+        for(List<ColumnPair> key : keys)
+        {
+            if(columns.stream().allMatch(k -> key.contains(k)))
+            {
+                Set<Column> covered = new HashSet<Column>();
+
+                for(ColumnPair pair : key)
+                    covered.add(pair.getRight());
+
+                if(extra.stream().allMatch(c -> covered.contains(c)))
+                    return key;
+            }
+        }
+
+        return null;
+    }
+
+
     public List<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
             Set<Column> parentColumns)
     {
@@ -334,6 +360,12 @@ public class DatabaseSchema
         }
 
         return null;
+    }
+
+
+    public boolean isKey(Table table, Set<Column> columns)
+    {
+        return getCompatibleKey(table, columns) != null;
     }
 
 

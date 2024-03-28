@@ -86,6 +86,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    public ResourceClass getResourceClass()
+    {
+        if(resourceClasses.size() != 1)
+            throw new IllegalArgumentException();
+
+        return resourceClasses.iterator().next();
+    }
+
+
     public Set<ResourceClass> getResourceClasses(Predicate<ResourceClass> predicate)
     {
         return resourceClasses.stream().filter(predicate).collect(toSet());

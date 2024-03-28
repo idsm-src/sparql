@@ -90,6 +90,21 @@ public class UsedVariable
     }
 
 
+    public List<Column> getMapping()
+    {
+        return mappings.get(getResourceClass());
+    }
+
+
+    public final ResourceClass getResourceClass()
+    {
+        if(mappings.size() != 1)
+            throw new IllegalArgumentException();
+
+        return mappings.keySet().iterator().next();
+    }
+
+
     public final Set<ResourceClass> getCompatibleClasses(ResourceClass resClass)
     {
         return mappings.keySet().stream()
@@ -160,5 +175,16 @@ public class UsedVariable
                 result.add(column);
 
         return result;
+    }
+
+
+    public boolean isConstant()
+    {
+        for(List<Column> columns : mappings.values())
+            for(Column column : columns)
+                if(!(column instanceof ConstantColumn))
+                    return false;
+
+        return true;
     }
 }

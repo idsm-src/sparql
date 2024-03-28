@@ -52,6 +52,41 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    public final Map<ResourceClass, List<Column>> getMappings(String variable)
+    {
+        return variables.get(variable).getMappings();
+    }
+
+
+    public final List<Column> getMapping(String variable, ResourceClass resClass)
+    {
+        return variables.get(variable).getMapping(resClass);
+    }
+
+
+    public final List<Column> getMapping(String variable)
+    {
+        if(variables.get(variable) == null)
+            return null;
+
+        return variables.get(variable).getMapping();
+    }
+
+
+    public final boolean hasConstantVariable(String variable)
+    {
+        UsedVariable var = variables.get(variable);
+
+        return var == null || var.isConstant();
+    }
+
+
+    public final boolean hasConstantVariables(Set<String> variables)
+    {
+        return variables.stream().allMatch(v -> hasConstantVariable(v));
+    }
+
+
     public boolean isDeterministic()
     {
         return isDeterministic;

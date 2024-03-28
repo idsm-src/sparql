@@ -365,6 +365,63 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private static boolean canBeDistinctUnionizedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left,
+            SqlTableAccess right)
+    {
+        // only the same tables can by merged
+        if(!Objects.equals(left.table, right.table))
+            return false;
+
+        // the sets of variables (and their resource classes) have to be the same
+        if(!left.resources.equals(right.resources))
+            return false;
+
+        if(!left.mappings.equals(right.mappings))
+            return false;
+
+        return true;
+    }
+
+
+    private static List<ColumnPair> canBeDistinctUnionizedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
+            SqlTableAccess child)
+    {
+        if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table) == null)
+            return null;
+
+        // because we cannot rewrite expressions
+        if(!child.expressions.isEmpty())
+            return null;
+
+        // because we cannot rewrite expressions
+        if(child.conditions.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
+            return null;
+
+        // the sets of variables (and their resource classes) have to be the same
+        if(!parent.resources.equals(child.resources))
+            return null;
+
+        Set<ColumnPair> columns = new HashSet<ColumnPair>();
+
+        for(String var : parent.getVariables().getNames())
+        {
+            List<Column> parentCols = parent.mappings.get(var);
+            List<Column> childCols = child.mappings.get(var);
+
+            for(int i = 0; i < parentCols.size(); i++)
+                columns.add(new ColumnPair(parentCols.get(i), childCols.get(i)));
+        }
+
+        Set<Column> childColumns = new HashSet<Column>();
+        childColumns.addAll(child.getVariables().getNonConstantColumns());
+
+        if(!parent.conditions.isTrue())
+            childColumns.addAll(child.conditions.getNonConstantColumns());
+
+        return schema.isPartOfForeignKey(parent.table, child.table, columns, childColumns);
+    }
+
+
     private static boolean canBeLeftJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         if(!canBeJoinedByPrimaryKey(schema, left, right))
@@ -682,6 +739,78 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private static SqlIntercode distinctUnionizeByPrimaryKey(SqlTableAccess parent, SqlTableAccess child,
+            List<ColumnPair> key)
+    {
+        Conditions conditions = null;
+
+        if(parent.conditions.isTrue())
+        {
+            conditions = new Conditions(parent.conditions);
+        }
+        else
+        {
+            Map<Column, Column> map = new HashMap<Column, Column>();
+
+            for(ColumnPair pair : key)
+                for(Column col : child.conditions.getEqualTableColumns(pair.getRight()))
+                    map.put(col, pair.getLeft());
+
+            conditions = Conditions.or(parent.conditions, remap(map, child.conditions));
+        }
+
+        Map<Column, Column> expressions = new HashMap<Column, Column>();
+        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
+        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
+        UsedVariables variables = new UsedVariables();
+
+        for(UsedVariable parentVariable : parent.variables.getValues())
+        {
+            String name = parentVariable.getName();
+
+            ResourceClass resClass = parent.resources.get(name);
+            List<Column> columns = parent.mappings.get(name);
+            resources.put(name, resClass);
+            mappings.put(name, columns);
+
+            UsedVariable variable = new UsedVariable(name, parentVariable.canBeNull());
+            variable.addMapping(resClass, selectColumns(representants, expressions, columns));
+            variables.add(variable);
+        }
+
+        return new SqlTableAccess(variables, parent.table, conditions, resources, mappings, expressions, true);
+    }
+
+
+    private static SqlTableAccess distinctUnionizeByForeignKey(SqlTableAccess left, SqlTableAccess right)
+    {
+        Conditions conditions = Conditions.or(left.conditions, right.conditions);
+
+        Map<Column, Column> expressions = new HashMap<Column, Column>();
+        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
+        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
+        Map<Column, Column> representants = selectColumnRepresentants(conditions);
+        UsedVariables variables = new UsedVariables();
+
+        for(UsedVariable leftVariable : left.variables.getValues())
+        {
+            String name = leftVariable.getName();
+
+            ResourceClass resClass = left.resources.get(name);
+            List<Column> columns = left.mappings.get(name);
+            resources.put(name, resClass);
+            mappings.put(name, columns);
+
+            UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
+            variable.addMapping(resClass, selectColumns(representants, expressions, columns));
+            variables.add(variable);
+        }
+
+        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions, true);
+    }
+
+
     public static SqlIntercode tryReduceJoinWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right,
             HashSet<String> mergeRestrictions)
     {
@@ -719,6 +848,26 @@ public class SqlTableAccess extends SqlIntercode
     {
         if(SqlTableAccess.canBeLeftJoinedByPrimaryKey(schema, left, right))
             return SqlTableAccess.leftJoinByPrimaryKey(left, right, restrictions);
+
+        return null;
+    }
+
+
+    public static SqlIntercode tryReduceDistinctUnion(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    {
+        List<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
+
+        if(dropRight != null)
+            return SqlTableAccess.distinctUnionizeByPrimaryKey(left, right, dropRight);
+
+        List<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, right, left);
+
+        if(dropLeft != null)
+            return SqlTableAccess.distinctUnionizeByPrimaryKey(right, left, dropLeft);
+
+
+        if(SqlTableAccess.canBeDistinctUnionizedByPrimaryKey(schema, left, right))
+            return SqlTableAccess.distinctUnionizeByForeignKey(left, right);
 
         return null;
     }
@@ -924,5 +1073,15 @@ public class SqlTableAccess extends SqlIntercode
     protected Conditions getConditions()
     {
         return conditions;
+    }
+
+
+    protected Column getRealColumn(Column c)
+    {
+        for(Entry<Column, Column> s : expressions.entrySet())
+            if(s.getValue().equals(c))
+                return s.getKey();
+
+        return c;
     }
 }
