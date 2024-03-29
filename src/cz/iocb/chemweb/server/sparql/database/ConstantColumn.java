@@ -8,7 +8,7 @@ public class ConstantColumn extends Column
 
     public ConstantColumn(String literal, String type)
     {
-        super(literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'::" + type);
+        super((literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'") + "::" + type);
 
         this.literal = literal;
     }
