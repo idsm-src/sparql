@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.config.ontology;
 
-import static java.util.Arrays.asList;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -58,7 +57,7 @@ public class OntologyResource extends GeneralUserIriClass
 
     private OntologyResource()
     {
-        super("ontology:resource", "ontology", "ontology_resource", asList("smallint", "integer"),
+        super("ontology:resource", "ontology", "ontology_resource", List.of("smallint", "integer"),
                 units.stream().map(c -> c.pattern).collect(Collectors.joining("|")),
                 GeneralUserIriClass.SqlCheck.IF_NOT_MATCH);
     }

@@ -3,7 +3,6 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATETIME;
-import static java.util.Arrays.asList;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -61,7 +60,7 @@ public class DateTimeClass extends LiteralClass
 
     DateTimeClass()
     {
-        super("datetime", asList("timestamptz", "int4"), asList(DATETIME), xsdDateTimeIri);
+        super("datetime", List.of("timestamptz", "int4"), List.of(DATETIME), xsdDateTimeIri);
     }
 
 
@@ -148,7 +147,7 @@ public class DateTimeClass extends LiteralClass
     public List<Column> toResult(List<Column> columns)
     {
         // xsdDateTime is returned as zoneddatetime because there are many discrepancies in timestamp interpretations
-        return asList(
+        return List.of(
                 new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 

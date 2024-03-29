@@ -8,7 +8,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsd
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDoubleType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
-import static java.util.Arrays.asList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -426,7 +425,7 @@ public abstract class Sachem
 
         FunctionDefinition similarity = new FunctionDefinition(sachem + "similarity",
                 new Function("sachem", "similarity_stub"), xsdDouble,
-                asList(xsdString, xsdString, xsdInteger, config.getIriClass("aromaticity_mode")), 2, false, true);
+                List.of(xsdString, xsdString, xsdInteger, config.getIriClass("aromaticity_mode")), 2, false, true);
 
         config.addFunction(similarity);
     }

@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.extension;
 
-import static java.util.Arrays.asList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +34,7 @@ public class ResultDefinition
 
     public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
     {
-        List<Column> sqlTypeFields = asList(new TableColumn(sqlTypeField));
+        List<Column> sqlTypeFields = List.of(new TableColumn(sqlTypeField));
         Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
         mappings.put(resultClass, sqlTypeFields);
 

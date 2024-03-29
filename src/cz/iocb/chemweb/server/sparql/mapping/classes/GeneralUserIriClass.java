@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -38,7 +37,7 @@ public class GeneralUserIriClass extends UserIriClass
     public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern,
             SqlCheck sqlCheck)
     {
-        super(name, sqlTypes, asList(ResultTag.IRI));
+        super(name, sqlTypes, List.of(ResultTag.IRI));
 
         this.sqlCheck = sqlCheck;
         this.pattern = pattern;
@@ -143,7 +142,7 @@ public class GeneralUserIriClass extends UserIriClass
 
         builder.append(")");
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 
@@ -276,7 +275,7 @@ public class GeneralUserIriClass extends UserIriClass
 
         builder.append(")");
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 

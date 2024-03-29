@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -161,7 +160,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(graph instanceof VariableOrBlankNode)
                     distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
 
-                SqlIntercode child = SqlDistinct.create(SqlUnion.union(asList(subjects, objects)), distinctVariables);
+                SqlIntercode child = SqlDistinct.create(SqlUnion.union(List.of(subjects, objects)), distinctVariables);
 
                 return SqlBind.bind(objectName, SqlVariable.create(subjectName, child.getVariables()), child);
             }
@@ -187,7 +186,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 SqlExpressionIntercode filter = getComparisonExpression(subject, object, false, child.getVariables());
 
-                return SqlFilter.filter(asList(filter), child);
+                return SqlFilter.filter(List.of(filter), child);
             }
         }
 
@@ -230,7 +229,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode child = SqlDistinct.create(visitElement(repeatedPath.getChild(), subject, object), distinct);
             SqlExpressionIntercode filter = getComparisonExpression(subject, object, true, child.getVariables());
 
-            return SqlFilter.filter(asList(filter), child);
+            return SqlFilter.filter(List.of(filter), child);
         }
 
 
@@ -273,7 +272,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(cndNode != null)
         {
             SqlExpressionIntercode filter = getComparisonExpression(cndNode, endNode, false, intercode.getVariables());
-            intercode = SqlFilter.filter(asList(filter), intercode);
+            intercode = SqlFilter.filter(List.of(filter), intercode);
         }
 
         if(repeatedPath.getKind() == Kind.ZeroOrMore)
@@ -281,7 +280,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             //NOTE: variants in which subject is equal to object are processed elsewhere
 
             SqlExpressionIntercode filter = getComparisonExpression(subject, object, true, intercode.getVariables());
-            intercode = SqlFilter.filter(asList(filter), intercode);
+            intercode = SqlFilter.filter(List.of(filter), intercode);
         }
 
         return intercode;
@@ -320,7 +319,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!invNegIriSet.isEmpty() && negIriSet.isEmpty())
             return translateNegatedPath(object, invNegIriSet, subject);
 
-        return SqlUnion.union(asList(translateNegatedPath(subject, negIriSet, object),
+        return SqlUnion.union(List.of(translateNegatedPath(subject, negIriSet, object),
                 translateNegatedPath(object, invNegIriSet, subject)));
     }
 
@@ -543,7 +542,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlExpressionIntercode expr1 = getExpression(node1, variables);
         SqlExpressionIntercode expr2 = getExpression(node2, variables);
 
-        SqlExpressionIntercode compare = SqlBuiltinCall.create("sameterm", false, asList(expr1, expr2));
+        SqlExpressionIntercode compare = SqlBuiltinCall.create("sameterm", false, List.of(expr1, expr2));
 
         if(not)
             return SqlUnaryLogical.create(compare);

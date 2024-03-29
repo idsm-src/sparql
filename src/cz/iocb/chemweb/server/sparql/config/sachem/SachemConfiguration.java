@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
-import static java.util.Arrays.asList;
 import java.sql.SQLException;
+import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
@@ -46,12 +46,12 @@ public class SachemConfiguration extends SparqlDatabaseConfiguration
     private void addQuadMappings(String index)
     {
         MolFiles.addQuadMappings(this, index + ":compound", index + ":molfile", new Table("molecules", index),
-                asList(new TableColumn("id")));
+                List.of(new TableColumn("id")));
     }
 
 
     private void addProcedures(String index)
     {
-        Sachem.addProcedures(this, index, index + ":compound", asList(new TableColumn("compound")));
+        Sachem.addProcedures(this, index, index + ":compound", List.of(new TableColumn("compound")));
     }
 }

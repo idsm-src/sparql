@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.config.idsm;
 
-import static java.util.Arrays.asList;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -115,13 +114,13 @@ public class IdsmConfiguration extends SparqlDatabaseConfiguration
         addService(new WikidataConfiguration(null, connectionPool, getDatabaseSchema()), true);
 
         Map<ResourceClass, List<Column>> mapping = new HashMap<ResourceClass, List<Column>>();
-        mapping.put(getIriClass("ontology:resource"), asList(getColumn(Ontology.unitCHEBI), getColumn("chebi")));
-        mapping.put(getIriClass("chembl:compound"), asList(getColumn("chembl")));
-        mapping.put(getIriClass("drugbank:compound"), asList(getColumn("drugbank")));
-        mapping.put(getIriClass("isdb:compound"), asList(getColumn("isdb")));
-        mapping.put(getIriClass("mona:compound"), asList(getColumn("mona")));
-        mapping.put(getIriClass("pubchem:compound"), asList(getColumn("pubchem")));
-        mapping.put(getIriClass("wikidata:entity"), asList(getColumn("wikidata")));
+        mapping.put(getIriClass("ontology:resource"), List.of(getColumn(Ontology.unitCHEBI), getColumn("chebi")));
+        mapping.put(getIriClass("chembl:compound"), List.of(getColumn("chembl")));
+        mapping.put(getIriClass("drugbank:compound"), List.of(getColumn("drugbank")));
+        mapping.put(getIriClass("isdb:compound"), List.of(getColumn("isdb")));
+        mapping.put(getIriClass("mona:compound"), List.of(getColumn("mona")));
+        mapping.put(getIriClass("pubchem:compound"), List.of(getColumn("pubchem")));
+        mapping.put(getIriClass("wikidata:entity"), List.of(getColumn("wikidata")));
 
         Sachem.addResourceClasses(this);
         Sachem.addProcedures(this, "sachem", mapping);

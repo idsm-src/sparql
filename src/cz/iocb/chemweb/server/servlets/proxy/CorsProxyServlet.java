@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.servlets.proxy;
 
-import static java.util.Arrays.asList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -23,7 +22,7 @@ import org.apache.commons.io.IOUtils;
 public class CorsProxyServlet extends HttpServlet
 {
     private static final List<String> specialParameters = new ArrayList<String>(
-            asList("endpoint", "requestMethod", "method"));
+            List.of("endpoint", "requestMethod", "method"));
 
     private String origin = null;
 

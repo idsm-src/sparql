@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.TYPE;
-import static java.util.Arrays.asList;
 import java.util.HashMap;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -24,7 +23,7 @@ public class UserLiteralClass extends LiteralClass
 
     private UserLiteralClass(int id, String sqlType, String equalOp, String notEqualOp, IRI type)
     {
-        super("usertype" + id, asList(sqlType), asList(LITERAL, TYPE), type);
+        super("usertype" + id, List.of(sqlType), List.of(LITERAL, TYPE), type);
         this.equalOperator = equalOp;
         this.notEqualOperator = notEqualOp;
     }
@@ -63,7 +62,7 @@ public class UserLiteralClass extends LiteralClass
     {
         Object value = ((Literal) node).getValue();
 
-        return asList(new ConstantColumn(value.toString(), sqlTypes.get(0)));
+        return List.of(new ConstantColumn(value.toString(), sqlTypes.get(0)));
     }
 
 
@@ -84,7 +83,7 @@ public class UserLiteralClass extends LiteralClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -101,10 +100,10 @@ public class UserLiteralClass extends LiteralClass
         //FIXME: can cause sql exception
 
         if(check)
-            return asList(new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value_of_type(" + column + ", '"
+            return List.of(new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value_of_type(" + column + ", '"
                     + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0))));
         else
-            return asList(
+            return List.of(
                     new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value(" + column + ")::" + sqlTypes.get(0))));
     }
 
@@ -132,7 +131,7 @@ public class UserLiteralClass extends LiteralClass
         String type = getTypeIri().getValue().replace("'", "''");
         String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + type + "'::varchar END";
 
-        return asList(new ExpressionColumn(columns.get(0) + "::varchar"), new ExpressionColumn(code));
+        return List.of(new ExpressionColumn(columns.get(0) + "::varchar"), new ExpressionColumn(code));
     }
 
 

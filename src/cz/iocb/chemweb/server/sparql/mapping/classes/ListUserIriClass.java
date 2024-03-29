@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -42,7 +41,7 @@ public class ListUserIriClass extends SimpleUserIriClass
         IRI iri = (IRI) node;
         assert match(iri);
 
-        return asList(new ConstantColumn(iri.getValue(), "varchar"));
+        return List.of(new ConstantColumn(iri.getValue(), "varchar"));
     }
 
 
@@ -76,7 +75,7 @@ public class ListUserIriClass extends SimpleUserIriClass
                 if(!match)
                     cache.storeToCache(iri, this, IriCache.mismatch);
                 else
-                    cache.storeToCache(iri, this, asList(new ConstantColumn(iri.getValue(), "varchar")));
+                    cache.storeToCache(iri, this, List.of(new ConstantColumn(iri.getValue(), "varchar")));
 
                 return match;
             }

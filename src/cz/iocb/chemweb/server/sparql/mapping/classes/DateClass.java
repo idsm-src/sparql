@@ -3,7 +3,6 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATE;
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -18,7 +17,7 @@ public class DateClass extends LiteralClass
 {
     DateClass()
     {
-        super("date", asList("date", "int4"), asList(DATE), xsdDateIri);
+        super("date", List.of("date", "int4"), List.of(DATE), xsdDateIri);
     }
 
 
@@ -104,7 +103,7 @@ public class DateClass extends LiteralClass
     public List<Column> toResult(List<Column> columns)
     {
         // xsdDate is returned as zoneddate because there are many discrepancies in date interpretations
-        return asList(new ExpressionColumn("sparql.zoneddate_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+        return List.of(new ExpressionColumn("sparql.zoneddate_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 
 

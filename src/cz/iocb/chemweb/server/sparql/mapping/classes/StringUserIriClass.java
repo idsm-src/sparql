@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.List;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -83,7 +82,7 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
 
-        return asList(new ConstantColumn(id, "varchar"));
+        return List.of(new ConstantColumn(id, "varchar"));
     }
 
 

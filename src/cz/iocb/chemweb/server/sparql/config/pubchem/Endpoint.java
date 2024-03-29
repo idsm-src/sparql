@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.Arrays.asList;
+import java.util.List;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.ontology.Ontology;
 import cz.iocb.chemweb.server.sparql.database.Conditions;
@@ -19,7 +19,7 @@ public class Endpoint
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new GeneralUserIriClass("pubchem:endpoint", schema, "endpoint",
-                asList("integer", "integer", "integer", "integer"),
+                List.of("integer", "integer", "integer", "integer"),
                 "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/endpoint/SID[1-9][0-9]*_AID[1-9][0-9]*(_(PMID([1-9][0-9]*)?|[1-9][0-9]*|0))?_VALUE[1-9][0-9]*"));
     }
 

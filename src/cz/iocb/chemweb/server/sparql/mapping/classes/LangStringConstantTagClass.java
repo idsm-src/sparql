@@ -4,7 +4,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -25,7 +24,7 @@ public class LangStringConstantTagClass extends LiteralClass
 
     private LangStringConstantTagClass(String lang)
     {
-        super("lang-" + lang, asList("varchar"), asList(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang-" + lang, List.of("varchar"), List.of(LANGSTRING, LANG), rdfLangStringIri);
         this.lang = lang;
     }
 
@@ -64,7 +63,7 @@ public class LangStringConstantTagClass extends LiteralClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn(((String) ((Literal) node).getValue()), "varchar"));
+        return List.of(new ConstantColumn(((String) ((Literal) node).getValue()), "varchar"));
     }
 
 
@@ -81,7 +80,7 @@ public class LangStringConstantTagClass extends LiteralClass
         builder.append(columns.get(0));
         builder.append(" END");
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 
@@ -116,7 +115,7 @@ public class LangStringConstantTagClass extends LiteralClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -131,10 +130,10 @@ public class LangStringConstantTagClass extends LiteralClass
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
         if(check)
-            return asList(new ExpressionColumn(
+            return List.of(new ExpressionColumn(
                     "sparql.rdfbox_get_langstring_value_of_lang(" + column + ", '" + lang + "'::varchar"));
         else
-            return asList(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
+            return List.of(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
     }
 
 
@@ -159,7 +158,7 @@ public class LangStringConstantTagClass extends LiteralClass
     {
         String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + lang + "'::varchar END";
 
-        return asList(columns.get(0), new ExpressionColumn(code));
+        return List.of(columns.get(0), new ExpressionColumn(code));
     }
 
 

@@ -3,7 +3,6 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.DATETIME;
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -24,7 +23,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
     private DateTimeConstantZoneClass(int zone)
     {
-        super("datetime$" + zone, asList("timestamptz"), asList(DATETIME), xsdDateTimeIri);
+        super("datetime$" + zone, List.of("timestamptz"), List.of(DATETIME), xsdDateTimeIri);
         this.zone = zone;
     }
 
@@ -61,7 +60,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn(((Literal) node).getValue().toString(), "timestamptz"));
+        return List.of(new ConstantColumn(((Literal) node).getValue().toString(), "timestamptz"));
     }
 
 
@@ -78,7 +77,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
         builder.append(columns.get(0));
         builder.append(" END");
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 
@@ -113,7 +112,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -128,10 +127,10 @@ public class DateTimeConstantZoneClass extends LiteralClass
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
         if(check)
-            return asList(new ExpressionColumn(
+            return List.of(new ExpressionColumn(
                     "sparql.rdfbox_get_datetime_value_of_zone(" + column + ", '" + zone + "'::int4)"));
         else
-            return asList(new ExpressionColumn("sparql.rdfbox_get_datetime_value(" + column + ")"));
+            return List.of(new ExpressionColumn("sparql.rdfbox_get_datetime_value(" + column + ")"));
     }
 
 
@@ -153,8 +152,8 @@ public class DateTimeConstantZoneClass extends LiteralClass
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return asList(
-                new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", '" + zone + "'::int4)"));
+        return List
+                .of(new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", '" + zone + "'::int4)"));
     }
 
 

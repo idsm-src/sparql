@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -15,14 +14,14 @@ public class UnsupportedIriClass extends IriClass
 {
     UnsupportedIriClass()
     {
-        super("unsupported", asList("varchar"), asList(ResultTag.IRI));
+        super("unsupported", List.of("varchar"), List.of(ResultTag.IRI));
     }
 
 
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn((((IRI) node).getValue()), "varchar"));
+        return List.of(new ConstantColumn((((IRI) node).getValue()), "varchar"));
     }
 
 
@@ -43,7 +42,7 @@ public class UnsupportedIriClass extends IriClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -60,7 +59,7 @@ public class UnsupportedIriClass extends IriClass
         if(check)
             throw new IllegalArgumentException();
         else
-            return asList(new ExpressionColumn("sparql.rdfbox_get_iri" + "(" + column + ")"));
+            return List.of(new ExpressionColumn("sparql.rdfbox_get_iri" + "(" + column + ")"));
     }
 
 

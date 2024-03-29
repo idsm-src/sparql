@@ -1,8 +1,8 @@
 package cz.iocb.chemweb.server.sparql.config.sachem;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.Arrays.asList;
 import java.sql.SQLException;
+import java.util.List;
 import javax.sql.DataSource;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.config.common.Common;
@@ -68,6 +68,6 @@ public class WikidataSachemConfiguration extends SparqlDatabaseConfiguration
 
     private void addProcedures()
     {
-        Sachem.addProcedures(this, "wikidata", "wikidata:entity", asList(new TableColumn("compound")));
+        Sachem.addProcedures(this, "wikidata", "wikidata:entity", List.of(new TableColumn("compound")));
     }
 }

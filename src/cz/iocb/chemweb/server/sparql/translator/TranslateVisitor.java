@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.translator;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import java.io.IOException;
 import java.io.InputStream;
@@ -227,8 +226,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 Variable variable = (Variable) resource;
                 SqlExpressionIntercode expression = SqlVariable.create(variable.getSqlName(), select.getVariables());
 
-                SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, asList(expression));
-                SqlIntercode source = SqlFilter.filter(asList(filter), select);
+                SqlExpressionIntercode filter = SqlBuiltinCall.create("bound", false, List.of(expression));
+                SqlIntercode source = SqlFilter.filter(List.of(filter), select);
 
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
                 subjectPattern = SqlJoin.join(source, subjectPattern);
@@ -605,9 +604,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     List<List<Node>> values = new ArrayList<List<Node>>();
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                        values.add(asList(g.getValue()));
+                        values.add(List.of(g.getValue()));
 
-                    translatedPattern = SqlJoin.join(translatedPattern, SqlValues.create(asList(varName), values));
+                    translatedPattern = SqlJoin.join(translatedPattern, SqlValues.create(List.of(varName), values));
                 }
                 else if(variable == null)
                 {
@@ -624,7 +623,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     for(ConstantIriMapping g : configuration.getGraphs(getService()))
                         unionList.add(SqlJoin.join(translatedPattern,
-                                SqlValues.create(asList(varName), asList(asList(g.getValue())))));
+                                SqlValues.create(List.of(varName), List.of(List.of(g.getValue())))));
 
                     translatedPattern = SqlUnion.union(unionList);
                 }

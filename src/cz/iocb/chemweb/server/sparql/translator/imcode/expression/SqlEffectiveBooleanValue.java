@@ -12,7 +12,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdSh
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -28,7 +27,7 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlEffectiveBooleanValue extends SqlUnary
 {
-    private static final List<IRI> ebvTypes = asList(xsdBoolean.getTypeIri(), xsdShort.getTypeIri(),
+    private static final List<IRI> ebvTypes = List.of(xsdBoolean.getTypeIri(), xsdShort.getTypeIri(),
             xsdInt.getTypeIri(), xsdLong.getTypeIri(), xsdInteger.getTypeIri(), xsdDecimal.getTypeIri(),
             xsdFloat.getTypeIri(), xsdDouble.getTypeIri(), xsdString.getTypeIri());
 

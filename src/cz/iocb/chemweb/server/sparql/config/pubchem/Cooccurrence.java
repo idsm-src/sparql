@@ -2,7 +2,7 @@ package cz.iocb.chemweb.server.sparql.config.pubchem;
 
 import static cz.iocb.chemweb.server.sparql.config.pubchem.PubChemConfiguration.schema;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdInteger;
-import static java.util.Arrays.asList;
+import java.util.List;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
@@ -19,55 +19,55 @@ public class Cooccurrence
         final String prefix = "http://rdf\\.ncbi\\.nlm\\.nih\\.gov/pubchem/cooccurrence/";
 
         config.addIriClass(new GeneralUserIriClass("pubchem:chemical_chemical_cooccurrence", schema,
-                "chemical_chemical_cooccurrence", asList("integer", "integer"),
+                "chemical_chemical_cooccurrence", List.of("integer", "integer"),
                 prefix + "CID[1-9][0-9]*_CID[1-9][0-9]*"));
 
         config.addIriClass(new GeneralUserIriClass("pubchem:chemical_disease_cooccurrence", schema,
-                "chemical_disease_cooccurrence", asList("integer", "integer"),
+                "chemical_disease_cooccurrence", List.of("integer", "integer"),
                 prefix + "CID[1-9][0-9]*_DZID[1-9][0-9]*"));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:chemical_gene_cooccurrence", schema, "chemical_gene_cooccurrence",
-                        asList("integer", "integer"), prefix + "CID[1-9][0-9]*_.*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "CID[1-9][0-9]*_.*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:chemical_enzyme_cooccurrence", schema, "chemical_enzyme_cooccurrence",
-                        asList("integer", "integer"), prefix + "CID[1-9][0-9]*_EC_.*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "CID[1-9][0-9]*_EC_.*", SqlCheck.IF_MATCH));
 
         config.addIriClass(new GeneralUserIriClass("pubchem:disease_chemical_cooccurrence", schema,
-                "disease_chemical_cooccurrence", asList("integer", "integer"),
+                "disease_chemical_cooccurrence", List.of("integer", "integer"),
                 prefix + "DZID[1-9][0-9]*_CID[1-9][0-9]*"));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:disease_disease_cooccurrence", schema, "disease_disease_cooccurrence",
-                        asList("integer", "integer"), prefix + "DZID[1-9][0-9]*_DZID[1-9][0-9]*"));
+                        List.of("integer", "integer"), prefix + "DZID[1-9][0-9]*_DZID[1-9][0-9]*"));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:disease_gene_cooccurrence", schema, "disease_gene_cooccurrence",
-                        asList("integer", "integer"), prefix + "DZID[1-9][0-9]*_.*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "DZID[1-9][0-9]*_.*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:disease_enzyme_cooccurrence", schema, "disease_enzyme_cooccurrence",
-                        asList("integer", "integer"), prefix + "DZID[1-9][0-9]*_EC_.*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "DZID[1-9][0-9]*_EC_.*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:gene_chemical_cooccurrence", schema, "gene_chemical_cooccurrence",
-                        asList("integer", "integer"), prefix + ".*_CID[1-9][0-9]*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + ".*_CID[1-9][0-9]*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:enzyme_chemical_cooccurrence", schema, "enzyme_chemical_cooccurrence",
-                        asList("integer", "integer"), prefix + "EC_.*_CID[1-9][0-9]*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "EC_.*_CID[1-9][0-9]*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:gene_disease_cooccurrence", schema, "gene_disease_cooccurrence",
-                        asList("integer", "integer"), prefix + ".*_DZID[1-9][0-9]*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + ".*_DZID[1-9][0-9]*", SqlCheck.IF_MATCH));
 
         config.addIriClass(
                 new GeneralUserIriClass("pubchem:enzyme_disease_cooccurrence", schema, "enzyme_disease_cooccurrence",
-                        asList("integer", "integer"), prefix + "EC_.*_DZID[1-9][0-9]*", SqlCheck.IF_MATCH));
+                        List.of("integer", "integer"), prefix + "EC_.*_DZID[1-9][0-9]*", SqlCheck.IF_MATCH));
 
         config.addIriClass(new GeneralUserIriClass("pubchem:gene_gene_cooccurrence", schema, "gene_gene_cooccurrence",
-                asList("integer", "integer"), prefix + ".*_.*", SqlCheck.IF_MATCH));
+                List.of("integer", "integer"), prefix + ".*_.*", SqlCheck.IF_MATCH));
     }
 
 

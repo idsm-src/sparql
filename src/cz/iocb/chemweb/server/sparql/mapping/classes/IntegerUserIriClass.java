@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.List;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -89,7 +88,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(id.isEmpty())
             id = "0";
 
-        return asList(new ConstantColumn(id, sqlTypes.get(0)));
+        return List.of(new ConstantColumn(id, sqlTypes.get(0)));
     }
 
 

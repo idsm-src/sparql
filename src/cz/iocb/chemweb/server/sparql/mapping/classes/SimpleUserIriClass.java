@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
@@ -14,28 +13,28 @@ public abstract class SimpleUserIriClass extends UserIriClass
 {
     public SimpleUserIriClass(String name, String sqlType)
     {
-        super(name, asList(sqlType), asList(ResultTag.IRI));
+        super(name, List.of(sqlType), List.of(ResultTag.IRI));
     }
 
 
     @Override
     public List<Column> fromGeneralClass(List<Column> columns)
     {
-        return asList(generateInverseFunction(columns.get(0), true));
+        return List.of(generateInverseFunction(columns.get(0), true));
     }
 
 
     @Override
     public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return asList(generateFunction(columns.get(0)));
+        return List.of(generateFunction(columns.get(0)));
     }
 
 
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(generateInverseFunction(column, true));
+        return List.of(generateInverseFunction(column, true));
     }
 
 
@@ -49,7 +48,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
     @Override
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
-        return asList(generateInverseFunction(new ExpressionColumn("sparql.rdfbox_get_iri(" + column + ")"), check));
+        return List.of(generateInverseFunction(new ExpressionColumn("sparql.rdfbox_get_iri(" + column + ")"), check));
     }
 
 
@@ -63,7 +62,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return asList(generateFunction(columns.get(0)));
+        return List.of(generateFunction(columns.get(0)));
     }
 
 

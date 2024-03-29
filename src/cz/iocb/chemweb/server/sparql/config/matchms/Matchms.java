@@ -1,7 +1,7 @@
 package cz.iocb.chemweb.server.sparql.config.matchms;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdFloat;
-import static java.util.Arrays.asList;
+import java.util.List;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.database.Function;
 import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
@@ -36,27 +36,27 @@ public abstract class Matchms
     {
         FunctionDefinition cosineGreedy = new FunctionDefinition(ms + "cosineGreedy",
                 new Function("pgms", "cosine_greedy"), xsdFloat,
-                asList(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat), 2, false, true);
+                List.of(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat), 2, false, true);
 
         config.addFunction(cosineGreedy);
 
 
         FunctionDefinition cosineHungarian = new FunctionDefinition(ms + "cosineHungarian",
                 new Function("pgms", "cosine_hungarian"), xsdFloat,
-                asList(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat), 2, false, true);
+                List.of(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat), 2, false, true);
 
         config.addFunction(cosineHungarian);
 
 
         FunctionDefinition modifiedCosine = new FunctionDefinition(ms + "modifiedCosine",
                 new Function("pgms", "cosine_modified"), xsdFloat,
-                asList(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat, xsdFloat), 3, false, true);
+                List.of(spectrum, spectrum, xsdFloat, xsdFloat, xsdFloat, xsdFloat), 3, false, true);
 
         config.addFunction(modifiedCosine);
 
 
         FunctionDefinition normalize = new FunctionDefinition(ms + "normalize",
-                new Function("pgms", "spectrum_normalize"), spectrum, asList(spectrum), false, true);
+                new Function("pgms", "spectrum_normalize"), spectrum, List.of(spectrum), false, true);
 
         config.addFunction(normalize);
     }

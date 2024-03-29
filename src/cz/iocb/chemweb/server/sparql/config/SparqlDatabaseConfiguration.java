@@ -13,7 +13,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsd
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdLongType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdShortType;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
-import static java.util.Arrays.asList;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -378,8 +377,8 @@ public class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        addQuadMapping(asList(subjectTable, objectTable), asList(
-                new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn))),
+        addQuadMapping(List.of(subjectTable, objectTable), List
+                .of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn))),
                 graph, subject, predicate, object);
     }
 
@@ -388,10 +387,10 @@ public class SparqlDatabaseConfiguration
             String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
-        addQuadMapping(asList(subjectTable, objectTable),
-                asList(new JoinColumns(new TableColumn(subjectTableJoinColumn),
+        addQuadMapping(List.of(subjectTable, objectTable),
+                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn),
                         new TableColumn(objectTableJoinColumn))),
-                graph, subject, predicate, object, asList(subjectCondition, objectCondition));
+                graph, subject, predicate, object, List.of(subjectCondition, objectCondition));
     }
 
 

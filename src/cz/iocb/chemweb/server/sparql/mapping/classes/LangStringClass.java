@@ -4,7 +4,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.rdfLa
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANG;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LANGSTRING;
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -19,7 +18,7 @@ public class LangStringClass extends LiteralClass
 {
     LangStringClass()
     {
-        super("lang", asList("varchar", "varchar"), asList(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang", List.of("varchar", "varchar"), List.of(LANGSTRING, LANG), rdfLangStringIri);
     }
 
 

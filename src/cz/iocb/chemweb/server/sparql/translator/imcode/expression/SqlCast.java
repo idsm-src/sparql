@@ -15,7 +15,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toSet;
 import java.util.List;
 import java.util.Set;
@@ -31,7 +30,7 @@ import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
 public class SqlCast extends SqlUnary
 {
-    private static final List<LiteralClass> supportedClasses = asList(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
+    private static final List<LiteralClass> supportedClasses = List.of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
             xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
 
 

@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -20,14 +19,14 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
 
     public UserIntBlankNodeClass()
     {
-        super("iblanknode-" + Integer.toHexString(counter), asList("int4"));
+        super("iblanknode-" + Integer.toHexString(counter), List.of("int4"));
         this.segment = counter++;
     }
 
 
     public UserIntBlankNodeClass(int segment)
     {
-        super("iblanknode-" + Integer.toHexString(segment), asList("int4"));
+        super("iblanknode-" + Integer.toHexString(segment), List.of("int4"));
         this.segment = segment;
 
         if(segment >= 0)
@@ -38,7 +37,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     @Override
     public List<Column> toColumns(Node node)
     {
-        return asList(new ConstantColumn(((BlankNodeLiteral) node).getLabel(), "int4"));
+        return List.of(new ConstantColumn(((BlankNodeLiteral) node).getLabel(), "int4"));
     }
 
 
@@ -55,7 +54,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
         builder.append(columns.get(0));
         builder.append(" END");
 
-        return asList(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 
@@ -90,7 +89,7 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -105,10 +104,10 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
         if(check)
-            return asList(new ExpressionColumn(
+            return List.of(new ExpressionColumn(
                     "sparql.rdfbox_get_iblanknode_value_of_segment(" + column + ", '" + segment + "'::int4"));
         else
-            return asList(new ExpressionColumn("sparql.rdfbox_get_iblanknode_value(" + column + ")"));
+            return List.of(new ExpressionColumn("sparql.rdfbox_get_iblanknode_value(" + column + ")"));
     }
 
 
@@ -123,8 +122,8 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return asList(
-                new ExpressionColumn("sparql.iblanknode_create(" + columns.get(0) + ", '" + segment + "'::int4)"));
+        return List
+                .of(new ExpressionColumn("sparql.iblanknode_create(" + columns.get(0) + ", '" + segment + "'::int4)"));
     }
 
 

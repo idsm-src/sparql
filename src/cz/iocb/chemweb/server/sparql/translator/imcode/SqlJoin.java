@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator.imcode;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
@@ -40,7 +39,7 @@ public class SqlJoin extends SqlIntercode
 
     public static SqlIntercode join(SqlIntercode left, SqlIntercode right)
     {
-        return convertToIntercode(expand(asList(left, right)), null);
+        return convertToIntercode(expand(List.of(left, right)), null);
     }
 
 
@@ -251,7 +250,8 @@ public class SqlJoin extends SqlIntercode
                     if(optChilds.get(j) instanceof SqlTableAccess right)
                     {
                         HashSet<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                        SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(schema, right, left, mergeRestrictions);
+                        SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(schema, right, left,
+                                mergeRestrictions);
 
                         if(merged == SqlNoSolution.get())
                             return List.of(SqlNoSolution.get());
@@ -369,7 +369,7 @@ public class SqlJoin extends SqlIntercode
         if(child instanceof SqlJoin)
             return new ArrayList<SqlIntercode>(((SqlJoin) child).getChilds());
         else
-            return asList(child);
+            return List.of(child);
     }
 
 

@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -13,7 +12,7 @@ public class CommonIntBlankNodeClass extends IntBlankNodeClass
 {
     CommonIntBlankNodeClass()
     {
-        super("iblanknode", asList("int4", "int4"));
+        super("iblanknode", List.of("int4", "int4"));
     }
 
 
@@ -80,7 +79,8 @@ public class CommonIntBlankNodeClass extends IntBlankNodeClass
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return asList(new ExpressionColumn("sparql.iblanknode_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
+        return List
+                .of(new ExpressionColumn("sparql.iblanknode_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 
 

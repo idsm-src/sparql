@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -15,7 +14,7 @@ public class SimpleLiteralClass extends LiteralClass
 {
     protected SimpleLiteralClass(ResultTag resultTag, String sqlType, IRI sparqlTypeIri)
     {
-        super(resultTag.getTag(), asList(sqlType), asList(resultTag), sparqlTypeIri);
+        super(resultTag.getTag(), List.of(sqlType), List.of(resultTag), sparqlTypeIri);
     }
 
 
@@ -32,9 +31,9 @@ public class SimpleLiteralClass extends LiteralClass
         Object value = ((Literal) node).getValue();
 
         if(value instanceof String)
-            return asList(new ConstantColumn((String) value, "varchar"));
+            return List.of(new ConstantColumn((String) value, "varchar"));
         else
-            return asList(new ConstantColumn(value.toString(), sqlTypes.get(0)));
+            return List.of(new ConstantColumn(value.toString(), sqlTypes.get(0)));
     }
 
 
@@ -55,7 +54,7 @@ public class SimpleLiteralClass extends LiteralClass
     @Override
     public List<Column> fromExpression(Column column)
     {
-        return asList(column);
+        return List.of(column);
     }
 
 
@@ -69,7 +68,7 @@ public class SimpleLiteralClass extends LiteralClass
     @Override
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
-        return asList(new ExpressionColumn("sparql.rdfbox_get_" + name + "(" + column + ")"));
+        return List.of(new ExpressionColumn("sparql.rdfbox_get_" + name + "(" + column + ")"));
     }
 
 

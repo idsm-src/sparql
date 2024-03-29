@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping;
 
-import static java.util.Arrays.asList;
 import java.util.Collections;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -27,8 +26,8 @@ public class JoinTableQuadMapping extends QuadMapping
 
         public JoinColumns(Column leftColumn, Column rightColumn)
         {
-            this.leftColumns = asList(leftColumn);
-            this.rightColumns = asList(rightColumn);
+            this.leftColumns = List.of(leftColumn);
+            this.rightColumns = List.of(rightColumn);
         }
 
         public List<Column> getLeftColumns()

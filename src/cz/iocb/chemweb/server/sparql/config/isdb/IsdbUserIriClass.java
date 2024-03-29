@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.config.isdb;
 
-import static java.util.Arrays.asList;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,7 +31,7 @@ public class IsdbUserIriClass extends UserIriClass
 
     public IsdbUserIriClass(String name, String prefix, String suffix)
     {
-        super(name, asList("integer", "char"), asList(ResultTag.IRI));
+        super(name, List.of("integer", "char"), List.of(ResultTag.IRI));
 
         //FIXME: check whether the pattern is valid also in pcre2
         this.pattern = Pattern.quote(prefix) + "([A-Z]{14}-[NP])" + (suffix != null ? Pattern.quote(suffix) : "");
@@ -72,7 +71,7 @@ public class IsdbUserIriClass extends UserIriClass
             {
                 if(result.next())
                 {
-                    List<Column> columns = asList(new ConstantColumn(result.getString(1), "integer"),
+                    List<Column> columns = List.of(new ConstantColumn(result.getString(1), "integer"),
                             new ConstantColumn(iri.getValue().substring(prefix.length() + 15), "char"));
                     cache.storeToCache(iri, this, columns);
                     return columns;
@@ -119,7 +118,7 @@ public class IsdbUserIriClass extends UserIriClass
                 }
                 else
                 {
-                    List<Column> columns = asList(new ConstantColumn(result.getString(1), "integer"),
+                    List<Column> columns = List.of(new ConstantColumn(result.getString(1), "integer"),
                             new ConstantColumn(iri.getValue().substring(prefixLen + 15), "char"));
                     cache.storeToCache(iri, this, columns);
                 }
@@ -198,7 +197,7 @@ public class IsdbUserIriClass extends UserIriClass
     @Override
     public List<Column> toGeneralClass(List<Column> columns, boolean check)
     {
-        return asList(generateFunction(columns));
+        return List.of(generateFunction(columns));
     }
 
 
@@ -233,7 +232,7 @@ public class IsdbUserIriClass extends UserIriClass
     @Override
     public List<Column> toResult(List<Column> columns)
     {
-        return asList(generateFunction(columns));
+        return List.of(generateFunction(columns));
     }
 
 

@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -134,7 +133,7 @@ public class MapUserIriClass extends SimpleUserIriClass
             {
                 if(result.next())
                 {
-                    List<Column> columns = asList(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
+                    List<Column> columns = List.of(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
                     cache.storeToCache(iri, this, columns);
                     return columns;
                 }
@@ -187,7 +186,7 @@ public class MapUserIriClass extends SimpleUserIriClass
                 }
                 else
                 {
-                    List<Column> columns = asList(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
+                    List<Column> columns = List.of(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
                     cache.storeToCache(iri, this, columns);
                 }
 

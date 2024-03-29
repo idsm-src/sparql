@@ -2,7 +2,6 @@ package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.ResultTag.TYPE;
-import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.chemweb.server.sparql.database.Column;
@@ -17,7 +16,7 @@ public class UnsupportedLiteralClass extends LiteralClass
 {
     UnsupportedLiteralClass()
     {
-        super("literal", asList("varchar", "varchar"), asList(LITERAL, TYPE), null);
+        super("literal", List.of("varchar", "varchar"), List.of(LITERAL, TYPE), null);
     }
 
 

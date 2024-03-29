@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.util.HashMap;
@@ -48,7 +47,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
         IRI iri = (IRI) node;
         assert match(node);
 
-        return asList(new ConstantColumn(values.get(iri), sqlTypes.get(0)));
+        return List.of(new ConstantColumn(values.get(iri), sqlTypes.get(0)));
     }
 
 

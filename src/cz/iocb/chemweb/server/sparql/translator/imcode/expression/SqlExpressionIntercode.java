@@ -13,7 +13,6 @@ import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdIn
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
@@ -37,7 +36,7 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.SqlBaseClass;
 
 public abstract class SqlExpressionIntercode extends SqlBaseClass
 {
-    private static final List<ResourceClass> numericOrder = asList(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal,
+    private static final List<ResourceClass> numericOrder = List.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal,
             xsdFloat, xsdDouble);
 
     private final boolean canBeNull;

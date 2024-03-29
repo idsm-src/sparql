@@ -1,6 +1,5 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 import java.util.LinkedList;
 import java.util.List;
@@ -130,7 +129,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         if(rewrite.getKind() == Kind.OneOrMore)
             return rewrite;
 
-        return new AlternativePath(asList(rewrite, new SequencePath(new LinkedList<Path>())));
+        return new AlternativePath(List.of(rewrite, new SequencePath(new LinkedList<Path>())));
     }
 
 
