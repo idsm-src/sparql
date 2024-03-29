@@ -267,6 +267,9 @@ public class SqlTableAccess extends SqlIntercode
         {
             String var = e.getKey();
 
+            if(right.getVariable(var) == null)
+                continue;
+
             //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
             if(!e.getValue().equals(right.resources.get(var)))
                 return false;
@@ -323,6 +326,9 @@ public class SqlTableAccess extends SqlIntercode
         for(Entry<String, ResourceClass> e : parent.resources.entrySet())
         {
             String var = e.getKey();
+
+            if(child.getVariable(var) == null)
+                continue;
 
             //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
             if(!e.getValue().equals(child.resources.get(var)))
