@@ -74,6 +74,23 @@ public class SqlBinaryComparison extends SqlBinary
         boolean canBeNull = left.canBeNull() || right.canBeNull();
 
 
+        if(left instanceof SqlIri a && right instanceof SqlIri b)
+        {
+            if(operator == Operator.Equals)
+                return a.getIri().equals(b.getIri()) ? trueValue : falseValue;
+            else if(operator == Operator.NotEquals)
+                return a.getIri().equals(b.getIri()) ? falseValue : trueValue;
+        }
+
+        if(left instanceof SqlLiteral a && right instanceof SqlLiteral b)
+        {
+            if(operator == Operator.Equals)
+                return a.getLiteral().equals(b.getLiteral()) ? trueValue : falseValue;
+            else if(operator == Operator.NotEquals)
+                return a.getLiteral().equals(b.getLiteral()) ? falseValue : trueValue;
+        }
+
+
         for(ResourceClass leftClass : left.getResourceClasses())
         {
             for(ResourceClass rightClass : right.getResourceClasses())
