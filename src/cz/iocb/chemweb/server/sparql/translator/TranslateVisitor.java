@@ -8,7 +8,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -1595,7 +1596,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
                 {
-                    connection = (HttpURLConnection) new URL(url).openConnection();
+                    connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
                     connection.setRequestMethod("POST");
                     connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
                     connection.setRequestProperty("accept", "application/sparql-results+xml");
@@ -1612,7 +1613,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
                     throw new IOException(connection.getResponseMessage());
             }
-            catch(IOException e)
+            catch(IOException | URISyntaxException e)
             {
                 e.printStackTrace();
 

@@ -4,7 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,34 +75,41 @@ public class CorsProxyServlet extends HttpServlet
                     query += (query.isEmpty() ? "" : "&") + item.getKey() + "=" + URLEncoder.encode(value, "UTF-8");
 
 
-        String url = method.equals("GET") ? endpoint + "?" + query : endpoint;
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setRequestMethod(method);
-        connection.setRequestProperty("accept", accept);
-
-        if(method.equals("POST"))
+        try
         {
-            connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
-            connection.setDoOutput(true);
+            String url = method.equals("GET") ? endpoint + "?" + query : endpoint;
+            HttpURLConnection connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
+            connection.setRequestMethod(method);
+            connection.setRequestProperty("accept", accept);
 
-            try(OutputStream out = connection.getOutputStream())
+            if(method.equals("POST"))
             {
-                out.write(query.getBytes());
-            }
-        }
+                connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
+                connection.setDoOutput(true);
 
-        res.setStatus(connection.getResponseCode());
-        res.setContentType(connection.getContentType());
-
-        try(InputStream input = dispatchStream(connection))
-        {
-            if(input != null)
-            {
-                try(OutputStream output = res.getOutputStream())
+                try(OutputStream out = connection.getOutputStream())
                 {
-                    IOUtils.copy(input, output);
+                    out.write(query.getBytes());
                 }
             }
+
+            res.setStatus(connection.getResponseCode());
+            res.setContentType(connection.getContentType());
+
+            try(InputStream input = dispatchStream(connection))
+            {
+                if(input != null)
+                {
+                    try(OutputStream output = res.getOutputStream())
+                    {
+                        IOUtils.copy(input, output);
+                    }
+                }
+            }
+        }
+        catch(URISyntaxException e)
+        {
+            throw new IOException(e);
         }
     }
 

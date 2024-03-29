@@ -3,7 +3,7 @@ package cz.iocb.chemweb.server.filters.piwik;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.InetAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.UnknownHostException;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -137,68 +137,68 @@ public class PiwikFilter implements Filter
             actionName = this.actionName;
 
 
-        /* create piwik request */
-        PiwikRequest piwikRequest = new PiwikRequest(siteId, new URL(actionUrl));
-        piwikRequest.setActionName(actionName);
-        piwikRequest.setAuthToken(authToken);
-
-
-        /* set visitor id */
-        String visitorId = null;
-
-        if(httpRequest.getCookies() != null)
-            for(Cookie cookie : httpRequest.getCookies())
-                if(cookie.getName().startsWith(cookieName) && cookie.getValue().length() >= 16)
-                    visitorId = cookie.getValue().substring(0, 16);
-
-        if(visitorId != null)
-            piwikRequest.setVisitorId(visitorId);
-
-
-        /* set visitor ip */
-        String forwarded = httpRequest.getHeader("X-Forwarded-For");
-        String address = null;
-
-        if(forwarded != null)
-        {
-            for(String forward : forwarded.split(","))
-            {
-                String trimmed = forward.trim();
-
-                try
-                {
-                    if(!InetAddress.getByName(trimmed).isSiteLocalAddress())
-                    {
-                        address = trimmed;
-                        break;
-                    }
-                }
-                catch(UnknownHostException e)
-                {
-                    request.getServletContext().log("PiwikFilter: UnknownHostException: " + e.getMessage());
-                }
-            }
-        }
-
-        piwikRequest.setVisitorIp(address != null ? address : httpRequest.getRemoteAddr());
-
-
-        /* set user agent */
-        String agent = httpRequest.getHeader("User-Agent");
-
-        if(agent != null)
-            piwikRequest.setHeaderUserAgent(agent);
-
-
-        /* set action time */
-        long actionTime = System.currentTimeMillis();
-        filterChain.doFilter(httpRequest, response);
-        actionTime = System.currentTimeMillis() - actionTime;
-        piwikRequest.setActionTime(actionTime);
-
-
         try
         {
+            /* create piwik request */
+            PiwikRequest piwikRequest = new PiwikRequest(siteId, (new URI(actionUrl)).toURL());
+            piwikRequest.setActionName(actionName);
+            piwikRequest.setAuthToken(authToken);
+
+
+            /* set visitor id */
+            String visitorId = null;
+
+            if(httpRequest.getCookies() != null)
+                for(Cookie cookie : httpRequest.getCookies())
+                    if(cookie.getName().startsWith(cookieName) && cookie.getValue().length() >= 16)
+                        visitorId = cookie.getValue().substring(0, 16);
+
+            if(visitorId != null)
+                piwikRequest.setVisitorId(visitorId);
+
+
+            /* set visitor ip */
+            String forwarded = httpRequest.getHeader("X-Forwarded-For");
+            String address = null;
+
+            if(forwarded != null)
+            {
+                for(String forward : forwarded.split(","))
+                {
+                    String trimmed = forward.trim();
+
+                    try
+                    {
+                        if(!InetAddress.getByName(trimmed).isSiteLocalAddress())
+                        {
+                            address = trimmed;
+                            break;
+                        }
+                    }
+                    catch(UnknownHostException e)
+                    {
+                        request.getServletContext().log("PiwikFilter: UnknownHostException: " + e.getMessage());
+                    }
+                }
+            }
+
+            piwikRequest.setVisitorIp(address != null ? address : httpRequest.getRemoteAddr());
+
+
+            /* set user agent */
+            String agent = httpRequest.getHeader("User-Agent");
+
+            if(agent != null)
+                piwikRequest.setHeaderUserAgent(agent);
+
+
+            /* set action time */
+            long actionTime = System.currentTimeMillis();
+            filterChain.doFilter(httpRequest, response);
+            actionTime = System.currentTimeMillis() - actionTime;
+            piwikRequest.setActionTime(actionTime);
+
+
             tracker.sendRequest(piwikRequest, new FutureCallback<HttpResponse>()
             {
                 @Override
