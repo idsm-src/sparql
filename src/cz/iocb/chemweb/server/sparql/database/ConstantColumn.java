@@ -8,7 +8,7 @@ public class ConstantColumn extends Column
 
     public ConstantColumn(String literal, String type)
     {
-        super((literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'") + "::" + type);
+        super((literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'") + "::" + normalizeSqlType(type));
 
         this.literal = literal;
     }
@@ -43,5 +43,24 @@ public class ConstantColumn extends Column
     public String getValue()
     {
         return literal;
+    }
+
+
+    private static String normalizeSqlType(String type)
+    {
+        return switch(type)
+        {
+            case "boolean" -> "bool";
+            case "int" -> "integer";
+            case "int2" -> "smallint";
+            case "int4" -> "integer";
+            case "int8" -> "bigint";
+            case "decimal" -> "numeric";
+            case "real" -> "float4";
+            case "double precision" -> "float8";
+            case "character" -> "char";
+            case "character varying" -> "varchar";
+            default -> type;
+        };
     }
 }
