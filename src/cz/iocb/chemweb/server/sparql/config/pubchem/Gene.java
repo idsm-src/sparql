@@ -17,13 +17,10 @@ public class Gene
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        String pattern = "([0123569]|[1-9][0-9]{1,8}|[1-1][0-9]{9}|2[0-0][0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]{1}|214748364[0-7])";
-
         config.addIriClass(new MapUserIriClass("pubchem:gene_symbol", "integer", new Table(schema, "gene_symbol_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/",
-                "(GI?D?|GID[478]|([^G]|G[^I]|GI[^D]).*)"));
-        config.addIriClass(new IntegerUserIriClass("pubchem:gene", "integer",
-                "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID", 0, pattern, null));
+                new TableColumn("id"), new TableColumn("iri"), "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/MD5_"));
+        config.addIriClass(
+                new IntegerUserIriClass("pubchem:gene", "integer", "http://rdf.ncbi.nlm.nih.gov/pubchem/gene/GID"));
     }
 
 
@@ -38,7 +35,7 @@ public class Gene
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_001383"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000300"),
-                    config.createLiteralMapping(xsdString, "iri"));
+                    config.createLiteralMapping(xsdString, "symbol"));
         }
 
         {
@@ -177,6 +174,118 @@ public class Gene
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
                     config.createIriMapping("kegg:entry", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_flybase_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("flybase:report", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_informatics_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("informatics:marker", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_wormbase_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("wormbase:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_opentargets_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("opentargets:target", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_rgdweb_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("rgdweb:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_thegencc_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("thegencc:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_genenames_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("genenames:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_xenbase_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("xenbase:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_yeastgenome_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("yeastgenome:locus", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_pharos_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("pharos:target", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_bgee_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("bgee:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_pombase_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("pombase:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_veupathdb_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("veupathdb:gene", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "gene_zfin_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:gene", "gene");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("zfin:entry", "match"));
         }
 
         {

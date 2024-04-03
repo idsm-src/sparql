@@ -34,8 +34,6 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_010343"));
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
-                    config.createIriMapping("up:Enzyme"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("pubchem:enzyme", "parent"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
@@ -44,6 +42,10 @@ public class Protein
                     config.createIriMapping("purl:enzyme", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:prefLabel"),
                     config.createLiteralMapping(xsdString, "title"));
+
+            // deprecated
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
+                    config.createIriMapping("up:Enzyme"));
 
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
@@ -209,14 +211,6 @@ public class Protein
         }
 
         {
-            Table table = new Table(schema, "protein_glycan_matches");
-            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
-                    config.createIriMapping("glygen:glycan", "match"));
-        }
-
-        {
             Table table = new Table(schema, "protein_glycosmos_matches");
             NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
 
@@ -230,6 +224,86 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
                     config.createIriMapping("alphafold:entry", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_opentargets_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("opentargets:target", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_proteinatlas_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("proteinatlas:entry", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_expasy_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("expasy_http:enzyme", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_pharos_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("pharos:target", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_proconsortium_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("proconsortium:entry", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_wormbase_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("wormbase:protein", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_brenda_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("brenda:enzyme", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_intact_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("intact:interactor", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_interpro_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("interpro:protein", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_nextprot_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("nextprot:entry", "match"));
         }
 
         {
@@ -254,6 +328,14 @@ public class Protein
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0002180"),
                     config.createIriMapping("pfam:family", "family"));
+        }
+
+        {
+            Table table = new Table(schema, "protein_interpro_families");
+            NodeMapping subject = config.createIriMapping("pubchem:protein", "protein");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("obo:RO_0002180"),
+                    config.createIriMapping("interpro:entry", "family"));
         }
 
         {

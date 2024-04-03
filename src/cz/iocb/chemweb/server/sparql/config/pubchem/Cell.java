@@ -74,19 +74,67 @@ public class Cell
         }
 
         {
-            Table table = new Table(schema, "cell_cellosaurus_matches");
-            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
-                    config.createIriMapping("expasy:cell", "match"));
-        }
-
-        {
             Table table = new Table(schema, "cell_mesh_matches");
             NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
                     config.createIriMapping("mesh:heading", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_wikidata_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("wikidata:wiki", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_cancerrxgene_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("cancerrxgene:celline", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_depmap_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("depmap:celline", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_sanger_passport_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("sanger:passport", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_sanger_line_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:closeMatch"),
+                    config.createIriMapping("sanger:line", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_cellosaurus_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:sameAs"),
+                    config.createIriMapping("expasy:cell", "match"));
+        }
+
+        {
+            Table table = new Table(schema, "cell_chembl_card_matches");
+            NodeMapping subject = config.createIriMapping("pubchem:cell", "cell");
+
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:sameAs"),
+                    config.createIriMapping("chembl:cell_line_report_card", "match"));
         }
 
         {

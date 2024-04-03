@@ -156,7 +156,7 @@ public class Common
         config.addIriClass(new IntegerUserIriClass("omim:entry", "integer", "https://omim.org/entry/"));
         config.addIriClass(new StringUserIriClass("alliancegenome:gene", "https://www.alliancegenome.org/gene/"));
         config.addIriClass(new IntegerUserIriClass("genenames:gene", "integer",
-                "https://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=HGNC:"));
+                "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:"));
         config.addIriClass(new StringUserIriClass("kegg:entry", "https://www.kegg.jp/entry/"));
 
         config.addIriClass(new IntegerUserIriClass("guidetopharmacology:target", "integer",
@@ -167,8 +167,9 @@ public class Common
                 "https://www.ebi.ac.uk/chembl/target_report_card/CHEMBL"));
         config.addIriClass(new IntegerUserIriClass("chembl:tissue_report_card", "integer",
                 "https://www.ebi.ac.uk/chembl/tissue_report_card/CHEMBL"));
-        config.addIriClass(new StringUserIriClass("glygen:protein", "https://glygen.org/protein/"));
-        config.addIriClass(new StringUserIriClass("glygen:glycan", "http://glygen.org/glycan/"));
+        config.addIriClass(new IntegerUserIriClass("chembl:cell_line_report_card", "integer",
+                "https://www.ebi.ac.uk/chembl/cell_line_report_card/CHEMBL"));
+        config.addIriClass(new StringUserIriClass("glygen:protein", "http://glygen.org/protein/"));
         config.addIriClass(
                 new StringUserIriClass("glycosmos:glycoproteins", "https://glycosmos.org/glycoproteins/show/uniprot/"));
         config.addIriClass(new StringUserIriClass("alphafold:entry", "https://alphafold.ebi.ac.uk/entry/"));
@@ -195,6 +196,49 @@ public class Common
         config.addIriClass(new IntegerUserIriClass("wikidata:wiki", "integer", "https://www.wikidata.org/wiki/Q"));
         config.addIriClass(new IntegerUserIriClass("wikidata:entity", "integer", "http://www.wikidata.org/entity/Q"));
         config.addIriClass(new IntegerUserIriClass("nextprot:term", "integer", "https://www.nextprot.org/term/TS-", 4));
+
+        config.addIriClass(new IntegerUserIriClass("cancerrxgene:celline", "integer",
+                "https://www.cancerrxgene.org/translation/CellLine/"));
+        config.addIriClass(
+                new IntegerUserIriClass("depmap:celline", "integer", "https://depmap.org/portal/cell_line/ACH-", 6));
+        config.addIriClass(new IntegerUserIriClass("sanger:passport", "integer",
+                "https://cellmodelpassports.sanger.ac.uk/passports/SIDM", 5));
+        config.addIriClass(new IntegerUserIriClass("sanger:line", "integer",
+                "https://cancer.sanger.ac.uk/cell_lines/sample/overview?id="));
+        config.addIriClass(new IntegerUserIriClass("flybase:report", "integer", "http://flybase.org/reports/FBgn", 7));
+        config.addIriClass(
+                new IntegerUserIriClass("informatics:marker", "integer", "http://www.informatics.jax.org/marker/MGI:"));
+        config.addIriClass(new IntegerUserIriClass("wormbase:gene", "integer",
+                "http://www.wormbase.org/db/gene/gene?name=WBGene", 8, ";class=Gene"));
+        config.addIriClass(new IntegerUserIriClass("opentargets:target", "integer",
+                "https://platform.opentargets.org/target/ENSG", 11));
+        config.addIriClass(new IntegerUserIriClass("rgdweb:gene", "integer",
+                "https://rgd.mcw.edu/rgdweb/report/gene/main.html?id="));
+        config.addIriClass(
+                new IntegerUserIriClass("thegencc:gene", "integer", "https://search.thegencc.org/genes/HGNC:"));
+        config.addIriClass(new IntegerUserIriClass("xenbase:gene", "integer",
+                "https://www.xenbase.org/gene/showgene.do?method=display&geneId=XB-GENE-"));
+        config.addIriClass(
+                new IntegerUserIriClass("yeastgenome:locus", "integer", "https://www.yeastgenome.org/locus/S", 9));
+        config.addIriClass(new StringUserIriClass("pharos:target", "https://pharos.nih.gov/targets/"));
+        config.addIriClass(new StringUserIriClass("bgee:gene", "https://www.bgee.org/gene/"));
+        config.addIriClass(new StringUserIriClass("pombase:gene", "https://www.pombase.org/gene/"));
+        config.addIriClass(new StringUserIriClass("veupathdb:gene", "https://www.veupathdb.org/gene/"));
+        config.addIriClass(new StringUserIriClass("zfin:entry", "https://zfin.org/ZDB-"));
+        config.addIriClass(new StringUserIriClass("expasy_http:enzyme", "http://enzyme.expasy.org/EC/"));
+        config.addIriClass(
+                new IntegerUserIriClass("proteinatlas:entry", "integer", "https://www.proteinatlas.org/ENSG", 11));
+        config.addIriClass(new StringUserIriClass("proconsortium:entry", "https://proconsortium.org/app/entry/PR:"));
+        config.addIriClass(new StringUserIriClass("wormbase:protein", "https://wormbase.org/db/seq/protein?name=",
+                ";class=Protein"));
+        config.addIriClass(new StringUserIriClass("brenda:enzyme", "https://www.brenda-enzymes.org/enzyme.php?ecno="));
+        config.addIriClass(new StringUserIriClass("intact:interactor", "https://www.ebi.ac.uk/intact/search?query=id:",
+                "#interactors"));
+        config.addIriClass(
+                new StringUserIriClass("interpro:protein", "https://www.ebi.ac.uk/interpro/protein/reviewed/"));
+        config.addIriClass(new StringUserIriClass("nextprot:entry", "https://www.nextprot.org/entry/NX_"));
+        config.addIriClass(new IntegerUserIriClass("interpro:entry", "integer",
+                "https://www.ebi.ac.uk/interpro/entry/InterPro/IPR", 6));
     }
 
 
