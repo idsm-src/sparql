@@ -20,9 +20,9 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.MapUserIriClass;
 
 public class Isdb
 {
-    public static final String isdb = "http://bioinfo.uochb.cas.cz/rdf/isdb/";
-    public static final String bnisdb = "http://bioinfo.uochb.cas.cz/rdf/isdb/bn";
-    public static final String isdbLibrary = "<http://bioinfo.uochb.cas.cz/rdf/isdb/library/isdb>";
+    public static final String isdb = "https://idsm.elixir-czech.cz/rdf/isdb/";
+    public static final String bnisdb = "https://idsm.elixir-czech.cz/rdf/isdb/bn";
+    public static final String isdbLibrary = "<https://idsm.elixir-czech.cz/rdf/isdb/library/isdb>";
 
 
     public static void addPrefixes(SparqlDatabaseConfiguration config)
