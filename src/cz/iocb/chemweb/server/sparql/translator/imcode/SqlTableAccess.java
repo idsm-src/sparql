@@ -422,7 +422,7 @@ public class SqlTableAccess extends SqlIntercode
         childColumns.addAll(child.getVariables().getNonConstantColumns());
 
         if(!parent.conditions.isTrue())
-            childColumns.addAll(child.conditions.getNonConstantColumns());
+            childColumns.addAll(parent.conditions.getNonConstantColumns());
 
         return schema.isPartOfForeignKey(parent.table, child.table, columns, childColumns);
     }
@@ -745,7 +745,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static SqlIntercode distinctUnionizeByPrimaryKey(SqlTableAccess parent, SqlTableAccess child,
+    private static SqlIntercode distinctUnionizeByForeignKey(SqlTableAccess parent, SqlTableAccess child,
             List<ColumnPair> key)
     {
         Conditions conditions = null;
@@ -789,7 +789,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static SqlTableAccess distinctUnionizeByForeignKey(SqlTableAccess left, SqlTableAccess right)
+    private static SqlTableAccess distinctUnionizeByPrimaryKey(SqlTableAccess left, SqlTableAccess right)
     {
         Conditions conditions = Conditions.or(left.conditions, right.conditions);
 
@@ -864,16 +864,16 @@ public class SqlTableAccess extends SqlIntercode
         List<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
 
         if(dropRight != null)
-            return SqlTableAccess.distinctUnionizeByPrimaryKey(left, right, dropRight);
+            return SqlTableAccess.distinctUnionizeByForeignKey(left, right, dropRight);
 
         List<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, right, left);
 
         if(dropLeft != null)
-            return SqlTableAccess.distinctUnionizeByPrimaryKey(right, left, dropLeft);
+            return SqlTableAccess.distinctUnionizeByForeignKey(right, left, dropLeft);
 
 
         if(SqlTableAccess.canBeDistinctUnionizedByPrimaryKey(schema, left, right))
-            return SqlTableAccess.distinctUnionizeByForeignKey(left, right);
+            return SqlTableAccess.distinctUnionizeByPrimaryKey(left, right);
 
         return null;
     }
@@ -941,9 +941,6 @@ public class SqlTableAccess extends SqlIntercode
     {
         if(restrictions == null)
             return this;
-
-        if(this.reduced)
-            reduced = true;
 
         UsedVariables optVariables = new UsedVariables();
 
@@ -1073,6 +1070,12 @@ public class SqlTableAccess extends SqlIntercode
     protected Table getTable()
     {
         return table;
+    }
+
+
+    protected boolean getReduced()
+    {
+        return reduced;
     }
 
 

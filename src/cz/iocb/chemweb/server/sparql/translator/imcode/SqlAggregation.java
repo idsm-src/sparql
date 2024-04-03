@@ -142,6 +142,9 @@ public class SqlAggregation extends SqlIntercode
                     optAggregations.put(entry.getKey(), SqlBuiltinCall.create("card", false, List.of()));
 
 
+        boolean optChildReduce = optAggregations.values().stream()
+                .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
+
         HashSet<String> newChildRestrictions = new HashSet<String>(groupVariables);
 
         for(Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
@@ -150,7 +153,7 @@ public class SqlAggregation extends SqlIntercode
 
         if(!newChildRestrictions.equals(childRestrictions))
         {
-            optChild = child.optimize(newChildRestrictions, childReduce);
+            optChild = child.optimize(newChildRestrictions, optChildReduce);
             optAggregations = optimizeAggregations(optAggregations, optChild);
         }
 
@@ -171,7 +174,7 @@ public class SqlAggregation extends SqlIntercode
 
             for(List<SqlIntercode> part : parts.values())
             {
-                SqlIntercode child = SqlUnion.union(part).optimize(childRestrictions, true); // TODO:
+                SqlIntercode child = SqlUnion.union(part).optimize(childRestrictions, optChildReduce);
                 Map<String, SqlExpressionIntercode> aggs = optimizeAggregations(optAggregations, child);
                 result.add(aggregate(groupVariables, aggs, child, restrictions).optimize(restrictions, reduced));
             }
@@ -199,14 +202,14 @@ public class SqlAggregation extends SqlIntercode
                 {
                     if(other instanceof CodeWrapper o && item instanceof SqlTableAccess l
                             && o.item instanceof SqlTableAccess r && Objects.equal(l.getTable(), r.getTable())
-                            && l.getConditions().equals(r.getConditions()))
+                            && l.getConditions().equals(r.getConditions()) && l.getReduced() == r.getReduced())
                         return true;
 
 
                     if(other instanceof CodeWrapper o && item instanceof SqlDistinct pl
                             && o.item instanceof SqlDistinct pr && pl.getChild() instanceof SqlTableAccess l
                             && pr.getChild() instanceof SqlTableAccess r && Objects.equal(l.getTable(), r.getTable())
-                            && l.getConditions().equals(r.getConditions()))
+                            && l.getConditions().equals(r.getConditions()) /*&& l.getReduced() == r.getReduced()*/)
                     {
                         Set<Column> sl = new HashSet<Column>();
 
