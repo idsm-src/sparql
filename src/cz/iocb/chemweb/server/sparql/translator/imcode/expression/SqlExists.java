@@ -79,7 +79,7 @@ public class SqlExists extends SqlExpressionIntercode
     @Override
     public SqlExpressionIntercode optimize(UsedVariables variables)
     {
-        return create(negated, pattern, variables);
+        return create(negated, pattern.optimize(variables.getNames(), true), variables);
     }
 
 
