@@ -11,15 +11,18 @@ import java.util.stream.Stream;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.Condition;
 import cz.iocb.chemweb.server.sparql.database.Conditions;
+import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Request;
 import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
 import cz.iocb.chemweb.server.sparql.mapping.InternalNodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.chemweb.server.sparql.mapping.MappedNode;
 import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
 import cz.iocb.chemweb.server.sparql.mapping.ParametrisedIriMapping;
+import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.QuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.SingleTableQuadMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.InternalResourceClass;
@@ -470,7 +473,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             maps.add(new MappedNode(predicate, mapping.getPredicate()));
             maps.add(new MappedNode(object, mapping.getObject()));
 
-            return SqlTableAccess.create(mapping.getTable(), conditions, maps);
+            return getTableAccess(mapping.getTable(), conditions, maps);
         }
         else if(qmapping instanceof JoinTableQuadMapping)
         {
@@ -524,7 +527,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(i == mapping.getPredicateTableIdx())
                     conditions = Conditions.and(conditions, predicateConditions);
 
-                SqlIntercode acess = SqlTableAccess.create(table, conditions, maps);
+                SqlIntercode acess = getTableAccess(table, conditions, maps);
 
                 result = SqlJoin.join(result, acess);
             }
@@ -533,6 +536,68 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         return null;
+    }
+
+
+    private static SqlIntercode getTableAccess(Table table, Conditions extraCondition, List<MappedNode> maps)
+    {
+        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
+
+        Condition condition = new Condition();
+        UsedVariables variables = new UsedVariables();
+
+        for(MappedNode map : maps)
+        {
+            Node node = map.getNode();
+            NodeMapping mapping = map.getMapping();
+
+            if(node == null)
+                continue;
+
+            if(!(node instanceof VariableOrBlankNode) && mapping instanceof ConstantMapping)
+                continue; //NOTE: already checked
+
+            ResourceClass resourceClass = mapping.getResourceClass();
+            List<Column> columns = mapping.getColumns();
+
+            for(Column column : columns)
+                if(schema.isNullableColumn(table, column))
+                    condition.addIsNotNull(column);
+
+            if(node instanceof VariableOrBlankNode)
+            {
+                String variableName = ((VariableOrBlankNode) node).getSqlName();
+                UsedVariable other = variables.get(variableName);
+
+                if(other == null)
+                {
+                    variables.add(new UsedVariable(variableName, resourceClass, columns, false));
+                }
+                else if(other.getResourceClass() == resourceClass)
+                {
+                    List<Column> current = other.getMapping(resourceClass);
+                    condition.addAreEqual(columns, current);
+                }
+                else
+                {
+                    //NOTE: CommonIriClass cannot be used in mappings
+                    assert other.getResourceClass().getGeneralClass() != resourceClass.getGeneralClass();
+                    return SqlNoSolution.get();
+                }
+            }
+            else if(mapping instanceof ParametrisedMapping)
+            {
+                List<Column> values = mapping.getResourceClass().toColumns(node);
+                condition.addAreEqual(columns, values);
+            }
+        }
+
+        Conditions conditions = Conditions.and(extraCondition, condition);
+
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
+
+        return SqlTableAccess.create(table, conditions, variables);
     }
 
 

@@ -21,13 +21,9 @@ import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
 import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
 import cz.iocb.chemweb.server.sparql.engine.Request;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantMapping;
-import cz.iocb.chemweb.server.sparql.mapping.MappedNode;
-import cz.iocb.chemweb.server.sparql.mapping.NodeMapping;
-import cz.iocb.chemweb.server.sparql.mapping.ParametrisedMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable;
+import cz.iocb.chemweb.server.sparql.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
 
@@ -37,105 +33,57 @@ public class SqlTableAccess extends SqlIntercode
 {
     private final Table table;
     private final Conditions conditions;
-    private final Map<String, ResourceClass> resources;
-    private final Map<String, List<Column>> mappings;
-    private final Map<Column, Column> expressions;
+    private final UsedVariables internal;
     private final boolean reduced;
 
 
-    public SqlTableAccess(UsedVariables variables, Table table, Conditions conditions,
-            Map<String, ResourceClass> resources, Map<String, List<Column>> mappings, Map<Column, Column> expressions,
-            boolean reduced)
+    private SqlTableAccess(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
     {
-        super(variables, true);
+        super(getExternalVariables(internal, conditions), true);
 
         this.table = table;
         this.conditions = conditions;
-        this.resources = resources;
-        this.mappings = mappings;
-        this.expressions = expressions;
+        this.internal = internal;
         this.reduced = reduced;
     }
 
 
-    public static SqlIntercode create(Table table, Conditions extraCondition, List<MappedNode> maps)
+    public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
     {
-        return create(table, extraCondition, maps, false);
+        return new SqlTableAccess(table, conditions, internal, reduced);
     }
 
 
-    protected static SqlIntercode create(Table table, Conditions extraCondition, List<MappedNode> maps, boolean reduced)
+    public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal)
     {
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
+        return new SqlTableAccess(table, conditions, internal, false);
+    }
 
-        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
 
-        Condition condition = new Condition();
+    public static SqlIntercode create(Table table, UsedVariables internal)
+    {
+        return new SqlTableAccess(table, new Conditions(new Condition()), internal, false);
+    }
 
-        for(MappedNode map : maps)
-        {
-            Node node = map.getNode();
-            NodeMapping mapping = map.getMapping();
 
-            if(node == null)
-                continue;
-
-            if(!(node instanceof VariableOrBlankNode) && mapping instanceof ConstantMapping)
-                continue; //NOTE: already checked
-
-            ResourceClass resourceClass = mapping.getResourceClass();
-            List<Column> columns = mapping.getColumns();
-
-            for(Column column : columns)
-                if(schema.isNullableColumn(table, column))
-                    condition.addIsNotNull(column);
-
-            if(node instanceof VariableOrBlankNode)
-            {
-                String variableName = ((VariableOrBlankNode) node).getSqlName();
-
-                if(mappings.get(variableName) == null)
-                {
-                    mappings.put(variableName, columns);
-                    resources.put(variableName, resourceClass);
-                }
-                else if(resources.get(variableName) == resourceClass)
-                {
-                    List<Column> current = mappings.get(variableName);
-                    condition.addAreEqual(columns, current);
-                }
-                else
-                {
-                    //NOTE: CommonIriClass cannot be used in mappings
-                    assert resources.get(variableName).getGeneralClass() != resourceClass.getGeneralClass();
-                    return SqlNoSolution.get();
-                }
-            }
-            else if(mapping instanceof ParametrisedMapping)
-            {
-                List<Column> values = mapping.getResourceClass().toColumns(node);
-                condition.addAreEqual(columns, values);
-            }
-        }
-
-        Conditions conditions = Conditions.and(extraCondition, condition);
-
-        if(conditions.isFalse())
-            return SqlNoSolution.get();
-
+    private static UsedVariables getExternalVariables(UsedVariables variables, Conditions conditions)
+    {
         Map<Column, Column> representants = selectColumnRepresentants(conditions);
-        UsedVariables variables = new UsedVariables();
+        Map<Column, Column> expressions = new HashMap<Column, Column>();
 
-        for(String name : mappings.keySet())
+        UsedVariables result = new UsedVariables();
+
+        for(UsedVariable var : variables.getValues())
         {
-            UsedVariable variable = new UsedVariable(name, false);
-            variable.addMapping(resources.get(name), selectColumns(representants, expressions, mappings.get(name)));
-            variables.add(variable);
+            UsedVariable variable = new UsedVariable(var.getName(), var.canBeNull());
+
+            for(Entry<ResourceClass, List<Column>> map : var.getMappings().entrySet())
+                variable.addMapping(map.getKey(), selectColumns(representants, expressions, map.getValue()));
+
+            result.add(variable);
         }
 
-        return new SqlTableAccess(variables, table, conditions, resources, mappings, expressions, reduced);
+        return result;
     }
 
 
@@ -263,32 +211,39 @@ public class SqlTableAccess extends SqlIntercode
 
         Set<Column> columns = new HashSet<Column>();
 
-        for(Entry<String, ResourceClass> e : left.resources.entrySet())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
         {
-            String var = e.getKey();
+            UsedVariable leftVar = pair.getLeftVariable();
+            UsedVariable rightVar = pair.getRightVariable();
 
-            if(right.getVariable(var) == null)
+            if(leftVar == null || rightVar == null)
                 continue;
 
-            //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
-            if(!e.getValue().equals(right.resources.get(var)))
+            //NOTE: currently, only simple join is taken into the account
+
+            if(pair.getClasses().size() > 1)
                 return false;
 
-            //NOTE: currently, only simple join (without IS NULL conditions) can be taken into the account
-            if(left.getVariable(var).canBeNull() || right.getVariable(var).canBeNull())
-                if(!left.mappings.get(var).equals(right.mappings.get(var)))
+            if(leftVar.canBeNull() || rightVar.canBeNull())
+                if(!leftVar.equals(rightVar)) // TODO:  take representatives into account
                     return false;
 
-            List<Column> leftCols = left.mappings.get(var);
-            List<Column> rightCols = right.mappings.get(var);
-
-            for(int i = 0; i < leftCols.size(); i++)
+            for(PairedClass pairedClass : pair.getClasses())
             {
-                Set<Column> leftColumns = left.conditions.getEqualTableColumns(leftCols.get(i));
-                Set<Column> rightColumns = right.conditions.getEqualTableColumns(rightCols.get(i));
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    return false;
 
-                leftColumns.retainAll(rightColumns);
-                columns.addAll(leftColumns);
+                List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
+                List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
+
+                for(int i = 0; i < leftCols.size(); i++)
+                {
+                    Set<Column> leftColumns = left.conditions.getEqualTableColumns(leftCols.get(i));
+                    Set<Column> rightColumns = right.conditions.getEqualTableColumns(rightCols.get(i));
+
+                    leftColumns.retainAll(rightColumns);
+                    columns.addAll(leftColumns);
+                }
             }
         }
 
@@ -313,42 +268,45 @@ public class SqlTableAccess extends SqlIntercode
         if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table) == null)
             return null;
 
-        if(!parent.expressions.isEmpty())
-            return null;
-
-        // FIXME:
-        if(parent.conditions.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
+        if(parent.hasExpression())
             return null;
 
 
         Set<ColumnPair> columns = new HashSet<ColumnPair>();
 
-        for(Entry<String, ResourceClass> e : parent.resources.entrySet())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(parent.internal, child.internal))
         {
-            String var = e.getKey();
+            UsedVariable parentVar = pair.getLeftVariable();
+            UsedVariable childVar = pair.getRightVariable();
 
-            if(child.getVariable(var) == null)
+            if(parentVar == null || childVar == null)
                 continue;
 
-            //NOTE: currently, merging is allowed only in the case that variables are not joined by different resource classes
-            if(!e.getValue().equals(child.resources.get(var)))
+            //NOTE: currently, only simple join is taken into the account
+
+            if(pair.getClasses().size() > 1)
                 return null;
 
-            //NOTE: currently, only simple join (without IS NULL conditions) can be taken into the account
-            if(parent.getVariable(var).canBeNull() || child.getVariable(var).canBeNull())
+            if(parentVar.canBeNull() || childVar.canBeNull())
                 return null;
 
-            List<Column> parentCols = parent.mappings.get(var);
-            List<Column> childCols = child.mappings.get(var);
-
-            for(int i = 0; i < parentCols.size(); i++)
+            for(PairedClass pairedClass : pair.getClasses())
             {
-                Set<Column> parentColumns = parent.conditions.getEqualTableColumns(parentCols.get(i));
-                Set<Column> childColumns = child.conditions.getEqualTableColumns(childCols.get(i));
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    return null;
 
-                for(Column parentColumn : parentColumns)
-                    for(Column childColumn : childColumns)
-                        columns.add(new ColumnPair(parentColumn, childColumn));
+                List<Column> parentCols = parentVar.getMapping(pairedClass.getLeftClass());
+                List<Column> childCols = childVar.getMapping(pairedClass.getRightClass());
+
+                for(int i = 0; i < parentCols.size(); i++)
+                {
+                    Set<Column> parentColumns = parent.conditions.getEqualTableColumns(parentCols.get(i));
+                    Set<Column> childColumns = child.conditions.getEqualTableColumns(childCols.get(i));
+
+                    for(Column parentColumn : parentColumns)
+                        for(Column childColumn : childColumns)
+                            columns.add(new ColumnPair(parentColumn, childColumn));
+                }
             }
         }
 
@@ -379,11 +337,26 @@ public class SqlTableAccess extends SqlIntercode
             return false;
 
         // the sets of variables (and their resource classes) have to be the same
-        if(!left.resources.equals(right.resources))
-            return false;
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
+        {
+            UsedVariable leftVar = pair.getLeftVariable();
+            UsedVariable rightVar = pair.getRightVariable();
 
-        if(!left.mappings.equals(right.mappings))
-            return false;
+            if(leftVar == null || rightVar == null)
+                return false;
+
+            for(PairedClass pairedClass : pair.getClasses())
+            {
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    return false;
+
+                List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
+                List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
+
+                if(!leftCols.equals(rightCols))
+                    return false;
+            }
+        }
 
         return true;
     }
@@ -396,26 +369,31 @@ public class SqlTableAccess extends SqlIntercode
             return null;
 
         // because we cannot rewrite expressions
-        if(!child.expressions.isEmpty())
-            return null;
-
-        // because we cannot rewrite expressions
-        if(child.conditions.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
+        if(child.hasExpression())
             return null;
 
         // the sets of variables (and their resource classes) have to be the same
-        if(!parent.resources.equals(child.resources))
-            return null;
-
         Set<ColumnPair> columns = new HashSet<ColumnPair>();
 
-        for(String var : parent.getVariables().getNames())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(parent.internal, child.internal))
         {
-            List<Column> parentCols = parent.mappings.get(var);
-            List<Column> childCols = child.mappings.get(var);
+            UsedVariable parentVar = pair.getLeftVariable();
+            UsedVariable childVar = pair.getRightVariable();
 
-            for(int i = 0; i < parentCols.size(); i++)
-                columns.add(new ColumnPair(parentCols.get(i), childCols.get(i)));
+            if(parentVar == null || childVar == null)
+                return null;
+
+            for(PairedClass pairedClass : pair.getClasses())
+            {
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    return null;
+
+                List<Column> parentCols = parentVar.getMapping(pairedClass.getLeftClass());
+                List<Column> childCols = childVar.getMapping(pairedClass.getRightClass());
+
+                for(int i = 0; i < parentCols.size(); i++)
+                    columns.add(new ColumnPair(parentCols.get(i), childCols.get(i)));
+            }
         }
 
         Set<Column> childColumns = new HashSet<Column>();
@@ -463,19 +441,25 @@ public class SqlTableAccess extends SqlIntercode
             rightConditions.add(condition);
         }
 
-
         // condition added by the join
         Condition joinCondition = new Condition();
 
-        for(Entry<String, List<Column>> entry : left.mappings.entrySet())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
         {
-            List<Column> leftCols = entry.getValue();
-            List<Column> rightCols = right.mappings.get(entry.getKey());
+            UsedVariable leftVar = pair.getLeftVariable();
+            UsedVariable rightVar = pair.getRightVariable();
 
-            if(rightCols != null)
-                joinCondition.addAreEqual(leftCols, rightCols);
+            if(leftVar != null && rightVar != null && !leftVar.canBeNull() && !rightVar.canBeNull())
+            {
+                for(PairedClass pairedClass : pair.getClasses())
+                {
+                    List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
+                    List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
+
+                    joinCondition.addAreEqual(leftCols, rightCols);
+                }
+            }
         }
-
 
         // check that nothing has been added
         Conditions conditions = Conditions.and(rightConditions, joinCondition);
@@ -494,101 +478,42 @@ public class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedVariable leftVariable : left.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(leftVariable.getName()))
-            {
-                String name = leftVariable.getName();
-
-                ResourceClass resClass = left.resources.get(name);
-                List<Column> columns = left.mappings.get(name);
-                resources.put(name, resClass);
-                mappings.put(name, columns);
-
-                UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                variables.add(variable);
-            }
-        }
-
-        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions, left.reduced);
+        return new SqlTableAccess(left.table, conditions, left.internal.restrict(restrictions), left.reduced);
     }
 
 
     private static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
-        Conditions conditions = Conditions.and(left.conditions, right.conditions);
-
-        // condition added by the join
         Condition joinCondition = new Condition();
+        UsedVariables variables = new UsedVariables();
 
-        for(Entry<String, List<Column>> entry : left.mappings.entrySet())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
         {
-            String name = entry.getKey();
-            List<Column> leftCols = entry.getValue();
-            List<Column> rightCols = right.mappings.get(name);
+            UsedVariable leftVar = pair.getLeftVariable();
+            UsedVariable rightVar = pair.getRightVariable();
 
-            if(rightCols != null)
-                joinCondition.addAreEqual(leftCols, rightCols);
+            if(restrictions == null || restrictions.contains(pair.getName()))
+                variables.add(leftVar != null ? leftVar : rightVar);
+
+            if(leftVar != null && rightVar != null && !leftVar.canBeNull() && !rightVar.canBeNull())
+            {
+                for(PairedClass pairedClass : pair.getClasses())
+                {
+                    List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
+                    List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
+
+                    joinCondition.addAreEqual(leftCols, rightCols);
+                }
+            }
         }
 
+        Conditions conditions = Conditions.and(left.conditions, right.conditions);
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedVariable leftVariable : left.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(leftVariable.getName()))
-            {
-                String name = leftVariable.getName();
-
-                ResourceClass resClass = left.resources.get(name);
-                List<Column> columns = left.mappings.get(name);
-                resources.put(name, resClass);
-                mappings.put(name, columns);
-
-                UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                variables.add(variable);
-            }
-        }
-
-        for(UsedVariable rightVariable : right.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(rightVariable.getName()))
-            {
-                String name = rightVariable.getName();
-
-                if(variables.get(name) == null)
-                {
-                    ResourceClass resClass = right.resources.get(name);
-                    List<Column> columns = right.mappings.get(name);
-                    resources.put(name, resClass);
-                    mappings.put(name, columns);
-
-                    UsedVariable variable = new UsedVariable(name, rightVariable.canBeNull());
-                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                    variables.add(variable);
-                }
-            }
-        }
-
-        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions,
-                left.reduced && right.reduced);
+        return new SqlTableAccess(left.table, conditions, variables, left.reduced && right.reduced);
     }
 
 
@@ -601,73 +526,37 @@ public class SqlTableAccess extends SqlIntercode
             for(Column col : parent.conditions.getEqualTableColumns(pair.getLeft()))
                 map.put(col, pair.getRight());
 
-        Conditions conditions = Conditions.and(child.conditions, remap(map, parent.conditions));
 
-        // condition added by the join
         Condition joinCondition = new Condition();
+        UsedVariables variables = new UsedVariables();
 
-        for(Entry<String, List<Column>> entry : parent.mappings.entrySet())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(child.internal, parent.internal))
         {
-            String name = entry.getKey();
-            List<Column> parentCols = entry.getValue();
-            List<Column> childCols = child.mappings.get(name);
+            UsedVariable childVar = pair.getLeftVariable();
+            UsedVariable parentVar = pair.getRightVariable();
 
-            if(childCols != null)
-                joinCondition.addAreEqual(childCols, remap(map, parentCols));
+            if(restrictions == null || restrictions.contains(pair.getName()))
+                variables.add(childVar != null ? childVar : remap(map, parentVar));
+
+            if(childVar != null && parentVar != null && !childVar.canBeNull() && !parentVar.canBeNull())
+            {
+                for(PairedClass pairedClass : pair.getClasses())
+                {
+                    List<Column> childCols = childVar.getMapping(pairedClass.getLeftClass());
+                    List<Column> parentCols = parentVar.getMapping(pairedClass.getRightClass());
+
+                    joinCondition.addAreEqual(childCols, remap(map, parentCols));
+                }
+            }
         }
 
+        Conditions conditions = Conditions.and(child.conditions, remap(map, parent.conditions));
         conditions = Conditions.and(conditions, joinCondition);
 
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedVariable childVariable : child.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(childVariable.getName()))
-            {
-                String name = childVariable.getName();
-
-                ResourceClass resClass = child.resources.get(name);
-                List<Column> columns = child.mappings.get(name);
-                resources.put(name, resClass);
-                mappings.put(name, columns);
-
-                UsedVariable variable = new UsedVariable(name, childVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                variables.add(variable);
-            }
-        }
-
-        for(UsedVariable parentVariable : parent.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(parentVariable.getName()))
-            {
-                String name = parentVariable.getName();
-
-                if(variables.get(name) == null)
-                {
-                    ResourceClass resClass = parent.resources.get(name);
-                    List<Column> columns = remap(map, parent.mappings.get(name));
-                    resources.put(name, resClass);
-                    mappings.put(name, columns);
-
-                    UsedVariable variable = new UsedVariable(name, parentVariable.canBeNull());
-                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                    variables.add(variable);
-                }
-            }
-        }
-
-
-        return new SqlTableAccess(variables, child.table, conditions, resources, mappings, expressions,
-                parent.reduced && child.reduced);
+        return new SqlTableAccess(child.table, conditions, variables, child.reduced && parent.reduced);
     }
 
 
@@ -679,40 +568,23 @@ public class SqlTableAccess extends SqlIntercode
         Column extraCondition = extraNotNulls.isEmpty() ? null : extraNotNulls.iterator().next();
 
         Conditions conditions = new Conditions(left.conditions);
-
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
-        for(UsedVariable leftVariable : left.variables.getValues())
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
         {
-            if(restrictions == null || restrictions.contains(leftVariable.getName()))
+            UsedVariable leftVar = pair.getLeftVariable();
+            UsedVariable rightVar = pair.getRightVariable();
+
+            if(restrictions == null || restrictions.contains(pair.getName()))
             {
-                String name = leftVariable.getName();
-
-                ResourceClass resClass = left.resources.get(name);
-                List<Column> columns = left.mappings.get(name);
-                resources.put(name, resClass);
-                mappings.put(name, columns);
-
-                UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-                variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                variables.add(variable);
-            }
-        }
-
-        for(UsedVariable rightVariable : right.variables.getValues())
-        {
-            if(restrictions == null || restrictions.contains(rightVariable.getName()))
-            {
-                String name = rightVariable.getName();
-
-                if(variables.get(name) == null)
+                if(leftVar != null)
                 {
-                    ResourceClass resClass = right.resources.get(name);
-                    List<Column> columns = right.mappings.get(name);
+                    variables.add(leftVar);
+                }
+                else if(variables.get(pair.getName()) != null)
+                {
+                    ResourceClass resClass = rightVar.getResourceClass();
+                    List<Column> columns = rightVar.getMapping(resClass);
 
                     if(extraCondition != null)
                     {
@@ -730,18 +602,13 @@ public class SqlTableAccess extends SqlIntercode
                         modified = columns;
                     }
 
-                    resources.put(name, resClass);
-                    mappings.put(name, columns);
-
-                    UsedVariable variable = new UsedVariable(name, rightVariable.canBeNull() || extraCondition != null);
-                    variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-                    variables.add(variable);
+                    boolean canBeNull = rightVar.canBeNull() || extraCondition != null;
+                    variables.add(new UsedVariable(pair.getName(), resClass, columns, canBeNull));
                 }
             }
         }
 
-        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions,
-                left.reduced && right.reduced);
+        return new SqlTableAccess(left.table, conditions, variables, left.reduced && right.reduced);
     }
 
 
@@ -765,27 +632,15 @@ public class SqlTableAccess extends SqlIntercode
             conditions = Conditions.or(parent.conditions, remap(map, child.conditions));
         }
 
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
-        for(UsedVariable parentVariable : parent.variables.getValues())
+        for(UsedVariable var : parent.internal.getValues())
         {
-            String name = parentVariable.getName();
-
-            ResourceClass resClass = parent.resources.get(name);
-            List<Column> columns = parent.mappings.get(name);
-            resources.put(name, resClass);
-            mappings.put(name, columns);
-
-            UsedVariable variable = new UsedVariable(name, parentVariable.canBeNull());
-            variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-            variables.add(variable);
+            boolean canBeNull = var.canBeNull() || child.internal.get(var.getName()).canBeNull();
+            variables.add(new UsedVariable(var.getName(), var.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(variables, parent.table, conditions, resources, mappings, expressions, true);
+        return new SqlTableAccess(parent.table, conditions, variables, true);
     }
 
 
@@ -793,27 +648,15 @@ public class SqlTableAccess extends SqlIntercode
     {
         Conditions conditions = Conditions.or(left.conditions, right.conditions);
 
-        Map<Column, Column> expressions = new HashMap<Column, Column>();
-        Map<String, ResourceClass> resources = new HashMap<String, ResourceClass>();
-        Map<String, List<Column>> mappings = new HashMap<String, List<Column>>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
         UsedVariables variables = new UsedVariables();
 
-        for(UsedVariable leftVariable : left.variables.getValues())
+        for(UsedVariable var : left.internal.getValues())
         {
-            String name = leftVariable.getName();
-
-            ResourceClass resClass = left.resources.get(name);
-            List<Column> columns = left.mappings.get(name);
-            resources.put(name, resClass);
-            mappings.put(name, columns);
-
-            UsedVariable variable = new UsedVariable(name, leftVariable.canBeNull());
-            variable.addMapping(resClass, selectColumns(representants, expressions, columns));
-            variables.add(variable);
+            boolean canBeNull = var.canBeNull() || right.internal.get(var.getName()).canBeNull();
+            variables.add(new UsedVariable(var.getName(), var.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(variables, left.table, conditions, resources, mappings, expressions, true);
+        return new SqlTableAccess(left.table, conditions, variables, true);
     }
 
 
@@ -879,6 +722,17 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private static UsedVariable remap(Map<Column, Column> map, UsedVariable var)
+    {
+        UsedVariable result = new UsedVariable(var.getName(), var.canBeNull());
+
+        for(Map.Entry<ResourceClass, List<Column>> mapping : var.getMappings().entrySet())
+            result.addMapping(mapping.getKey(), remap(map, mapping.getValue()));
+
+        return result;
+    }
+
+
     private static List<Column> remap(Map<Column, Column> map, List<Column> columns)
     {
         List<Column> result = new ArrayList<Column>();
@@ -936,44 +790,49 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    private boolean hasExpression()
+    {
+        if(internal.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
+            return true;
+
+        if(conditions.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
+            return true;
+
+        return false;
+    }
+
+
     @Override
     public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
 
-        UsedVariables optVariables = new UsedVariables();
-
-        Map<Column, Column> optExpressions = new HashMap<Column, Column>();
-        Map<String, List<Column>> optMappings = new HashMap<String, List<Column>>();
-        Map<String, ResourceClass> optResources = new HashMap<String, ResourceClass>();
-        Map<Column, Column> representants = selectColumnRepresentants(conditions);
-
-        for(UsedVariable variable : variables.getValues())
-        {
-            String name = variable.getName();
-
-            if(restrictions.contains(name))
-            {
-                ResourceClass resClass = resources.get(name);
-                List<Column> columns = mappings.get(name);
-
-                optResources.put(name, resClass);
-                optMappings.put(name, columns);
-
-                UsedVariable optVariable = new UsedVariable(name, variable.canBeNull());
-                optVariable.addMapping(resClass, selectColumns(representants, optExpressions, columns));
-                optVariables.add(optVariable);
-            }
-        }
-
-        return new SqlTableAccess(optVariables, table, conditions, optResources, optMappings, optExpressions, reduced);
+        return new SqlTableAccess(table, conditions, internal.restrict(restrictions), reduced);
     }
 
 
     @Override
     public String translate()
     {
+        Map<Column, Column> rev = new HashMap<Column, Column>();
+
+        for(UsedVariable var : variables.getValues())
+        {
+            UsedVariable inner = internal.get(var.getName());
+
+            for(ResourceClass resClass : var.getClasses())
+            {
+                List<Column> vCols = var.getMapping(resClass);
+                List<Column> iCols = inner.getMapping(resClass);
+
+                for(int i = 0; i < iCols.size(); i++)
+                    if(iCols.get(i) instanceof ExpressionColumn)
+                        rev.put(vCols.get(i), iCols.get(i));
+            }
+        }
+
+
         boolean canBeLimited = reduced;
 
         for(UsedVariable var : variables.getValues())
@@ -986,9 +845,6 @@ public class SqlTableAccess extends SqlIntercode
         builder.append("SELECT ");
 
         Set<Column> columns = getVariables().getNonConstantColumns();
-
-        Map<Column, Column> rev = new HashMap<Column, Column>();
-        expressions.forEach((k, v) -> rev.put(v, k));
 
         if(!columns.isEmpty())
             builder.append(columns.stream().map(c -> (rev.containsKey(c) ? rev.get(c) + " AS " : "") + c)
@@ -1085,12 +941,8 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    protected Column getRealColumn(Column c)
+    protected UsedVariable getInternalVariable(String varName)
     {
-        for(Entry<Column, Column> s : expressions.entrySet())
-            if(s.getValue().equals(c))
-                return s.getKey();
-
-        return c;
+        return internal.get(varName);
     }
 }

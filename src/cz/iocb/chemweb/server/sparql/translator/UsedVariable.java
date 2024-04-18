@@ -187,4 +187,28 @@ public class UsedVariable
 
         return true;
     }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        UsedVariable other = (UsedVariable) object;
+
+        if(!name.equals(other.name))
+            return false;
+
+        if(canBeNull != other.canBeNull)
+            return false;
+
+        if(!mappings.equals(other.mappings))
+            return false;
+
+        return true;
+    }
 }

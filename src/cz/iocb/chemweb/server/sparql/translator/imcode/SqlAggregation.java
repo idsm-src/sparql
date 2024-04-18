@@ -212,22 +212,17 @@ public class SqlAggregation extends SqlIntercode
                             && l.getConditions().equals(r.getConditions()) /*&& l.getReduced() == r.getReduced()*/)
                     {
                         Set<Column> sl = new HashSet<Column>();
-
-                        for(String v : pl.getVariables().getNames())
-                            for(Column c : l.getMapping(v))
-                                sl.add(l.getRealColumn(c));
-
-
                         Set<Column> sr = new HashSet<Column>();
 
+                        for(String v : pl.getVariables().getNames())
+                            sl.addAll(l.getInternalVariable(v).getNonConstantColumns());
+
                         for(String v : pr.getVariables().getNames())
-                            for(Column c : r.getMapping(v))
-                                sr.add(r.getRealColumn(c));
+                            sr.addAll(r.getInternalVariable(v).getNonConstantColumns());
 
                         if(sl.equals(sr))
                             return true;
                     }
-
 
                     return false;
                 }
