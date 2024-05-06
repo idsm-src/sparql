@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -16,7 +17,8 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class EnumUserIriClass extends SimpleUserIriClass
 {
-    private final String pattern;
+    private final Pattern pattern;
+    private final String regexp;
     private final HashMap<IRI, String> values;
     private final String prefix;
 
@@ -36,8 +38,11 @@ public class EnumUserIriClass extends SimpleUserIriClass
             length++;
 
         this.prefix = first.substring(0, length);
-        this.pattern = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
         this.values = values;
+
+        //FIXME: check whether the pattern is valid also in pcre2
+        this.regexp = values.keySet().stream().map(i -> Pattern.quote(i.getValue())).collect(joining("|"));
+        this.pattern = Pattern.compile(regexp);
     }
 
 
@@ -61,7 +66,8 @@ public class EnumUserIriClass extends SimpleUserIriClass
     @Override
     public boolean match(IRI iri)
     {
-        return iri.getValue().matches(pattern);
+        Matcher matcher = pattern.matcher(iri.getValue());
+        return matcher.matches();
     }
 
 
@@ -117,7 +123,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
         EnumUserIriClass other = (EnumUserIriClass) object;
 
-        if(!pattern.equals(other.pattern))
+        if(!regexp.equals(other.regexp))
             return false;
 
         if(!values.equals(other.values))

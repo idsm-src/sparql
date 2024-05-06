@@ -4,6 +4,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -26,7 +27,8 @@ public class MapUserIriClass extends SimpleUserIriClass
     private final TableColumn from;
     private final TableColumn to;
 
-    private final String pattern;
+    private final Pattern pattern;
+    private final String regexp;
     private final String prefix;
     private final String suffix;
     private final int length;
@@ -36,6 +38,31 @@ public class MapUserIriClass extends SimpleUserIriClass
             int length, String pattern, String suffix)
     {
         super(name, sqlType);
+
+        this.table = table;
+        this.from = from;
+        this.to = to;
+
+        this.length = length;
+        this.prefix = prefix;
+        this.suffix = suffix;
+
+
+        String code;
+
+        if(prefix == null && suffix == null)
+            code = "?::varchar";
+        else if(length > 0)
+            code = String.format("substring(?, %d, %d)::varchar", prefix != null ? prefix.length() + 1 : 1, length);
+        else if(prefix == null)
+            code = String.format("left(?, -%d)::varchar", suffix.length());
+        else if(suffix == null)
+            code = String.format("right(?, -%d)::varchar", prefix.length());
+        else
+            code = String.format("left(right(?, -%d), -%d)::varchar", prefix.length(), suffix.length());
+
+        this.sqlQuery = String.format("(SELECT %s::varchar FROM %s WHERE %s = %s)", from, table, to, code);
+
 
         StringBuilder builder = new StringBuilder();
 
@@ -52,29 +79,9 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
 
-        this.table = table;
-        this.from = from;
-        this.to = to;
-
-        this.pattern = builder.toString(); //FIXME: check whether the pattern is valid also in pcre2
-        this.prefix = prefix;
-        this.length = length;
-        this.suffix = suffix;
-
-        String code;
-
-        if(prefix == null && suffix == null)
-            code = "?::varchar";
-        else if(length > 0)
-            code = String.format("substring(?, %d, %d)::varchar", prefix != null ? prefix.length() + 1 : 1, length);
-        else if(prefix == null)
-            code = String.format("left(?, -%d)::varchar", suffix.length());
-        else if(suffix == null)
-            code = String.format("right(?, -%d)::varchar", prefix.length());
-        else
-            code = String.format("left(right(?, -%d), -%d)::varchar", prefix.length(), suffix.length());
-
-        this.sqlQuery = String.format("(SELECT %s::varchar FROM %s WHERE %s = %s)", from, table, to, code);
+        //FIXME: check whether the pattern is valid also in pcre2
+        this.regexp = builder.toString();
+        this.pattern = Pattern.compile(regexp);
     }
 
 
@@ -160,7 +167,9 @@ public class MapUserIriClass extends SimpleUserIriClass
     @Override
     public boolean match(IRI iri)
     {
-        if(!iri.getValue().matches(pattern))
+        Matcher matcher = pattern.matcher(iri.getValue());
+
+        if(!matcher.matches())
             return false;
 
         IriCache cache = Request.currentRequest().getIriCache();
@@ -239,7 +248,7 @@ public class MapUserIriClass extends SimpleUserIriClass
             builder.append("CASE WHEN sparql.regex_string(");
             builder.append(parameter);
             builder.append(", '^(");
-            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(regexp.replaceAll("'", "''"));
             builder.append(")$', '') THEN ");
         }
 
@@ -289,7 +298,7 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(!to.equals(other.to))
             return false;
 
-        if(!pattern.equals(other.pattern))
+        if(!regexp.equals(other.regexp))
             return false;
 
         if(prefix == null ? other.prefix != null : !prefix.equals(other.prefix))

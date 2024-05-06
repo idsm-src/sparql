@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -22,7 +23,8 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class IsdbUserIriClass extends UserIriClass
 {
-    private final String pattern;
+    private final Pattern pattern;
+    private final String regexp;
     private final String prefix;
     private final String suffix;
     private final String sqlQuery;
@@ -33,14 +35,15 @@ public class IsdbUserIriClass extends UserIriClass
     {
         super(name, List.of("integer", "char"), List.of(ResultTag.IRI));
 
-        //FIXME: check whether the pattern is valid also in pcre2
-        this.pattern = Pattern.quote(prefix) + "([A-Z]{14}-[NP])" + (suffix != null ? Pattern.quote(suffix) : "");
         this.prefix = prefix;
         this.suffix = suffix;
+        this.prefixLen = prefix.length();
+        this.suffixLen = suffix != null ? suffix.length() : 0;
+        this.sqlQuery = "select id::varchar from isdb.compound_bases where accession = ?";
 
-        prefixLen = prefix.length();
-        suffixLen = suffix != null ? suffix.length() : 0;
-        sqlQuery = "select id::varchar from isdb.compound_bases where accession = ?";
+        //FIXME: check whether the pattern is valid also in pcre2
+        this.regexp = Pattern.quote(prefix) + "([A-Z]{14}-[NP])" + (suffix != null ? Pattern.quote(suffix) : "");
+        this.pattern = Pattern.compile(regexp);
     }
 
 
@@ -92,7 +95,9 @@ public class IsdbUserIriClass extends UserIriClass
     @Override
     public boolean match(IRI iri)
     {
-        if(!iri.getValue().matches(pattern))
+        Matcher matcher = pattern.matcher(iri.getValue());
+
+        if(!matcher.matches())
             return false;
 
         IriCache cache = Request.currentRequest().getIriCache();
@@ -171,7 +176,7 @@ public class IsdbUserIriClass extends UserIriClass
             builder.append("CASE WHEN sparql.regex_string(");
             builder.append(parameter);
             builder.append(", '^(");
-            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(regexp.replaceAll("'", "''"));
             builder.append(")$', '') THEN ");
 
             col1 = builder.toString() + col1 + " END";

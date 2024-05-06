@@ -6,6 +6,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.ExpressionColumn;
@@ -29,33 +31,37 @@ public class GeneralUserIriClass extends UserIriClass
 
     private final SqlCheck sqlCheck;
     private final String sqlQuery;
-    private final String pattern;
+    private final Pattern pattern;
+    private final String regexp;
     private final Function function;
     private final List<Function> inverseFunction;
 
 
-    public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern,
+    public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,
             SqlCheck sqlCheck)
     {
         super(name, sqlTypes, List.of(ResultTag.IRI));
 
         this.sqlCheck = sqlCheck;
-        this.pattern = pattern;
         this.function = new Function(schema, function);
 
-        inverseFunction = new ArrayList<Function>(sqlTypes.size());
+        this.inverseFunction = new ArrayList<Function>(sqlTypes.size());
 
         if(sqlTypes.size() == 1)
         {
-            inverseFunction.add(new Function(schema, function + "_inverse"));
+            this.inverseFunction.add(new Function(schema, function + "_inverse"));
         }
         else
         {
             for(int i = 0; i < sqlTypes.size(); i++)
-                inverseFunction.add(new Function(schema, function + "_inv" + (i + 1)));
+                this.inverseFunction.add(new Function(schema, function + "_inv" + (i + 1)));
         }
 
-        sqlQuery = "SELECT " + inverseFunction.stream().map(f -> f + "(?)").collect(joining(", "));
+        this.sqlQuery = "SELECT " + inverseFunction.stream().map(f -> f + "(?)").collect(joining(", "));
+
+        //FIXME: check whether the pattern is valid also in pcre2
+        this.regexp = regexp;
+        this.pattern = Pattern.compile(regexp);
     }
 
 
@@ -160,7 +166,7 @@ public class GeneralUserIriClass extends UserIriClass
             builder.append("CASE WHEN sparql.regex_string(");
             builder.append(iri);
             builder.append(", '^(");
-            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(regexp.replaceAll("'", "''"));
             builder.append(")$', '') THEN ");
 
             builder.append(inverseFunction.get(part));
@@ -213,7 +219,7 @@ public class GeneralUserIriClass extends UserIriClass
                 builder.append("CASE WHEN sparql.regex_string(");
                 builder.append(iri);
                 builder.append(", '^(");
-                builder.append(pattern.replaceAll("'", "''"));
+                builder.append(regexp.replaceAll("'", "''"));
                 builder.append(")$', '') THEN ");
             }
 
@@ -309,7 +315,9 @@ public class GeneralUserIriClass extends UserIriClass
     @Override
     public boolean match(IRI iri)
     {
-        if(iri.getValue().matches(pattern))
+        Matcher matcher = pattern.matcher(iri.getValue());
+
+        if(matcher.matches())
         {
             if(sqlCheck == SqlCheck.IF_MATCH)
                 return check(iri);
@@ -409,7 +417,7 @@ public class GeneralUserIriClass extends UserIriClass
         if(!sqlCheck.equals(other.sqlCheck))
             return false;
 
-        if(!pattern.equals(other.pattern))
+        if(!regexp.equals(other.regexp))
             return false;
 
         if(!function.equals(other.function))

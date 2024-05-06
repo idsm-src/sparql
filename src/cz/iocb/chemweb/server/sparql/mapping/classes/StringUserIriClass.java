@@ -1,6 +1,7 @@
 package cz.iocb.chemweb.server.sparql.mapping.classes;
 
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
@@ -12,7 +13,8 @@ import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 
 public class StringUserIriClass extends SimpleUserIriClass
 {
-    private final String pattern;
+    private final Pattern pattern;
+    private final String regexp;
     private final String prefix;
     private final String suffix;
     private final int length;
@@ -22,23 +24,27 @@ public class StringUserIriClass extends SimpleUserIriClass
     {
         super(name, "varchar");
 
-        if(pattern == null)
-            pattern = length > 0 ? ".{" + length + "}" : ".*";
+        this.length = length;
+        this.prefix = prefix;
+        this.suffix = suffix;
+
 
         StringBuilder builder = new StringBuilder();
 
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
+        if(pattern == null)
+            pattern = length > 0 ? ".{" + length + "}" : ".*";
+
         builder.append("(" + pattern + ")");
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
 
-        this.pattern = builder.toString(); //FIXME: check whether the pattern is valid also in pcre2
-        this.prefix = prefix;
-        this.length = length;
-        this.suffix = suffix;
+        //FIXME: check whether the pattern is valid also in pcre2
+        this.regexp = builder.toString();
+        this.pattern = Pattern.compile(regexp);
     }
 
 
@@ -96,7 +102,8 @@ public class StringUserIriClass extends SimpleUserIriClass
     @Override
     public boolean match(IRI iri)
     {
-        return iri.getValue().matches(pattern);
+        Matcher matcher = pattern.matcher(iri.getValue());
+        return matcher.matches();
     }
 
 
@@ -138,7 +145,7 @@ public class StringUserIriClass extends SimpleUserIriClass
             builder.append("CASE WHEN sparql.regex_string(");
             builder.append(parameter);
             builder.append(", '^(");
-            builder.append(pattern.replaceAll("'", "''"));
+            builder.append(regexp.replaceAll("'", "''"));
             builder.append(")$', '') THEN ");
         }
 
@@ -174,7 +181,7 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         StringUserIriClass other = (StringUserIriClass) object;
 
-        if(!pattern.equals(other.pattern))
+        if(!regexp.equals(other.regexp))
             return false;
 
         if(!prefix.equals(other.prefix))
