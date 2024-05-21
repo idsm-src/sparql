@@ -93,8 +93,6 @@ public class Common
                 new StringUserIriClass("reference:zinc", "http://zinc15.docking.org/substances/", "ZINC[0-9]{12}"));
         config.addIriClass(new StringUserIriClass("reference:surechembl", "https://www.surechembl.org/chemical/",
                 "SCHEMBL[0-9]+"));
-        config.addIriClass(new StringUserIriClass("reference:molport", "https://www.molport.com/shop/molecule-link/",
-                "MolPort(-[0-9]{3}){3}"));
         config.addIriClass(new StringUserIriClass("reference:emolecules",
                 "https://www.emolecules.com/cgi-bin/more?vid=", "[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("reference:mcule", "https://mcule.com/", "MCULE-[1-9][0-9]*"));
@@ -120,7 +118,7 @@ public class Common
                 new StringUserIriClass("reference:pharmgkb-drug", "https://www.pharmgkb.org/drug/", "PA[1-9][0-9]*"));
         config.addIriClass(new StringUserIriClass("reference:expression_atlas",
                 "http://www.ebi.ac.uk/gxa/query?conditionQuery=", ".+"));
-        config.addIriClass(new StringUserIriClass("reference:recon", "https://vmh.uni.lu/#metabolite/", "[^/]+"));
+        config.addIriClass(new StringUserIriClass("reference:recon", "https://www.vmh.life/#metabolite/", "[^/]+"));
         config.addIriClass(new StringUserIriClass("reference:wikipedia", "http://en.wikipedia.org/wiki/", ".+"));
         config.addIriClass(new StringUserIriClass("reference:fda_srs", "https://precision.fda.gov/uniisearch/srs/unii/",
                 "[A-Z0-9]{10}"));

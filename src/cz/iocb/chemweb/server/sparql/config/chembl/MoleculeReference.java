@@ -108,15 +108,6 @@ public class MoleculeReference
                     config.createAreEqualCondition("reference_type", "'SURE CHEMBL'::" + moleculeReferenceType));
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
-                    config.createIriMapping("reference:molport", "reference"),
-                    config.createAreEqualCondition("reference_type", "'MOLPORT'::" + moleculeReferenceType));
-            config.addQuadMapping(table, graph, config.createIriMapping("reference:molport", "reference"),
-                    config.createIriMapping("rdfs:label"),
-                    config.createLiteralMapping(xsdString,
-                            "('CHEMBL' || molecule_id || ' MolPort Reference: ' || reference)"),
-                    config.createAreEqualCondition("reference_type", "'MOLPORT'::" + moleculeReferenceType));
-
-            config.addQuadMapping(table, graph, subject, config.createIriMapping("cco:moleculeXref"),
                     config.createIriMapping("reference:emolecules", "reference"),
                     config.createAreEqualCondition("reference_type", "'EMOLECULES'::" + moleculeReferenceType));
             config.addQuadMapping(table, graph, config.createIriMapping("reference:emolecules", "reference"),
@@ -281,9 +272,6 @@ public class MoleculeReference
             config.addQuadMapping(table, graph, config.createIriMapping("reference:surechembl", "reference"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:SureChemblRef"),
                     config.createAreEqualCondition("reference_type", "'SURE CHEMBL'::" + moleculeReferenceType));
-            config.addQuadMapping(table, graph, config.createIriMapping("reference:molport", "reference"),
-                    config.createIriMapping("rdf:type"), config.createIriMapping("cco:MolportRef"),
-                    config.createAreEqualCondition("reference_type", "'MOLPORT'::" + moleculeReferenceType));
             config.addQuadMapping(table, graph, config.createIriMapping("reference:emolecules", "reference"),
                     config.createIriMapping("rdf:type"), config.createIriMapping("cco:EmoleculesRef"),
                     config.createAreEqualCondition("reference_type", "'EMOLECULES'::" + moleculeReferenceType));
