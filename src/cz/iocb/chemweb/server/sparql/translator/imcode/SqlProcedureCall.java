@@ -17,10 +17,10 @@ import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ProcedureDefinition;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ResultDefinition;
-import cz.iocb.chemweb.server.sparql.parser.model.VariableOrBlankNode;
-import cz.iocb.chemweb.server.sparql.parser.model.triple.Node;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariable;
 import cz.iocb.chemweb.server.sparql.translator.UsedVariables;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNodeValue;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
 
@@ -30,15 +30,14 @@ public class SqlProcedureCall extends SqlIntercode
 
     private final SqlIntercode child;
     private final ProcedureDefinition procedure;
-    private final LinkedHashMap<ParameterDefinition, Node> parameters;
-    private final LinkedHashMap<ResultDefinition, VariableOrBlankNode> results;
+    private final LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters;
+    private final LinkedHashMap<ResultDefinition, String> results;
     private final Map<Column, Column> columnMap;
 
 
     protected SqlProcedureCall(UsedVariables variables, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters,
-            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child,
-            Map<Column, Column> columnMap)
+            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Map<Column, Column> columnMap)
     {
         super(variables, child.isDeterministic()); //TODO: is procedure deterministic?
 
@@ -51,25 +50,33 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     protected static SqlIntercode create(ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters,
-            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child, Set<String> restrictions)
+            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Set<String> restrictions)
     {
         UsedVariables callVariables = new UsedVariables();
 
-        for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
-            Node node = entry.getValue();
+            ResourceClass resClass = definition.getParameterClass();
+            SqlNodeValue node = entry.getValue();
 
-            if(node instanceof VariableOrBlankNode)
+            if(node instanceof SqlVariable var)
             {
-                String name = ((VariableOrBlankNode) node).getSqlName();
-                ResourceClass resClass = definition.getParameterClass();
+                String name = var.getName();
+                UsedVariable variable = callVariables.get(var.getName());
 
-                UsedVariable variable = callVariables.get(name);
+                if(variable != null)
+                {
 
-                if(variable != null && !variable.getClasses().contains(definition.getParameterClass()))
-                    return SqlNoSolution.get();
+                    ResourceClass other = variable.getResourceClass();
+
+                    if(resClass != other && resClass.getGeneralClass() != other && resClass != other.getGeneralClass())
+                        return SqlNoSolution.get();
+
+                    if(resClass == other.getGeneralClass())
+                        resClass = other;
+                }
 
                 List<Column> columns = getColumns(child, name, resClass);
 
@@ -78,17 +85,19 @@ public class SqlProcedureCall extends SqlIntercode
 
                 callVariables.add(new UsedVariable(name, resClass, columns, false));
             }
-            else if(node == null || !definition.getParameterClass().match(node))
+            else if(node == null
+                    || resClass != node.getResourceClass() && resClass.getGeneralClass() != node.getResourceClass()
+                            && resClass != node.getResourceClass().getGeneralClass())
             {
                 return SqlNoSolution.get();
             }
         }
 
 
-        for(Entry<ResultDefinition, VariableOrBlankNode> entry : results.entrySet())
+        for(Entry<ResultDefinition, String> entry : results.entrySet())
         {
             ResultDefinition definition = entry.getKey();
-            VariableOrBlankNode node = entry.getValue();
+            String node = entry.getValue();
 
             if(node == null)
                 return SqlNoSolution.get();
@@ -98,14 +107,13 @@ public class SqlProcedureCall extends SqlIntercode
             for(Entry<ResourceClass, List<Column>> e : definition.getMappings().entrySet())
                 mappings.put(e.getKey(), getSqlResultColumns(e.getValue()));
 
-            callVariables.add(new UsedVariable(node.getSqlName(), mappings, false));
+            callVariables.add(new UsedVariable(node, mappings, false));
         }
 
 
         SqlIntercode originalChild = null;
 
-        if(parameters.values().stream().noneMatch(n -> n instanceof VariableOrBlankNode)
-                && child != SqlEmptySolution.get())
+        if(parameters.values().stream().noneMatch(n -> n instanceof SqlVariable) && child != SqlEmptySolution.get())
         {
             originalChild = child;
             child = SqlEmptySolution.get();
@@ -126,8 +134,8 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     public static SqlIntercode create(ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, Node> parameters,
-            LinkedHashMap<ResultDefinition, VariableOrBlankNode> results, SqlIntercode child)
+            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child)
     {
         return create(procedure, parameters, results, child, null);
     }
@@ -139,18 +147,17 @@ public class SqlProcedureCall extends SqlIntercode
         if(restrictions == null)
             return this;
 
-        LinkedHashMap<ResultDefinition, VariableOrBlankNode> restrictedResults = new LinkedHashMap<>();
+        LinkedHashMap<ResultDefinition, String> restrictedResults = new LinkedHashMap<>();
 
-        for(Entry<ResultDefinition, VariableOrBlankNode> result : results.entrySet())
-            if(restrictions.contains(result.getValue().getSqlName()))
+        for(Entry<ResultDefinition, String> result : results.entrySet())
+            if(restrictions.contains(result.getValue()))
                 restrictedResults.put(result.getKey(), result.getValue());
 
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
 
-        for(Node paramater : parameters.values())
-            if(paramater instanceof VariableOrBlankNode)
-                childRestrictions.add(((VariableOrBlankNode) paramater).getSqlName());
+        for(SqlNodeValue paramater : parameters.values())
+            childRestrictions.addAll(paramater.getReferencedVariables());
 
         //FIXME: is procedure deterministic?
         SqlIntercode optimized = child.optimize(childRestrictions, reduced);
@@ -191,35 +198,19 @@ public class SqlProcedureCall extends SqlIntercode
         boolean hasParameter = false;
         builder.append("(");
 
-        for(Entry<ParameterDefinition, Node> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
         {
             appendComma(builder, hasParameter);
             hasParameter = true;
 
             ResourceClass resClass = entry.getKey().getParameterClass();
-            Node node = entry.getValue();
+            SqlNodeValue node = entry.getValue();
+            List<Column> columns = node.asResource(resClass);
 
-            if(node instanceof VariableOrBlankNode)
+            for(int i = 0; i < resClass.getColumnCount(); i++)
             {
-                String varName = ((VariableOrBlankNode) node).getSqlName();
-                UsedVariable variable = child.getVariables().get(varName);
-                List<Column> columns = variable.toResource(resClass);
-
-                for(int i = 0; i < resClass.getColumnCount(); i++)
-                {
-                    appendComma(builder, i > 0);
-                    builder.append(columns.get(i));
-                }
-            }
-            else
-            {
-                List<Column> columns = resClass.toColumns(entry.getValue());
-
-                for(int i = 0; i < resClass.getColumnCount(); i++)
-                {
-                    appendComma(builder, i > 0);
-                    builder.append(columns.get(i));
-                }
+                appendComma(builder, i > 0);
+                builder.append(columns.get(i));
             }
         }
 

@@ -114,6 +114,8 @@ import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExists;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlIri;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNodeValue;
+import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlNull;
 import cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlVariable;
 
 
@@ -1254,7 +1256,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         /* check parameters */
 
-        LinkedHashMap<ParameterDefinition, Node> parameterNodes = new LinkedHashMap<ParameterDefinition, Node>();
+        ExpressionTranslateVisitor translator = new ExpressionTranslateVisitor(contextVariables, this);
+
+        LinkedHashMap<ParameterDefinition, SqlNodeValue> parameterNodes = new LinkedHashMap<>();
 
         for(ParameterDefinition parameter : procedureDefinition.getParameters())
             parameterNodes.put(parameter, null);
@@ -1276,41 +1280,27 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else
             {
-                Node value = parameter.getValue();
+                SqlExpressionIntercode value = translator.visitElement(parameter.getValue());
 
-                if(value instanceof VariableOrBlankNode)
-                {
-                    String variableName = ((VariableOrBlankNode) value).getSqlName();
-                    UsedVariable variable = contextVariables.get(variableName);
+                if(value == SqlNull.get())
+                    messages.add(new TranslateMessage(MessageType.unboundedParameterValue,
+                            parameter.getValue().getRange(), parameter.getName().toString(prologue)));
 
-                    if(variable == null)
-                    {
-                        String parName = parameter.getName().toString(prologue);
-
-                        if(value instanceof Variable)
-                            messages.add(new TranslateMessage(MessageType.unboundedVariableParameterValue,
-                                    value.getRange(), parName, ((Variable) value).getName()));
-                        else if(value instanceof BlankNode)
-                            messages.add(new TranslateMessage(MessageType.unboundedBlankNodeParameterValue,
-                                    value.getRange(), parName));
-                    }
-                }
-
-                parameterNodes.put(parameterDefinition, value);
+                parameterNodes.put(parameterDefinition, (SqlNodeValue) value);
             }
         }
 
 
-        for(Entry<ParameterDefinition, Node> entry : parameterNodes.entrySet())
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameterNodes.entrySet())
         {
-            Node parameterValue = entry.getValue();
+            SqlNodeValue parameterValue = entry.getValue();
 
             if(parameterValue == null)
             {
                 ParameterDefinition parameterDefinition = entry.getKey();
 
                 if(parameterDefinition.getDefaultValue() != null)
-                    entry.setValue(parameterDefinition.getDefaultValue());
+                    entry.setValue((SqlNodeValue) translator.visitElement(parameterDefinition.getDefaultValue()));
                 else
                     messages.add(new TranslateMessage(MessageType.missingParameterPredicate,
                             procedureCallBase.getProcedure().getRange(),
@@ -1322,7 +1312,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         /* check results */
 
-        LinkedHashMap<ResultDefinition, VariableOrBlankNode> resultNodes = new LinkedHashMap<ResultDefinition, VariableOrBlankNode>();
+        LinkedHashMap<ResultDefinition, String> resultNodes = new LinkedHashMap<ResultDefinition, String>();
 
         Set<String> used = new HashSet<String>(contextVariables.getNames());
         LinkedHashMap<Variable, Node> conditions = new LinkedHashMap<Variable, Node>();
@@ -1343,7 +1333,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             used.add(((VariableOrBlankNode) result).getSqlName());
 
-            resultNodes.put(resultDefinition, (VariableOrBlankNode) result);
+            resultNodes.put(resultDefinition, ((VariableOrBlankNode) result).getSqlName());
         }
         else
         {
@@ -1382,7 +1372,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     used.add(((VariableOrBlankNode) result).getSqlName());
 
-                    resultNodes.put(resultDefinition, (VariableOrBlankNode) result);
+                    resultNodes.put(resultDefinition, ((VariableOrBlankNode) result).getSqlName());
                 }
             }
         }

@@ -87,13 +87,7 @@ public enum MessageType
 
     repeatOfProjectionVariable(ERROR, "Projection variable '%s' cannot be used twice."),
 
-    unboundedVariableParameterValue(
-            ERROR,
-            "Procedure parameter '%s' uses unbounded variable '%s', which is not permited."),
-
-    unboundedBlankNodeParameterValue(
-            ERROR,
-            "Procedure parameter '%s' uses unbounded blank node, which is not permited."),
+    unboundedParameterValue(ERROR, "Procedure parameter '%s' uses unbounded value."),
 
     procedureCallInsideService(ERROR, "Procedure call cannot be used inside service."),
 
