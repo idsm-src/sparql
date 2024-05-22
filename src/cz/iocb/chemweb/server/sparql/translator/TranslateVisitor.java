@@ -3,6 +3,7 @@ package cz.iocb.chemweb.server.sparql.translator;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,7 +45,6 @@ import cz.iocb.chemweb.server.sparql.engine.TypedLiteral;
 import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
-import cz.iocb.chemweb.server.sparql.mapping.ConstantIriMapping;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
@@ -556,6 +556,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Graph graph)
     {
+        Set<IRI> graphs = configuration.getGraphs(getService());
+
+        if(!datasets.isEmpty())
+        {
+            Set<IRI> all = graphs;
+
+            graphs = datasets.stream().filter(d -> !d.isDefault() && all.contains(d.getSourceSelector()))
+                    .map(d -> d.getSourceSelector()).collect(toSet());
+        }
+
+
+        if(graph.getName() instanceof IRI && !graphs.contains(graph.getName()))
+            return SqlNoSolution.get();
+
+
         boolean rename = false;
 
         if(graph.getName() instanceof Variable)
@@ -582,6 +597,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(rename)
             graphVariable = createVariable("@graph");
 
+
         graphRestrictions.push(graphVariable);
 
         SqlIntercode translatedPattern = visitElement(graph.getPattern());
@@ -606,8 +622,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     List<List<Node>> values = new ArrayList<List<Node>>();
 
-                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                        values.add(List.of(g.getValue()));
+                    for(Node g : graphs)
+                        values.add(List.of(g));
 
                     translatedPattern = SqlJoin.join(translatedPattern, SqlValues.create(List.of(varName), values));
                 }
@@ -615,8 +631,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
-                        unionList.add(SqlBind.bind(varName, SqlIri.create((IRI) g.getValue()), translatedPattern));
+                    for(Node g : graphs)
+                        unionList.add(SqlBind.bind(varName, SqlIri.create((IRI) g), translatedPattern));
 
                     translatedPattern = SqlUnion.union(unionList);
                 }
@@ -624,9 +640,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-                    for(ConstantIriMapping g : configuration.getGraphs(getService()))
+                    for(Node g : graphs)
                         unionList.add(SqlJoin.join(translatedPattern,
-                                SqlValues.create(List.of(varName), List.of(List.of(g.getValue())))));
+                                SqlValues.create(List.of(varName), List.of(List.of(g)))));
 
                     translatedPattern = SqlUnion.union(unionList);
                 }
