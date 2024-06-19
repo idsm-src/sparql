@@ -1,5 +1,7 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedIri;
+import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.chemweb.server.sparql.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static cz.iocb.chemweb.server.sparql.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.toList;
@@ -22,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
@@ -32,6 +35,8 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Column;
+import cz.iocb.chemweb.server.sparql.database.ConstantColumn;
 import cz.iocb.chemweb.server.sparql.database.SQLRuntimeException;
 import cz.iocb.chemweb.server.sparql.engine.IriNode;
 import cz.iocb.chemweb.server.sparql.engine.LanguageTaggedLiteral;
@@ -46,6 +51,9 @@ import cz.iocb.chemweb.server.sparql.error.MessageType;
 import cz.iocb.chemweb.server.sparql.error.TranslateMessage;
 import cz.iocb.chemweb.server.sparql.mapping.BlankNodeLiteral;
 import cz.iocb.chemweb.server.sparql.mapping.classes.BlankNodeClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.DataType;
+import cz.iocb.chemweb.server.sparql.mapping.classes.LiteralClass;
+import cz.iocb.chemweb.server.sparql.mapping.classes.ResourceClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserIriClass;
 import cz.iocb.chemweb.server.sparql.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.chemweb.server.sparql.mapping.extension.ParameterDefinition;
@@ -124,7 +132,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
     private static final int serviceRedirectLimit = 3;
     private static final int serviceContextLimit = 1000;
-    private static final int serviceResultLimit = 100000;
+    private static final int serviceResultLimit = 10000000;
     private static final String variablePrefix = "@additionalvar";
 
     private int variableId = 0;
@@ -625,7 +633,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     for(Node g : graphs)
                         values.add(List.of(g));
 
-                    translatedPattern = SqlJoin.join(translatedPattern, SqlValues.create(List.of(varName), values));
+                    translatedPattern = SqlJoin.join(translatedPattern, translateValues(List.of(varName), values));
                 }
                 else if(variable == null)
                 {
@@ -642,7 +650,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     for(Node g : graphs)
                         unionList.add(SqlJoin.join(translatedPattern,
-                                SqlValues.create(List.of(varName), List.of(List.of(g)))));
+                                translateValues(List.of(varName), List.of(List.of(g)))));
 
                     translatedPattern = SqlUnion.union(unionList);
                 }
@@ -697,7 +705,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             lines.add(line);
         }
 
-        return SqlValues.create(values.getVariables().stream().map(v -> v.getSqlName()).collect(toList()), lines);
+        return translateValues(values.getVariables().stream().map(v -> v.getSqlName()).collect(toList()), lines);
     }
 
 
@@ -1253,6 +1261,111 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    private SqlIntercode translateValues(List<String> variableNames, List<List<Node>> lines)
+    {
+        if(lines.size() == 0)
+            return SqlNoSolution.get();
+
+
+        LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
+        Map<List<Column>, Column> revData = new HashMap<List<Column>, Column>();
+        UsedVariables variables = new UsedVariables();
+
+        for(int i = 0; i < variableNames.size(); i++)
+        {
+            if(variables.get(variableNames.get(i)) != null)
+                continue; // ignore repeated occurrences of the variable
+
+            LinkedHashSet<ResourceClass> resClasses = new LinkedHashSet<ResourceClass>();
+            boolean canBeNull = false;
+
+            Map<Node, ResourceClass> nodeTypes = new HashMap<Node, ResourceClass>();
+
+            for(List<Node> line : lines)
+            {
+                Node node = line.get(i);
+
+                if(node != null)
+                {
+                    ResourceClass resClass = getType(node);
+
+                    resClasses.add(resClass);
+                    nodeTypes.put(node, resClass);
+                }
+                else
+                {
+                    canBeNull = true;
+                }
+            }
+
+            if(resClasses.size() == 0)
+                continue;
+
+
+            UsedVariable variable = new UsedVariable(variableNames.get(i), canBeNull);
+
+            for(ResourceClass resClass : resClasses)
+            {
+                List<List<Column>> classColumns = new ArrayList<List<Column>>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                    classColumns.add(new ArrayList<Column>(lines.size()));
+
+                for(List<Node> line : lines)
+                {
+                    Node node = line.get(i);
+
+                    if(node != null && resClass == nodeTypes.get(node))
+                    {
+                        List<Column> cols = resClass.toColumns(node);
+
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(cols.get(j));
+                    }
+                    else
+                    {
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            classColumns.get(j).add(new ConstantColumn(null, resClass.getSqlTypes().get(j)));
+                    }
+                }
+
+
+                List<Column> tableColumns = resClass.createColumns(variableNames.get(i));
+                List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
+
+                for(int j = 0; j < resClass.getColumnCount(); j++)
+                {
+                    List<Column> columns = classColumns.get(j);
+
+                    if(columns.stream().allMatch(c -> c.equals(columns.get(0))))
+                    {
+                        mapping.add(columns.get(0));
+                    }
+                    else
+                    {
+                        Column tableColumn = revData.get(columns);
+
+                        if(tableColumn == null)
+                        {
+                            tableColumn = tableColumns.get(j);
+                            revData.put(columns, tableColumn);
+                            data.put(tableColumn, columns);
+                        }
+
+                        mapping.add(tableColumn);
+                    }
+                }
+
+                variable.addMapping(resClass, mapping);
+            }
+
+            variables.add(variable);
+        }
+
+        return SqlValues.create(variables, data, lines.size());
+    }
+
+
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
         IRI procedureName = procedureCallBase.getProcedure();
@@ -1518,247 +1631,269 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
         String serviceCode = visitor.getResultCode(service.getPattern());
 
-        ResultHandler results = new ValuesResultHandler(mergedVariables);
-
-        BlankNodeClass blankNodeClass = new UserStrBlankNodeClass(--serviceId);
-        int call = 0;
-
-        for(RdfNode[] row : rows)
+        try(ResultHandler results = new StoredResultHandler())
         {
-            String endpoint = null;
+            //ResultHandler results = new ValuesResultHandler(mergedVariables);
 
-            if(name instanceof IRI)
-                endpoint = ((IRI) name).getValue();
-            else if(row[varIndexes.get(((Variable) name).getSqlName())] instanceof IriNode)
-                endpoint = row[varIndexes.get(((Variable) name).getSqlName())].getValue();
-            else
-                continue;
+            BlankNodeClass blankNodeClass = new UserStrBlankNodeClass(--serviceId);
+            int call = 0;
 
-
-            /* build default result */
-
-            HashMap<String, Node> defaultResult = new HashMap<String, Node>();
-
-            for(String variable : contextVariables)
+            for(RdfNode[] row : rows)
             {
-                Integer idx = varIndexes.get(variable);
+                String endpoint = null;
 
-                if(idx == null)
+                if(name instanceof IRI)
+                    endpoint = ((IRI) name).getValue();
+                else if(row[varIndexes.get(((Variable) name).getSqlName())] instanceof IriNode)
+                    endpoint = row[varIndexes.get(((Variable) name).getSqlName())].getValue();
+                else
                     continue;
 
-                RdfNode term = row[idx];
 
-                Node node = null;
+                /* build default result */
 
-                if(term instanceof IriNode)
-                    node = new IRI(term.getValue());
-                else if(term instanceof LanguageTaggedLiteral)
-                    node = new Literal(term.getValue(), ((LanguageTaggedLiteral) term).getLanguage());
-                else if(term instanceof TypedLiteral)
-                    node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
-                else if(term instanceof ReferenceNode)
-                    node = new BlankNodeLiteral(term.getValue(), context.getVariables().get(variable).getClasses());
+                HashMap<String, Node> defaultResult = new HashMap<String, Node>();
 
-                defaultResult.put(variable, node);
-            }
-
-
-            /* build service query */
-
-            StringBuilder sparqlQueryBuilder = new StringBuilder();
-            sparqlQueryBuilder.append("select * where ");
-            sparqlQueryBuilder.append(serviceCode);
-
-            if(!sharedVariables.isEmpty())
-            {
-                sparqlQueryBuilder.append("values (");
-
-                for(Variable var : sharedVariables)
-                    sparqlQueryBuilder.append(" ?").append(var.getName());
-
-                sparqlQueryBuilder.append(") {(");
-
-                for(Variable variable : sharedVariables)
+                for(String variable : contextVariables)
                 {
-                    RdfNode term = row[varIndexes.get(variable.getSqlName())];
+                    Integer idx = varIndexes.get(variable);
 
-                    if(term != null && (term instanceof IriNode || term.isLiteral()))
-                        sparqlQueryBuilder.append(term).append(" ");
-                    else
-                        sparqlQueryBuilder.append("undef ");
+                    if(idx == null)
+                        continue;
+
+                    RdfNode term = row[idx];
+
+                    Node node = null;
+
+                    if(term instanceof IriNode)
+                        node = new IRI(term.getValue());
+                    else if(term instanceof LanguageTaggedLiteral)
+                        node = new Literal(term.getValue(), ((LanguageTaggedLiteral) term).getLanguage());
+                    else if(term instanceof TypedLiteral)
+                        node = new Literal(term.getValue(), new IRI(((TypedLiteral) term).getDatatype().getValue()));
+                    else if(term instanceof ReferenceNode)
+                        node = new BlankNodeLiteral(term.getValue(), context.getVariables().get(variable).getClasses());
+
+                    defaultResult.put(variable, node);
                 }
 
-                sparqlQueryBuilder.append(")}");
-            }
 
+                /* build service query */
 
-            /* open connection */
+                StringBuilder sparqlQueryBuilder = new StringBuilder();
+                sparqlQueryBuilder.append("select * where ");
+                sparqlQueryBuilder.append(serviceCode);
 
-            HttpURLConnection connection = null;
-
-            try
-            {
-                String url = endpoint;
-
-                for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
+                if(!sharedVariables.isEmpty())
                 {
-                    connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
-                    connection.setRequestMethod("POST");
-                    connection.setRequestProperty("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
-                    connection.setRequestProperty("accept", "application/sparql-results+xml");
-                    connection.setDoOutput(true);
+                    sparqlQueryBuilder.append("values (");
 
-                    try(OutputStream out = connection.getOutputStream())
+                    for(Variable var : sharedVariables)
+                        sparqlQueryBuilder.append(" ?").append(var.getName());
+
+                    sparqlQueryBuilder.append(") {(");
+
+                    for(Variable variable : sharedVariables)
                     {
-                        out.write(("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
+                        RdfNode term = row[varIndexes.get(variable.getSqlName())];
+
+                        if(term != null && (term instanceof IriNode || term.isLiteral()))
+                            sparqlQueryBuilder.append(term).append(" ");
+                        else
+                            sparqlQueryBuilder.append("undef ");
                     }
 
-                    url = connection.getHeaderField("Location");
+                    sparqlQueryBuilder.append(")}");
                 }
 
-                if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
-                    throw new IOException(connection.getResponseMessage());
-            }
-            catch(IOException | URISyntaxException e)
-            {
-                e.printStackTrace();
 
-                if(service.isSilent())
+                /* open connection */
+
+                HttpURLConnection connection = null;
+
+                try
                 {
-                    results.add(defaultResult);
+                    String url = endpoint;
+
+                    for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
+                    {
+                        connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
+                        connection.setRequestMethod("POST");
+                        connection.setRequestProperty("content-type",
+                                "application/x-www-form-urlencoded; charset=UTF-8");
+                        connection.setRequestProperty("accept", "application/sparql-results+xml");
+                        connection.setDoOutput(true);
+
+                        try(OutputStream out = connection.getOutputStream())
+                        {
+                            out.write(
+                                    ("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
+                        }
+
+                        url = connection.getHeaderField("Location");
+                    }
+
+                    if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
+                        throw new IOException(connection.getResponseMessage());
                 }
-                else
+                catch(IOException | URISyntaxException e)
                 {
-                    messages.add(new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
+                    e.printStackTrace();
+
+                    if(service.isSilent())
+                    {
+                        results.add(defaultResult);
+                    }
+                    else
+                    {
+                        messages.add(
+                                new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
+                        return context;
+                    }
+                }
+
+
+                /* receive result*/
+
+                try
+                {
+                    final int bnprefix = call++;
+
+                    DefaultHandler handler = new DefaultHandler()
+                    {
+                        Set<String> used = new HashSet<String>();
+                        HashMap<String, Node> result = new HashMap<String, Node>();
+
+                        boolean skip;
+                        String variable;
+                        StringBuilder data;
+                        String datatype;
+                        String lang;
+
+                        @Override
+                        public void startElement(String uri, String localName, String qName, Attributes attributes)
+                                throws SAXException
+                        {
+                            if(qName.equalsIgnoreCase("result"))
+                            {
+                                skip = false;
+                                used.clear();
+                                result.clear();
+                                result.putAll(defaultResult);
+
+                                if(results.size() >= serviceResultLimit)
+                                    throw new SAXException();
+                            }
+                            else if(qName.equalsIgnoreCase("binding"))
+                            {
+                                variable = varmap.get(attributes.getValue("name"));
+                            }
+                            else if(qName.equalsIgnoreCase("literal"))
+                            {
+                                lang = attributes.getValue("xml:lang");
+                                datatype = attributes.getValue("datatype");
+                                data = new StringBuilder();
+                            }
+                            else if(qName.equalsIgnoreCase("uri") || qName.equalsIgnoreCase("bnode"))
+                            {
+                                data = new StringBuilder();
+                            }
+                        }
+
+                        @Override
+                        public void endElement(String uri, String localName, String qName) throws SAXException
+                        {
+                            if(qName.equalsIgnoreCase("result") && !skip)
+                            {
+                                try
+                                {
+                                    results.add(result);
+                                }
+                                catch(SQLException e)
+                                {
+                                    throw new SQLRuntimeException(e);
+                                }
+                            }
+                            else if(qName.equalsIgnoreCase("binding"))
+                            {
+                                variable = null;
+                            }
+
+                            Node node = null;
+
+                            if(qName.equalsIgnoreCase("uri"))
+                                node = new IRI(data.toString());
+                            else if(qName.equalsIgnoreCase("bnode"))
+                                node = new BlankNodeLiteral(bnprefix + "r" + data.toString(), blankNodeClass);
+                            else if(!qName.equalsIgnoreCase("literal"))
+                                return;
+                            else if(lang != null)
+                                node = new Literal(data.toString(), lang);
+                            else if(datatype != null)
+                                node = new Literal(data.toString(), new IRI(datatype));
+                            else
+                                node = new Literal(data.toString(), xsdStringType);
+
+                            if(variable == null /*|| !serviceVariables.contains(variable)*/)
+                                return; // should not happen if the response is valid
+
+                            if(!used.add(variable))
+                                return; // should not happen if the response is valid
+
+                            if(defaultResult.get(variable) instanceof BlankNodeLiteral)
+                            {
+                                skip = true;
+                                return;
+                            }
+
+                            if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(node))
+                            {
+                                // should not happen if the response is correct
+                                skip = true;
+                                return;
+                            }
+
+                            result.put(variable, node);
+                        }
+
+                        @Override
+                        public void characters(char ch[], int start, int length)
+                        {
+                            if(data != null)
+                                data.append(new String(ch, start, length));
+                        }
+                    };
+
+                    try(InputStream input = connection.getInputStream())
+                    {
+                        SAXParserFactory factory = SAXParserFactory.newInstance();
+                        SAXParser saxParser = factory.newSAXParser();
+                        saxParser.parse(input, handler);
+                    }
+                }
+                catch(ParserConfigurationException | SAXException | IOException e)
+                {
+                    if(e instanceof SAXException && results.size() >= serviceResultLimit)
+                    {
+                        messages.add(new TranslateMessage(MessageType.serviceResultLimitExceeded, service.getRange()));
+                    }
+                    else
+                    {
+                        messages.add(
+                                new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
+                        e.printStackTrace();
+                    }
+
                     return context;
                 }
             }
 
-
-            /* receive result*/
-
-            try
-            {
-                final int bnprefix = call++;
-
-                DefaultHandler handler = new DefaultHandler()
-                {
-                    Set<String> used = new HashSet<String>();
-                    HashMap<String, Node> result = new HashMap<String, Node>();
-
-                    boolean skip;
-                    String variable;
-                    StringBuilder data;
-                    String datatype;
-                    String lang;
-
-                    @Override
-                    public void startElement(String uri, String localName, String qName, Attributes attributes)
-                            throws SAXException
-                    {
-                        if(qName.equalsIgnoreCase("result"))
-                        {
-                            skip = false;
-                            used.clear();
-                            result.clear();
-                            result.putAll(defaultResult);
-
-                            if(results.size() >= serviceResultLimit)
-                                throw new SAXException();
-                        }
-                        else if(qName.equalsIgnoreCase("binding"))
-                        {
-                            variable = varmap.get(attributes.getValue("name"));
-                        }
-                        else if(qName.equalsIgnoreCase("literal"))
-                        {
-                            lang = attributes.getValue("xml:lang");
-                            datatype = attributes.getValue("datatype");
-                            data = new StringBuilder();
-                        }
-                        else if(qName.equalsIgnoreCase("uri") || qName.equalsIgnoreCase("bnode"))
-                        {
-                            data = new StringBuilder();
-                        }
-                    }
-
-                    @Override
-                    public void endElement(String uri, String localName, String qName) throws SAXException
-                    {
-                        if(qName.equalsIgnoreCase("result") && !skip)
-                            results.add(result);
-                        else if(qName.equalsIgnoreCase("binding"))
-                            variable = null;
-
-                        Node node = null;
-
-                        if(qName.equalsIgnoreCase("uri"))
-                            node = new IRI(data.toString());
-                        else if(qName.equalsIgnoreCase("bnode"))
-                            node = new BlankNodeLiteral(bnprefix + "r" + data.toString(), blankNodeClass);
-                        else if(!qName.equalsIgnoreCase("literal"))
-                            return;
-                        else if(lang != null)
-                            node = new Literal(data.toString(), lang);
-                        else if(datatype != null)
-                            node = new Literal(data.toString(), new IRI(datatype));
-                        else
-                            node = new Literal(data.toString(), xsdStringType);
-
-                        if(variable == null /*|| !serviceVariables.contains(variable)*/)
-                            return; // should not happen if the response is valid
-
-                        if(!used.add(variable))
-                            return; // should not happen if the response is valid
-
-                        if(defaultResult.get(variable) instanceof BlankNodeLiteral)
-                        {
-                            skip = true;
-                            return;
-                        }
-
-                        if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(node))
-                        {
-                            // should not happen if the response is correct
-                            skip = true;
-                            return;
-                        }
-
-                        result.put(variable, node);
-                    }
-
-                    @Override
-                    public void characters(char ch[], int start, int length)
-                    {
-                        if(data != null)
-                            data.append(new String(ch, start, length));
-                    }
-                };
-
-                try(InputStream input = connection.getInputStream())
-                {
-                    SAXParserFactory factory = SAXParserFactory.newInstance();
-                    SAXParser saxParser = factory.newSAXParser();
-                    saxParser.parse(input, handler);
-                }
-            }
-            catch(ParserConfigurationException | SAXException | IOException e)
-            {
-                if(e instanceof SAXException && results.size() >= serviceResultLimit)
-                {
-                    messages.add(new TranslateMessage(MessageType.serviceResultLimitExceeded, service.getRange()));
-                }
-                else
-                {
-                    messages.add(new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
-                    e.printStackTrace();
-                }
-
-                return context;
-            }
+            return results.get();
         }
-
-        return results.get();
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
+        }
     }
 
 
@@ -1801,6 +1936,36 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         catch(SQLRuntimeException e)
         {
             throw(SQLException) e.getCause();
+        }
+    }
+
+
+    @SuppressWarnings("resource")
+    private static ResourceClass getType(Node value)
+    {
+        if(value instanceof Literal)
+        {
+            Literal literal = (Literal) value;
+            DataType datatype = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
+
+            return resourceClass;
+        }
+        else if(value instanceof IRI)
+        {
+            for(UserIriClass resClass : Request.currentRequest().getConfiguration().getIriClasses())
+                if(resClass.match(value))
+                    return resClass;
+
+            return unsupportedIri;
+        }
+        else if(value instanceof BlankNodeLiteral)
+        {
+            return ((BlankNodeLiteral) value).getResourceClass();
+        }
+        else
+        {
+            return null;
         }
     }
 

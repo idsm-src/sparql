@@ -12,6 +12,7 @@ import java.util.LinkedList;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
+import cz.iocb.chemweb.server.sparql.database.Table;
 import cz.iocb.chemweb.server.sparql.engine.Result.ResultType;
 import cz.iocb.chemweb.server.sparql.error.MessageCategory;
 import cz.iocb.chemweb.server.sparql.error.TranslateExceptions;
@@ -47,6 +48,7 @@ public class Request implements AutoCloseable
 
     private Connection connection;
     private Statement statement;
+    private List<Table> tables = new ArrayList<Table>();
 
     private long begin;
     private long timeout;
@@ -294,7 +296,21 @@ public class Request implements AutoCloseable
         finally
         {
             if(connection != null)
+            {
+                for(Table table : tables)
+                {
+                    try(Statement stm = connection.createStatement())
+                    {
+                        stm.execute("drop table " + table);
+                    }
+                    catch(SQLException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
                 connection.close();
+            }
         }
     }
 
