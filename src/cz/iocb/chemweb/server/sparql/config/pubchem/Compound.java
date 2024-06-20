@@ -33,11 +33,21 @@ public class Compound
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("sio:SIO_010004"));
 
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:SIO_000008"),
+                    config.createIriMapping("pubchem:compound_identifier", "id"));
+
             // extension
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:itemTemplate"),
                     config.createLiteralMapping("pubchem/Compound.vm"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("template:pageTemplate"),
                     config.createLiteralMapping("pubchem/Compound.vm"));
+
+            config.addQuadMapping(table, graph, config.createIriMapping("pubchem:compound_identifier", "id"),
+                    config.createIriMapping("sio:SIO_000011"), subject);
+
+            // deprecated
+            config.addQuadMapping(table, graph, subject, config.createIriMapping("sio:has-attribute"),
+                    config.createIriMapping("pubchem:compound_identifier", "id"));
         }
 
         {

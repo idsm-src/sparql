@@ -18,6 +18,8 @@ public class CompoundDescriptor
     {
         String prefix = "http://rdf.ncbi.nlm.nih.gov/pubchem/descriptor/CID";
 
+        config.addIriClass(
+                new IntegerUserIriClass("pubchem:compound_identifier", "integer", prefix, "_Compound_Identifier"));
         config.addIriClass(new IntegerUserIriClass("pubchem:hydrogen_bond_acceptor_count", "integer", prefix,
                 "_Hydrogen_Bond_Acceptor_Count"));
         config.addIriClass(new IntegerUserIriClass("pubchem:tautomer_count", "integer", prefix, "_Tautomer_Count"));
@@ -70,6 +72,22 @@ public class CompoundDescriptor
 
         ConstantIriMapping oldValue = config.createIriMapping("sio:has-value");
         ConstantIriMapping oldUnit = config.createIriMapping("sio:has-unit");
+
+        {
+            Table table = new Table(schema, "compound_bases");
+            NodeMapping subject = config.createIriMapping("pubchem:compound_identifier", "id");
+            String field = "(id::varchar)";
+
+            config.addQuadMapping(table, graph, subject, type, config.createIriMapping("sio:CHEMINF_000140"));
+            config.addQuadMapping(table, graph, subject, value, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // deprecated
+            config.addQuadMapping(table, graph, subject, oldValue, config.createLiteralMapping(rdfLangStringEn, field));
+
+            // extension
+            config.addQuadMapping(table, graph, subject, template,
+                    config.createLiteralMapping("pubchem/CompoundDescriptor.vm"));
+        }
 
         {
             Table table = new Table(schema, "descriptor_compound_bases");
