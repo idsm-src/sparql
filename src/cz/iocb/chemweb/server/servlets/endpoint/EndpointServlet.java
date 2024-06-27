@@ -20,7 +20,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.io.IOUtils;
 import com.google.common.io.ByteStreams;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.engine.BNode;
@@ -189,7 +188,8 @@ public class EndpointServlet extends HttpServlet
         if(req.getContentType() != null && req.getContentType().matches("application/x-www-form-urlencoded.*"))
             query = req.getParameter("query");
         else if(req.getContentType() != null && req.getContentType().matches("application/sparql-query.*"))
-            query = IOUtils.toString(req.getInputStream(), StandardCharsets.UTF_8);
+            query = new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
 
         process(req, res, query, defaultGraphs, namedGraphs);
     }
