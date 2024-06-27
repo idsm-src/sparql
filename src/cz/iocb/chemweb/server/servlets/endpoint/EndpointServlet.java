@@ -20,7 +20,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import com.google.common.io.ByteStreams;
 import cz.iocb.chemweb.server.sparql.config.SparqlDatabaseConfiguration;
 import cz.iocb.chemweb.server.sparql.engine.BNode;
 import cz.iocb.chemweb.server.sparql.engine.Engine;
@@ -426,7 +425,7 @@ public class EndpointServlet extends HttpServlet
 
                 try(InputStream stream = getClass().getResourceAsStream("yasgui.min.css"))
                 {
-                    ByteStreams.copy(stream, res.getOutputStream());
+                    stream.transferTo(res.getOutputStream());
                 }
 
         res.getOutputStream().print(
@@ -435,7 +434,7 @@ public class EndpointServlet extends HttpServlet
 
         try(InputStream stream = getClass().getResourceAsStream("yasgui.min.js"))
         {
-            ByteStreams.copy(stream, res.getOutputStream());
+            stream.transferTo(res.getOutputStream());
         }
 
         res.getOutputStream().print(
@@ -444,7 +443,7 @@ public class EndpointServlet extends HttpServlet
 
         try(InputStream stream = getClass().getResourceAsStream("endpoint.js"))
         {
-            ByteStreams.copy(stream, res.getOutputStream());
+            stream.transferTo(res.getOutputStream());
         }
 
         res.getOutputStream().print(

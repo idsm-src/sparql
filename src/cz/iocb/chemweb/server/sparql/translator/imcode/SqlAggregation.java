@@ -11,9 +11,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.google.common.base.Objects;
 import cz.iocb.chemweb.server.sparql.database.Column;
 import cz.iocb.chemweb.server.sparql.database.DatabaseSchema;
 import cz.iocb.chemweb.server.sparql.database.TableColumn;
@@ -201,14 +201,14 @@ public class SqlAggregation extends SqlIntercode
                 public boolean equals(Object other)
                 {
                     if(other instanceof CodeWrapper o && item instanceof SqlTableAccess l
-                            && o.item instanceof SqlTableAccess r && Objects.equal(l.getTable(), r.getTable())
+                            && o.item instanceof SqlTableAccess r && Objects.equals(l.getTable(), r.getTable())
                             && l.getConditions().equals(r.getConditions()) && l.getReduced() == r.getReduced())
                         return true;
 
 
                     if(other instanceof CodeWrapper o && item instanceof SqlDistinct pl
                             && o.item instanceof SqlDistinct pr && pl.getChild() instanceof SqlTableAccess l
-                            && pr.getChild() instanceof SqlTableAccess r && Objects.equal(l.getTable(), r.getTable())
+                            && pr.getChild() instanceof SqlTableAccess r && Objects.equals(l.getTable(), r.getTable())
                             && l.getConditions().equals(r.getConditions()) /*&& l.getReduced() == r.getReduced()*/)
                     {
                         Set<Column> sl = new HashSet<Column>();

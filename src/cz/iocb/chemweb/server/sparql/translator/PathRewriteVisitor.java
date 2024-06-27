@@ -1,9 +1,9 @@
 package cz.iocb.chemweb.server.sparql.translator;
 
 import static java.util.stream.Collectors.toList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import com.google.common.collect.Lists;
 import cz.iocb.chemweb.server.sparql.parser.ElementVisitor;
 import cz.iocb.chemweb.server.sparql.parser.model.IRI;
 import cz.iocb.chemweb.server.sparql.parser.model.triple.AlternativePath;
@@ -88,27 +88,35 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
     @Override
     public Path visit(InversePath path)
     {
-        Path child = path.getChild();
+        switch(path.getChild())
+        {
+            case AlternativePath child:
+                return visitElement(new AlternativePath(
+                        child.getChildren().stream().map(p -> new InversePath(p)).collect(toList())));
 
-        if(child instanceof AlternativePath)
-            return visitElement(new AlternativePath(
-                    ((AlternativePath) child).getChildren().stream().map(p -> new InversePath(p)).collect(toList())));
-        else if(child instanceof SequencePath)
-            return visitElement(new SequencePath(Lists.reverse(
-                    ((SequencePath) child).getChildren().stream().map(p -> new InversePath(p)).collect(toList()))));
-        else if(child instanceof InversePath)
-            return visitElement(child);
-        else if(child instanceof RepeatedPath)
-            return visitElement(new RepeatedPath(((RepeatedPath) child).getKind(),
-                    new InversePath(((RepeatedPath) child).getChild())));
-        else if(child instanceof NegatedPath)
-            return visitElement(new NegatedPath(new InversePath(((NegatedPath) child).getChild())));
-        else if(child instanceof BracketedPath)
-            return visitElement(new InversePath(((BracketedPath) child).getChild()));
-        else if(child instanceof IRI)
-            return path;
+            case SequencePath child:
+                List<Path> rev = child.getChildren().stream().map(p -> new InversePath(p)).collect(toList());
+                Collections.reverse(rev);
+                return visitElement(new SequencePath(rev));
 
-        return null;
+            case InversePath child:
+                return visitElement(child);
+
+            case RepeatedPath child:
+                return visitElement(new RepeatedPath(child.getKind(), new InversePath(child.getChild())));
+
+            case NegatedPath child:
+                return visitElement(new NegatedPath(new InversePath(child.getChild())));
+
+            case BracketedPath child:
+                return visitElement(new InversePath(child.getChild()));
+
+            case IRI child:
+                return path;
+
+            default:
+                return null;
+        }
     }
 
 
