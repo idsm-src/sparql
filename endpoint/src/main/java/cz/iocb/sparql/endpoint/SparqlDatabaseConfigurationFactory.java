@@ -1,4 +1,4 @@
-package cz.iocb.sparql.engine.config;
+package cz.iocb.sparql.endpoint;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;

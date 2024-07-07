@@ -1,4 +1,4 @@
-package cz.iocb.sparql.engine.endpoint;
+package cz.iocb.sparql.endpoint;
 
 import static java.util.stream.Collectors.joining;
 import java.io.IOException;
