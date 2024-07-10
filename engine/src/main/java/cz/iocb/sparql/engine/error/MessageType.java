@@ -109,6 +109,8 @@ public enum MessageType
 
     badServiceEndpoint(ERROR, "The SERVICE pattern cannot be evaluated by endpoint '%s'."),
 
+    partialSurrogatePair(ERROR, "Literal contains a codepoint that is half of a surrogate pair"),
+
     unsupportedDatatype(WARNING, "datatype '%s' is not supported"),
 
     invalidDatatype(WARNING, "datatype '%s' should not be specified explicitly"),

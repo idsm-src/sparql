@@ -39,6 +39,9 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     {
         String value = unquote(ctx.string().getText());
 
+        if(containsInvalidSurrogatePairs(value))
+            messages.add(new TranslateMessage(MessageType.partialSurrogatePair, Range.compute(ctx.string())));
+
         if(ctx.LANGTAG() != null)
         {
             String tag = ctx.LANGTAG().getText().substring(1);
@@ -141,5 +144,28 @@ public class LiteralVisitor extends BaseVisitor<Literal>
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
         return new Literal(ctx.getText(), xsdBooleanType);
+    }
+
+
+    private static boolean containsInvalidSurrogatePairs(String str)
+    {
+        for(int i = 0; i < str.length(); i++)
+        {
+            char ch = str.charAt(i);
+
+            if(Character.isHighSurrogate(ch))
+            {
+                if(i + 1 < str.length() && Character.isLowSurrogate(str.charAt(i + 1)))
+                    i++;
+                else
+                    return true;
+            }
+            else if(Character.isLowSurrogate(ch))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
