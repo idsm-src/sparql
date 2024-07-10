@@ -1,9 +1,9 @@
 package cz.iocb.sparql.engine.parser;
 
 import java.util.List;
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RecognitionException;
@@ -71,7 +71,7 @@ public class Parser
         query = builder.toString();
 
 
-        return parse(new ANTLRInputStream(query));
+        return parse(CharStreams.fromString(query));
     }
 
 
