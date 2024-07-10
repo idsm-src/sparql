@@ -166,7 +166,9 @@ public class SqlAggregation extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                var key = groupVariables.stream().map(v -> child.getMappings(v)).collect(Collectors.toList());
+                List<Map<ResourceClass, List<Column>>> key = groupVariables.stream()
+                        .map(v -> child.getVariable(v) == null ? null : child.getMappings(v))
+                        .collect(Collectors.toList());
                 parts.computeIfAbsent(key, (k) -> new ArrayList<SqlIntercode>()).add(child);
             }
 
@@ -421,7 +423,7 @@ public class SqlAggregation extends SqlIntercode
             builder.append(" GROUP BY ");
             builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
         }
-        else if(!groupVariables.isEmpty() && aggregations.isEmpty())
+        else if(!groupVariables.isEmpty())
         {
             builder.append(" GROUP BY true::boolean");
         }
