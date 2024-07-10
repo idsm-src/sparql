@@ -259,11 +259,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         String endName = ((VariableOrBlankNode) endNode).getSqlName();
 
         SqlIntercode init = visitElement(repeatedPath.getChild(), subject, endNode);
+
+        if(init == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
+
+        if(next == SqlNoSolution.get())
+            return SqlDistinct.create(visitElement(repeatedPath.getChild(), subject, object), distinct);
 
         UsedVariable initBeginVar = init.getVariables().get(beginName);
         UsedVariable nextEndVar = next.getVariables().get(endName);
-
 
         if(cndNode instanceof VariableOrBlankNode && !(new UsedPairedVariable(initBeginVar, nextEndVar)).isJoinable()
                 || cndNode != null && nextEndVar.getClasses().stream().noneMatch(r -> r.match(cndNode)))
