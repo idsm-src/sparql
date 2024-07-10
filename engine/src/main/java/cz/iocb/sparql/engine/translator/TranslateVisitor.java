@@ -99,10 +99,11 @@ import cz.iocb.sparql.engine.request.ReferenceNode;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.request.Result.ResultType;
-import cz.iocb.sparql.engine.request.SelectResult;
 import cz.iocb.sparql.engine.request.TypedLiteral;
 import cz.iocb.sparql.engine.translator.imcode.SqlAggregation;
 import cz.iocb.sparql.engine.translator.imcode.SqlBind;
+import cz.iocb.sparql.engine.translator.imcode.SqlConstruct;
+import cz.iocb.sparql.engine.translator.imcode.SqlConstruct.Template;
 import cz.iocb.sparql.engine.translator.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlFilter;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
@@ -262,11 +263,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         prologue = constructQuery.getPrologue();
         datasets = constructQuery.getSelect().getDataSets();
 
-        Select select = constructQuery.getSelect();
-        SqlIntercode translatedSelect = visitElement(select);
-        List<String> variables = select.getVariablesInScope().stream().map(v -> v.getSqlName()).collect(toList());
+        SqlIntercode source = visitElement(constructQuery.getSelect());
 
-        return new SqlQuery(variables, translatedSelect);
+        List<Template> templates = new ArrayList<Template>();
+
+        for(Pattern pattern : constructQuery.getTemplates())
+        {
+            Triple triple = (Triple) pattern;
+            templates.add(new Template(triple.getSubject(), (Node) triple.getPredicate(), triple.getObject()));
+        }
+
+        return new SqlQuery(List.of("subject", "predicate", "object"), SqlConstruct.construct(templates, source));
     }
 
 
@@ -1603,7 +1610,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             Request request = Request.currentRequest();
 
-            try(Result result = new SelectResult(ResultType.SELECT, request.getStatement().executeQuery(code),
+            try(Result result = new Result(ResultType.SELECT, request.getStatement().executeQuery(code),
                     request.getBegin(), request.getTimeout()))
             {
                 varIndexes = result.getVariableIndexes();

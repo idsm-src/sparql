@@ -21,16 +21,9 @@ import cz.iocb.sparql.engine.parser.model.AskQuery;
 import cz.iocb.sparql.engine.parser.model.ConstructQuery;
 import cz.iocb.sparql.engine.parser.model.DataSet;
 import cz.iocb.sparql.engine.parser.model.DescribeQuery;
-import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Query;
 import cz.iocb.sparql.engine.parser.model.Select;
 import cz.iocb.sparql.engine.parser.model.SelectQuery;
-import cz.iocb.sparql.engine.parser.model.Variable;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.pattern.Pattern;
-import cz.iocb.sparql.engine.parser.model.triple.BlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.parser.model.triple.Triple;
 import cz.iocb.sparql.engine.parser.visitor.QueryVisitor;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
@@ -183,13 +176,10 @@ public class Request implements AutoCloseable
             TranslateVisitor translateVisitor = new TranslateVisitor(messages, true);
             SqlQuery imcode = translateVisitor.translate(syntaxTree);
 
-            if(type != ResultType.CONSTRUCT)
-            {
-                imcode.setOffset(offset);
+            imcode.setOffset(offset);
 
-                if(limit >= 0)
-                    imcode.setLimit(limit);
-            }
+            if(limit >= 0)
+                imcode.setLimit(limit);
 
             String code = imcode.translate();
 
@@ -203,30 +193,7 @@ public class Request implements AutoCloseable
 
             checkForErrors(messages);
 
-            Statement statement = getStatement();
-
-            if(type == ResultType.CONSTRUCT)
-            {
-                ArrayList<RdfNode[]> templates = new ArrayList<RdfNode[]>();
-
-                for(Pattern pattern : ((ConstructQuery) syntaxTree).getTemplates())
-                {
-                    Triple triple = (Triple) pattern;
-
-                    RdfNode[] template = new RdfNode[3];
-                    templates.add(template);
-
-                    template[0] = convertNodeToTemplate(triple.getSubject());
-                    template[1] = convertNodeToTemplate((Node) triple.getPredicate());
-                    template[2] = convertNodeToTemplate(triple.getObject());
-                }
-
-                return new ConstructResult(templates, statement.executeQuery(code), limit, offset, begin, timeout);
-            }
-            else
-            {
-                return new SelectResult(type, statement.executeQuery(code), begin, timeout);
-            }
+            return new Result(type, getStatement().executeQuery(code), begin, timeout);
         }
         catch(Throwable e)
         {
@@ -384,23 +351,6 @@ public class Request implements AutoCloseable
     public IriCache getIriCache()
     {
         return iriCache;
-    }
-
-
-    private static RdfNode convertNodeToTemplate(Node node)
-    {
-        if(node instanceof IRI)
-            return new IriNode(((IRI) node).getValue());
-        else if(node instanceof BlankNode)
-            return new BNode(((BlankNode) node).getName());
-        else if(node instanceof Variable)
-            return new VariableNode(((Variable) node).getName());
-        else if(((Literal) node).getLanguageTag() != null)
-            return new LanguageTaggedLiteral(((Literal) node).getStringValue(), ((Literal) node).getLanguageTag());
-        else if(((Literal) node).getTypeIri() != null)
-            return new TypedLiteral(((Literal) node).getStringValue(), ((Literal) node).getTypeIri());
-        else
-            return new LiteralNode(((Literal) node).getStringValue());
     }
 
 
