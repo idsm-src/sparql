@@ -73,8 +73,14 @@ public class Request implements AutoCloseable
             Parser parser = new Parser(messages);
             ParserRuleContext context = parser.parse(query);
 
+            if(hasErrors(messages))
+                return messages;
+
             QueryVisitor queryVisitor = new QueryVisitor(config, messages);
             Query syntaxTree = queryVisitor.visit(context);
+
+            if(hasErrors(messages))
+                return messages;
 
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
@@ -227,6 +233,12 @@ public class Request implements AutoCloseable
     public Result execute(String query, int offset, int limit, long timeout) throws TranslateExceptions, SQLException
     {
         return execute(query, null, offset, limit, 0, timeout);
+    }
+
+
+    private boolean hasErrors(List<TranslateMessage> messages)
+    {
+        return messages.stream().anyMatch(m -> m.getCategory() == MessageCategory.ERROR);
     }
 
 
