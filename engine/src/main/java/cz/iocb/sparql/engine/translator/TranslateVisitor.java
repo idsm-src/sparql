@@ -1747,16 +1747,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     e.printStackTrace();
 
-                    if(service.isSilent())
-                    {
-                        results.add(defaultResult);
-                    }
-                    else
-                    {
+                    if(!service.isSilent())
                         messages.add(
                                 new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
-                        return context;
-                    }
+
+                    return context;
                 }
 
 
