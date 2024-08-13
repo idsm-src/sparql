@@ -210,7 +210,7 @@ public class SqlProcedureCall extends SqlIntercode
             for(int i = 0; i < resClass.getColumnCount(); i++)
             {
                 appendComma(builder, i > 0);
-                builder.append(columns.get(i));
+                builder.append(columnMap.getOrDefault(columns.get(i), columns.get(i)));
             }
         }
 
