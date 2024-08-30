@@ -178,6 +178,9 @@ public class EndpointServlet extends HttpServlet
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException
     {
+        if(req.getCharacterEncoding() == null)
+            req.setCharacterEncoding("UTF-8");
+
         setBasicHttpHeaders(req, res);
 
         String query = null;
