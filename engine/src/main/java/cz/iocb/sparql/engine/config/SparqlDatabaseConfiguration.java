@@ -578,7 +578,7 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    public static List<Column> getColumns(String[] values)
+    public static List<Column> getColumns(String... values)
     {
         List<Column> columns = new ArrayList<Column>(values.length);
 
@@ -716,11 +716,18 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    public Conditions createAreEqualCondition(String column, String value)
+    public Conditions createAreEqualCondition(String column, String... values)
     {
-        Condition condition = new Condition();
-        condition.addAreEqual(getColumn(column), getColumn(value));
-        return new Conditions(condition);
+        Conditions result = new Conditions();
+
+        for(String value : values)
+        {
+            Condition condition = new Condition();
+            condition.addAreEqual(getColumn(column), getColumn(value));
+            result.add(condition);
+        }
+
+        return result;
     }
 
 
