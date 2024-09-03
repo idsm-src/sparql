@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerT
 import static cz.iocb.sparql.engine.translator.imcode.SqlBind.isExpressionExpansionNeeded;
 import static cz.iocb.sparql.engine.translator.imcode.SqlBind.translateExpressionExpansion;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,11 +88,25 @@ public class SqlAggregation extends SqlIntercode
         {
             if(entry.getValue() != SqlNull.get() && (restrictions == null || restrictions.contains(entry.getKey())))
             {
+                Set<ResourceClass> resClasses = entry.getValue().getResourceClasses();
+
+                for(ResourceClass resClass : resClasses)
+                {
+                    if(!resClass.canBeDerivatedFromGeneral())
+                    {
+                        ResourceClass genClass = resClass.getGeneralClass();
+
+                        if(resClasses.stream().filter(c -> c.getGeneralClass() == genClass).count() > 1)
+                        {
+                            resClasses = resClasses.stream().filter(c -> c.getGeneralClass() != genClass)
+                                    .collect(toSet());
+                            resClasses.add(genClass);
+                        }
+                    }
+                }
+
                 UsedVariable variable = new UsedVariable(entry.getKey(), entry.getValue().canBeNull());
-
-                for(ResourceClass resClass : entry.getValue().getResourceClasses())
-                    variable.addMapping(resClass, resClass.createColumns(entry.getKey()));
-
+                resClasses.stream().forEach(res -> variable.addMapping(res, res.createColumns(entry.getKey())));
                 variables.add(variable);
             }
         }

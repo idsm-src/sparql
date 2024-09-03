@@ -57,10 +57,6 @@ public enum MessageType
             ERROR,
             "Variable '%s' is used outside aggregate, but it is not mentioned in the GROUP BY clause."),
 
-    invalidVariableInAggregate(
-            ERROR,
-            "Variable '%s' mentioned in the GROUP BY clause cannot be used in the aggregate."),
-
     invalidProjection(ERROR, "Use of * is only permitted when the query does not use grouping."),
 
     variableUsedBeforeBind(

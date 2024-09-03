@@ -349,13 +349,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         // translate the GROUP BY clause
-        HashSet<String> groupByVariables = new HashSet<String>();
+        HashSet<String> groupByVars = new HashSet<String>();
 
         for(GroupCondition groupBy : select.getGroupByConditions())
         {
             if(groupBy.getExpression() instanceof Variable && groupBy.getVariable() == null)
             {
-                groupByVariables.add(((Variable) groupBy.getExpression()).getSqlName());
+                groupByVars.add(((Variable) groupBy.getExpression()).getSqlName());
             }
             else
             {
@@ -364,7 +364,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(variable == null)
                     variable = createVariable(variablePrefix);
 
-                groupByVariables.add(variable.getSqlName());
+                groupByVars.add(variable.getSqlName());
 
                 if(select.getPattern().getVariablesInScope().contains(variable))
                     messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
@@ -389,7 +389,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(select.isInAggregateMode())
         {
-            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor(this);
+            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor(this, groupByVars);
 
             List<Filter> havingConditions = select.getHavingConditions().stream()
                     .map(e -> new Filter(rewriter.visitElement(e))).collect(toList());
@@ -452,7 +452,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             for(Entry<Variable, BuiltInCallExpression> entry : rewriter.getAggregations().entrySet())
                 aggregations.put(entry.getKey().getSqlName(), visitor.visitElement(entry.getValue()));
 
-            SqlIntercode intercode = SqlAggregation.aggregate(groupByVariables, aggregations, translatedWhereClause);
+            SqlIntercode intercode = SqlAggregation.aggregate(groupByVars, aggregations, translatedWhereClause);
 
             translatedWhereClause = intercode;
 
@@ -793,9 +793,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 groupVars.add(((Variable) groupCondition.getExpression()).getName());
         }
 
-        for(Expression havingCondition : select.getHavingConditions())
-            checkExpressionForGroupedSolutions(havingCondition, groupVars);
-
         for(Projection projection : select.getProjections())
         {
             if(projection.getExpression() != null)
@@ -803,14 +800,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else
                 checkExpressionForGroupedSolutions(projection.getVariable(), groupVars);
         }
-
-
-        for(Projection projection : select.getProjections())
-            if(projection.getExpression() != null)
-                groupVars.add(projection.getVariable().getName());
-
-        for(OrderCondition orderCondition : select.getOrderByConditions())
-            checkExpressionForGroupedSolutions(orderCondition.getExpression(), groupVars);
     }
 
 
@@ -839,9 +828,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(!inAggregateFunction && !groupByVars.contains(name))
                     messages.add(
                             new TranslateMessage(MessageType.invalidVariableOutsideAggregate, var.getRange(), name));
-
-                if(inAggregateFunction && groupByVars.contains(name))
-                    messages.add(new TranslateMessage(MessageType.invalidVariableInAggregate, var.getRange(), name));
 
                 return null;
             }

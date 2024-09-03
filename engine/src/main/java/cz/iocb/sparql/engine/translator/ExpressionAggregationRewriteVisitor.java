@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
 import static java.util.stream.Collectors.toList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import cz.iocb.sparql.engine.parser.ElementVisitor;
@@ -23,11 +24,13 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     private static final String variablePrefix = "@aggregationvar";
     private final TranslateVisitor parent;
     private final LinkedHashMap<Variable, BuiltInCallExpression> aggregations = new LinkedHashMap<>();
+    private final HashSet<String> groupVars;
 
 
-    public ExpressionAggregationRewriteVisitor(TranslateVisitor parent)
+    public ExpressionAggregationRewriteVisitor(TranslateVisitor parent, HashSet<String> groupVars)
     {
         this.parent = parent;
+        this.groupVars = groupVars;
     }
 
 
@@ -128,7 +131,18 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     @Override
     public Expression visit(Variable variable)
     {
-        return variable;
+        if(groupVars.contains(variable.getSqlName()))
+            return variable;
+
+
+        BuiltInCallExpression builtInCallExpression = new BuiltInCallExpression("sample", List.of(variable));
+        builtInCallExpression.setRange(variable.getRange());
+
+        Variable result = parent.createVariable(variablePrefix);
+        aggregations.put(result, builtInCallExpression);
+        result.setRange(variable.getRange());
+
+        return result;
     }
 
 
