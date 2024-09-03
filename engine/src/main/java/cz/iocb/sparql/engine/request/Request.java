@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.error.MessageCategory;
@@ -33,6 +36,8 @@ import cz.iocb.sparql.engine.translator.imcode.SqlQuery;
 
 public class Request implements AutoCloseable
 {
+    private static final Logger logger = LoggerFactory.getLogger(Request.class);
+
     private static ThreadLocal<Request> requests = new ThreadLocal<Request>();
 
     private final SparqlDatabaseConfiguration config;
@@ -70,6 +75,8 @@ public class Request implements AutoCloseable
 
         try
         {
+            MDC.put("sparql", query);
+
             Parser parser = new Parser(messages);
             ParserRuleContext context = parser.parse(query);
 
@@ -87,21 +94,21 @@ public class Request implements AutoCloseable
 
             TranslateVisitor translateVisitor = new TranslateVisitor(messages, false);
             translateVisitor.translate(syntaxTree);
-        }
-        catch(SQLException e)
-        {
-            throw e;
+
+            logger.trace("query check");
         }
         catch(Throwable e)
         {
-            System.err.println("RequestCheck: log begin");
-            System.err.println(query);
-            e.printStackTrace(System.err);
-            System.err.println("RequestCheck: log end");
+            logger.error("sparql check error: " + e.getMessage(), e);
+
+            if(statement != null)
+                statement.close();
         }
         finally
         {
             requests.set(previous);
+
+            MDC.remove("sparql");
         }
 
         return messages;
@@ -120,65 +127,65 @@ public class Request implements AutoCloseable
         Request previous = requests.get();
         requests.set(this);
 
-        getConnection(); // time is measured after a connection is established
-
-
-        List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
-
-        Parser parser = new Parser(messages);
-        ParserRuleContext context = parser.parse(query);
-
-        checkForErrors(messages);
-
-        QueryVisitor queryVisitor = new QueryVisitor(config, messages);
-        Query syntaxTree = queryVisitor.visit(context);
-
-        checkForErrors(messages);
-
-        if(dataSets != null && !dataSets.isEmpty())
-            syntaxTree.getSelect().setDataSets(dataSets);
-
-
-        this.fetchSize = fetchSize;
-        this.timeout = timeout;
-        this.begin = System.nanoTime();
-
-
-        ResultType type = null;
-
-        if(syntaxTree instanceof SelectQuery)
-        {
-            type = ResultType.SELECT;
-
-            Select select = ((SelectQuery) syntaxTree).getSelect();
-
-            if(limit > 0 && limit <= fetchSize)
-                this.fetchSize = 0;
-
-            if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(fetchSize)) <= 0)
-                this.fetchSize = 0;
-
-            if(select.getGroupByConditions().isEmpty() && select.isInAggregateMode())
-                this.fetchSize = 0;
-        }
-        else if(syntaxTree instanceof AskQuery)
-        {
-            type = ResultType.ASK;
-            this.fetchSize = 0;
-        }
-        else if(syntaxTree instanceof DescribeQuery)
-        {
-            type = ResultType.DESCRIBE;
-            this.fetchSize = 0;
-        }
-        else if(syntaxTree instanceof ConstructQuery)
-        {
-            type = ResultType.CONSTRUCT;
-        }
-
-
         try
         {
+            MDC.put("sparql", query);
+
+            getConnection(); // time is measured after a connection is established
+
+            List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
+
+            Parser parser = new Parser(messages);
+            ParserRuleContext context = parser.parse(query);
+
+            checkForErrors(messages);
+
+            QueryVisitor queryVisitor = new QueryVisitor(config, messages);
+            Query syntaxTree = queryVisitor.visit(context);
+
+            checkForErrors(messages);
+
+            if(dataSets != null && !dataSets.isEmpty())
+                syntaxTree.getSelect().setDataSets(dataSets);
+
+
+            this.fetchSize = fetchSize;
+            this.timeout = timeout;
+            this.begin = System.nanoTime();
+
+
+            ResultType type = null;
+
+            if(syntaxTree instanceof SelectQuery)
+            {
+                type = ResultType.SELECT;
+
+                Select select = ((SelectQuery) syntaxTree).getSelect();
+
+                if(limit > 0 && limit <= fetchSize)
+                    this.fetchSize = 0;
+
+                if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(fetchSize)) <= 0)
+                    this.fetchSize = 0;
+
+                if(select.getGroupByConditions().isEmpty() && select.isInAggregateMode())
+                    this.fetchSize = 0;
+            }
+            else if(syntaxTree instanceof AskQuery)
+            {
+                type = ResultType.ASK;
+                this.fetchSize = 0;
+            }
+            else if(syntaxTree instanceof DescribeQuery)
+            {
+                type = ResultType.DESCRIBE;
+                this.fetchSize = 0;
+            }
+            else if(syntaxTree instanceof ConstructQuery)
+            {
+                type = ResultType.CONSTRUCT;
+            }
+
             TranslateVisitor translateVisitor = new TranslateVisitor(messages, true);
             SqlQuery imcode = translateVisitor.translate(syntaxTree);
 
@@ -189,13 +196,9 @@ public class Request implements AutoCloseable
 
             String code = imcode.translate();
 
-            /*
-            System.err.println("=========================================================================");
-            System.err.println(query);
-            System.err.println("-------------------------------------------------------------------------");
-            System.err.println(code);
-            System.err.println("=========================================================================");
-            */
+            MDC.put("sql", code);
+
+            logger.trace("query evaluation");
 
             checkForErrors(messages);
 
@@ -203,8 +206,10 @@ public class Request implements AutoCloseable
         }
         catch(Throwable e)
         {
-            if(!(e instanceof TranslateExceptions))
-                e.printStackTrace();
+            if(e instanceof TranslateExceptions)
+                logger.info("query translation error: " + e.getMessage());
+            else
+                logger.error("query evaluation error: " + e.getMessage(), e);
 
             if(statement != null)
                 statement.close();
@@ -214,6 +219,9 @@ public class Request implements AutoCloseable
         finally
         {
             requests.set(previous);
+
+            MDC.remove("sparql");
+            MDC.remove("sql");
         }
     }
 
