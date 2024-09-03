@@ -163,16 +163,22 @@ public class GeneralUserIriClass extends UserIriClass
         {
             StringBuilder builder = new StringBuilder();
 
-            builder.append("CASE WHEN sparql.regex_string(");
-            builder.append(iri);
-            builder.append(", '^(");
-            builder.append(regexp.replaceAll("'", "''"));
-            builder.append(")$', '') THEN ");
+            if(canBeDerivatedFromGeneral())
+            {
+                builder.append("CASE WHEN sparql.regex_string(");
+                builder.append(iri);
+                builder.append(", '^(");
+                builder.append(regexp.replaceAll("'", "''"));
+                builder.append(")$', '') THEN ");
+            }
 
             builder.append(inverseFunction.get(part));
             builder.append("(");
             builder.append(iri);
-            builder.append(") END");
+            builder.append(")");
+
+            if(canBeDerivatedFromGeneral())
+                builder.append(" END");
 
             result.add(new ExpressionColumn(builder.toString()));
         }
@@ -206,6 +212,9 @@ public class GeneralUserIriClass extends UserIriClass
     @Override
     public List<Column> fromBoxedExpression(Column column, boolean check)
     {
+        if(check && !canBeDerivatedFromGeneral())
+            throw new IllegalArgumentException();
+
         List<Column> result = new ArrayList<Column>(getColumnCount());
 
         String iri = "sparql.rdfbox_get_iri(" + column + ")";
@@ -331,6 +340,13 @@ public class GeneralUserIriClass extends UserIriClass
 
             return false;
         }
+    }
+
+
+    @Override
+    public boolean canBeDerivatedFromGeneral()
+    {
+        return sqlCheck == SqlCheck.NEVER;
     }
 
 
