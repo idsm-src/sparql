@@ -33,13 +33,14 @@ public class SqlDistinct extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(SqlIntercode child, Set<String> distinct)
+    public static SqlIntercode create(Request request, SqlIntercode child, Set<String> distinct)
     {
-        return create(child, distinct, null);
+        return create(request, child, distinct, null);
     }
 
 
-    protected static SqlIntercode create(SqlIntercode child, Set<String> distinctVariables, Set<String> restrictions)
+    protected static SqlIntercode create(Request request, SqlIntercode child, Set<String> distinctVariables,
+            Set<String> restrictions)
     {
         /* special cases */
 
@@ -49,8 +50,8 @@ public class SqlDistinct extends SqlIntercode
         if(child == SqlEmptySolution.get())
             return SqlEmptySolution.get();
 
-        if(child instanceof SqlTableAccess access && access.isDistinct(distinctVariables))
-            return child.optimize(restrictions, true);
+        if(child instanceof SqlTableAccess access && access.isDistinct(request, distinctVariables))
+            return child.optimize(request, restrictions, true);
 
 
         /* standard distinct */
@@ -66,7 +67,7 @@ public class SqlDistinct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -74,7 +75,7 @@ public class SqlDistinct extends SqlIntercode
         HashSet<String> childRestriction = new HashSet<String>(restrictions);
         childRestriction.addAll(distinctVariables);
 
-        SqlIntercode optChild = child.optimize(childRestriction, true);
+        SqlIntercode optChild = child.optimize(request, childRestriction, true);
 
 
         if(optChild instanceof SqlUnion union)
@@ -137,23 +138,23 @@ public class SqlDistinct extends SqlIntercode
                 sorts.add(new Pair<List<Set<ResourceClass>>, List<SqlIntercode>>(newKey, newValue));
             }
 
-            DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
+            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
             List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 
             for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
-                list.add(create(SqlUnion.union(reduceDistinctUnion(s.getValue(), schema)), distinctVariables,
+                list.add(create(request, SqlUnion.union(reduceDistinctUnion(s.getValue(), schema)), distinctVariables,
                         restrictions));
 
             return SqlUnion.union(list);
         }
 
-        return create(optChild, distinctVariables, restrictions);
+        return create(request, optChild, distinctVariables, restrictions);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         SqlIntercode child = this.child;
 
@@ -167,9 +168,8 @@ public class SqlDistinct extends SqlIntercode
                     stringLiterals.add(v.getName());
 
         for(String var : stringLiterals)
-            child = SqlBind.bind("#hash_" + var,
-                    SqlBuiltinCall.create("_strhash", false, List.of(SqlVariable.create(var, child.getVariables()))),
-                    child);
+            child = SqlBind.bind(request, "#hash_" + var, SqlBuiltinCall.create(request, "_strhash", false,
+                    List.of(SqlVariable.create(var, child.getVariables()))), child);
 
 
         StringBuilder builder = new StringBuilder();
@@ -184,7 +184,7 @@ public class SqlDistinct extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(" ) AS tab");
 
         builder.append(" GROUP BY ");

@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.true
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -70,17 +71,18 @@ public class SqlBinaryLogical extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variables);
-        SqlExpressionIntercode right = getRight().optimize(variables);
+        SqlExpressionIntercode left = getLeft().optimize(request, variables);
+        SqlExpressionIntercode right = getRight().optimize(request, variables);
         return create(operator, left, right);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
-        return "(" + getLeft().translate() + " " + operator.getName() + " " + getRight().translate() + ")";
+        return "(" + getLeft().translate(request) + " " + operator.getName() + " " + getRight().translate(request)
+                + ")";
     }
 }

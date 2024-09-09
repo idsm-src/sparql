@@ -18,6 +18,6 @@ public final class InternalNodeMapping extends ParametrisedMapping
     @Override
     public NodeMapping remap(List<ColumnPair> columnMap)
     {
-        return new InternalNodeMapping(getResourceClass(), remapColumns(columnMap));
+        return new InternalNodeMapping(resourceClass, remapColumns(columnMap));
     }
 }

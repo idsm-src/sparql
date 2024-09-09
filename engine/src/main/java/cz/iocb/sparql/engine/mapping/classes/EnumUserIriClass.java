@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -47,24 +48,24 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         IRI iri = (IRI) node;
-        assert match(node);
+        assert match(statement, node);
 
         return List.of(new ConstantColumn(values.get(iri), sqlTypes.get(0)));
     }
 
 
     @Override
-    public String getPrefix(List<Column> columns)
+    public String getPrefix(Statement statement, List<Column> columns)
     {
         return prefix;
     }
 
 
     @Override
-    public boolean match(IRI iri)
+    public boolean match(Statement statement, IRI iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
         return matcher.matches();

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -67,7 +68,7 @@ public abstract class ResourceClass
     }
 
 
-    public abstract List<Column> toColumns(Node node);
+    public abstract List<Column> toColumns(Statement statement, Node node);
 
 
     public abstract List<Column> fromGeneralClass(List<Column> columns);
@@ -88,7 +89,7 @@ public abstract class ResourceClass
     public abstract Column toBoxedExpression(List<Column> columns);
 
 
-    public abstract Column toExpression(Node node);
+    public abstract Column toExpression(Statement statement, Node node);
 
 
     public abstract List<Column> toResult(List<Column> columns);
@@ -106,7 +107,7 @@ public abstract class ResourceClass
     public abstract String toUnboxedExpression(String code, boolean check);
 
 
-    public abstract boolean match(Node node);
+    public abstract boolean match(Statement statement, Node node);
 
 
     public boolean hasExpressionType()

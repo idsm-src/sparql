@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -80,7 +81,7 @@ public class SimpleLiteralClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         Object value = ((Literal) node).getValue();
 

@@ -1,9 +1,12 @@
 package cz.iocb.sparql.engine.mapping;
 
 import java.util.List;
+import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -12,9 +15,10 @@ public abstract class ConstantMapping extends NodeMapping
     protected final Node value;
 
 
-    protected ConstantMapping(Node node)
+    protected ConstantMapping(Node value, ResourceClass resourceClass, List<Column> columns)
     {
-        this.value = node;
+        super(resourceClass, columns);
+        this.value = value;
     }
 
 
@@ -25,7 +29,7 @@ public abstract class ConstantMapping extends NodeMapping
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Request request, Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;

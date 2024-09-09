@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
@@ -15,15 +16,25 @@ public abstract class BlankNodeClass extends ResourceClass
     }
 
 
+    public abstract List<Column> toColumns(Node node);
+
+
     @Override
-    public Column toExpression(Node node)
+    public final List<Column> toColumns(Statement statement, Node node)
+    {
+        return toColumns(node);
+    }
+
+
+    @Override
+    public Column toExpression(Statement statement, Node node)
     {
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
         return node instanceof VariableOrBlankNode;
     }

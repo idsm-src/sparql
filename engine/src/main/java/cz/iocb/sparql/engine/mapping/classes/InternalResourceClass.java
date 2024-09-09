@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +26,7 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         throw new UnsupportedOperationException();
     }
@@ -74,7 +75,7 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         throw new IllegalArgumentException();
     }
@@ -115,7 +116,7 @@ public class InternalResourceClass extends ResourceClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
         throw new UnsupportedOperationException();
     }

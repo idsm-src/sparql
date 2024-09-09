@@ -11,6 +11,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -86,30 +87,32 @@ public class SqlBinaryArithmetic extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variables);
-        SqlExpressionIntercode right = getRight().optimize(variables);
+        SqlExpressionIntercode left = getLeft().optimize(request, variables);
+        SqlExpressionIntercode right = getRight().optimize(request, variables);
         return create(operator, left, right);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         ResourceClass expressionResourceClass = getExpressionResourceClass();
 
         if(expressionResourceClass == null)
         {
-            String leftCode = translateAsBoxedOperand(getLeft(), getLeft().getResourceClasses(r -> isNumeric(r)));
-            String rightCode = translateAsBoxedOperand(getRight(), getRight().getResourceClasses(r -> isNumeric(r)));
+            String leftCode = translateAsBoxedOperand(request, getLeft(),
+                    getLeft().getResourceClasses(r -> isNumeric(r)));
+            String rightCode = translateAsBoxedOperand(request, getRight(),
+                    getRight().getResourceClasses(r -> isNumeric(r)));
 
             return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
         }
         else
         {
-            String leftCode = translateAsUnboxedOperand(getLeft(), getExpressionResourceClass());
-            String rightCode = translateAsUnboxedOperand(getRight(), getExpressionResourceClass());
+            String leftCode = translateAsUnboxedOperand(request, getLeft(), getExpressionResourceClass());
+            String rightCode = translateAsUnboxedOperand(request, getRight(), getExpressionResourceClass());
 
             return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
         }

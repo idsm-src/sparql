@@ -18,17 +18,20 @@ import cz.iocb.sparql.engine.parser.Range;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Prologue;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 public class LiteralVisitor extends BaseVisitor<Literal>
 {
+    private final Request request;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
 
 
-    public LiteralVisitor(Prologue prologue, List<TranslateMessage> messages)
+    public LiteralVisitor(Request request, Prologue prologue, List<TranslateMessage> messages)
     {
+        this.request = request;
         this.prologue = prologue;
         this.messages = messages;
     }
@@ -63,7 +66,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
             if(type == null)
                 return new Literal(value);
 
-            Literal literal = new Literal(value, type);
+            Literal literal = new Literal(value, request.getConfiguration().getDataType(type), type);
 
             if(type.equals(rdfLangStringType.getTypeIri()))
                 messages.add(new TranslateMessage(MessageType.invalidDatatype, Range.compute(ctx.iri()),

@@ -51,9 +51,9 @@ public class StoredResultHandler extends ResultHandler
     int batchCount;
 
 
-    public StoredResultHandler()
+    public StoredResultHandler(Request request)
     {
-        request = Request.currentRequest();
+        this.request = request;
         columns.put(new TableColumn("__"), "int");
     }
 
@@ -73,8 +73,8 @@ public class StoredResultHandler extends ResultHandler
                 variables.add(variable);
             }
 
-            ResourceClass resClass = getType(entry.getValue(), entry.getKey());
-            List<Column> vals = resClass.toColumns(entry.getValue());
+            ResourceClass resClass = getType(request, entry.getValue(), entry.getKey());
+            List<Column> vals = resClass.toColumns(request.getStatement(), entry.getValue());
             List<Column> cols = variable.getMapping(resClass);
             List<String> types = resClass.getSqlTypes();
 

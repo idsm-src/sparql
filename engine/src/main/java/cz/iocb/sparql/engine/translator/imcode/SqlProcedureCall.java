@@ -17,6 +17,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
@@ -142,7 +143,7 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -160,14 +161,14 @@ public class SqlProcedureCall extends SqlIntercode
             childRestrictions.addAll(paramater.getReferencedVariables());
 
         //FIXME: is procedure deterministic?
-        SqlIntercode optimized = child.optimize(childRestrictions, reduced);
+        SqlIntercode optimized = child.optimize(request, childRestrictions, reduced);
 
         return create(procedure, parameters, restrictedResults, optimized, restrictions);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         Set<Column> columns = variables.getNonConstantColumns();
 
@@ -182,14 +183,14 @@ public class SqlProcedureCall extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        generateInnerSelect(builder);
+        generateInnerSelect(request, builder);
         builder.append(" ) AS tab ");
 
         return builder.toString();
     }
 
 
-    private void generateInnerSelect(StringBuilder builder)
+    private void generateInnerSelect(Request request, StringBuilder builder)
     {
         builder.append("SELECT ");
 
@@ -205,7 +206,7 @@ public class SqlProcedureCall extends SqlIntercode
 
             ResourceClass resClass = entry.getKey().getParameterClass();
             SqlNodeValue node = entry.getValue();
-            List<Column> columns = node.asResource(resClass);
+            List<Column> columns = node.asResource(request, resClass);
 
             for(int i = 0; i < resClass.getColumnCount(); i++)
             {
@@ -229,7 +230,7 @@ public class SqlProcedureCall extends SqlIntercode
         if(child != SqlEmptySolution.get())
         {
             builder.append(" FROM (");
-            builder.append(child.translate());
+            builder.append(child.translate(request));
             builder.append(" ) AS tab");
         }
     }

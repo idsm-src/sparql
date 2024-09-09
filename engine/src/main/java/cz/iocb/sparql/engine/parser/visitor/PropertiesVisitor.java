@@ -24,18 +24,21 @@ import cz.iocb.sparql.engine.parser.model.Variable;
 import cz.iocb.sparql.engine.parser.model.triple.ComplexNode;
 import cz.iocb.sparql.engine.parser.model.triple.Property;
 import cz.iocb.sparql.engine.parser.model.triple.Verb;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 {
+    private final Request request;
     private final Prologue prologue;
     private final VariableScopes scopes;
     private final List<TranslateMessage> messages;
 
 
-    public PropertiesVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
+    public PropertiesVisitor(Request request, Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
+        this.request = request;
         this.prologue = prologue;
         this.scopes = scopes;
         this.messages = messages;
@@ -52,8 +55,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
             return new PathVisitor(prologue, messages).visit(verbPathCtx.path());
         }
 
-        return withRange(
-                new Variable(scopes.addToScope(verbSimpleCtx.var().getText()), verbSimpleCtx.var().getText()),
+        return withRange(new Variable(scopes.addToScope(verbSimpleCtx.var().getText()), verbSimpleCtx.var().getText()),
                 verbSimpleCtx);
     }
 
@@ -63,7 +65,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         if(ctx == null)
             return new LinkedList<ComplexNode>();
 
-        NodeVisitor nodeVisitor = new NodeVisitor(prologue, scopes, messages);
+        NodeVisitor nodeVisitor = new NodeVisitor(request, prologue, scopes, messages);
 
         return mapList(ctx.objectPath(), nodeVisitor::visit);
     }
@@ -74,7 +76,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         if(ctx == null)
             return new LinkedList<ComplexNode>();
 
-        NodeVisitor nodeVisitor = new NodeVisitor(prologue, scopes, messages);
+        NodeVisitor nodeVisitor = new NodeVisitor(request, prologue, scopes, messages);
 
         return mapList(ctx.object(), nodeVisitor::visit);
     }

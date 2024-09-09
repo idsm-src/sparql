@@ -37,6 +37,7 @@ import cz.iocb.sparql.engine.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Pair;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -228,19 +229,19 @@ public class SqlBinaryComparison extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        SqlExpressionIntercode left = getLeft().optimize(variables);
-        SqlExpressionIntercode right = getRight().optimize(variables);
+        SqlExpressionIntercode left = getLeft().optimize(request, variables);
+        SqlExpressionIntercode right = getRight().optimize(request, variables);
         return create(operator, left, right);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         if(getLeft() instanceof SqlNodeValue && getRight() instanceof SqlNodeValue)
-            return translateAsNodeComparison();
+            return translateAsNodeComparison(request);
 
 
         StringBuilder builder = new StringBuilder();
@@ -253,13 +254,13 @@ public class SqlBinaryComparison extends SqlBinary
             builder.append("NULLIF(");
 
             if(getLeft().canBeNull())
-                builder.append(translateAsNullCheck(getLeft(), operator == Operator.NotEquals));
+                builder.append(translateAsNullCheck(request, getLeft(), operator == Operator.NotEquals));
 
             if(getLeft().canBeNull() && getRight().canBeNull())
                 builder.append(operator == Operator.Equals ? " OR " : " AND ");
 
             if(getRight().canBeNull())
-                builder.append(translateAsNullCheck(getRight(), operator == Operator.NotEquals));
+                builder.append(translateAsNullCheck(request, getRight(), operator == Operator.NotEquals));
 
             builder.append(operator == Operator.Equals ? ", true)" : ", false)");
         }
@@ -277,8 +278,8 @@ public class SqlBinaryComparison extends SqlBinary
             {
                 //TODO: add special treatment
 
-                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(getRight(), cmpClass);
+                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
 
                 builder.append("(");
                 builder.append(left);
@@ -292,8 +293,8 @@ public class SqlBinaryComparison extends SqlBinary
             {
                 //TODO: add special cases to compare xsdDate as simple date
 
-                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(getRight(), cmpClass);
+                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
 
                 builder.append("(");
                 builder.append(left);
@@ -305,8 +306,8 @@ public class SqlBinaryComparison extends SqlBinary
             }
             else
             {
-                String left = translateAsUnboxedOperand(getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(getRight(), cmpClass);
+                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
+                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
 
                 builder.append("(");
                 builder.append(left);
@@ -328,11 +329,11 @@ public class SqlBinaryComparison extends SqlBinary
             rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
 
             builder.append("(");
-            builder.append(translateAsBoxedOperand(getLeft(), leftSet));
+            builder.append(translateAsBoxedOperand(request, getLeft(), leftSet));
             builder.append(" operator(sparql.");
             builder.append(operator.getText());
             builder.append(") ");
-            builder.append(translateAsBoxedOperand(getRight(), rightSet));
+            builder.append(translateAsBoxedOperand(request, getRight(), rightSet));
             builder.append(")");
         }
 
@@ -340,7 +341,7 @@ public class SqlBinaryComparison extends SqlBinary
     }
 
 
-    public String translateAsNodeComparison()
+    public String translateAsNodeComparison(Request request)
     {
         SqlNodeValue leftNode = (SqlNodeValue) getLeft();
         SqlNodeValue rightNode = (SqlNodeValue) getRight();
@@ -360,8 +361,8 @@ public class SqlBinaryComparison extends SqlBinary
             ResourceClass leftClass = pair.getKey();
             ResourceClass rightClass = pair.getValue();
 
-            List<Column> leftCols = leftNode.asResource(leftClass);
-            List<Column> rightCols = rightNode.asResource(rightClass);
+            List<Column> leftCols = leftNode.asResource(request, leftClass);
+            List<Column> rightCols = rightNode.asResource(request, rightClass);
 
 
             if(leftClass instanceof BlankNodeClass)
@@ -376,8 +377,8 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    List<Column> lcols = leftNode.asResource(leftClass.getGeneralClass());
-                    List<Column> rcols = rightNode.asResource(rightClass.getGeneralClass());
+                    List<Column> lcols = leftNode.asResource(request, leftClass.getGeneralClass());
+                    List<Column> rcols = rightNode.asResource(request, rightClass.getGeneralClass());
 
                     builder.append("(");
                     builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
@@ -446,8 +447,8 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    List<Column> lcols = leftNode.asResource(xsdDate);
-                    List<Column> rcols = rightNode.asResource(xsdDate);
+                    List<Column> lcols = leftNode.asResource(request, xsdDate);
+                    List<Column> rcols = rightNode.asResource(request, xsdDate);
 
                     String left = null;
                     String right = null;
@@ -488,8 +489,8 @@ public class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    List<Column> lcols = leftNode.asResource(leftClass.getGeneralClass());
-                    List<Column> rcols = rightNode.asResource(rightClass.getGeneralClass());
+                    List<Column> lcols = leftNode.asResource(request, leftClass.getGeneralClass());
+                    List<Column> rcols = rightNode.asResource(request, rightClass.getGeneralClass());
 
                     builder.append("(");
                     builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
@@ -579,8 +580,8 @@ public class SqlBinaryComparison extends SqlBinary
             ResourceClass leftClass = pair.getKey();
             ResourceClass rightClass = pair.getValue();
 
-            List<Column> leftCols = leftNode.asResource(leftClass);
-            List<Column> rightCols = rightNode.asResource(rightClass);
+            List<Column> leftCols = leftNode.asResource(request, leftClass);
+            List<Column> rightCols = rightNode.asResource(request, rightClass);
 
             assert operator == Operator.Equals || operator == Operator.NotEquals;
 

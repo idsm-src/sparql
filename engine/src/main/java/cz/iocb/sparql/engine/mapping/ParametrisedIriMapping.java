@@ -20,4 +20,16 @@ public class ParametrisedIriMapping extends ParametrisedMapping
     {
         return new ParametrisedIriMapping((IriClass) resourceClass, remapColumns(columnMap));
     }
+
+
+    public IriClass getResourceClass()
+    {
+        return (IriClass) resourceClass;
+    }
+
+
+    public List<Column> getColumns()
+    {
+        return columns;
+    }
 }

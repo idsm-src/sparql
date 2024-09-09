@@ -8,7 +8,6 @@ import cz.iocb.sparql.engine.parser.BaseComplexNode;
 import cz.iocb.sparql.engine.parser.ElementVisitor;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -59,16 +58,16 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.isSimple = false;
     }
 
-
+    /*
     public Literal(String value, IRI typeIri)
     {
         this.stringValue = value;
         this.languageTag = null;
         this.type = typeIri;
         this.isSimple = false;
-
+    
         DataType dataType = Request.currentRequest().getConfiguration().getDataType(typeIri);
-
+    
         if(dataType == null)
         {
             this.value = null;
@@ -80,6 +79,7 @@ public class Literal extends BaseComplexNode implements Expression, Node
             this.isTypeSupported = true;
         }
     }
+    */
 
 
     public Literal(String value, DataType datatype, IRI typeIri)

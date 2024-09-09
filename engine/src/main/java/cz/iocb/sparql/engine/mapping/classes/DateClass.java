@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateIri;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATE;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -93,7 +94,7 @@ public class DateClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((Literal) node).getValue().toString(), "sparql.zoneddate");
     }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,10 +81,10 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         IRI iri = (IRI) node;
-        assert match(iri);
+        assert match(statement, iri);
 
         String value = iri.getValue();
 
@@ -99,7 +100,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public String getPrefix(List<Column> columns)
+    public String getPrefix(Statement statement, List<Column> columns)
     {
         return prefix;
     }
@@ -107,7 +108,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(IRI iri)
+    public boolean match(Statement statement, IRI iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
         return matcher.matches();

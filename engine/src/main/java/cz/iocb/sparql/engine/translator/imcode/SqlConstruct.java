@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
@@ -20,7 +19,6 @@ import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIntBlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Variable;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
@@ -55,7 +53,7 @@ public class SqlConstruct extends SqlIntercode
     }
 
 
-    public static SqlIntercode construct(List<Template> templates, SqlIntercode child)
+    public static SqlIntercode construct(Request request, List<Template> templates, SqlIntercode child)
     {
         List<UsedVariables> branches = new ArrayList<UsedVariables>(templates.size());
         List<Template> validTemplates = new ArrayList<Template>();
@@ -63,9 +61,10 @@ public class SqlConstruct extends SqlIntercode
 
         for(Template template : templates)
         {
-            UsedVariable subject = getUsedVariable("subject", template.subject, bnClasses, child, true, false);
-            UsedVariable predicate = getUsedVariable("predicate", template.predicate, bnClasses, child, false, false);
-            UsedVariable object = getUsedVariable("object", template.object, bnClasses, child, true, true);
+            UsedVariable subject = getUsedVariable(request, "subject", template.subject, bnClasses, child, true, false);
+            UsedVariable predicate = getUsedVariable(request, "predicate", template.predicate, bnClasses, child, false,
+                    false);
+            UsedVariable object = getUsedVariable(request, "object", template.object, bnClasses, child, true, true);
 
             if(subject == null || predicate == null || object == null)
                 continue;
@@ -210,7 +209,7 @@ public class SqlConstruct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         Set<String> childRestrictions = new HashSet<String>();
 
@@ -226,12 +225,12 @@ public class SqlConstruct extends SqlIntercode
                 childRestrictions.add(variable.getSqlName());
         }
 
-        return construct(templates, child.optimize(childRestrictions, true));
+        return construct(request, templates, child.optimize(request, childRestrictions, true));
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -275,7 +274,7 @@ public class SqlConstruct extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(") AS tab");
 
         if(canBeNull)
@@ -312,25 +311,15 @@ public class SqlConstruct extends SqlIntercode
     }
 
 
-    private static UsedVariable getUsedVariable(String varName, Node node, Map<String, ResourceClass> bnResourceClasses,
-            SqlIntercode child, boolean allowBlankNode, boolean allowLiteral)
+    private static UsedVariable getUsedVariable(Request request, String varName, Node node,
+            Map<String, ResourceClass> bnResourceClasses, SqlIntercode child, boolean allowBlankNode,
+            boolean allowLiteral)
     {
         switch(node)
         {
             case IRI iri -> {
-
-                IriClass iriClass = unsupportedIri;
-
-                for(UserIriClass userClass : Request.currentRequest().getConfiguration().getIriClasses())
-                {
-                    if(userClass.match(iri))
-                    {
-                        iriClass = userClass;
-                        break;
-                    }
-                }
-
-                List<Column> columns = iriClass.toColumns(iri);
+                IriClass iriClass = request.getIriClass(iri);
+                List<Column> columns = iriClass.toColumns(request.getStatement(), iri);
                 return new UsedVariable(varName, iriClass, columns, false);
             }
 
@@ -338,9 +327,9 @@ public class SqlConstruct extends SqlIntercode
                 if(!allowLiteral)
                     return null;
 
-                DataType dataType = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+                DataType dataType = request.getConfiguration().getDataType(literal.getTypeIri());
                 LiteralClass resClass = dataType == null ? unsupportedLiteral : dataType.getResourceClass(literal);
-                List<Column> columns = resClass.toColumns(literal);
+                List<Column> columns = resClass.toColumns(request.getStatement(), literal);
                 return new UsedVariable(varName, resClass, columns, false);
             }
 

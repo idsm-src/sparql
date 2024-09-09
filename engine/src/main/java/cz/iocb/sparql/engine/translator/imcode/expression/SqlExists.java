@@ -14,6 +14,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
@@ -77,14 +78,14 @@ public class SqlExists extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        return create(negated, pattern.optimize(variables.getNames(), true), variables);
+        return create(negated, pattern.optimize(request, variables.getNames(), true), variables);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         //NOTE: rename pattern columns to prevent collisions
 
@@ -121,7 +122,7 @@ public class SqlExists extends SqlExpressionIntercode
 
         builder.append(" FROM (");
 
-        builder.append(pattern.translate());
+        builder.append(pattern.translate(request));
 
         builder.append(") AS tab) AS tabcnd");
 

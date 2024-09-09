@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.request;
 import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -15,15 +14,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
+import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.Parser;
 import cz.iocb.sparql.engine.parser.model.AskQuery;
 import cz.iocb.sparql.engine.parser.model.ConstructQuery;
 import cz.iocb.sparql.engine.parser.model.DataSet;
 import cz.iocb.sparql.engine.parser.model.DescribeQuery;
+import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Query;
 import cz.iocb.sparql.engine.parser.model.Select;
 import cz.iocb.sparql.engine.parser.model.SelectQuery;
@@ -38,11 +43,9 @@ public class Request implements AutoCloseable
 {
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
-    private static ThreadLocal<Request> requests = new ThreadLocal<Request>();
-
     private final SparqlDatabaseConfiguration config;
 
-    private final IriCache iriCache = new IriCache(1000, 10);
+    private final IriCache iriCache = new IriCache(10000);
 
     private Connection connection;
     private Statement statement;
@@ -60,17 +63,8 @@ public class Request implements AutoCloseable
     }
 
 
-    static public Request currentRequest()
-    {
-        return requests.get();
-    }
-
-
     public List<TranslateMessage> check(String query, List<DataSet> dataSets, int timeout) throws SQLException
     {
-        Request previous = requests.get();
-        requests.set(this);
-
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
         try
@@ -83,7 +77,7 @@ public class Request implements AutoCloseable
             if(hasErrors(messages))
                 return messages;
 
-            QueryVisitor queryVisitor = new QueryVisitor(config, messages);
+            QueryVisitor queryVisitor = new QueryVisitor(this, messages);
             Query syntaxTree = queryVisitor.visit(context);
 
             if(hasErrors(messages))
@@ -92,7 +86,7 @@ public class Request implements AutoCloseable
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
 
-            TranslateVisitor translateVisitor = new TranslateVisitor(messages, false);
+            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
             translateVisitor.translate(syntaxTree);
 
             logger.trace("query check");
@@ -106,8 +100,6 @@ public class Request implements AutoCloseable
         }
         finally
         {
-            requests.set(previous);
-
             MDC.remove("sparql");
         }
 
@@ -124,9 +116,6 @@ public class Request implements AutoCloseable
     public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
             throws TranslateExceptions, SQLException
     {
-        Request previous = requests.get();
-        requests.set(this);
-
         try
         {
             MDC.put("sparql", query);
@@ -140,7 +129,7 @@ public class Request implements AutoCloseable
 
             checkForErrors(messages);
 
-            QueryVisitor queryVisitor = new QueryVisitor(config, messages);
+            QueryVisitor queryVisitor = new QueryVisitor(this, messages);
             Query syntaxTree = queryVisitor.visit(context);
 
             checkForErrors(messages);
@@ -186,7 +175,7 @@ public class Request implements AutoCloseable
                 type = ResultType.CONSTRUCT;
             }
 
-            TranslateVisitor translateVisitor = new TranslateVisitor(messages, true);
+            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
             SqlQuery imcode = translateVisitor.translate(syntaxTree);
 
             imcode.setOffset(offset);
@@ -194,7 +183,7 @@ public class Request implements AutoCloseable
             if(limit >= 0)
                 imcode.setLimit(limit);
 
-            String code = imcode.translate();
+            String code = imcode.translate(this);
 
             MDC.put("sql", code);
 
@@ -218,8 +207,6 @@ public class Request implements AutoCloseable
         }
         finally
         {
-            requests.set(previous);
-
             MDC.remove("sparql");
             MDC.remove("sql");
         }
@@ -328,49 +315,36 @@ public class Request implements AutoCloseable
     }
 
 
-    public synchronized Statement getStatement() throws SQLException
+    public synchronized Statement getStatement()
     {
-        if(statement != null && !statement.isClosed())
-            throw new IllegalStateException();
+        try
+        {
+            if(canceled)
+                throw new SQLException("query was canceled");
 
-        if(canceled)
-            throw new SQLException("query was canceled");
+            if(statement == null)
+            {
+                Statement statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY,
+                        ResultSet.CONCUR_READ_ONLY);
+                statement.setFetchSize(fetchSize);
 
-        Statement statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-        statement.setQueryTimeout(getStatementTimeout());
-        statement.setFetchSize(fetchSize);
+                this.statement = statement;
+            }
 
-        this.statement = statement;
-        return statement;
-    }
+            statement.setQueryTimeout(getStatementTimeout());
 
-
-    public PreparedStatement getStatement(String query) throws SQLException
-    {
-        if(statement != null && !statement.isClosed())
-            throw new IllegalStateException();
-
-        if(canceled)
-            throw new SQLException("query was canceled");
-
-        PreparedStatement statement = getConnection().prepareStatement(query);
-        statement.setQueryTimeout(getStatementTimeout());
-        statement.setFetchSize(fetchSize);
-
-        this.statement = statement;
-        return statement;
+            return statement;
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
+        }
     }
 
 
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
-    }
-
-
-    public IriCache getIriCache()
-    {
-        return iriCache;
     }
 
 
@@ -383,5 +357,55 @@ public class Request implements AutoCloseable
     public long getTimeout()
     {
         return timeout;
+    }
+
+
+    private IriClass detectIriClass(IRI value)
+    {
+        for(UserIriClass iriClass : getConfiguration().getIriClasses())
+            if(iriClass.match(getStatement(), value))
+                return iriClass;
+
+        return BuiltinClasses.unsupportedIri;
+    }
+
+    public IriClass getIriClass(IRI value)
+    {
+        IriClass iriClass = iriCache.getIriClass(value);
+
+        if(iriClass != null)
+            return iriClass;
+
+        iriClass = detectIriClass(value);
+        List<Column> columns = iriClass.toColumns(statement, value);
+        iriCache.storeToCache(value, iriClass, columns);
+
+        return iriClass;
+    }
+
+
+    public List<Column> getIriColumns(IRI value)
+    {
+        List<Column> columns = iriCache.getIriColumns(value);
+
+        if(columns != null)
+            return columns;
+
+        IriClass iriClass = detectIriClass(value);
+        columns = iriClass.toColumns(statement, value);
+        iriCache.storeToCache(value, iriClass, columns);
+
+        return columns;
+    }
+
+
+    public String getIriPrefix(IriClass iriClass, List<Column> columns)
+    {
+        IRI iri = iriCache.getFromCache(iriClass, columns);
+
+        if(iri != null)
+            return iri.getValue();
+
+        return iriClass.getPrefix(getStatement(), columns);
     }
 }

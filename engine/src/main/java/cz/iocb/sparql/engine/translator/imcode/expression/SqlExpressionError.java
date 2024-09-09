@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 import java.util.HashSet;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -22,14 +23,14 @@ public class SqlExpressionError extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         return this;
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         return null;
     }

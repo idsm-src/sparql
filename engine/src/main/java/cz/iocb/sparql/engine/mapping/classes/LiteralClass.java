@@ -1,7 +1,9 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import java.sql.Statement;
 import java.util.List;
+import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
@@ -21,8 +23,18 @@ public abstract class LiteralClass extends ResourceClass
     }
 
 
+    public abstract List<Column> toColumns(Node node);
+
+
     @Override
-    public boolean match(Node node)
+    public final List<Column> toColumns(Statement statement, Node node)
+    {
+        return toColumns(node);
+    }
+
+
+    @Override
+    public boolean match(Statement statement, Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;

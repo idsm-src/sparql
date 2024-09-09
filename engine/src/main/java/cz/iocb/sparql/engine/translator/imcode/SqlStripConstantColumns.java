@@ -10,6 +10,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -81,17 +82,17 @@ public class SqlStripConstantColumns extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
 
-        return strip(child.optimize(restrictions, reduced));
+        return strip(child.optimize(request, restrictions, reduced));
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -115,7 +116,7 @@ public class SqlStripConstantColumns extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(" ) AS tab");
 
         return builder.toString();

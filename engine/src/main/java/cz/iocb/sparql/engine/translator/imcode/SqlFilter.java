@@ -11,6 +11,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
@@ -33,13 +34,13 @@ public class SqlFilter extends SqlIntercode
     }
 
 
-    public static SqlIntercode filter(List<SqlExpressionIntercode> conditions, SqlIntercode child)
+    public static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child)
     {
-        return filter(conditions, child, null, false);
+        return filter(request, conditions, child, null, false);
     }
 
 
-    protected static SqlIntercode filter(List<SqlExpressionIntercode> conditions, SqlIntercode child,
+    protected static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child,
             Set<String> restrictions, boolean reduced)
     {
         /* special cases */
@@ -55,14 +56,19 @@ public class SqlFilter extends SqlIntercode
             merged.addAll(((SqlFilter) child).conditions);
             merged.addAll(conditions);
 
-            return filter(merged, restrictions == null ? filter.child : filter.child.optimize(restrictions, reduced));
+            return filter(request, merged,
+                    restrictions == null ? filter.child : filter.child.optimize(request, restrictions, reduced));
         }
 
         if(child instanceof SqlUnion)
-            return SqlUnion.union(((SqlUnion) child).getChilds().stream()
-                    .map(p -> filter(conditions.stream().map(c -> c.optimize(p.getVariables())).collect(toList()), p,
-                            restrictions, reduced))
-                    .collect(toList())).optimize(restrictions, reduced);
+            return SqlUnion
+                    .union(((SqlUnion) child).getChilds().stream()
+                            .map(p -> filter(request,
+                                    conditions.stream().map(c -> c.optimize(request, p.getVariables()))
+                                            .collect(toList()),
+                                    p, restrictions, reduced))
+                            .collect(toList()))
+                    .optimize(request, restrictions, reduced);
 
         /* standard filter */
 
@@ -84,7 +90,7 @@ public class SqlFilter extends SqlIntercode
             return SqlNoSolution.get();
 
         if(validExpressions.isEmpty())
-            return child.optimize(restrictions, reduced);
+            return child.optimize(request, restrictions, reduced);
 
 
         UsedVariables variables = child.getVariables().restrict(restrictions);
@@ -94,7 +100,7 @@ public class SqlFilter extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -109,11 +115,11 @@ public class SqlFilter extends SqlIntercode
             HashSet<String> childRestrictions = new HashSet<String>(restrictions);
             childRestrictions.addAll(cndVariables);
 
-            SqlIntercode newOptChild = optChild.optimize(childRestrictions,
+            SqlIntercode newOptChild = optChild.optimize(request, childRestrictions,
                     reduced && optCnds.stream().allMatch(r -> r.isDeterministic()));
 
-            List<SqlExpressionIntercode> newOptCnds = optCnds.stream().map(c -> c.optimize(newOptChild.getVariables()))
-                    .collect(toList());
+            List<SqlExpressionIntercode> newOptCnds = optCnds.stream()
+                    .map(c -> c.optimize(request, newOptChild.getVariables())).collect(toList());
 
             Set<String> newCndVars = newOptCnds.stream().flatMap(c -> c.getReferencedVariables().stream())
                     .collect(toSet());
@@ -127,12 +133,12 @@ public class SqlFilter extends SqlIntercode
             cndVariables = newCndVars;
         }
 
-        return filter(optCnds, optChild, restrictions, reduced);
+        return filter(request, optCnds, optChild, restrictions, reduced);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -146,12 +152,12 @@ public class SqlFilter extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(" ) AS tab");
 
         builder.append(" WHERE ");
 
-        builder.append(conditions.stream().map(cnd -> cnd.translate()).collect(joining(" AND ")));
+        builder.append(conditions.stream().map(cnd -> cnd.translate(request)).collect(joining(" AND ")));
 
         return builder.toString();
     }

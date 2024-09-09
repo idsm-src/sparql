@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import java.util.HashSet;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -24,14 +25,14 @@ public class SqlNull extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         return singleton;
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         return "NULL";
     }

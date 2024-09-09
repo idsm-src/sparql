@@ -44,16 +44,16 @@ public class SqlJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
 
         Set<String> childRestrictions = getRestrictions(childs, restrictions);
 
-        List<List<SqlIntercode>> unionList = expand(optimize(childs, childRestrictions, reduced));
-        unionList = reoptimizeUnion(unionList, restrictions, reduced);
-        unionList = reduceUnion(unionList, restrictions);
+        List<List<SqlIntercode>> unionList = expand(optimize(request, childs, childRestrictions, reduced));
+        unionList = reoptimizeUnion(request, unionList, restrictions, reduced);
+        unionList = reduceUnion(request, unionList, restrictions);
 
         return convertToIntercode(unionList, restrictions);
     }
@@ -66,9 +66,9 @@ public class SqlJoin extends SqlIntercode
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
-        String translate = childs.get(0).translate();
+        String translate = childs.get(0).translate(request);
         UsedVariables leftVariables = childs.get(0).getVariables();
 
         for(int i = 1; i < childs.size(); i++)
@@ -91,7 +91,7 @@ public class SqlJoin extends SqlIntercode
             builder.append(leftTable);
 
             builder.append(", (");
-            builder.append(childs.get(i).translate());
+            builder.append(childs.get(i).translate(request));
             builder.append(" ) AS ");
             builder.append(rightTable);
 
@@ -127,19 +127,20 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    public static List<SqlIntercode> optimize(List<SqlIntercode> childs, Set<String> restrictions, boolean reduced)
+    public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Set<String> restrictions,
+            boolean reduced)
     {
         List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
 
         for(SqlIntercode child : childs)
-            optimized.add(child.optimize(restrictions, reduced));
+            optimized.add(child.optimize(request, restrictions, reduced));
 
         return optimized;
     }
 
 
-    public static List<List<SqlIntercode>> reoptimizeUnion(List<List<SqlIntercode>> unionList, Set<String> restrictions,
-            boolean reduced)
+    public static List<List<SqlIntercode>> reoptimizeUnion(Request request, List<List<SqlIntercode>> unionList,
+            Set<String> restrictions, boolean reduced)
     {
         List<List<SqlIntercode>> optUnionList = new ArrayList<List<SqlIntercode>>();
         Stack<List<SqlIntercode>> unionStack = new Stack<List<SqlIntercode>>();
@@ -152,7 +153,7 @@ public class SqlJoin extends SqlIntercode
             Set<String> newRestrictions = getRestrictions(joinList, restrictions);
 
             if(!newRestrictions.containsAll(getVariables(joinList)))
-                unionStack.addAll(expand(reoptimizeJoin(joinList, newRestrictions, reduced)));
+                unionStack.addAll(expand(reoptimizeJoin(request, joinList, newRestrictions, reduced)));
             else
                 optUnionList.add(joinList);
         }
@@ -161,8 +162,8 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static List<SqlIntercode> reoptimizeJoin(List<SqlIntercode> childs, Set<String> restrictions,
-            boolean reduced)
+    private static List<SqlIntercode> reoptimizeJoin(Request request, List<SqlIntercode> childs,
+            Set<String> restrictions, boolean reduced)
     {
         List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
 
@@ -170,7 +171,7 @@ public class SqlJoin extends SqlIntercode
             if(restrictions.containsAll(child.getVariables().getNames()))
                 optimized.add(child);
             else
-                optimized.add(child.optimize(restrictions, reduced));
+                optimized.add(child.optimize(request, restrictions, reduced));
 
         return optimized;
     }
@@ -218,9 +219,10 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private List<List<SqlIntercode>> reduceUnion(List<List<SqlIntercode>> childs, Set<String> restrictions)
+    private List<List<SqlIntercode>> reduceUnion(Request request, List<List<SqlIntercode>> childs,
+            Set<String> restrictions)
     {
-        DatabaseSchema schema = Request.currentRequest().getConfiguration().getDatabaseSchema();
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         List<List<SqlIntercode>> newChilds = new ArrayList<List<SqlIntercode>>();
 

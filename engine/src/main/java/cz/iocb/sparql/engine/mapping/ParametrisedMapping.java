@@ -6,43 +6,22 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 public abstract class ParametrisedMapping extends NodeMapping
 {
-    protected final ResourceClass resourceClass;
-    protected final List<Column> columns;
-
-
     protected ParametrisedMapping(ResourceClass resourceClass, List<Column> columns)
     {
-        this.resourceClass = resourceClass;
-        this.columns = columns;
-
-        if(resourceClass.getColumnCount() != columns.size())
-            throw new IllegalArgumentException("wrong number of columns");
+        super(resourceClass, columns);
     }
 
 
     @Override
-    public ResourceClass getResourceClass()
+    public boolean match(Request request, Node node)
     {
-        return resourceClass;
-    }
-
-
-    @Override
-    public List<Column> getColumns()
-    {
-        return columns;
-    }
-
-
-    @Override
-    public boolean match(Node node)
-    {
-        return resourceClass.match(node);
+        return resourceClass.match(request.getStatement(), node);
     }
 
 

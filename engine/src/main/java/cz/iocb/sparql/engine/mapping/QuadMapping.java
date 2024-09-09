@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping;
 
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -24,43 +25,43 @@ public abstract class QuadMapping
     }
 
 
-    public boolean match(Node graph, Node subject, Node predicate, Node object)
+    public boolean match(Request request, Node graph, Node subject, Node predicate, Node object)
     {
-        if(!match(this.graph, graph))
+        if(!match(request, this.graph, graph))
             return false;
 
-        if(!match(this.subject, subject))
+        if(!match(request, this.subject, subject))
             return false;
 
-        if(!match(this.predicate, predicate))
+        if(!match(request, this.predicate, predicate))
             return false;
 
-        if(!match(this.object, object))
+        if(!match(request, this.object, object))
             return false;
 
-        if(!checkNodeCondition(graph, subject, getGraph(), getSubject()))
+        if(!checkNodeCondition(request, graph, subject, getGraph(), getSubject()))
             return false;
 
-        if(!checkNodeCondition(graph, predicate, getGraph(), getPredicate()))
+        if(!checkNodeCondition(request, graph, predicate, getGraph(), getPredicate()))
             return false;
 
-        if(!checkNodeCondition(graph, object, getGraph(), getObject()))
+        if(!checkNodeCondition(request, graph, object, getGraph(), getObject()))
             return false;
 
-        if(!checkNodeCondition(subject, predicate, getSubject(), getPredicate()))
+        if(!checkNodeCondition(request, subject, predicate, getSubject(), getPredicate()))
             return false;
 
-        if(!checkNodeCondition(subject, object, getSubject(), getObject()))
+        if(!checkNodeCondition(request, subject, object, getSubject(), getObject()))
             return false;
 
-        if(!checkNodeCondition(predicate, object, getPredicate(), getObject()))
+        if(!checkNodeCondition(request, predicate, object, getPredicate(), getObject()))
             return false;
 
         return true;
     }
 
 
-    private boolean match(NodeMapping mapping, Node node)
+    private boolean match(Request request, NodeMapping mapping, Node node)
     {
         if(node == null)
             return true;
@@ -68,11 +69,11 @@ public abstract class QuadMapping
         if(mapping == null)
             return false;
 
-        return mapping.match(node);
+        return mapping.match(request, node);
     }
 
 
-    private boolean checkNodeCondition(Node node1, Node node2, NodeMapping map1, NodeMapping map2)
+    private boolean checkNodeCondition(Request request, Node node1, Node node2, NodeMapping map1, NodeMapping map2)
     {
         if(!(node1 instanceof VariableOrBlankNode && node2 instanceof VariableOrBlankNode))
             return true;
@@ -81,11 +82,11 @@ public abstract class QuadMapping
         else if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
             return map1.equals(map2);
         else if(map1 instanceof ConstantMapping)
-            return map2.getResourceClass().match(((ConstantMapping) map1).getValue());
+            return map2.getResourceClass(request).match(request.getStatement(), ((ConstantMapping) map1).getValue());
         else if(map2 instanceof ConstantMapping)
-            return map1.getResourceClass().match(((ConstantMapping) map2).getValue());
+            return map1.getResourceClass(request).match(request.getStatement(), ((ConstantMapping) map2).getValue());
         else
-            return map1.getResourceClass() == map2.getResourceClass(); //NOTE: CommonIriClass cannot be used in mappings
+            return map1.getResourceClass(request) == map2.getResourceClass(request); //NOTE: CommonIriClass cannot be used in mappings
     }
 
 

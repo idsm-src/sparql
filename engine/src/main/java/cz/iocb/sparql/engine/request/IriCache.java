@@ -5,76 +5,64 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
 
 
 
 public class IriCache
 {
+    private static record CacheItem(IriClass iriClass, List<Column> columns)
+    {
+    }
+
+
     public static final List<Column> mismatch = new ArrayList<Column>(0);
 
-    private final Map<IRI, Map<ResourceClass, List<Column>>> cache;
-    private final Map<ResourceClass, Map<List<Column>, IRI>> revCache;
-
-    private final int minorSize;
+    private final Map<IRI, CacheItem> cache;
+    private final Map<CacheItem, IRI> revCache;
 
 
-    public IriCache(int majorSize, int minorSize)
+    public IriCache(int majorSize)
     {
-        this.cache = new HashMap<IRI, Map<ResourceClass, List<Column>>>(majorSize);
-        this.revCache = new HashMap<ResourceClass, Map<List<Column>, IRI>>();
-        this.minorSize = minorSize;
+        this.cache = new HashMap<IRI, CacheItem>(majorSize);
+        this.revCache = new HashMap<CacheItem, IRI>();
     }
 
 
-    public List<Column> getFromCache(IRI iri, ResourceClass resClass)
+    public IriClass getIriClass(IRI iri)
     {
-        Map<ResourceClass, List<Column>> items = cache.get(iri);
+        CacheItem items = cache.get(iri);
 
         if(items == null)
             return null;
 
-        return items.get(resClass);
+        return items.iriClass();
     }
 
 
-    public IRI getFromCache(ResourceClass resClass, List<Column> columns)
+    public List<Column> getIriColumns(IRI iri)
     {
-        Map<List<Column>, IRI> revItems = revCache.get(resClass);
-
-        if(revItems == null)
-            return null;
-
-        return revItems.get(columns);
-    }
-
-
-    public void storeToCache(IRI iri, ResourceClass resClass, List<Column> columns)
-    {
-        Map<ResourceClass, List<Column>> items = cache.get(iri);
+        CacheItem items = cache.get(iri);
 
         if(items == null)
-        {
-            items = new HashMap<ResourceClass, List<Column>>(minorSize);
-            cache.put(iri, items);
-        }
+            return null;
 
-        items.put(resClass, columns);
+        return items.columns();
+    }
 
 
-        if(columns == mismatch)
-            return;
+    public IRI getFromCache(IriClass iriClass, List<Column> columns)
+    {
+        CacheItem item = new CacheItem(iriClass, columns);
+        return revCache.get(item);
+    }
 
 
-        Map<List<Column>, IRI> revItems = revCache.get(resClass);
-
-        if(revItems == null)
-        {
-            revItems = new HashMap<List<Column>, IRI>(minorSize);
-            revCache.put(resClass, revItems);
-        }
-
-        revItems.put(columns, iri);
+    public void storeToCache(IRI iri, IriClass iriClass, List<Column> columns)
+    {
+        CacheItem item = new CacheItem(iriClass, columns);
+        cache.put(iri, item);
+        revCache.put(item, iri);
     }
 }

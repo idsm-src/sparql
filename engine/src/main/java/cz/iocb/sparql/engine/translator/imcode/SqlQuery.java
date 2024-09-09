@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultTag;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -32,21 +33,21 @@ public class SqlQuery extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         throw new UnsupportedOperationException();
     }
 
 
-    public SqlIntercode optimize()
+    public SqlIntercode optimize(Request request)
     {
         Set<String> restrictions = new HashSet<String>(selectedVariables);
-        return new SqlQuery(selectedVariables, child.optimize(restrictions, false));
+        return new SqlQuery(selectedVariables, child.optimize(request, restrictions, false));
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         UsedVariables variables = child.getVariables();
         StringBuilder builder = new StringBuilder();
@@ -131,7 +132,7 @@ public class SqlQuery extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(") AS tab");
 
         if(offset > 0)

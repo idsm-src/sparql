@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.sparql.engine.translator.UsedVariable;
@@ -34,10 +35,10 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlIntercode optimize(Set<String> restrictions, boolean reduced);
+    public abstract SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced);
 
 
-    public abstract String translate();
+    public abstract String translate(Request request);
 
 
     public final UsedVariables getVariables()

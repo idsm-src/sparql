@@ -1,9 +1,9 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static java.util.stream.Collectors.joining;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -16,8 +16,6 @@ import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.request.IriCache;
-import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -72,24 +70,16 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         IRI iri = ((IRI) node);
-        assert match(iri);
+        assert match(statement, iri);
 
-        IriCache cache = Request.currentRequest().getIriCache();
-
-        List<Column> hit = cache.getFromCache(iri, this);
-
-        if(hit != null)
-            return hit;
-
-        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
+        try
         {
-            for(int i = 1; i <= getColumnCount(); i++)
-                statement.setString(i, iri.getValue());
+            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery())
+            try(ResultSet result = statement.executeQuery(sql))
             {
                 result.next();
 
@@ -98,7 +88,6 @@ public class GeneralUserIriClass extends UserIriClass
                 for(int i = 0; i < getColumnCount(); i++)
                     columns.add(new ConstantColumn(result.getString(i + 1), sqlTypes.get(i)));
 
-                cache.storeToCache(iri, this, columns);
                 return columns;
             }
         }
@@ -295,21 +284,14 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public String getPrefix(List<Column> columns)
+    public String getPrefix(Statement statement, List<Column> columns)
     {
-        IriCache cache = Request.currentRequest().getIriCache();
-
-        IRI iri = cache.getFromCache(this, columns);
-
-        if(iri != null)
-            return iri.getValue();
-
         return "";
     }
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;
@@ -317,26 +299,26 @@ public class GeneralUserIriClass extends UserIriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match((IRI) node);
+        return match(statement, (IRI) node);
     }
 
 
     @Override
-    public boolean match(IRI iri)
+    public boolean match(Statement statement, IRI iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
 
         if(matcher.matches())
         {
             if(sqlCheck == SqlCheck.IF_MATCH)
-                return check(iri);
+                return check(statement, iri);
 
             return true;
         }
         else
         {
             if(sqlCheck == SqlCheck.IF_NOT_MATCH)
-                return check(iri);
+                return check(statement, iri);
 
             return false;
         }
@@ -369,47 +351,21 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    private boolean check(IRI iri)
+    private boolean check(Statement statement, IRI iri)
     {
-        IriCache cache = Request.currentRequest().getIriCache();
-
-        List<Column> hit = cache.getFromCache(iri, this);
-
-        if(hit == IriCache.mismatch)
-            return false;
-        else if(hit != null)
-            return true;
-
-        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
+        try
         {
-            for(int i = 1; i <= getColumnCount(); i++)
-                statement.setString(i, iri.getValue());
+            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery())
+            try(ResultSet result = statement.executeQuery(sql))
             {
                 result.next();
 
-                boolean match = true;
-
                 for(int i = 1; i <= getColumnCount(); i++)
                     if(result.getString(i) == null)
-                        match = false;
+                        return false;
 
-                if(!match)
-                {
-                    cache.storeToCache(iri, this, IriCache.mismatch);
-                }
-                else
-                {
-                    List<Column> columns = new ArrayList<Column>();
-
-                    for(int i = 0; i < getColumnCount(); i++)
-                        columns.add(new ConstantColumn(result.getString(i + 1), sqlTypes.get(i)));
-
-                    cache.storeToCache(iri, this, columns);
-                }
-
-                return match;
+                return true;
             }
         }
         catch(SQLException e)

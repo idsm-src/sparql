@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.true
 import java.util.LinkedList;
 import java.util.List;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -33,13 +34,13 @@ public class SqlInExpression extends SqlExpressionIntercode
         }
 
         @Override
-        public SqlExpressionIntercode optimize(UsedVariables variables)
+        public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
         {
-            return create(operand.optimize(variables));
+            return create(operand.optimize(request, variables));
         }
 
         @Override
-        public String translate()
+        public String translate(Request request)
         {
             return "\"expr\"";
         }
@@ -100,29 +101,29 @@ public class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode right : rights)
-            optimized.add(right.optimize(variables));
+            optimized.add(right.optimize(request, variables));
 
-        return create(negated, left.optimize(variables), optimized);
+        return create(negated, left.optimize(request, variables), optimized);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         if(left instanceof SqlNodeValue)
-            return expression.translate();
+            return expression.translate(request);
 
 
         StringBuilder builder = new StringBuilder();
         builder.append("(SELECT ");
-        builder.append(expression.translate());
+        builder.append(expression.translate(request));
         builder.append(" FROM (VALUES (");
-        builder.append(left.translate());
+        builder.append(left.translate(request));
         builder.append(")) AS \"tab\"(\"expr\"))");
         return builder.toString();
     }

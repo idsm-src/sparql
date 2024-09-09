@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANG;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANGSTRING;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -92,7 +93,7 @@ public class LangStringClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         Literal literal = (Literal) node;
 

@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.TYPE;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -117,7 +118,7 @@ public class UserLiteralClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         Object value = ((Literal) node).getValue();
 

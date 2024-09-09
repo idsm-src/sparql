@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import java.util.Set;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -23,14 +24,14 @@ public class SqlNoSolution extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         return this;
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         return "SELECT 1 WHERE false";
     }

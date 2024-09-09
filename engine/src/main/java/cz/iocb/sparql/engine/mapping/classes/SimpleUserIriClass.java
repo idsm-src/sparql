@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -67,7 +68,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
         if(node instanceof VariableOrBlankNode)
             return true;
@@ -75,7 +76,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
         if(!(node instanceof IRI))
             return false;
 
-        return match((IRI) node);
+        return match(statement, (IRI) node);
     }
 
 

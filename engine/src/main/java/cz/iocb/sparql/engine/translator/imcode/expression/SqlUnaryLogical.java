@@ -5,6 +5,7 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.fals
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -35,16 +36,16 @@ public class SqlUnaryLogical extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        SqlExpressionIntercode operand = getOperand().optimize(variables);
+        SqlExpressionIntercode operand = getOperand().optimize(request, variables);
         return create(operand);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
-        return "(not " + getOperand().translate() + ")";
+        return "(not " + getOperand().translate(request) + ")";
     }
 }

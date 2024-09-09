@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -35,19 +36,19 @@ public class SqlVariable extends SqlNodeValue
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         return create(variable.getName(), variables);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         if(isBoxed())
-            return translateAsBoxedOperand(this, getResourceClasses());
+            return translateAsBoxedOperand(request, this, getResourceClasses());
         else
-            return translateAsUnboxedOperand(this, getExpressionResourceClass());
+            return translateAsUnboxedOperand(request, this, getExpressionResourceClass());
     }
 
 
@@ -58,7 +59,7 @@ public class SqlVariable extends SqlNodeValue
 
 
     @Override
-    public List<Column> asResource(ResourceClass resourceClass)
+    public List<Column> asResource(Request request, ResourceClass resourceClass)
     {
         return variable.toResource(resourceClass);
     }

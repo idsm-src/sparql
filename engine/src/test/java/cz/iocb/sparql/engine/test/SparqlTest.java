@@ -456,7 +456,9 @@ public class SparqlTest
 
             if(literal.getValue() == null)
                 return new ConstantLiteralMapping(BuiltinClasses.unsupportedLiteral,
-                        new Literal(node.asLiteral().getLexicalForm(), new IRI(node.asLiteral().getDatatypeURI())));
+                        new Literal(node.asLiteral().getLexicalForm(),
+                                config.getDataType(new IRI(node.asLiteral().getDatatypeURI())),
+                                new IRI(node.asLiteral().getDatatypeURI())));
 
             return new ConstantLiteralMapping(literalClass, literal);
         }

@@ -29,6 +29,7 @@ import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlBaseClass;
 
@@ -55,10 +56,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlExpressionIntercode optimize(UsedVariables variables);
+    public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables);
 
 
-    public abstract String translate();
+    public abstract String translate(Request request);
 
 
     public boolean canBeNull()
@@ -296,7 +297,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static String translateAsNullCheck(SqlExpressionIntercode operand, boolean not)
+    protected static String translateAsNullCheck(Request request, SqlExpressionIntercode operand, boolean not)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -345,7 +346,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
         else
         {
-            builder.append(operand.translate());
+            builder.append(operand.translate(request));
             builder.append(not ? " IS NOT NULL" : " IS NULL");
         }
 
@@ -353,7 +354,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static String translateAsUnboxedOperand(SqlExpressionIntercode operand, ResourceClass resourceClass)
+    protected static String translateAsUnboxedOperand(Request request, SqlExpressionIntercode operand,
+            ResourceClass resourceClass)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -418,7 +420,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
             if(operand.isBoxed() && isNumeric(resourceClass))
             {
-                builder.append("sparql.rdfbox_promote_to_" + resourceClass.getName() + "(" + operand.translate() + ")");
+                builder.append(
+                        "sparql.rdfbox_promote_to_" + resourceClass.getName() + "(" + operand.translate(request) + ")");
             }
             else if(operand.isBoxed())
             {
@@ -426,19 +429,19 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 boolean check = operand.getResourceClasses().stream().filter(c -> c.getGeneralClass() == genClass)
                         .count() > 1;
 
-                builder.append(resourceClass.toUnboxedExpression(operand.translate(), check));
+                builder.append(resourceClass.toUnboxedExpression(operand.translate(request), check));
             }
             else if(expressionClass == resourceClass)
             {
-                builder.append(operand.translate());
+                builder.append(operand.translate(request));
             }
             else if(expressionClass.getGeneralClass() == resourceClass)
             {
-                builder.append(expressionClass.toGeneralExpression(operand.translate()));
+                builder.append(expressionClass.toGeneralExpression(operand.translate(request)));
             }
             else if(expressionClass == resourceClass.getGeneralClass())
             {
-                builder.append(resourceClass.fromGeneralExpression(operand.translate()));
+                builder.append(resourceClass.fromGeneralExpression(operand.translate(request)));
             }
             else
             {
@@ -447,7 +450,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 builder.append("_from_");
                 builder.append(expressionClass.getName());
                 builder.append("(");
-                builder.append(operand.translate());
+                builder.append(operand.translate(request));
                 builder.append(")");
             }
         }
@@ -456,7 +459,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    protected static String translateAsBoxedOperand(SqlExpressionIntercode operand, Set<ResourceClass> requestedClasses)
+    protected static String translateAsBoxedOperand(Request request, SqlExpressionIntercode operand,
+            Set<ResourceClass> requestedClasses)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -483,32 +487,33 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
         else if(operand.isBoxed())
         {
-            builder.append(operand.translate());
+            builder.append(operand.translate(request));
         }
         else
         {
             ResourceClass resourceClass = operand.getExpressionResourceClass();
-            builder.append(resourceClass.toBoxedExpression(operand.translate()));
+            builder.append(resourceClass.toBoxedExpression(operand.translate(request)));
         }
 
         return builder.toString();
     }
 
 
-    protected static String translateAsStringLiteral(SqlExpressionIntercode operand, ResourceClass resourceClass)
+    protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand,
+            ResourceClass resourceClass)
     {
         if(operand instanceof SqlVariable)
             return ((SqlVariable) operand).getExpressionValue(resourceClass).toString();
         else if(!operand.isBoxed())
-            return operand.translate();
+            return operand.translate(request);
         else if(resourceClass == xsdString)
-            return "sparql.rdfbox_get_string(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_string(" + operand.translate(request) + ")";
         else
-            return "sparql.rdfbox_get_langstring_value(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_langstring_value(" + operand.translate(request) + ")";
     }
 
 
-    protected static String translateAsStringLiteral(SqlExpressionIntercode operand)
+    protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand)
     {
         if(operand instanceof SqlVariable)
         {
@@ -528,7 +533,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 appendComma(builder, hasVariant);
                 hasVariant = true;
 
-                builder.append(variable.asResource(resClass).get(0));
+                builder.append(variable.asResource(request, resClass).get(0));
             }
 
             if(compatible.size() > 1)
@@ -538,11 +543,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
         else if(!operand.isBoxed())
         {
-            return operand.translate();
+            return operand.translate(request);
         }
         else
         {
-            return "sparql.rdfbox_get_string_literal(" + operand.translate() + ")";
+            return "sparql.rdfbox_get_string_literal(" + operand.translate(request) + ")";
         }
     }
 }

@@ -27,18 +27,21 @@ import cz.iocb.sparql.engine.parser.model.triple.BlankNodePropertyList;
 import cz.iocb.sparql.engine.parser.model.triple.ComplexNode;
 import cz.iocb.sparql.engine.parser.model.triple.Property;
 import cz.iocb.sparql.engine.parser.model.triple.RdfCollection;
+import cz.iocb.sparql.engine.request.Request;
 
 
 
 public class NodeVisitor extends BaseVisitor<ComplexNode>
 {
+    private final Request request;
     private final Prologue prologue;
     private final VariableScopes scopes;
     private final List<TranslateMessage> messages;
 
 
-    public NodeVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
+    public NodeVisitor(Request request, Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
+        this.request = request;
         this.prologue = prologue;
         this.scopes = scopes;
         this.messages = messages;
@@ -120,7 +123,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public BlankNodePropertyList visitBlankNodePropertyListPath(BlankNodePropertyListPathContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(prologue, scopes, messages)
+        List<Property> properties = new PropertiesVisitor(request, prologue, scopes, messages)
                 .visit(ctx.propertyListPathNotEmpty()).collect(toList());
 
         return new BlankNodePropertyList(properties);
@@ -130,8 +133,8 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public BlankNodePropertyList visitBlankNodePropertyList(BlankNodePropertyListContext ctx)
     {
-        List<Property> properties = new PropertiesVisitor(prologue, scopes, messages).visit(ctx.propertyListNotEmpty())
-                .collect(toList());
+        List<Property> properties = new PropertiesVisitor(request, prologue, scopes, messages)
+                .visit(ctx.propertyListNotEmpty()).collect(toList());
 
         return new BlankNodePropertyList(properties);
     }
@@ -140,20 +143,20 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
-        return new LiteralVisitor(prologue, messages).visitRdfLiteral(ctx);
+        return new LiteralVisitor(request, prologue, messages).visitRdfLiteral(ctx);
     }
 
 
     @Override
     public Literal visitNumericLiteral(NumericLiteralContext ctx)
     {
-        return new LiteralVisitor(prologue, messages).visitNumericLiteral(ctx);
+        return new LiteralVisitor(request, prologue, messages).visitNumericLiteral(ctx);
     }
 
 
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new LiteralVisitor(prologue, messages).visitBooleanLiteral(ctx);
+        return new LiteralVisitor(request, prologue, messages).visitBooleanLiteral(ctx);
     }
 }

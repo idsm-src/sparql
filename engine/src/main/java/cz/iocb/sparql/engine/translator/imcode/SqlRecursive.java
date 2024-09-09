@@ -12,6 +12,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
@@ -42,15 +43,15 @@ public class SqlRecursive extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(SqlIntercode init, SqlIntercode next, String beginName, String joinName,
-            String endName)
+    public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, String beginName,
+            String joinName, String endName)
     {
-        return create(init, next, beginName, joinName, endName, null);
+        return create(request, init, next, beginName, joinName, endName, null);
     }
 
 
-    protected static SqlIntercode create(SqlIntercode init, SqlIntercode next, String beginName, String joinName,
-            String endName, Set<String> restrictions)
+    protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, String beginName,
+            String joinName, String endName, Set<String> restrictions)
     {
         if(init == SqlNoSolution.get())
             return SqlNoSolution.get();
@@ -65,10 +66,12 @@ public class SqlRecursive extends SqlIntercode
         }
 
         if(next == SqlNoSolution.get())
-            return SqlDistinct.create(init, Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
+            return SqlDistinct.create(request, init,
+                    Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
 
         if(!(new UsedPairedVariable(init.getVariables().get(endName), next.getVariables().get(joinName))).isJoinable())
-            return SqlDistinct.create(init, Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
+            return SqlDistinct.create(request, init,
+                    Stream.of(beginName, endName).filter(n -> n != null).collect(toSet()));
 
 
         /* standard recursion */
@@ -114,7 +117,7 @@ public class SqlRecursive extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -127,13 +130,14 @@ public class SqlRecursive extends SqlIntercode
         if(beginName != null)
             childRestrictions.add(beginName);
 
-        return create(init.optimize(childRestrictions, reduced), next.optimize(childRestrictions, reduced), beginName,
-                joinName, endVar.getName(), restrictions);
+        return create(request, init.optimize(request, childRestrictions, reduced),
+                next.optimize(request, childRestrictions, reduced), beginName, joinName, endVar.getName(),
+                restrictions);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         UsedVariables initVars = new UsedVariables(init.variables);
         initVars.remove(endVar.getName());
@@ -199,7 +203,7 @@ public class SqlRecursive extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(init.translate());
+        builder.append(init.translate(request));
         builder.append(") AS tab");
 
         builder.append(" UNION SELECT ");
@@ -231,7 +235,7 @@ public class SqlRecursive extends SqlIntercode
         builder.append(leftTable);
 
         builder.append(", (");
-        builder.append(next.translate());
+        builder.append(next.translate(request));
         builder.append(") AS ");
         builder.append(rightTable);
 

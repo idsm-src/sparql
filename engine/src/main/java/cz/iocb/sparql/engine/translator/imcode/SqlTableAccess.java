@@ -150,7 +150,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    public boolean isDistinct(Collection<String> selected)
+    public boolean isDistinct(Request request, Collection<String> selected)
     {
         if(table == null)
             return true;
@@ -178,7 +178,7 @@ public class SqlTableAccess extends SqlIntercode
             }
         }
 
-        return Request.currentRequest().getConfiguration().getDatabaseSchema().getCompatibleKey(table, columns) != null;
+        return request.getConfiguration().getDatabaseSchema().getCompatibleKey(table, columns) != null;
     }
 
 
@@ -803,7 +803,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -813,7 +813,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         Map<Column, Column> rev = new HashMap<Column, Column>();
 

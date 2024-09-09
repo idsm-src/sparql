@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -199,17 +200,17 @@ public class SqlUnion extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
 
-        return union(childs.stream().map(c -> c.optimize(restrictions, reduced)).collect(toList()));
+        return union(childs.stream().map(c -> c.optimize(request, restrictions, reduced)).collect(toList()));
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -246,7 +247,7 @@ public class SqlUnion extends SqlIntercode
                 builder.append("1");
 
             builder.append(" FROM (");
-            builder.append(child.translate());
+            builder.append(child.translate(request));
             builder.append(") AS tab");
             builder.append(i);
         }

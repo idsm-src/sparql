@@ -2,9 +2,8 @@ package cz.iocb.sparql.engine.mapping;
 
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.request.Request;
 
@@ -12,36 +11,52 @@ import cz.iocb.sparql.engine.request.Request;
 
 public class ConstantIriMapping extends ConstantMapping
 {
+    public ConstantIriMapping(IRI iri, IriClass iriClass, List<Column> columns)
+    {
+        super(iri, iriClass, columns);
+    }
+
+
     public ConstantIriMapping(IRI iri)
     {
-        super(iri);
+        this(iri, null, null);
     }
 
 
-    @SuppressWarnings("resource")
     @Override
-    public ResourceClass getResourceClass()
+    public ResourceClass getResourceClass(Request request)
     {
-        //TODO: use cache
+        if(resourceClass != null)
+            return resourceClass;
 
-        for(UserIriClass iriClass : Request.currentRequest().getConfiguration().getIriClasses())
-            if(iriClass.match(value))
-                return iriClass;
-
-        return BuiltinClasses.unsupportedIri;
+        return request.getIriClass((IRI) value);
     }
 
 
-    @SuppressWarnings("resource")
+    public IriClass getResourceClass()
+    {
+        return (IriClass) resourceClass;
+    }
+
+
     @Override
+    public List<Column> getColumns(Request request)
+    {
+        if(columns != null)
+            return columns;
+
+        return request.getIriColumns((IRI) value);
+    }
+
+
     public List<Column> getColumns()
     {
-        //TODO: use cache
+        return columns;
+    }
 
-        for(UserIriClass iriClass : Request.currentRequest().getConfiguration().getIriClasses())
-            if(iriClass.match(value))
-                return iriClass.toColumns(value);
 
-        return BuiltinClasses.unsupportedIri.toColumns(value);
+    public IRI getIRI()
+    {
+        return (IRI) value;
     }
 }

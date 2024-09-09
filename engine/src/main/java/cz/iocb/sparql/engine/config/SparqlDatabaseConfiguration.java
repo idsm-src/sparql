@@ -214,7 +214,7 @@ public class SparqlDatabaseConfiguration
             iri = prefix + (parts.length == 2 ? parts[1] : "");
         }
 
-        return new ConstantIriMapping(new IRI(iri));
+        return createIriMapping(new IRI(iri));
     }
 
 
@@ -424,23 +424,18 @@ public class SparqlDatabaseConfiguration
 
             for(QuadMapping original : other.getMappings(service))
             {
-                if(original instanceof SingleTableQuadMapping)
+                if(original instanceof SingleTableQuadMapping map)
                 {
-                    SingleTableQuadMapping map = (SingleTableQuadMapping) original;
-
-                    SingleTableQuadMapping mapping = new SingleTableQuadMapping(map.getTable(),
-                            (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
-                            (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()),
+                    SingleTableQuadMapping mapping = new SingleTableQuadMapping(map.getTable(), remap(map.getGraph()),
+                            remap(map.getSubject()), remap(map.getPredicate()), remap(map.getObject()),
                             map.getConditions());
 
                     addQuadMapping(target, mapping);
                 }
-                else if(original instanceof JoinTableQuadMapping)
+                else if(original instanceof JoinTableQuadMapping map)
                 {
-                    JoinTableQuadMapping map = (JoinTableQuadMapping) original;
-
                     JoinTableQuadMapping mapping = new JoinTableQuadMapping(map.getTables(), map.getJoinColumnsPairs(),
-                            (ConstantIriMapping) remap(map.getGraph()), remap(map.getSubject()),
+                            remap(map.getGraph()), remap(map.getSubject()),
                             (ConstantIriMapping) remap(map.getPredicate()), remap(map.getObject()),
                             map.getConditions());
 
@@ -678,10 +673,13 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    private ResourceClass remap(ResourceClass resourceClass)
+    @SuppressWarnings("unchecked")
+    private <T extends ResourceClass> T remap(T resourceClass)
     {
+        // remap to ensure that a resource class of a given name are unique in the config
+
         if(resourceClass instanceof UserIriClass)
-            return getIriClass(resourceClass.getName());
+            return (T) getIriClass(resourceClass.getName());
 
         return resourceClass;
     }
@@ -689,6 +687,8 @@ public class SparqlDatabaseConfiguration
 
     private Map<ResourceClass, List<Column>> remap(Map<ResourceClass, List<Column>> mappings)
     {
+        // remap to ensure that a resource class of a given name are unique in the config
+
         Map<ResourceClass, List<Column>> map = new HashMap<ResourceClass, List<Column>>();
 
         for(Entry<ResourceClass, List<Column>> e : mappings.entrySet())
@@ -698,19 +698,16 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    private NodeMapping remap(NodeMapping mapping)
+    @SuppressWarnings("unchecked")
+    private <T extends NodeMapping> T remap(T mapping)
     {
-        if(mapping instanceof ConstantIriMapping)
-        {
-            ConstantIriMapping original = (ConstantIriMapping) mapping;
-            return createIriMapping(((IRI) original.getValue()).toString());
-        }
+        // remap to ensure that a resource class of a given name are unique in the config
 
-        if(mapping instanceof ParametrisedIriMapping)
-        {
-            ParametrisedIriMapping original = (ParametrisedIriMapping) mapping;
-            return new ParametrisedIriMapping((IriClass) remap(original.getResourceClass()), original.getColumns());
-        }
+        if(mapping instanceof ConstantIriMapping original)
+            return (T) createIriMapping(original.getIRI());
+
+        if(mapping instanceof ParametrisedIriMapping original)
+            return (T) createIriMapping(remap(original.getResourceClass()), original.getColumns());
 
         return mapping;
     }

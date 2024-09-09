@@ -34,7 +34,7 @@ public class SqlLiteral extends SqlNodeValue
     }
 
 
-    public static SqlExpressionIntercode create(Literal literal)
+    public static SqlExpressionIntercode create(Request request, Literal literal)
     {
         if(literal.equals(trueLiteral))
             return trueValue;
@@ -42,7 +42,7 @@ public class SqlLiteral extends SqlNodeValue
         if(literal.equals(falseLiteral))
             return falseValue;
 
-        DataType datatype = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+        DataType datatype = request.getConfiguration().getDataType(literal.getTypeIri());
         LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
 
         return new SqlLiteral(literal, resourceClass);
@@ -50,18 +50,18 @@ public class SqlLiteral extends SqlNodeValue
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         return this;
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         LiteralClass resourceClass = (LiteralClass) getResourceClasses().iterator().next();
 
-        return resourceClass.toExpression(literal).toString();
+        return resourceClass.toExpression(request.getStatement(), literal).toString();
     }
 
 
@@ -78,8 +78,8 @@ public class SqlLiteral extends SqlNodeValue
 
 
     @Override
-    public List<Column> asResource(ResourceClass resourceClass)
+    public List<Column> asResource(Request request, ResourceClass resourceClass)
     {
-        return resourceClass.toColumns(literal);
+        return resourceClass.toColumns(request.getStatement(), literal);
     }
 }

@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.parser.model.OrderCondition.Direction;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -65,7 +66,7 @@ public class SqlSelect extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -75,13 +76,14 @@ public class SqlSelect extends SqlIntercode
 
         if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && limit == null
                 && (offset == null || offset.equals(BigInteger.ZERO)))
-            return child.optimize(restrictions, reduced);
+            return child.optimize(request, restrictions, reduced);
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
         childRestrictions.addAll(orderByVariables.keySet());
         childRestrictions.addAll(distinctVariables);
 
-        SqlIntercode optimizedChild = child.optimize(childRestrictions, !distinctVariables.isEmpty() || reduced);
+        SqlIntercode optimizedChild = child.optimize(request, childRestrictions,
+                !distinctVariables.isEmpty() || reduced);
 
         LinkedHashMap<String, Direction> optimizedOrderByVariables = new LinkedHashMap<String, Direction>();
 
@@ -100,7 +102,7 @@ public class SqlSelect extends SqlIntercode
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -126,7 +128,7 @@ public class SqlSelect extends SqlIntercode
         }
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(") AS tab");
 
         if(distinctVariables.isEmpty() && !orderByVariables.isEmpty())

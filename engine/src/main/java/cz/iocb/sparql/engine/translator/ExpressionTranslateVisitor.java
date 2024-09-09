@@ -45,14 +45,16 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionIntercode>
 {
+    private final Request request;
     private final UsedVariables variables;
     private final TranslateVisitor parent;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
 
 
-    public ExpressionTranslateVisitor(UsedVariables variables, TranslateVisitor parent)
+    public ExpressionTranslateVisitor(Request request, UsedVariables variables, TranslateVisitor parent)
     {
+        this.request = request;
         this.variables = variables;
         this.parent = parent;
         this.prologue = parent.getPrologue();
@@ -153,7 +155,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             arguments.add(visitElement(expression));
 
         if(function.equalsIgnoreCase("iri") || function.equalsIgnoreCase("uri"))
-            arguments.add(SqlIri.create(prologue.getBase()));
+            arguments.add(SqlIri.create(request, prologue.getBase()));
 
         if(function.equalsIgnoreCase("count") && arguments.size() == 0)
         {
@@ -166,10 +168,10 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
                         arguments.add(SqlVariable.create(variable.getName(), variables));
             }
 
-            return SqlBuiltinCall.create("card", builtInCallExpression.isDistinct(), arguments);
+            return SqlBuiltinCall.create(request, "card", builtInCallExpression.isDistinct(), arguments);
         }
 
-        return SqlBuiltinCall.create(function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
+        return SqlBuiltinCall.create(request, function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
     }
 
 
@@ -208,7 +210,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         }
 
 
-        FunctionDefinition definition = Request.currentRequest().getConfiguration().getFunctions(parent.getService())
+        FunctionDefinition definition = request.getConfiguration().getFunctions(parent.getService())
                 .get(iri.getValue());
 
         if(definition == null)
@@ -235,14 +237,14 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(IRI iri)
     {
-        return SqlIri.create(iri);
+        return SqlIri.create(request, iri);
     }
 
 
     @Override
     public SqlExpressionIntercode visit(Literal literal)
     {
-        return SqlLiteral.create(literal);
+        return SqlLiteral.create(request, literal);
     }
 
 

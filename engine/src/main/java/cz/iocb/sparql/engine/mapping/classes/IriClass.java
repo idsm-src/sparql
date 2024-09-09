@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -25,7 +26,7 @@ public abstract class IriClass extends ResourceClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((IRI) node).getValue(), "varchar");
     }
@@ -59,5 +60,5 @@ public abstract class IriClass extends ResourceClass
     }
 
 
-    public abstract String getPrefix(List<Column> columns);
+    public abstract String getPrefix(Statement statement, List<Column> columns);
 }

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATETIME;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -25,7 +26,8 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 public class DateTimeClass extends LiteralClass
 {
-    @SuppressWarnings("serial") private static final Map<Long, String> era = new HashMap<Long, String>()
+    @SuppressWarnings("serial")
+    private static final Map<Long, String> era = new HashMap<Long, String>()
     {
         {
             put(0l, " BC");
@@ -137,7 +139,7 @@ public class DateTimeClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((Literal) node).getValue().toString(), "sparql.zoneddatetime");
     }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -19,7 +20,7 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         return List.of(new ConstantColumn((((IRI) node).getValue()), "varchar"));
     }
@@ -78,7 +79,7 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public String getPrefix(List<Column> columns)
+    public String getPrefix(Statement statement, List<Column> columns)
     {
         if(columns.get(0) instanceof ConstantColumn col)
             return col.getValue();
@@ -88,7 +89,7 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
         if(node instanceof VariableOrBlankNode || node instanceof IRI)
             return true;

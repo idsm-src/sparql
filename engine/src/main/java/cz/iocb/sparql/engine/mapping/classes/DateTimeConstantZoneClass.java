@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATETIME;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -142,7 +143,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         return new ExpressionColumn(
                 "sparql.zoneddatetime_get_value('" + ((Literal) node).getValue() + "'::sparql.zoneddatetime)");
@@ -189,9 +190,9 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
-        if(!super.match(node))
+        if(!super.match(statement, node))
             return false;
 
         if(!(node instanceof Literal))

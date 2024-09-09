@@ -26,12 +26,12 @@ public abstract class ResultHandler implements AutoCloseable
     final private HashMap<String, List<UserIriClass>> typeIriClassesMap = new HashMap<String, List<UserIriClass>>();
 
 
-    protected final ResourceClass getType(Node value, String variable)
+    protected final ResourceClass getType(Request request, Node value, String variable)
     {
         if(value instanceof Literal)
         {
             Literal literal = (Literal) value;
-            DataType datatype = Request.currentRequest().getConfiguration().getDataType(literal.getTypeIri());
+            DataType datatype = request.getConfiguration().getDataType(literal.getTypeIri());
             LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
 
             return resourceClass;
@@ -39,7 +39,7 @@ public abstract class ResultHandler implements AutoCloseable
         else if(value instanceof IRI)
         {
             List<UserIriClass> iriClasses = typeIriClassesMap.computeIfAbsent(variable,
-                    k -> new LinkedList<UserIriClass>(Request.currentRequest().getConfiguration().getIriClasses()));
+                    k -> new LinkedList<UserIriClass>(request.getConfiguration().getIriClasses()));
 
             Iterator<UserIriClass> it = iriClasses.iterator();
 
@@ -47,7 +47,7 @@ public abstract class ResultHandler implements AutoCloseable
             {
                 UserIriClass resClass = it.next();
 
-                if(resClass.match(value))
+                if(resClass.match(request.getStatement(), value))
                 {
                     if(resClass != iriClasses.getFirst())
                     {

@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIntBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
@@ -14,10 +15,10 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 public class BlankNodeLiteral implements Node
 {
     private final String label;
-    private final ResourceClass resourceClass;
+    private final BlankNodeClass resourceClass;
 
 
-    public BlankNodeLiteral(String label, ResourceClass resourceClass)
+    public BlankNodeLiteral(String label, BlankNodeClass resourceClass)
     {
         this.label = label;
         this.resourceClass = resourceClass;
@@ -32,7 +33,7 @@ public class BlankNodeLiteral implements Node
             int segment = Integer.parseInt(value.substring(0, 8));
 
             this.label = value.substring(8);
-            this.resourceClass = classes.stream().filter(
+            this.resourceClass = (UserStrBlankNodeClass) classes.stream().filter(
                     r -> r instanceof UserStrBlankNodeClass && segment == ((UserStrBlankNodeClass) r).getSegment())
                     .findAny().get();
         }
@@ -42,7 +43,7 @@ public class BlankNodeLiteral implements Node
             int segment = (int) (value >> 32);
 
             this.label = Integer.toString((int) (value & 0xFFFFFFFF));
-            this.resourceClass = classes.stream().filter(
+            this.resourceClass = (UserIntBlankNodeClass) classes.stream().filter(
                     r -> r instanceof UserIntBlankNodeClass && segment == ((UserIntBlankNodeClass) r).getSegment())
                     .findAny().get();
         }
@@ -81,7 +82,7 @@ public class BlankNodeLiteral implements Node
     }
 
 
-    public ResourceClass getResourceClass()
+    public BlankNodeClass getResourceClass()
     {
         return resourceClass;
     }

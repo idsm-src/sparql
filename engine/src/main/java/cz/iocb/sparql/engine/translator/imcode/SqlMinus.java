@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
@@ -31,14 +32,14 @@ public class SqlMinus extends SqlIntercode
     }
 
 
-    public static SqlIntercode minus(SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return minus(left, right, null, false);
+        return minus(request, left, right, null, false);
     }
 
 
-    protected static SqlIntercode minus(SqlIntercode left, SqlIntercode right, Set<String> restrictions,
-            boolean reduced)
+    protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right,
+            Set<String> restrictions, boolean reduced)
     {
         boolean shareVariables = false;
 
@@ -48,18 +49,18 @@ public class SqlMinus extends SqlIntercode
                 shareVariables = true;
 
             if(!pair.isJoinable())
-                return left.optimize(restrictions, reduced);
+                return left.optimize(request, restrictions, reduced);
         }
 
         if(shareVariables == false)
-            return left.optimize(restrictions, reduced);
+            return left.optimize(request, restrictions, reduced);
 
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -71,15 +72,15 @@ public class SqlMinus extends SqlIntercode
         childRestrictions.retainAll(right.getVariables().getNames());
         childRestrictions.addAll(restrictions);
 
-        SqlIntercode optimizedLeft = left.optimize(childRestrictions, reduced);
-        SqlIntercode optimizedRight = right.optimize(childRestrictions, true);
+        SqlIntercode optimizedLeft = left.optimize(request, childRestrictions, reduced);
+        SqlIntercode optimizedRight = right.optimize(request, childRestrictions, true);
 
-        return minus(optimizedLeft, optimizedRight, restrictions, reduced);
+        return minus(request, optimizedLeft, optimizedRight, restrictions, reduced);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -93,12 +94,12 @@ public class SqlMinus extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(left.translate());
+        builder.append(left.translate(request));
         builder.append(") AS ");
         builder.append(leftTable);
 
         builder.append(" WHERE NOT EXISTS (SELECT 1 FROM (");
-        builder.append(right.translate());
+        builder.append(right.translate(request));
         builder.append(") AS ");
         builder.append(rightTable);
 

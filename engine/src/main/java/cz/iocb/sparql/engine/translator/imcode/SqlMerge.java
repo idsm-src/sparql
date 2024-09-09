@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -75,7 +76,7 @@ public class SqlMerge extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
         if(restrictions == null)
             return this;
@@ -84,20 +85,20 @@ public class SqlMerge extends SqlIntercode
         contextRestrictions.add(variable1);
         contextRestrictions.add(variable2);
 
-        SqlIntercode optimizedContext = child.optimize(contextRestrictions, reduced);
+        SqlIntercode optimizedContext = child.optimize(request, contextRestrictions, reduced);
 
         if(child.getVariables().get(variable1) == null && !restrictions.contains(variable1))
-            return child.optimize(restrictions, reduced);
+            return child.optimize(request, restrictions, reduced);
 
         if(optimizedContext.getVariables().get(variable2) == null)
-            return child.optimize(restrictions, reduced);
+            return child.optimize(request, restrictions, reduced);
 
         return create(variable1, variable2, optimizedContext, restrictions);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         UsedVariable usedVariable1 = child.getVariables().get(variable1);
         UsedVariable usedVariable2 = child.getVariables().get(variable2);
@@ -115,7 +116,7 @@ public class SqlMerge extends SqlIntercode
             builder.append("1");
 
         builder.append(" FROM (");
-        builder.append(child.translate());
+        builder.append(child.translate(request));
         builder.append(" ) AS ");
         builder.append("tab");
 

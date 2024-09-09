@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANG;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANGSTRING;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -147,7 +148,7 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((String) ((Literal) node).getValue()), "varchar");
     }
@@ -194,9 +195,9 @@ public class LangStringConstantTagClass extends LiteralClass
 
 
     @Override
-    public boolean match(Node node)
+    public boolean match(Statement statement, Node node)
     {
-        if(!super.match(node))
+        if(!super.match(statement, node))
             return false;
 
         if(!(node instanceof Literal))

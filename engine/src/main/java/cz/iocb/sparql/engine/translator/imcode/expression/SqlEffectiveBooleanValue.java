@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -107,14 +108,14 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        return create(getOperand().optimize(variables));
+        return create(getOperand().optimize(request, variables));
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         SqlExpressionIntercode operand = getOperand();
 
@@ -169,25 +170,25 @@ public class SqlEffectiveBooleanValue extends SqlUnary
         }
         else if(operand.isBoxed())
         {
-            return "sparql.ebv_rdfbox(" + operand.translate() + ")";
+            return "sparql.ebv_rdfbox(" + operand.translate(request) + ")";
         }
         else if(operand.getResourceClasses().contains(xsdString))
         {
-            return "(octet_length(" + operand.translate() + ") != 0)";
+            return "(octet_length(" + operand.translate(request) + ") != 0)";
         }
         else if(operand.getResourceClasses().contains(xsdFloat) || operand.getResourceClasses().contains(xsdDouble))
         {
             String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
-            return "(" + operand.translate() + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
+            return "(" + operand.translate(request) + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
         }
         else if(!operand.getResourceClasses().contains(xsdBoolean))
         {
             String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
-            return "(" + operand.translate() + " != '0'::" + sqlType + ")";
+            return "(" + operand.translate(request) + " != '0'::" + sqlType + ")";
         }
         else
         {
-            return operand.translate();
+            return operand.translate(request);
         }
     }
 }

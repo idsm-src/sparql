@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LITERAL;
 import static cz.iocb.sparql.engine.mapping.classes.ResultTag.TYPE;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -88,7 +89,7 @@ public class UnsupportedLiteralClass extends LiteralClass
 
 
     @Override
-    public Column toExpression(Node node)
+    public Column toExpression(Statement statement, Node node)
     {
         String value = ((Literal) node).getStringValue().replaceAll("'", "''");
 

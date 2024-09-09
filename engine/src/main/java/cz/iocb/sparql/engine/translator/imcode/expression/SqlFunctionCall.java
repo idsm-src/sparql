@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
+import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -55,19 +56,19 @@ public class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
-            optimized.add(argument.optimize(variables));
+            optimized.add(argument.optimize(request, variables));
 
         return create(definition, optimized);
     }
 
 
     @Override
-    public String translate()
+    public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -79,9 +80,10 @@ public class SqlFunctionCall extends SqlExpressionIntercode
             appendComma(builder, i > 0);
 
             if(definition.getArgumentClasses().get(i) == FunctionDefinition.stringLiteral)
-                builder.append(translateAsStringLiteral(arguments.get(i)));
+                builder.append(translateAsStringLiteral(request, arguments.get(i)));
             else
-                builder.append(translateAsUnboxedOperand(arguments.get(i), definition.getArgumentClasses().get(i)));
+                builder.append(
+                        translateAsUnboxedOperand(request, arguments.get(i), definition.getArgumentClasses().get(i)));
         }
 
         builder.append(")");

@@ -1,8 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -12,8 +12,6 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.request.IriCache;
-import cz.iocb.sparql.engine.request.Request;
 
 
 
@@ -36,48 +34,32 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Statement statement, Node node)
     {
         IRI iri = (IRI) node;
-        assert match(iri);
+        assert match(statement, iri);
 
         return List.of(new ConstantColumn(iri.getValue(), "varchar"));
     }
 
 
     @Override
-    public String getPrefix(List<Column> columns)
+    public String getPrefix(Statement statement, List<Column> columns)
     {
         return "";
     }
 
 
     @Override
-    public boolean match(IRI iri)
+    public boolean match(Statement statement, IRI iri)
     {
-        IriCache cache = Request.currentRequest().getIriCache();
-
-        List<Column> hit = cache.getFromCache(iri, this);
-
-        if(hit == IriCache.mismatch)
-            return false;
-        else if(hit != null)
-            return true;
-
-        try(PreparedStatement statement = Request.currentRequest().getStatement(sqlQuery))
+        try
         {
-            statement.setString(1, iri.getValue());
+            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
 
-            try(ResultSet result = statement.executeQuery())
+            try(ResultSet result = statement.executeQuery(sql))
             {
-                boolean match = result.next();
-
-                if(!match)
-                    cache.storeToCache(iri, this, IriCache.mismatch);
-                else
-                    cache.storeToCache(iri, this, List.of(new ConstantColumn(iri.getValue(), "varchar")));
-
-                return match;
+                return result.next();
             }
         }
         catch(SQLException e)
