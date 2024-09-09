@@ -1885,7 +1885,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SqlQuery translate(Query sparqlQuery, BigInteger offset, BigInteger limit) throws SQLException
+    public SqlQuery translate(Query sparqlQuery, BigInteger offset, BigInteger limit, boolean optimize)
+            throws SQLException
     {
         variableOccurrences = new HashMap<String, List<Range>>();
 
@@ -1925,7 +1926,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 imcode = new SqlQuery(imcode.getSelectedVariables(), select);
             }
 
-            return (SqlQuery) imcode.optimize(request);
+            if(optimize)
+                imcode = (SqlQuery) imcode.optimize(request);
+
+            return imcode;
         }
         catch(SQLRuntimeException e)
         {

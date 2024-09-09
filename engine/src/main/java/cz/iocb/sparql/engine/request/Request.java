@@ -87,7 +87,7 @@ public class Request implements AutoCloseable
                 syntaxTree.getSelect().setDataSets(dataSets);
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
-            translateVisitor.translate(syntaxTree, null, null);
+            translateVisitor.translate(syntaxTree, null, null, false);
 
             logger.trace("query check");
         }
@@ -179,7 +179,7 @@ public class Request implements AutoCloseable
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
-            SqlQuery imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit);
+            SqlQuery imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, true);
 
             String code = imcode.translate(this);
 
