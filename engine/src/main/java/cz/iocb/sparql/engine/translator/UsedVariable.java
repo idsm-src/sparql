@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.translator;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -107,9 +106,13 @@ public class UsedVariable
 
     public final Set<ResourceClass> getCompatibleClasses(ResourceClass resClass)
     {
-        return mappings.keySet().stream()
-                .filter(r -> r == resClass || r.getGeneralClass() == resClass || r == resClass.getGeneralClass())
-                .collect(toSet());
+        HashSet<ResourceClass> result = new HashSet<ResourceClass>();
+
+        for(ResourceClass r : mappings.keySet())
+            if(r == resClass || r.getGeneralClass() == resClass || r == resClass.getGeneralClass())
+                result.add(r);
+
+        return result;
     }
 
 
