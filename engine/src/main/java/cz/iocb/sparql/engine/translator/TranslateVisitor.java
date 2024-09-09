@@ -548,17 +548,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             for(Projection projection : select.getProjections())
                 distinctVariables.add(projection.getVariable().getSqlName());
 
-        SqlSelect sqlSelect = new SqlSelect(variables, translatedWhereClause, distinctVariables, orderByVariables);
-
-
-        if(select.getLimit() != null)
-            sqlSelect.setLimit(select.getLimit());
-
-        if(select.getOffset() != null)
-            sqlSelect.setOffset(select.getOffset());
-
-
-        return sqlSelect;
+        return new SqlSelect(variables, translatedWhereClause, distinctVariables, orderByVariables, select.getOffset(),
+                select.getLimit());
     }
 
 
@@ -1595,8 +1586,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             /* evaluate context pattern */
 
-            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context);
-            sqlSelect.setLimit(BigInteger.valueOf(serviceContextLimit + 1));
+            BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
+            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context, null, limit);
             SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
 
             String code = query.optimize(request).translate(request);
@@ -1894,7 +1885,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SqlQuery translate(Query sparqlQuery) throws SQLException
+    public SqlQuery translate(Query sparqlQuery, BigInteger offset, BigInteger limit) throws SQLException
     {
         variableOccurrences = new HashMap<String, List<Range>>();
 
@@ -1927,6 +1918,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(imcode == null)
                 return null;
+
+            if(offset != null || limit != null)
+            {
+                SqlSelect select = new SqlSelect(imcode.getChild().getVariables(), imcode.getChild(), offset, limit);
+                imcode = new SqlQuery(imcode.getSelectedVariables(), select);
+            }
 
             return (SqlQuery) imcode.optimize(request);
         }

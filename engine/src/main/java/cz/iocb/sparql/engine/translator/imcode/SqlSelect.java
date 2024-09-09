@@ -32,36 +32,39 @@ public class SqlSelect extends SqlIntercode
     private final SqlIntercode child;
     private final LinkedHashMap<String, Direction> orderByVariables;
     private final HashSet<String> distinctVariables;
-    private BigInteger limit = null;
-    private BigInteger offset = null;
+    private final BigInteger offset;
+    private final BigInteger limit;
 
 
     public SqlSelect(UsedVariables variables, SqlIntercode child, HashSet<String> distinctVariables,
-            LinkedHashMap<String, Direction> orderByVariables)
+            LinkedHashMap<String, Direction> orderByVariables, BigInteger offset, BigInteger limit)
     {
         super(variables, child.isDeterministic());
 
         this.child = child;
         this.distinctVariables = distinctVariables;
         this.orderByVariables = orderByVariables;
+        this.offset = offset;
+        this.limit = limit;
+    }
+
+
+    public SqlSelect(UsedVariables variables, SqlIntercode child, HashSet<String> distinctVariables,
+            LinkedHashMap<String, Direction> orderByVariables)
+    {
+        this(variables, child, distinctVariables, orderByVariables, null, null);
+    }
+
+
+    public SqlSelect(UsedVariables variables, SqlIntercode child, BigInteger offset, BigInteger limit)
+    {
+        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>(), offset, limit);
     }
 
 
     public SqlSelect(UsedVariables variables, SqlIntercode child)
     {
-        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>());
-    }
-
-
-    public final void setLimit(BigInteger limit)
-    {
-        this.limit = limit;
-    }
-
-
-    public final void setOffset(BigInteger offset)
-    {
-        this.offset = offset;
+        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>(), null, null);
     }
 
 
@@ -85,19 +88,49 @@ public class SqlSelect extends SqlIntercode
         SqlIntercode optimizedChild = child.optimize(request, childRestrictions,
                 !distinctVariables.isEmpty() || reduced);
 
+        if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && optimizedChild instanceof SqlSelect inner)
+        {
+            BigInteger zero = BigInteger.valueOf(0);
+
+            BigInteger innerOffset = inner.offset == null ? zero : inner.offset;
+            BigInteger innerLimit = inner.limit;
+
+            BigInteger outerOffset = offset == null ? zero : offset;
+            BigInteger outerLimit = limit;
+
+            if(innerLimit != null)
+                innerLimit = innerLimit.subtract(outerOffset).max(zero);
+
+            BigInteger newOffset = outerOffset.add(innerOffset);
+
+            if(newOffset.equals(zero))
+                newOffset = null;
+
+            BigInteger newLimit = null;
+
+            if(innerLimit != null && outerLimit != null)
+                newLimit = outerLimit.min(innerLimit);
+            else if(innerLimit != null)
+                newLimit = innerLimit;
+            else
+                newLimit = outerLimit;
+
+            if(newLimit.compareTo(zero) <= 0)
+                return SqlNoSolution.get();
+
+
+            return new SqlSelect(inner.getChild().getVariables(), inner.getChild(), inner.getDistinctVariables(),
+                    inner.getOrderByVariables(), newOffset, newLimit);
+        }
+
         LinkedHashMap<String, Direction> optimizedOrderByVariables = new LinkedHashMap<String, Direction>();
 
         for(Entry<String, Direction> entry : orderByVariables.entrySet())
             if(optimizedChild.getVariables().get(entry.getKey()) != null)
                 optimizedOrderByVariables.put(entry.getKey(), entry.getValue());
 
-        SqlSelect result = new SqlSelect(optimizedChild.getVariables().restrict(restrictions), optimizedChild,
-                distinctVariables, optimizedOrderByVariables);
-
-        result.setLimit(limit);
-        result.setOffset(offset);
-
-        return result;
+        return new SqlSelect(optimizedChild.getVariables().restrict(restrictions), optimizedChild, distinctVariables,
+                optimizedOrderByVariables, offset, limit);
     }
 
 
@@ -481,5 +514,35 @@ public class SqlSelect extends SqlIntercode
         }
 
         return builder.toString();
+    }
+
+
+    public LinkedHashMap<String, Direction> getOrderByVariables()
+    {
+        return orderByVariables;
+    }
+
+
+    public HashSet<String> getDistinctVariables()
+    {
+        return distinctVariables;
+    }
+
+
+    public SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
+    public final BigInteger getLimit()
+    {
+        return limit;
+    }
+
+
+    public final BigInteger getOffset()
+    {
+        return offset;
     }
 }

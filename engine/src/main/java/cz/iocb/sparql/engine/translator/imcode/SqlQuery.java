@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -19,8 +20,6 @@ public class SqlQuery extends SqlIntercode
 {
     private final SqlIntercode child;
     private final Collection<String> selectedVariables;
-    private int offset = 0;
-    private int limit = -1;
 
 
     public SqlQuery(Collection<String> selectedVariables, SqlIntercode child)
@@ -52,12 +51,55 @@ public class SqlQuery extends SqlIntercode
         UsedVariables variables = child.getVariables();
         StringBuilder builder = new StringBuilder();
 
+        if(child instanceof SqlSelect select && select.getChild() instanceof SqlUnion union
+                && select.getDistinctVariables().isEmpty() && select.getOrderByVariables().isEmpty())
+        {
+            for(int i = 0; i < union.getChilds().size(); i++)
+            {
+                if(i > 0)
+                    builder.append(" UNION ALL ");
+
+                builder.append(translateChild(request, selectedVariables, variables, union.getChilds().get(i)));
+            }
+
+            if(select.getLimit() != null)
+                builder.append(" LIMIT ").append(select.getLimit().toString());
+
+            if(select.getOffset() != null)
+                builder.append(" OFFSET ").append(select.getOffset().toString());
+        }
+        else if(child instanceof SqlUnion union)
+        {
+            for(int i = 0; i < union.getChilds().size(); i++)
+            {
+                if(i > 0)
+                    builder.append(" UNION ALL ");
+
+                builder.append(translateChild(request, selectedVariables, variables, union.getChilds().get(i)));
+            }
+        }
+        else
+        {
+            builder.append(translateChild(request, selectedVariables, variables, child));
+        }
+
+        return builder.toString();
+    }
+
+
+    public static String translateChild(Request request, Collection<String> selectedVariables, UsedVariables variables,
+            SqlIntercode child)
+    {
+        UsedVariables childVariables = child.getVariables();
+        StringBuilder builder = new StringBuilder();
+
         builder.append("SELECT ");
         boolean hasSelect = false;
 
         for(String variableName : selectedVariables)
         {
             UsedVariable variable = variables.get(variableName);
+            UsedVariable childVariable = childVariables.get(variableName);
 
             if(variable == null || variable.getClasses().isEmpty())
             {
@@ -92,26 +134,39 @@ public class SqlQuery extends SqlIntercode
                 for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
                 {
                     List<ResultTag> tags = entry.getKey();
-                    List<ResourceClass> resClasses = entry.getValue();
+                    List<ResourceClass> fullClasses = entry.getValue();
+
+                    Set<ResourceClass> childClasses = childVariable != null ? childVariable.getClasses() :
+                            new HashSet<ResourceClass>();
+
+                    List<ResourceClass> resClasses = fullClasses.stream().filter(c -> childClasses.contains(c))
+                            .collect(toList());
 
                     for(int part = 0; part < tags.size(); part++)
                     {
                         appendComma(builder, hasSelect);
                         hasSelect = true;
 
-                        if(resClasses.size() > 1)
-                            builder.append("coalesce(");
-
-                        for(int i = 0; i < resClasses.size(); i++)
+                        if(resClasses.size() == 0)
                         {
-                            appendComma(builder, i > 0);
-
-                            ResourceClass resClass = resClasses.get(i);
-                            builder.append(resClass.toResult(variable.getMapping(resClass)).get(part));
+                            builder.append("NULL::" + tags.get(part).getSqlType());
                         }
+                        else
+                        {
+                            if(resClasses.size() > 1)
+                                builder.append("coalesce(");
 
-                        if(resClasses.size() > 1)
-                            builder.append(")");
+                            for(int i = 0; i < resClasses.size(); i++)
+                            {
+                                appendComma(builder, i > 0);
+
+                                ResourceClass resClass = resClasses.get(i);
+                                builder.append(resClass.toResult(childVariable.getMapping(resClass)).get(part));
+                            }
+
+                            if(resClasses.size() > 1)
+                                builder.append(")");
+                        }
 
                         builder.append(" AS \"");
 
@@ -135,30 +190,18 @@ public class SqlQuery extends SqlIntercode
         builder.append(child.translate(request));
         builder.append(") AS tab");
 
-        if(offset > 0)
-        {
-            builder.append(" OFFSET ");
-            builder.append(offset);
-        }
-
-        if(limit >= 0)
-        {
-            builder.append(" LIMIT ");
-            builder.append(limit);
-        }
-
         return builder.toString();
     }
 
 
-    public void setOffset(int offset)
+    public SqlIntercode getChild()
     {
-        this.offset = offset;
+        return child;
     }
 
 
-    public void setLimit(int limit)
+    public Collection<String> getSelectedVariables()
     {
-        this.limit = limit;
+        return selectedVariables;
     }
 }
