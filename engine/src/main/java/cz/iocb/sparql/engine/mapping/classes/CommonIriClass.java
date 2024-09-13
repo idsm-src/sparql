@@ -76,7 +76,7 @@ public class CommonIriClass extends IriClass
 
 
     @Override
-    public String getPrefix(Statement statement, List<Column> columns)
+    public String getPrefix(List<Column> columns)
     {
         if(columns.get(0) instanceof ConstantColumn col)
             return col.getValue();

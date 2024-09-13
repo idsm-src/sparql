@@ -1,7 +1,5 @@
 package cz.iocb.sparql.engine.translator;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.toList;
@@ -42,8 +40,6 @@ import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
@@ -1277,7 +1273,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(node != null)
                 {
-                    ResourceClass resClass = getType(request, node);
+                    ResourceClass resClass = request.getResourceClass(node);
 
                     resClasses.add(resClass);
                     nodeTypes.put(node, resClass);
@@ -1307,7 +1303,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     if(node != null && resClass == nodeTypes.get(node))
                     {
-                        List<Column> cols = resClass.toColumns(request.getStatement(), node);
+                        List<Column> cols = request.getColumns(resClass, node);
 
                         for(int j = 0; j < resClass.getColumnCount(); j++)
                             classColumns.get(j).add(cols.get(j));
@@ -1934,35 +1930,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         catch(SQLRuntimeException e)
         {
             throw(SQLException) e.getCause();
-        }
-    }
-
-
-    private static ResourceClass getType(Request request, Node value)
-    {
-        if(value instanceof Literal)
-        {
-            Literal literal = (Literal) value;
-            DataType datatype = request.getConfiguration().getDataType(literal.getTypeIri());
-            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
-
-            return resourceClass;
-        }
-        else if(value instanceof IRI)
-        {
-            for(UserIriClass resClass : request.getConfiguration().getIriClasses())
-                if(resClass.match(request.getStatement(), value))
-                    return resClass;
-
-            return unsupportedIri;
-        }
-        else if(value instanceof BlankNodeLiteral)
-        {
-            return ((BlankNodeLiteral) value).getResourceClass();
-        }
-        else
-        {
-            return null;
         }
     }
 

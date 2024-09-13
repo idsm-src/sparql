@@ -1,9 +1,9 @@
 package cz.iocb.sparql.engine.request;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -17,16 +17,12 @@ public class IriCache
     }
 
 
-    public static final List<Column> mismatch = new ArrayList<Column>(0);
-
     private final Map<IRI, CacheItem> cache;
-    private final Map<CacheItem, IRI> revCache;
 
 
     public IriCache(int majorSize)
     {
-        this.cache = new HashMap<IRI, CacheItem>(majorSize);
-        this.revCache = new HashMap<CacheItem, IRI>();
+        cache = new HashMap<IRI, CacheItem>(majorSize);
     }
 
 
@@ -52,10 +48,15 @@ public class IriCache
     }
 
 
-    public IRI getFromCache(IriClass iriClass, List<Column> columns)
+    public IRI getIri(IriClass iriClass, List<Column> columns)
     {
         CacheItem item = new CacheItem(iriClass, columns);
-        return revCache.get(item);
+
+        for(Entry<IRI, CacheItem> entry : cache.entrySet())
+            if(entry.getValue().equals(item))
+                return entry.getKey();
+
+        return null;
     }
 
 
@@ -63,6 +64,5 @@ public class IriCache
     {
         CacheItem item = new CacheItem(iriClass, columns);
         cache.put(iri, item);
-        revCache.put(item, iri);
     }
 }

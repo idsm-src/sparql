@@ -60,5 +60,5 @@ public abstract class IriClass extends ResourceClass
     }
 
 
-    public abstract String getPrefix(Statement statement, List<Column> columns);
+    public abstract String getPrefix(List<Column> columns);
 }

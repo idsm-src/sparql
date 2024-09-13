@@ -319,7 +319,7 @@ public class SqlConstruct extends SqlIntercode
         {
             case IRI iri -> {
                 IriClass iriClass = request.getIriClass(iri);
-                List<Column> columns = iriClass.toColumns(request.getStatement(), iri);
+                List<Column> columns = request.getColumns(iriClass, iri);
                 return new UsedVariable(varName, iriClass, columns, false);
             }
 
@@ -329,7 +329,7 @@ public class SqlConstruct extends SqlIntercode
 
                 DataType dataType = request.getConfiguration().getDataType(literal.getTypeIri());
                 LiteralClass resClass = dataType == null ? unsupportedLiteral : dataType.getResourceClass(literal);
-                List<Column> columns = resClass.toColumns(request.getStatement(), literal);
+                List<Column> columns = request.getColumns(resClass, literal);
                 return new UsedVariable(varName, resClass, columns, false);
             }
 

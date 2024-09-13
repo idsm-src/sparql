@@ -58,7 +58,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public String getPrefix(Statement statement, List<Column> columns)
+    public String getPrefix(List<Column> columns)
     {
         return prefix;
     }

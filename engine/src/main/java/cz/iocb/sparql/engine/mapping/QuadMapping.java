@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping;
 
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.request.Request;
@@ -77,16 +78,28 @@ public abstract class QuadMapping
     {
         if(!(node1 instanceof VariableOrBlankNode && node2 instanceof VariableOrBlankNode))
             return true;
-        else if(!node1.equals(node2))
+
+        if(!node1.equals(node2))
             return true;
-        else if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
+
+        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
             return map1.equals(map2);
-        else if(map1 instanceof ConstantMapping)
-            return map2.getResourceClass(request).match(request.getStatement(), ((ConstantMapping) map1).getValue());
-        else if(map2 instanceof ConstantMapping)
-            return map1.getResourceClass(request).match(request.getStatement(), ((ConstantMapping) map2).getValue());
-        else
-            return map1.getResourceClass(request) == map2.getResourceClass(request); //NOTE: CommonIriClass cannot be used in mappings
+
+        ResourceClass rc1 = map1.getResourceClass(request);
+        ResourceClass rc2 = map2.getResourceClass(request);
+
+        //NOTE: CommonIriClass cannot be used in mappings
+
+        if(rc1 == rc2)
+            return true;
+
+        if(map1 instanceof ConstantMapping && rc1.getGeneralClass() == rc2)
+            return true;
+
+        if(map2 instanceof ConstantMapping && rc2.getGeneralClass() == rc1)
+            return true;
+
+        return false;
     }
 
 

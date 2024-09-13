@@ -280,8 +280,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         UsedVariable nextEndVar = next.getVariables().get(endName);
 
         if(cndNode instanceof VariableOrBlankNode && !(new UsedPairedVariable(initBeginVar, nextEndVar)).isJoinable()
-                || cndNode != null
-                        && nextEndVar.getClasses().stream().noneMatch(r -> r.match(request.getStatement(), cndNode)))
+                || cndNode != null && nextEndVar.getClasses().stream().noneMatch(r -> request.match(r, cndNode)))
             return SqlDistinct.create(request, visitElement(repeatedPath.getChild(), subject, object), distinct);
 
 
@@ -448,7 +447,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                         {
                             ParametrisedIriMapping pm = (ParametrisedIriMapping) mapping.getPredicate();
                             List<Column> columns = pm.getColumns(request);
-                            List<Column> values = pm.getResourceClass(request).toColumns(request.getStatement(), node);
+                            List<Column> values = request.getColumns(pm.getResourceClass(request), node);
                             Conditions conditions = new Conditions();
 
                             for(int i = 0; i < columns.size(); i++)
@@ -605,7 +604,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(mapping instanceof ParametrisedMapping)
             {
-                List<Column> values = mapping.getResourceClass(request).toColumns(request.getStatement(), node);
+                List<Column> values = request.getColumns(mapping.getResourceClass(request), node);
                 condition.addAreEqual(columns, values);
             }
         }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.request;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.sql.Connection;
@@ -7,8 +8,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,8 +25,12 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
+import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.Parser;
 import cz.iocb.sparql.engine.parser.model.AskQuery;
@@ -32,6 +41,8 @@ import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Query;
 import cz.iocb.sparql.engine.parser.model.Select;
 import cz.iocb.sparql.engine.parser.model.SelectQuery;
+import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.parser.visitor.QueryVisitor;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
@@ -46,6 +57,7 @@ public class Request implements AutoCloseable
     private final SparqlDatabaseConfiguration config;
 
     private final IriCache iriCache = new IriCache(10000);
+    private final Map<IRI, Set<IriClass>> missmatches = new HashMap<IRI, Set<IriClass>>();
 
     private Connection connection;
     private Statement statement;
@@ -358,14 +370,30 @@ public class Request implements AutoCloseable
     }
 
 
-    private IriClass detectIriClass(IRI value)
+    public ResourceClass getResourceClass(Node value)
     {
-        for(UserIriClass iriClass : getConfiguration().getIriClasses())
-            if(iriClass.match(getStatement(), value))
-                return iriClass;
+        if(value instanceof Literal)
+        {
+            Literal literal = (Literal) value;
+            DataType datatype = getConfiguration().getDataType(literal.getTypeIri());
+            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
 
-        return BuiltinClasses.unsupportedIri;
+            return resourceClass;
+        }
+        else if(value instanceof IRI iri)
+        {
+            return getIriClass(iri);
+        }
+        else if(value instanceof BlankNodeLiteral)
+        {
+            return ((BlankNodeLiteral) value).getResourceClass();
+        }
+        else
+        {
+            return null;
+        }
     }
+
 
     public IriClass getIriClass(IRI value)
     {
@@ -382,28 +410,87 @@ public class Request implements AutoCloseable
     }
 
 
-    public List<Column> getIriColumns(IRI value)
+    private IriClass detectIriClass(IRI value)
     {
-        List<Column> columns = iriCache.getIriColumns(value);
+        for(UserIriClass iriClass : getConfiguration().getIriClasses())
+            if(iriClass.match(getStatement(), value))
+                return iriClass;
+
+        return BuiltinClasses.unsupportedIri;
+    }
+
+
+    public boolean match(ResourceClass resClass, Node node)
+    {
+        if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
+        {
+            IriClass cachedClass = iriCache.getIriClass(iri);
+
+            if(cachedClass != null)
+                return iriClass == cachedClass;
+
+            Set<IriClass> set = missmatches.get(iri);
+
+            if(set != null && set.contains(iriClass))
+                return false;
+
+            if(iriClass.match(getStatement(), iri))
+            {
+                if(set != null)
+                    missmatches.remove(iri);
+
+                List<Column> columns = iriClass.toColumns(statement, iri);
+                iriCache.storeToCache(iri, iriClass, columns);
+
+                return true;
+            }
+            else
+            {
+                if(set == null)
+                {
+                    set = new HashSet<IriClass>();
+                    missmatches.put(iri, set);
+                }
+
+                set.add(iriClass);
+
+                return false;
+            }
+        }
+
+        return resClass.match(getStatement(), node);
+    }
+
+
+    public List<Column> getColumns(ResourceClass resClass, Node node)
+    {
+        if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
+            return getColumns(iriClass, iri);
+
+        return resClass.toColumns(getStatement(), node);
+    }
+
+
+    public List<Column> getColumns(IriClass iriClass, IRI iri)
+    {
+        List<Column> columns = iriCache.getIriColumns(iri);
 
         if(columns != null)
             return columns;
 
-        IriClass iriClass = detectIriClass(value);
-        columns = iriClass.toColumns(statement, value);
-        iriCache.storeToCache(value, iriClass, columns);
+        iriCache.storeToCache(iri, iriClass, columns);
 
-        return columns;
+        return iriClass.toColumns(getStatement(), iri);
     }
 
 
     public String getIriPrefix(IriClass iriClass, List<Column> columns)
     {
-        IRI iri = iriCache.getFromCache(iriClass, columns);
+        IRI iri = iriCache.getIri(iriClass, columns);
 
         if(iri != null)
             return iri.getValue();
 
-        return iriClass.getPrefix(getStatement(), columns);
+        return iriClass.getPrefix(columns);
     }
 }

@@ -44,7 +44,7 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public String getPrefix(Statement statement, List<Column> columns)
+    public String getPrefix(List<Column> columns)
     {
         return "";
     }

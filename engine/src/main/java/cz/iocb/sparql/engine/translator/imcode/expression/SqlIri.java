@@ -41,14 +41,14 @@ public class SqlIri extends SqlNodeValue
     @Override
     public String translate(Request request)
     {
-        return BuiltinClasses.iri.toColumns(request.getStatement(), iri).get(0).toString();
+        return BuiltinClasses.iri.toExpression(request.getStatement(), iri).toString();
     }
 
 
     @Override
     public List<Column> asResource(Request request, ResourceClass resourceClass)
     {
-        return resourceClass.toColumns(request.getStatement(), iri);
+        return request.getColumns(resourceClass, iri);
     }
 
 

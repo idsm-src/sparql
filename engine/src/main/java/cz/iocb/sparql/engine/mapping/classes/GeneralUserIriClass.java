@@ -284,7 +284,7 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public String getPrefix(Statement statement, List<Column> columns)
+    public String getPrefix(List<Column> columns)
     {
         return "";
     }

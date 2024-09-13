@@ -74,21 +74,21 @@ public class SqlBind extends SqlIntercode
 
         UsedVariable variable = null;
 
-        if(expression instanceof SqlIri)
+        if(expression instanceof SqlIri iri)
         {
-            IriClass resClass = ((SqlIri) expression).getIriClass();
-            List<Column> columns = resClass.toColumns(request.getStatement(), ((SqlIri) expression).getIri());
+            IriClass resClass = iri.getIriClass();
+            List<Column> columns = request.getColumns(resClass, iri.getIri());
             variable = new UsedVariable(variableName, resClass, columns, expression.canBeNull());
         }
-        else if(expression instanceof SqlLiteral)
+        else if(expression instanceof SqlLiteral literal)
         {
-            LiteralClass resClass = ((SqlLiteral) expression).getLiteralClass();
-            List<Column> columns = resClass.toColumns(request.getStatement(), ((SqlLiteral) expression).getLiteral());
+            LiteralClass resClass = literal.getLiteralClass();
+            List<Column> columns = request.getColumns(resClass, literal.getLiteral());
             variable = new UsedVariable(variableName, resClass, columns, expression.canBeNull());
         }
-        else if(expression instanceof SqlVariable)
+        else if(expression instanceof SqlVariable var)
         {
-            UsedVariable source = child.getVariables().get(((SqlVariable) expression).getName());
+            UsedVariable source = child.getVariables().get(var.getName());
             variable = new UsedVariable(variableName, source.getMappings(), expression.canBeNull());
         }
         else

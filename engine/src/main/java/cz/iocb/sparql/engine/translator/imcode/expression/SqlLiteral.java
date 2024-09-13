@@ -59,9 +59,7 @@ public class SqlLiteral extends SqlNodeValue
     @Override
     public String translate(Request request)
     {
-        LiteralClass resourceClass = (LiteralClass) getResourceClasses().iterator().next();
-
-        return resourceClass.toExpression(request.getStatement(), literal).toString();
+        return getResourceClass().toExpression(request.getStatement(), literal).toString();
     }
 
 

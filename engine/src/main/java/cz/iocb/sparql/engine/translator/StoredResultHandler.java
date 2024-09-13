@@ -73,8 +73,8 @@ public class StoredResultHandler extends ResultHandler
                 variables.add(variable);
             }
 
-            ResourceClass resClass = getType(request, entry.getValue(), entry.getKey());
-            List<Column> vals = resClass.toColumns(request.getStatement(), entry.getValue());
+            ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
+            List<Column> vals = getColumns(request, resClass, entry.getValue());
             List<Column> cols = variable.getMapping(resClass);
             List<String> types = resClass.getSqlTypes();
 
@@ -221,6 +221,7 @@ public class StoredResultHandler extends ResultHandler
 
         return column.toString();
     }
+
 
     private void flushValues() throws SQLException
     {

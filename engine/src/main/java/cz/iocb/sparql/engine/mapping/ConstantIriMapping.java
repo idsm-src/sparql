@@ -45,7 +45,7 @@ public class ConstantIriMapping extends ConstantMapping
         if(columns != null)
             return columns;
 
-        return request.getIriColumns((IRI) value);
+        return request.getColumns(getResourceClass(request), value);
     }
 
 

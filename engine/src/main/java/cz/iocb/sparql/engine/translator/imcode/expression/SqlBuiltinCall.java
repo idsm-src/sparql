@@ -949,7 +949,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                 builder.append("sparql.sample(");
 
-                // XXX ???
+                //FIXME: is it needed?
                 if(distinct)
                     builder.append("DISTINCT ");
 
@@ -1130,11 +1130,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                             {
                                 rightCols = rightNode.asResource(request, rightClass);
 
-                                if(left instanceof SqlIri)
-                                    leftCols = rightClass.toColumns(request.getStatement(), ((SqlIri) left).getIri());
-                                else if(left instanceof SqlLiteral)
-                                    leftCols = rightClass.toColumns(request.getStatement(),
-                                            ((SqlLiteral) left).getLiteral());
+                                if(left instanceof SqlIri iri)
+                                    leftCols = request.getColumns(rightClass, iri.getIri());
+                                else if(left instanceof SqlLiteral literal)
+                                    leftCols = request.getColumns(rightClass, literal.getLiteral());
                                 else
                                     leftCols = leftClass.toGeneralClass(leftNode.asResource(request, leftClass), false);
                             }
@@ -1143,11 +1142,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
                                 leftCols = leftNode.asResource(request, leftClass);
 
-                                if(right instanceof SqlIri)
-                                    rightCols = leftClass.toColumns(request.getStatement(), ((SqlIri) right).getIri());
-                                else if(right instanceof SqlLiteral)
-                                    rightCols = leftClass.toColumns(request.getStatement(),
-                                            ((SqlLiteral) right).getLiteral());
+                                if(right instanceof SqlIri iri)
+                                    rightCols = request.getColumns(leftClass, iri.getIri());
+                                else if(right instanceof SqlLiteral literal)
+                                    rightCols = request.getColumns(leftClass, literal.getLiteral());
                                 else
                                     rightCols = rightClass.toGeneralClass(rightNode.asResource(request, rightClass),
                                             false);

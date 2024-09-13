@@ -21,7 +21,7 @@ public abstract class ParametrisedMapping extends NodeMapping
     @Override
     public boolean match(Request request, Node node)
     {
-        return resourceClass.match(request.getStatement(), node);
+        return request.match(resourceClass, node);
     }
 
 
