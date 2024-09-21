@@ -262,7 +262,7 @@ graphGraphPattern
     ;
 
 serviceGraphPattern
-    : SERVICE SILENT? varOrIRI groupGraphPattern
+    : SERVICE SILENT? varOrIRI ('(' ')')? groupGraphPattern
     ;
     
 bind
