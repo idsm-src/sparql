@@ -469,7 +469,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                         String prefix = request.getIriPrefix((IriClass) resClass,
                                 var.getUsedVariable().getMapping(resClass));
 
-                        if(prefix.startsWith(value) || prefix.length() < value.length())
+                        if(prefix.startsWith(value) || prefix.length() < value.length() && value.startsWith(prefix))
                             allfalse = false;
 
                         if(!prefix.startsWith(value))
