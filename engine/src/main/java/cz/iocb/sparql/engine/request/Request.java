@@ -161,7 +161,7 @@ public class Request implements AutoCloseable
             {
                 type = ResultType.SELECT;
 
-                Select select = ((SelectQuery) syntaxTree).getSelect();
+                Select select = syntaxTree.getSelect();
 
                 if(limit > 0 && limit <= fetchSize)
                     this.fetchSize = 0;
@@ -402,6 +402,11 @@ public class Request implements AutoCloseable
         if(iriClass != null)
             return iriClass;
 
+        iriClass = config.getIriCache().getIriClass(value);
+
+        if(iriClass != null)
+            return iriClass;
+
         iriClass = detectIriClass(value);
         List<Column> columns = iriClass.toColumns(statement, value);
         iriCache.storeToCache(value, iriClass, columns);
@@ -425,6 +430,11 @@ public class Request implements AutoCloseable
         if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
         {
             IriClass cachedClass = iriCache.getIriClass(iri);
+
+            if(cachedClass != null)
+                return iriClass == cachedClass;
+
+            cachedClass = config.getIriCache().getIriClass(iri);
 
             if(cachedClass != null)
                 return iriClass == cachedClass;
@@ -478,6 +488,11 @@ public class Request implements AutoCloseable
         if(columns != null)
             return columns;
 
+        columns = config.getIriCache().getIriColumns(iri);
+
+        if(columns != null)
+            return columns;
+
         iriCache.storeToCache(iri, iriClass, columns);
 
         return iriClass.toColumns(getStatement(), iri);
@@ -487,6 +502,11 @@ public class Request implements AutoCloseable
     public String getIriPrefix(IriClass iriClass, List<Column> columns)
     {
         IRI iri = iriCache.getIri(iriClass, columns);
+
+        if(iri != null)
+            return iri.getValue();
+
+        iri = config.getIriCache().getIri(iriClass, columns);
 
         if(iri != null)
             return iri.getValue();

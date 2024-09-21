@@ -55,6 +55,7 @@ import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.request.IriCache;
 
 
 
@@ -77,6 +78,8 @@ public class SparqlDatabaseConfiguration
     protected HashMap<IRI, List<QuadMapping>> mappings = new HashMap<IRI, List<QuadMapping>>();
     protected HashMap<IRI, HashMap<String, ProcedureDefinition>> procedures = new HashMap<IRI, HashMap<String, ProcedureDefinition>>();
     protected HashMap<IRI, HashMap<String, FunctionDefinition>> functions = new HashMap<IRI, HashMap<String, FunctionDefinition>>();
+
+    protected final IriCache iriCache = new IriCache(10000);
 
 
     public SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
@@ -670,6 +673,12 @@ public class SparqlDatabaseConfiguration
     public DataSource getConnectionPool()
     {
         return connectionPool;
+    }
+
+
+    public final IriCache getIriCache()
+    {
+        return iriCache;
     }
 
 
