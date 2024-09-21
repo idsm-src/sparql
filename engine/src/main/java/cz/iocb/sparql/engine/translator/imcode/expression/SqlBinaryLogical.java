@@ -33,37 +33,40 @@ public class SqlBinaryLogical extends SqlBinary
         if(left == SqlNull.get() && right == SqlNull.get())
             return SqlNull.get();
 
-        if(left == SqlNull.get() || right == SqlNull.get())
+        if(operator == Operator.Or)
         {
-            if(operator == Operator.Or)
-            {
-                if(left == falseValue || right == falseValue)
-                    return SqlNull.get();
+            if(left == falseValue)
+                return right;
 
-                if(left == trueValue || right == trueValue)
-                    return trueValue;
+            if(right == falseValue)
+                return left;
 
-                if(left instanceof SqlBinaryComparison && ((SqlBinaryComparison) left).isAlwaysFalseOrNull())
-                    return SqlNull.get();
+            if(left == trueValue || right == trueValue)
+                return trueValue;
 
-                if(right instanceof SqlBinaryComparison && ((SqlBinaryComparison) right).isAlwaysFalseOrNull())
-                    return SqlNull.get();
-            }
+            if(right == SqlNull.get() && left instanceof SqlBinaryComparison cmp && cmp.isAlwaysFalseOrNull())
+                return SqlNull.get();
 
-            if(operator == Operator.And)
-            {
-                if(left == falseValue || right == falseValue)
-                    return falseValue;
+            if(left == SqlNull.get() && right instanceof SqlBinaryComparison cmp && cmp.isAlwaysFalseOrNull())
+                return SqlNull.get();
+        }
 
-                if(left == trueValue || right == trueValue)
-                    return SqlNull.get();
+        if(operator == Operator.And)
+        {
+            if(left == trueValue)
+                return right;
 
-                if(left instanceof SqlBinaryComparison && ((SqlBinaryComparison) left).isAlwaysTrueOrNull())
-                    return SqlNull.get();
+            if(right == trueValue)
+                return left;
 
-                if(right instanceof SqlBinaryComparison && ((SqlBinaryComparison) right).isAlwaysTrueOrNull())
-                    return SqlNull.get();
-            }
+            if(left == falseValue || right == falseValue)
+                return falseValue;
+
+            if(right == SqlNull.get() && left instanceof SqlBinaryComparison cmp && cmp.isAlwaysTrueOrNull())
+                return SqlNull.get();
+
+            if(left == SqlNull.get() && right instanceof SqlBinaryComparison cmp && cmp.isAlwaysTrueOrNull())
+                return SqlNull.get();
         }
 
         return new SqlBinaryLogical(operator, left, right, asSet(xsdBoolean), left.canBeNull() || right.canBeNull());

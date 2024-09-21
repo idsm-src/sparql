@@ -156,6 +156,12 @@ public class Condition
 
     public static Condition and(Condition left, Condition right)
     {
+        if(left.isTrue())
+            return new Condition(right);
+
+        if(right.isTrue())
+            return new Condition(left);
+
         Condition result = new Condition(left);
         result.add(right);
         return result;
