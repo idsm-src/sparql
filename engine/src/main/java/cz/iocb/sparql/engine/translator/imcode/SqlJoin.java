@@ -7,12 +7,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.Condition;
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
@@ -242,6 +246,69 @@ public class SqlJoin extends SqlIntercode
             DatabaseSchema schema)
     {
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
+
+
+        HashMap<String, UsedVariable> constants = new HashMap<String, UsedVariable>();
+
+        for(SqlIntercode child : childs)
+        {
+            for(UsedVariable v : child.getVariables().getValues())
+            {
+                if(child.hasConstantVariable(v.getName()))
+                {
+                    UsedVariable old = constants.put(v.getName(), v);
+
+                    if(old != null && !old.equals(v))
+                        return List.of(SqlNoSolution.get());
+                }
+            }
+        }
+
+        if(!constants.isEmpty())
+        {
+            for(int i = 0; i < optChilds.size(); i++)
+            {
+                SqlIntercode child = optChilds.get(i);
+
+                if(child instanceof SqlTableAccess access)
+                {
+                    Condition cnd = new Condition();
+                    HashMap<String, UsedVariable> skip = new HashMap<String, UsedVariable>();
+
+                    for(Entry<String, UsedVariable> e : constants.entrySet())
+                    {
+                        UsedVariable v = access.getInternalVariable(e.getKey());
+
+                        if(v != null && !child.hasConstantVariable(e.getKey()))
+                        {
+                            cnd.addAreEqual(e.getValue().getMapping(), v.getMapping(e.getValue().getResourceClass()));
+                            skip.put(e.getKey(), e.getValue());
+                        }
+                    }
+
+                    if(!skip.isEmpty())
+                    {
+                        Conditions cnds = Conditions.and(access.getConditions(), cnd);
+
+                        if(cnds.isFalse())
+                            return List.of(SqlNoSolution.get());
+
+                        UsedVariables internal = new UsedVariables();
+
+                        for(String name : access.getVariables().getNames())
+                        {
+                            if(skip.containsKey(name))
+                                internal.add(new UsedVariable(skip.get(name)));
+                            else
+                                internal.add(access.getInternalVariable(name));
+                        }
+
+                        optChilds.set(i, SqlTableAccess.create(access.getTable(), cnds, internal, access.getReduced()));
+                    }
+                }
+            }
+        }
+
 
         for(int i = 0; i < optChilds.size(); i++)
         {
