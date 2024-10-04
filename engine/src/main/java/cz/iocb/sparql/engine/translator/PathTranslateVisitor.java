@@ -609,12 +609,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        Conditions conditions = Conditions.and(extraCondition, condition);
-
-        if(conditions.isFalse())
-            return SqlNoSolution.get();
-
-        return SqlTableAccess.create(table, conditions, variables);
+        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), variables);
     }
 
 

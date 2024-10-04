@@ -50,12 +50,18 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
     {
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
+
         return new SqlTableAccess(table, conditions, internal, reduced);
     }
 
 
     public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal)
     {
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
+
         return new SqlTableAccess(table, conditions, internal, false);
     }
 
