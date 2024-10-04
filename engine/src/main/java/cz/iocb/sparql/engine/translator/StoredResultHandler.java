@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.translator;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -91,11 +90,7 @@ public class StoredResultHandler extends ResultHandler
                     for(int i = 0; i < resClass.getColumnCount(); i++)
                     {
                         String sql = "alter table " + table + " add " + cols.get(i) + " " + types.get(i);
-
-                        try(Statement stm = request.getStatement())
-                        {
-                            stm.execute(sql);
-                        }
+                        request.getStatement().execute(sql);
                     }
                 }
             }
@@ -232,10 +227,7 @@ public class StoredResultHandler extends ResultHandler
             String sql = "create temporary table " + table + columns.entrySet().stream()
                     .map(e -> e.getKey() + " " + e.getValue()).collect(joining(", ", "(", ")"));
 
-            try(Statement stm = request.getStatement())
-            {
-                stm.execute(sql);
-            }
+            request.getStatement().execute(sql);
         }
 
         if(data.isEmpty())
@@ -246,10 +238,7 @@ public class StoredResultHandler extends ResultHandler
                 + IntStream.range(0, batchCount).mapToObj(i -> data.values().stream()
                         .map(v -> getColumnAsString(v.get(i))).collect(joining(", ", "(", ")"))).collect(joining(", "));
 
-        try(Statement stm = request.getStatement())
-        {
-            stm.execute(insert);
-        }
+        request.getStatement().execute(insert);
 
         data.clear();
         batchCount = 0;
