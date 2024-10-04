@@ -78,6 +78,38 @@ public class SqlDistinct extends SqlIntercode
         SqlIntercode optChild = child.optimize(request, childRestriction, true);
 
 
+        if(optChild instanceof SqlTableAccess access && access.isDistinct(request, distinctVariables))
+            return optChild.optimize(request, restrictions, reduced);
+
+
+        if(optChild instanceof SqlJoin join)
+        {
+            boolean canBeEliminated = true;
+            SqlIntercode extra = null;
+
+            for(SqlIntercode child : join.getChilds())
+            {
+                if(child instanceof SqlTableAccess access)
+                {
+                    if(access.isDistinct(request, Set.of()))
+                        continue;
+
+                    if(extra == null && access.isDistinct(request, distinctVariables))
+                    {
+                        extra = access;
+                        continue;
+                    }
+                }
+
+                canBeEliminated = false;
+                break;
+            }
+
+            if(canBeEliminated)
+                return join.optimize(request, restrictions, reduced);
+        }
+
+
         if(optChild instanceof SqlUnion union)
         {
             List<Pair<List<Set<ResourceClass>>, List<SqlIntercode>>> sorts = new ArrayList<>();

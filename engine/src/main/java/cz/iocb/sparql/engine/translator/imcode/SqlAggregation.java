@@ -297,8 +297,7 @@ public class SqlAggregation extends SqlIntercode
         }
 
 
-        if(optChild.hasConstantVariables(groupVariables) && optAggregations.size() == 1
-                && optAggregations.values().iterator().next() instanceof SqlBuiltinCall call
+        if(optAggregations.size() == 1 && optAggregations.values().iterator().next() instanceof SqlBuiltinCall call
                 && call.getFunction().equals("count") && call.getArgument() instanceof SqlVariable var
                 && call.isDistinct())
         {
@@ -306,7 +305,7 @@ public class SqlAggregation extends SqlIntercode
             distinctVars.add(var.getName());
 
             for(String v : groupVariables)
-                if(restrictions.contains(v))
+                if(restrictions.contains(v) || !optChild.hasConstantVariable(v))
                     distinctVars.add(v);
 
             SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars).optimize(request, distinctVars,
