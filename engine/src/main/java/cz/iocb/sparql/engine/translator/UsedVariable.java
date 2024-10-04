@@ -22,6 +22,14 @@ public class UsedVariable
     private final Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
 
 
+    public UsedVariable(UsedVariable other)
+    {
+        this.name = other.name;
+        this.canBeNull = other.canBeNull;
+        this.mappings.putAll(other.mappings);
+    }
+
+
     public UsedVariable(String name, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         this.name = name;
