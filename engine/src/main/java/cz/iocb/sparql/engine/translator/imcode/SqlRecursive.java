@@ -212,13 +212,15 @@ public class SqlRecursive extends SqlIntercode
 
         boolean hasUnionSelect = !sharedColumns.isEmpty();
 
+        UsedVariable nextEndVariable = next.getVariables().get(endVar.getName());
+
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = endVar.getMapping(resClass);
+            List<Column> columns = nextEndVariable.toResource(resClass);
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
-                if(columns.get(j) instanceof ConstantColumn)
+                if(endVar.getMapping(resClass).get(j) instanceof ConstantColumn)
                     continue;
 
                 appendComma(builder, hasUnionSelect);
