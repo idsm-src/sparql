@@ -293,7 +293,18 @@ public class Request implements AutoCloseable
                     }
                 }
 
-                connection.close();
+                try
+                {
+                    connection.rollback();
+                }
+                catch(SQLException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    connection.close();
+                }
             }
         }
     }

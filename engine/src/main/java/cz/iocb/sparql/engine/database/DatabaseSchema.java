@@ -87,6 +87,8 @@ public class DatabaseSchema
     {
         try(Connection connection = connectionPool.getConnection())
         {
+            connection.setAutoCommit(true);
+
             DatabaseMetaData metaData = connection.getMetaData();
 
             try(ResultSet tables = metaData.getTables(null, null, null, new String[] { "TABLE", "VIEW" }))
