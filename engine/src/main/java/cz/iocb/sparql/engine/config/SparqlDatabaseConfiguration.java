@@ -82,11 +82,12 @@ public class SparqlDatabaseConfiguration
     protected final IriCache iriCache = new IriCache(10000);
 
 
-    public SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
-            boolean autoAddToDefaultGraph) throws SQLException
+    public SparqlDatabaseConfiguration(String service, String descriptionGraph, DataSource connectionPool,
+            DatabaseSchema schema, boolean autoAddToDefaultGraph) throws SQLException
     {
-        IRI serviceIri = service == null ? null : new IRI(service);
-        IRI descriptionGraphIri = service == null ? null : new IRI(service + "#ServiceDescription");
+        IRI serviceIri = service != null ? new IRI(service) : null;
+        IRI descriptionGraphIri = descriptionGraph != null ? new IRI(descriptionGraph) :
+                service != null ? new IRI(service + "#ServiceDescription") : null;
 
         this.serviceIri = serviceIri;
         this.descriptionGraphIri = descriptionGraphIri;
@@ -109,6 +110,20 @@ public class SparqlDatabaseConfiguration
         addDataType(xsdDateType);
         addDataType(xsdDateTimeType);
         addDataType(rdfLangStringType);
+    }
+
+
+    public SparqlDatabaseConfiguration(String service, String descriptionGraph, DataSource connectionPool,
+            DatabaseSchema schema) throws SQLException
+    {
+        this(service, descriptionGraph, connectionPool, schema, true);
+    }
+
+
+    public SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
+            boolean autoAddToDefaultGraph) throws SQLException
+    {
+        this(service, null, connectionPool, schema, autoAddToDefaultGraph);
     }
 
 

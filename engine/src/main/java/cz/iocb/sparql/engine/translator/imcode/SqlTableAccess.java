@@ -929,7 +929,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    protected Table getTable()
+    public Table getTable()
     {
         return table;
     }
