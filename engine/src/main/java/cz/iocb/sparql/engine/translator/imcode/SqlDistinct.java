@@ -2,10 +2,14 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -111,75 +115,7 @@ public class SqlDistinct extends SqlIntercode
 
 
         if(optChild instanceof SqlUnion union)
-        {
-            List<Pair<List<Set<ResourceClass>>, List<SqlIntercode>>> sorts = new ArrayList<>();
-
-            for(SqlIntercode child : union.getChilds())
-            {
-                List<Set<ResourceClass>> newKey = new ArrayList<Set<ResourceClass>>();
-
-                for(String varName : getVariables().getNames())
-                {
-                    Set<ResourceClass> classes = new HashSet<ResourceClass>();
-
-                    UsedVariable unionVar = union.getVariable(varName);
-                    UsedVariable var = child.getVariable(varName);
-
-                    if(var == null || var.canBeNull())
-                        classes.add(null);
-
-                    if(var != null)
-                        for(ResourceClass r : var.getClasses())
-                            classes.add(unionVar.getClasses().contains(r.getGeneralClass()) ? r.getGeneralClass() : r);
-
-                    newKey.add(classes);
-                }
-
-                List<SqlIntercode> newValue = new ArrayList<SqlIntercode>();
-                newValue.add(child);
-
-                for(int i = 0; i < sorts.size(); i++)
-                {
-                    Pair<List<Set<ResourceClass>>, List<SqlIntercode>> pair = sorts.get(i);
-                    List<Set<ResourceClass>> key = pair.getKey();
-                    List<SqlIntercode> value = pair.getValue();
-
-                    boolean isCompatible = true;
-
-                    for(int j = 0; j < key.size(); j++)
-                    {
-                        Set<ResourceClass> a = key.get(j);
-                        Set<ResourceClass> b = newKey.get(j);
-
-                        if(a.stream().noneMatch(x -> b.contains(x)))
-                            isCompatible = false;
-                    }
-
-                    if(isCompatible)
-                    {
-                        for(int j = 0; j < newKey.size(); j++)
-                            newKey.get(j).addAll(key.get(j));
-
-                        newValue.addAll(value);
-
-                        sorts.remove(i);
-                        i = -1;
-                    }
-                }
-
-                sorts.add(new Pair<List<Set<ResourceClass>>, List<SqlIntercode>>(newKey, newValue));
-            }
-
-            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
-            List<SqlIntercode> list = new ArrayList<SqlIntercode>();
-
-            for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
-                list.add(create(request, SqlUnion.union(reduceDistinctUnion(s.getValue(), schema)), distinctVariables,
-                        restrictions));
-
-            return SqlUnion.union(list);
-        }
+            return expandUnionByResourceClasses(request, union, distinctVariables, restrictions);
 
         return create(request, optChild, distinctVariables, restrictions);
     }
@@ -240,6 +176,131 @@ public class SqlDistinct extends SqlIntercode
             builder.append("1"); // TODO: remove this possibility by an optimization
 
         return builder.toString();
+    }
+
+
+    private static SqlIntercode expandUnionByResourceClasses(Request request, SqlUnion union,
+            Set<String> distinctVariables, Set<String> restrictions)
+    {
+        List<Pair<List<Set<ResourceClass>>, List<SqlIntercode>>> sorts = new ArrayList<>();
+
+        for(SqlIntercode child : union.getChilds())
+        {
+            List<Set<ResourceClass>> newKey = new ArrayList<Set<ResourceClass>>();
+
+            for(String varName : distinctVariables)
+            {
+                Set<ResourceClass> classes = new HashSet<ResourceClass>();
+
+                UsedVariable unionVar = union.getVariable(varName);
+                UsedVariable var = child.getVariable(varName);
+
+                if(var == null || var.canBeNull())
+                    classes.add(null);
+
+                if(var != null)
+                    for(ResourceClass r : var.getClasses())
+                        classes.add(unionVar.getClasses().contains(r.getGeneralClass()) ? r.getGeneralClass() : r);
+
+                newKey.add(classes);
+            }
+
+            List<SqlIntercode> newValue = new ArrayList<SqlIntercode>();
+            newValue.add(child);
+
+            for(int i = 0; i < sorts.size(); i++)
+            {
+                Pair<List<Set<ResourceClass>>, List<SqlIntercode>> pair = sorts.get(i);
+                List<Set<ResourceClass>> key = pair.getKey();
+                List<SqlIntercode> value = pair.getValue();
+
+                boolean isCompatible = true;
+
+                for(int j = 0; j < key.size(); j++)
+                {
+                    Set<ResourceClass> a = key.get(j);
+                    Set<ResourceClass> b = newKey.get(j);
+
+                    if(a.stream().noneMatch(x -> b.contains(x)))
+                        isCompatible = false;
+                }
+
+                if(isCompatible)
+                {
+                    for(int j = 0; j < newKey.size(); j++)
+                        newKey.get(j).addAll(key.get(j));
+
+                    newValue.addAll(value);
+
+                    sorts.remove(i);
+                    i = -1;
+                }
+            }
+
+            sorts.add(new Pair<List<Set<ResourceClass>>, List<SqlIntercode>>(newKey, newValue));
+        }
+
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        List<SqlIntercode> list = new ArrayList<SqlIntercode>();
+
+        for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
+        {
+            SqlIntercode item = SqlUnion.union(reduceDistinctUnion(s.getValue(), schema));
+
+            if(item instanceof SqlUnion subUnion)
+                list.add(expandUnionByConstantColumns(request, subUnion, distinctVariables, restrictions));
+            else
+                list.add(create(request, item, distinctVariables, restrictions));
+        }
+
+        return SqlUnion.union(list);
+    }
+
+
+    private static SqlIntercode expandUnionByConstantColumns(Request request, SqlUnion union,
+            Set<String> distinctVariables, Set<String> restrictions)
+    {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        Map<SqlIntercode, List<Column>> values = new HashMap<SqlIntercode, List<Column>>();
+
+        for(SqlIntercode child : union.getChilds())
+            values.put(child, new ArrayList<Column>());
+
+        for(String varName : distinctVariables)
+        {
+            UsedVariable var = union.getVariable(varName);
+
+            if(var != null && !var.canBeNull() && var.getClasses().size() == 1)
+            {
+                ResourceClass rc = var.getResourceClass();
+                int[] counts = new int[rc.getColumnCount()];
+
+                for(SqlIntercode child : union.getChilds())
+                    if(child.getMapping(varName, rc) != null)
+                        for(int i = 0; i < rc.getColumnCount(); i++)
+                            if(child.getMapping(varName, rc).get(i) instanceof ConstantColumn)
+                                counts[i]++;
+
+                for(int i = 0; i < rc.getColumnCount(); i++)
+                    if(counts[i] == union.getChilds().size())
+                        for(SqlIntercode child : union.getChilds())
+                            values.get(child).add(child.getMapping(varName, rc).get(i));
+            }
+        }
+
+        Map<List<Column>, List<SqlIntercode>> rev = new HashMap<List<Column>, List<SqlIntercode>>();
+
+        for(Entry<SqlIntercode, List<Column>> e : values.entrySet())
+            rev.computeIfAbsent(e.getValue(), k -> new ArrayList<SqlIntercode>()).add(e.getKey());
+
+        List<SqlIntercode> list = new ArrayList<SqlIntercode>();
+
+        for(List<SqlIntercode> l : rev.values())
+            list.add(create(request, SqlUnion.union(reduceDistinctUnion(l, schema)), distinctVariables, restrictions));
+
+        return SqlUnion.union(list);
     }
 
 
