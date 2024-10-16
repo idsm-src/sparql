@@ -100,6 +100,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlAggregation;
 import cz.iocb.sparql.engine.translator.imcode.SqlBind;
 import cz.iocb.sparql.engine.translator.imcode.SqlConstruct;
 import cz.iocb.sparql.engine.translator.imcode.SqlConstruct.Template;
+import cz.iocb.sparql.engine.translator.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.translator.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlFilter;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
@@ -271,8 +272,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             templates.add(new Template(triple.getSubject(), (Node) triple.getPredicate(), triple.getObject()));
         }
 
-        return new SqlQuery(List.of("subject", "predicate", "object"),
-                SqlConstruct.construct(request, templates, source));
+        return new SqlQuery(SqlConstruct.getColumns(), SqlDistinct.create(request,
+                SqlConstruct.construct(request, templates, source), new HashSet<>(SqlConstruct.getColumns())));
     }
 
 

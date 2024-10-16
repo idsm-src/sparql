@@ -1,7 +1,11 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.OBJECT;
+import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.PREDICATE;
+import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,9 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.Condition;
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
@@ -32,47 +41,107 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 public class SqlConstruct extends SqlIntercode
 {
-    public static record Template(Node subject, Node predicate, Node object)
+    protected static enum ConstructColumn
     {
+        SUBJECT("subject", true, false), PREDICATE("predicate", false, false), OBJECT("object", true, true);
+
+        final String name;
+        final boolean allowBlankNode;
+        final boolean allowLiteral;
+
+        private ConstructColumn(String name, boolean allowBlankNode, boolean allowLiteral)
+        {
+            this.name = name;
+            this.allowBlankNode = allowBlankNode;
+            this.allowLiteral = allowLiteral;
+        }
+
+        String getName()
+        {
+            return name;
+        }
+
+        boolean isBlankNodeAllowed()
+        {
+            return allowBlankNode;
+        }
+
+        boolean isLiteralAllowed()
+        {
+            return allowLiteral;
+        }
     }
 
+
+    public static record Template(Node subject, Node predicate, Node object)
+    {
+        Node get(ConstructColumn column)
+        {
+            return switch(column)
+            {
+                case SUBJECT -> subject;
+                case PREDICATE -> predicate;
+                case OBJECT -> object;
+            };
+        }
+    }
+
+
+    private static final List<String> columns = List.of(SUBJECT.getName(), PREDICATE.getName(), OBJECT.getName());
 
     private final SqlIntercode child;
     private final List<Template> templates;
     private final List<Map<Column, Column>> columnMappings;
+    private final AtomicInteger bnOffset;
 
 
     protected SqlConstruct(UsedVariables variables, SqlIntercode child, List<Template> templates,
-            List<Map<Column, Column>> columnMappings)
+            List<Map<Column, Column>> columnMappings, AtomicInteger bnOffset)
     {
         super(variables, child.isDeterministic);
 
         this.child = child;
         this.templates = templates;
         this.columnMappings = columnMappings;
+        this.bnOffset = bnOffset;
     }
 
 
     public static SqlIntercode construct(Request request, List<Template> templates, SqlIntercode child)
     {
+        return construct(request, templates, new AtomicInteger(), child);
+    }
+
+
+    public static SqlIntercode construct(Request request, List<Template> templates, AtomicInteger bnOffset,
+            SqlIntercode child)
+    {
+        if(child == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(child instanceof SqlUnion union)
+            return SqlUnion.union(
+                    union.getChilds().stream().map(c -> construct(request, templates, bnOffset, c)).collect(toList()));
+
+
         List<UsedVariables> branches = new ArrayList<UsedVariables>(templates.size());
         List<Template> validTemplates = new ArrayList<Template>();
         Map<String, ResourceClass> bnClasses = new HashMap<String, ResourceClass>();
 
         for(Template template : templates)
         {
-            UsedVariable subject = getUsedVariable(request, "subject", template.subject, bnClasses, child, true, false);
-            UsedVariable predicate = getUsedVariable(request, "predicate", template.predicate, bnClasses, child, false,
-                    false);
-            UsedVariable object = getUsedVariable(request, "object", template.object, bnClasses, child, true, true);
-
-            if(subject == null || predicate == null || object == null)
-                continue;
-
             UsedVariables vars = new UsedVariables();
-            vars.add(subject);
-            vars.add(predicate);
-            vars.add(object);
+
+            for(ConstructColumn column : ConstructColumn.values())
+            {
+                UsedVariable var = getUsedVariable(request, column, template.get(column), bnOffset, bnClasses, child);
+
+                if(var != null)
+                    vars.add(var);
+            }
+
+            if(vars.getValues().size() != ConstructColumn.values().length)
+                continue;
 
             branches.add(vars);
             validTemplates.add(template);
@@ -82,9 +151,38 @@ public class SqlConstruct extends SqlIntercode
             return SqlNoSolution.get();
 
 
+        if(validTemplates.size() == 1 && child instanceof SqlTableAccess acc)
+        {
+            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+            UsedVariables branch = branches.get(0);
+            Template template = validTemplates.get(0);
+
+            UsedVariables internal = new UsedVariables();
+            Conditions conditions = acc.getConditions();
+
+            for(ConstructColumn column : ConstructColumn.values())
+            {
+                if(template.get(column) instanceof Variable variable)
+                {
+                    UsedVariable original = acc.getInternalVariable(variable.getSqlName());
+                    UsedVariable mapped = getInternalVariable(column, original.getMappings());
+                    conditions = Conditions.and(conditions, createConditions(schema, acc.getTable(), mapped));
+                    internal.add(mapped);
+                }
+                else
+                {
+                    internal.add(branch.get(column.getName()));
+                }
+            }
+
+            return SqlTableAccess.create(acc.getTable(), conditions, internal, true);
+        }
+
+
         Map<String, Set<ResourceClass>> classes = new HashMap<String, Set<ResourceClass>>();
 
-        for(String varName : Set.of("subject", "predicate", "object"))
+        for(String varName : columns)
         {
             Set<ResourceClass> set = new HashSet<ResourceClass>();
             classes.put(varName, set);
@@ -204,7 +302,7 @@ public class SqlConstruct extends SqlIntercode
             variables.add(variable);
         }
 
-        return new SqlConstruct(variables, child, validTemplates, columnMappings);
+        return new SqlConstruct(variables, child, validTemplates, columnMappings, bnOffset);
     }
 
 
@@ -214,18 +312,11 @@ public class SqlConstruct extends SqlIntercode
         Set<String> childRestrictions = new HashSet<String>();
 
         for(Template template : templates)
-        {
-            if(template.subject instanceof Variable variable)
-                childRestrictions.add(variable.getSqlName());
+            for(ConstructColumn column : ConstructColumn.values())
+                if(template.get(column) instanceof Variable variable)
+                    childRestrictions.add(variable.getSqlName());
 
-            if(template.predicate instanceof Variable variable)
-                childRestrictions.add(variable.getSqlName());
-
-            if(template.object instanceof Variable variable)
-                childRestrictions.add(variable.getSqlName());
-        }
-
-        return construct(request, templates, child.optimize(request, childRestrictions, true));
+        return construct(request, templates, bnOffset, child.optimize(request, childRestrictions, true));
     }
 
 
@@ -237,7 +328,7 @@ public class SqlConstruct extends SqlIntercode
         boolean canBeNull = variables.getValues().stream().anyMatch(v -> v.canBeNull());
         Set<Column> columns = variables.getNonConstantColumns();
 
-        builder.append("SELECT DISTINCT ");
+        builder.append("SELECT ");
 
         if(canBeNull)
         {
@@ -311,30 +402,38 @@ public class SqlConstruct extends SqlIntercode
     }
 
 
-    private static UsedVariable getUsedVariable(Request request, String varName, Node node,
-            Map<String, ResourceClass> bnResourceClasses, SqlIntercode child, boolean allowBlankNode,
-            boolean allowLiteral)
+    public static List<String> getColumns()
+    {
+        return columns;
+    }
+
+
+    private static UsedVariable getUsedVariable(Request request, ConstructColumn column, Node node,
+            AtomicInteger bnOffset, Map<String, ResourceClass> bnResourceClasses, SqlIntercode child)
     {
         switch(node)
         {
-            case IRI iri -> {
+            case IRI iri ->
+            {
                 IriClass iriClass = request.getIriClass(iri);
                 List<Column> columns = request.getColumns(iriClass, iri);
-                return new UsedVariable(varName, iriClass, columns, false);
+                return new UsedVariable(column.getName(), iriClass, columns, false);
             }
 
-            case Literal literal -> {
-                if(!allowLiteral)
+            case Literal literal ->
+            {
+                if(!column.isLiteralAllowed())
                     return null;
 
                 DataType dataType = request.getConfiguration().getDataType(literal.getTypeIri());
                 LiteralClass resClass = dataType == null ? unsupportedLiteral : dataType.getResourceClass(literal);
                 List<Column> columns = request.getColumns(resClass, literal);
-                return new UsedVariable(varName, resClass, columns, false);
+                return new UsedVariable(column.getName(), resClass, columns, false);
             }
 
-            case BlankNode bnode -> {
-                if(!allowBlankNode)
+            case BlankNode bnode ->
+            {
+                if(!column.isBlankNodeAllowed())
                     return null;
 
                 String name = bnode.getName();
@@ -342,15 +441,16 @@ public class SqlConstruct extends SqlIntercode
 
                 if(resClass == null)
                 {
-                    resClass = new UserIntBlankNodeClass(-1 - bnResourceClasses.size());
+                    resClass = new UserIntBlankNodeClass(bnOffset.decrementAndGet());
                     bnResourceClasses.put(name, resClass);
                 }
 
                 List<Column> columns = List.of(new ExpressionColumn("(row_number() OVER ())::int4"));
-                return new UsedVariable(varName, resClass, columns, false);
+                return new UsedVariable(column.getName(), resClass, columns, false);
             }
 
-            case Variable variable -> {
+            case Variable variable ->
+            {
                 UsedVariable var = child.getVariable(variable.getSqlName());
 
                 Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
@@ -360,10 +460,10 @@ public class SqlConstruct extends SqlIntercode
 
                 for(Entry<ResourceClass, List<Column>> map : var.getMappings().entrySet())
                 {
-                    if(!allowLiteral && map.getKey() instanceof LiteralClass)
+                    if(!column.isLiteralAllowed() && map.getKey() instanceof LiteralClass)
                         continue;
 
-                    if(!allowBlankNode && map.getKey() instanceof BlankNodeClass)
+                    if(!column.isBlankNodeAllowed() && map.getKey() instanceof BlankNodeClass)
                         continue;
 
                     mappings.put(map.getKey(), map.getValue());
@@ -373,12 +473,51 @@ public class SqlConstruct extends SqlIntercode
                     return null;
 
                 boolean canBeNull = var.canBeNull() || mappings.size() < var.getMappings().size();
-                return new UsedVariable(varName, mappings, canBeNull);
+                return new UsedVariable(column.getName(), mappings, canBeNull);
             }
 
-            default -> {
+            default ->
+            {
                 return null;
             }
         }
+    }
+
+
+    private static UsedVariable getInternalVariable(ConstructColumn column, Map<ResourceClass, List<Column>> original)
+    {
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+
+        for(Entry<ResourceClass, List<Column>> map : original.entrySet())
+        {
+            if(!column.isLiteralAllowed() && map.getKey() instanceof LiteralClass)
+                continue;
+
+            if(!column.isBlankNodeAllowed() && map.getKey() instanceof BlankNodeClass)
+                continue;
+
+            mappings.put(map.getKey(), map.getValue());
+        }
+
+        return new UsedVariable(column.getName(), mappings, false);
+    }
+
+
+    private static Conditions createConditions(DatabaseSchema schema, Table table, UsedVariable var)
+    {
+        Conditions conditions = new Conditions();
+
+        for(List<Column> cols : var.getMappings().values())
+        {
+            Condition condition = new Condition();
+
+            for(Column column : cols)
+                if(schema.isNullableColumn(table, column))
+                    condition.addIsNotNull(column);
+
+            conditions.add(condition);
+        }
+
+        return conditions;
     }
 }
