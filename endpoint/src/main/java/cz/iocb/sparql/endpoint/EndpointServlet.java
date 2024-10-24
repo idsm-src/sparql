@@ -1,5 +1,8 @@
 package cz.iocb.sparql.endpoint;
 
+import static cz.iocb.sparql.endpoint.EndpointServlet.OutputType.RDF_JSON;
+import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.PREDICATE;
+import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static java.util.stream.Collectors.joining;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +36,7 @@ import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
 import cz.iocb.sparql.engine.request.LiteralNode;
 import cz.iocb.sparql.engine.request.RdfNode;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.request.TypedLiteral;
@@ -93,7 +97,6 @@ public class EndpointServlet extends HttpServlet
     private SparqlDatabaseConfiguration sparqlConfig;
     private int fetchSize = 1000;
     private long timeout = 1000 * 1000000000l;
-    private int processLimit = 100000000;
 
 
     @Override
@@ -117,12 +120,6 @@ public class EndpointServlet extends HttpServlet
 
             if(timeoutValue != null)
                 timeout = Integer.parseInt(timeoutValue) * 1000000000l;
-
-
-            String limitValue = config.getInitParameter("limit");
-
-            if(limitValue != null)
-                processLimit = Integer.parseInt(limitValue);
 
 
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
@@ -266,9 +263,12 @@ public class EndpointServlet extends HttpServlet
 
             try(Request request = engine.getRequest())
             {
-                try(Result result = request.execute(query, dataSets, 0, limit, fetchSize, timeout))
+                PreparedQuery preparedQuery = request.prepareQuery(query, dataSets);
+                OutputType format = detectOutputType(req, preparedQuery.getResultType());
+                List<String> order = format == RDF_JSON ? List.of(SUBJECT.getName(), PREDICATE.getName()) : List.of();
+
+                try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout))
                 {
-                    OutputType format = detectOutputType(req, result.getResultType());
                     res.setContentType(format.getMime());
 
                     switch(result.getResultType())
@@ -319,35 +319,27 @@ public class EndpointServlet extends HttpServlet
 
                         case DESCRIBE:
                         case CONSTRUCT:
-                            Graph data = processResult(result);
-
-                            if(data == null)
-                            {
-                                res.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
-                                return;
-                            }
-
                             switch(format)
                             {
                                 case RDF_XML:
-                                    writeGraphXml(res.getWriter(), data);
+                                    writeGraphXml(res.getWriter(), result);
                                     break;
                                 case RDF_JSON:
-                                    writeGraphJson(res.getWriter(), data);
+                                    writeGraphJson(res.getWriter(), result);
                                     break;
                                 case TURTLE:
                                 case TRIG:
-                                    writeGraphTurtle(res.getWriter(), data, engine.getConfig().getPrefixes());
+                                    writeGraphTurtle(res.getWriter(), result, engine.getConfig().getPrefixes());
                                     break;
                                 case NTRIPLES:
                                 case NQUADS:
-                                    writeGraphTriples(res.getWriter(), data);
+                                    writeGraphTriples(res.getWriter(), result);
                                     break;
                                 case TSV:
-                                    writeGraphTsv(res.getWriter(), data);
+                                    writeGraphTsv(res.getWriter(), result);
                                     break;
                                 case CSV:
-                                    writeGraphCsv(res.getWriter(), data);
+                                    writeGraphCsv(res.getWriter(), result);
                                     break;
                                 default:
                                     res.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
@@ -974,310 +966,231 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphXml(PrintWriter out, Graph data) throws IOException, SQLException
+    private static void writeGraphXml(PrintWriter out, Result result) throws IOException, SQLException
     {
-        HashMap<String, String> prefixes = new HashMap<String, String>();
-        prefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
-
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
-        {
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
-            {
-                String predicate = predicates.getKey().getValue();
-                String prefix = predicate.replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
-
-                if(!prefixes.containsKey(prefix))
-                    prefixes.put(prefix, "ns" + prefixes.size());
-            }
-        }
-
+        RdfNode subject = null;
 
         out.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        out.println("<rdf:RDF");
+        out.println("<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 
-        for(Entry<String, String> prefix : prefixes.entrySet())
+
+        while(result.next())
         {
-            out.print("\txmlns:");
-            out.print(prefix.getValue());
-            out.print("=\"");
-            out.print(prefix.getKey());
-            out.println("\"");
-        }
-
-        out.println(">");
-
-
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
-        {
-            out.print("\t<rdf:Description ");
-
-            if(subjects.getKey() instanceof IriNode)
-                out.print("rdf:about=\"");
-            else
-                out.print("rdf:nodeID=\"");
-
-            writeXmlValue(out, subjects.getKey().getValue());
-
-            out.println("\">");
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            if(!result.get(0).equals(subject))
             {
-                String predicate = predicates.getKey().getValue();
-                String prefix = predicate.replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
-                String name = predicate.substring(prefix.length());
+                if(subject != null)
+                    out.println("\t</rdf:Description>");
 
-                for(RdfNode value : predicates.getValue())
-                {
-                    out.print("\t\t<");
-                    out.print(prefixes.get(prefix));
-                    out.print(":");
-                    out.print(name);
+                subject = result.get(0);
 
-                    if(value instanceof IriNode)
-                    {
-                        out.print(" rdf:resource=\"");
-                        writeXmlValue(out, value.getValue());
-                        out.println("\"/>");
-                    }
-                    else if(value instanceof BNode)
-                    {
-                        out.print(" rdf:nodeID=\"");
-                        writeXmlValue(out, value.getValue());
-                        out.println("\"/>");
-                    }
-                    else
-                    {
-                        if(value instanceof LanguageTaggedLiteral)
-                        {
-                            out.print(" xml:lang=\"");
-                            writeXmlValue(out, ((LanguageTaggedLiteral) value).getLanguage());
-                            out.print("\">");
-                        }
-                        else if(value instanceof TypedLiteral)
-                        {
-                            out.print(" rdf:datatype=\"");
-                            writeXmlValue(out, ((TypedLiteral) value).getDatatype().getValue());
-                            out.print("\">");
-                        }
-                        else
-                        {
-                            out.print(">");
-                        }
+                out.print("\t<rdf:Description ");
 
-                        writeXmlValue(out, value.getValue());
-                        out.print("</");
-                        out.print(prefixes.get(prefix));
-                        out.print(":");
-                        out.print(name);
-                        out.println(">");
-                    }
-                }
+                if(subject instanceof IriNode)
+                    out.print("rdf:about=\"");
+                else
+                    out.print("rdf:nodeID=\"");
+
+                writeXmlValue(out, subject.getValue());
+
+                out.println("\">");
             }
 
-            out.println("\t</rdf:Description>");
+            RdfNode predicate = result.get(1);
+            RdfNode object = result.get(2);
+
+            String prefix = predicate.getValue().replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
+            String name = predicate.getValue().substring(prefix.length());
+
+            out.print("\t\t<p:");
+            out.print(name);
+            out.print(" xmlns:p=\"");
+            writeXmlValue(out, prefix);
+            out.print("\"");
+
+            if(object instanceof IriNode)
+            {
+                out.print(" rdf:resource=\"");
+                writeXmlValue(out, object.getValue());
+                out.println("\"/>");
+            }
+            else if(object instanceof BNode)
+            {
+                out.print(" rdf:nodeID=\"");
+                writeXmlValue(out, object.getValue());
+                out.println("\"/>");
+            }
+            else
+            {
+                if(object instanceof LanguageTaggedLiteral)
+                {
+                    out.print(" xml:lang=\"");
+                    writeXmlValue(out, ((LanguageTaggedLiteral) object).getLanguage());
+                    out.print("\">");
+                }
+                else if(object instanceof TypedLiteral)
+                {
+                    out.print(" rdf:datatype=\"");
+                    writeXmlValue(out, ((TypedLiteral) object).getDatatype().getValue());
+                    out.print("\">");
+                }
+                else
+                {
+                    out.print(">");
+                }
+
+                writeXmlValue(out, object.getValue());
+                out.print("</p:");
+                out.print(name);
+                out.println(">");
+            }
         }
+
+        if(subject != null)
+            out.println("\t</rdf:Description>");
 
         out.println("</rdf:RDF>");
     }
 
 
-    private static void writeGraphJson(PrintWriter out, Graph data) throws IOException, SQLException
+    private static void writeGraphJson(PrintWriter out, Result result) throws IOException, SQLException
     {
+        RdfNode subject = null;
+        RdfNode predicate = null;
+
         out.println("{");
 
-        boolean hasResult = false;
-
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        while(result.next())
         {
-            if(hasResult)
-                out.println(",");
-            else
-                hasResult = true;
-
-            out.print("\t\"");
-            writeJsonValue(out, subjects.getKey().getValue());
-            out.println("\" : {");
-
-            boolean hasProperty = false;
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            if(!result.get(0).equals(subject))
             {
-                if(hasProperty)
-                    out.println(",");
-                else
-                    hasProperty = true;
+                if(subject != null)
+                    out.println("\n\t\t]\n\t},");
 
-                out.print("\t\t\"");
-                writeJsonValue(out, predicates.getKey().getValue());
-                out.println("\" : [");
+                subject = result.get(0);
+                predicate = null;
 
-                boolean hasValue = false;
-
-                for(RdfNode value : predicates.getValue())
-                {
-                    if(hasValue)
-                        out.println(",");
-                    else
-                        hasValue = true;
-
-                    out.print("\t\t\t");
-                    writeJsonNode(out, value);
-                }
-
-                out.print("\n\t\t]");
+                out.print("\t\"");
+                writeJsonValue(out, subject.getValue());
+                out.println("\" : {");
             }
 
-            out.print("\n\t}");
+            if(!result.get(1).equals(predicate))
+            {
+                if(predicate != null)
+                    out.println("\n\t\t],");
+
+                predicate = result.get(1);
+
+                out.print("\t\t\"");
+                writeJsonValue(out, predicate.getValue());
+                out.println("\" : [");
+            }
+            else
+            {
+                out.println(",");
+            }
+
+            out.print("\t\t\t");
+            writeJsonNode(out, result.get(2));
         }
+
+        if(predicate != null)
+            out.print("\n\t\t]");
+
+        if(subject != null)
+            out.print("\n\t}");
 
         out.println("\n}");
     }
 
 
-    private static void writeGraphTurtle(PrintWriter out, Graph data, HashMap<String, String> systemPrefixes)
+    private static void writeGraphTurtle(PrintWriter out, Result result, HashMap<String, String> systemPrefixes)
             throws IOException, SQLException
     {
         HashMap<String, String> prefixes = new HashMap<String, String>();
 
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
-        {
-            selectPrefix(subjects.getKey(), systemPrefixes, prefixes);
+        RdfNode subject = null;
+        RdfNode predicate = null;
 
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+        while(result.next())
+        {
+            if(!result.get(0).equals(subject))
             {
-                selectPrefix(predicates.getKey(), systemPrefixes, prefixes);
+                if(subject != null)
+                    out.println(" .\n");
 
-                for(RdfNode value : predicates.getValue())
-                {
-                    selectPrefix(value, systemPrefixes, prefixes);
+                subject = result.get(0);
+                predicate = null;
 
-                    if(value instanceof TypedLiteral)
-                        selectPrefix(((TypedLiteral) value).getDatatype(), systemPrefixes, prefixes);
-                }
-            }
-        }
-
-
-        for(Entry<String, String> prefix : prefixes.entrySet())
-        {
-            out.print("@prefix ");
-            out.print(prefix.getKey());
-            out.print(": <");
-            writeTsvIriValue(out, prefix.getValue());
-            out.println("> .");
-        }
-
-        if(prefixes.size() > 0)
-            out.println();
-
-
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
-        {
-            writeTripleNode(out, subjects.getKey(), prefixes);
-            out.print(" ");
-
-            boolean hasProperty = false;
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
-            {
-                if(hasProperty)
-                    out.print(";\n\t");
-                else
-                    hasProperty = true;
-
-                writeTripleNode(out, predicates.getKey(), prefixes);
+                writeTripleNode(out, subject, prefixes);
                 out.print(" ");
-
-                boolean hasValue = false;
-
-                for(RdfNode value : predicates.getValue())
-                {
-                    if(hasValue)
-                        out.print(",\n\t\t");
-                    else
-                        hasValue = true;
-
-                    writeTripleNode(out, value, prefixes);
-                }
             }
 
-            out.println(" .");
-        }
-    }
-
-
-    private static void writeGraphTriples(PrintWriter out, Graph data) throws IOException, SQLException
-    {
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
-        {
-            RdfNode subject = subjects.getKey();
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
+            if(!result.get(1).equals(predicate))
             {
-                RdfNode predicate = predicates.getKey();
+                if(predicate != null)
+                    out.print(";\n\t");
 
-                for(RdfNode object : predicates.getValue())
-                {
-                    writeTripleNode(out, subject);
-                    out.print(' ');
-                    writeTripleNode(out, predicate);
-                    out.print(' ');
-                    writeTripleNode(out, object);
-                    out.println('.');
-                }
+                predicate = result.get(1);
+
+                writeTripleNode(out, predicate, prefixes);
+                out.print(" ");
             }
+            else
+            {
+                out.print(",\n\t\t");
+            }
+
+            writeTripleNode(out, result.get(2), prefixes);
+        }
+
+        if(subject != null)
+            out.println(" .\n");
+    }
+
+
+    private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
+    {
+        while(result.next())
+        {
+            writeTripleNode(out, result.get(0));
+            out.print(' ');
+            writeTripleNode(out, result.get(1));
+            out.print(' ');
+            writeTripleNode(out, result.get(2));
+            out.println('.');
         }
     }
 
 
-    private static void writeGraphTsv(PrintWriter out, Graph data) throws IOException, SQLException
+    private static void writeGraphTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         out.print("subject\tpredicate\tobject\r\n");
 
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        while(result.next())
         {
-            RdfNode subject = subjects.getKey();
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
-            {
-                RdfNode predicate = predicates.getKey();
-
-                for(RdfNode object : predicates.getValue())
-                {
-                    writeTripleNode(out, subject);
-                    out.print('\t');
-                    writeTripleNode(out, predicate);
-                    out.print('\t');
-                    writeTripleNode(out, object);
-                    out.print("\r\n");
-                }
-            }
+            writeTripleNode(out, result.get(0));
+            out.print('\t');
+            writeTripleNode(out, result.get(1));
+            out.print('\t');
+            writeTripleNode(out, result.get(2));
+            out.print("\r\n");
         }
     }
 
 
-    private static void writeGraphCsv(PrintWriter out, Graph data) throws IOException, SQLException
+    private static void writeGraphCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         out.print("subject,predicate,object\r\n");
 
-        for(Entry<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>> subjects : data.entrySet())
+        while(result.next())
         {
-            RdfNode subject = subjects.getKey();
-
-            for(Entry<RdfNode, LinkedHashSet<RdfNode>> predicates : subjects.getValue().entrySet())
-            {
-                RdfNode predicate = predicates.getKey();
-
-                for(RdfNode object : predicates.getValue())
-                {
-                    writeCsvValue(out, subject.getValue());
-                    out.print(',');
-                    writeCsvValue(out, predicate.getValue());
-                    out.print(',');
-                    writeCsvValue(out, object.getValue());
-                    out.print("\r\n");
-                }
-            }
+            writeCsvValue(out, result.get(0).getValue());
+            out.print(',');
+            writeCsvValue(out, result.get(1).getValue());
+            out.print(',');
+            writeCsvValue(out, result.get(2).getValue());
+            out.print("\r\n");
         }
     }
 
@@ -1532,70 +1445,5 @@ public class EndpointServlet extends HttpServlet
 
         if(mustBeQuoted)
             out.print('"');
-    }
-
-
-    private Graph processResult(Result result) throws SQLException
-    {
-        Graph data = new Graph();
-
-        int count = 0;
-
-        while(result.next())
-        {
-            RdfNode subject = result.get(0);
-            RdfNode predicate = result.get(1);
-            RdfNode object = result.get(2);
-
-            LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>> properties = data.get(subject);
-
-            if(properties == null)
-            {
-                properties = new LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>();
-                data.put(subject, properties);
-            }
-
-
-            LinkedHashSet<RdfNode> values = properties.get(predicate);
-
-            if(values == null)
-            {
-                values = new LinkedHashSet<RdfNode>();
-                properties.put(predicate, values);
-            }
-
-            if(values.add(object))
-                count++;
-
-            if(count > processLimit)
-                return null;
-        }
-
-        return data;
-    }
-
-
-    private static void selectPrefix(RdfNode node, HashMap<String, String> systemPrefixes,
-            HashMap<String, String> prefixes)
-    {
-        if(!(node instanceof IriNode))
-            return;
-
-
-        String iri = node.getValue();
-
-        for(Entry<String, String> prefix : systemPrefixes.entrySet())
-        {
-            if(iri.startsWith(prefix.getValue()))
-            {
-                String name = iri.substring(prefix.getValue().length());
-
-                if(name.matches("[_a-zA-Z][_a-zA-Z0-9]*"))
-                {
-                    prefixes.put(prefix.getKey(), prefix.getValue());
-                    return;
-                }
-            }
-        }
     }
 }

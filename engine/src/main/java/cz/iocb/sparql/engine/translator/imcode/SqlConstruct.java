@@ -41,7 +41,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 public class SqlConstruct extends SqlIntercode
 {
-    protected static enum ConstructColumn
+    public static enum ConstructColumn
     {
         SUBJECT("subject", true, false), PREDICATE("predicate", false, false), OBJECT("object", true, true);
 
@@ -56,17 +56,17 @@ public class SqlConstruct extends SqlIntercode
             this.allowLiteral = allowLiteral;
         }
 
-        String getName()
+        public String getName()
         {
             return name;
         }
 
-        boolean isBlankNodeAllowed()
+        public boolean isBlankNodeAllowed()
         {
             return allowBlankNode;
         }
 
-        boolean isLiteralAllowed()
+        public boolean isLiteralAllowed()
         {
             return allowLiteral;
         }

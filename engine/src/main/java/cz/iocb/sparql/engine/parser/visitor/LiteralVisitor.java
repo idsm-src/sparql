@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDecimalT
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDoubleType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import java.util.List;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.grammar.SparqlParser.BooleanLiteralContext;
@@ -18,20 +19,19 @@ import cz.iocb.sparql.engine.parser.Range;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.Prologue;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.request.Request;
 
 
 
 public class LiteralVisitor extends BaseVisitor<Literal>
 {
-    private final Request request;
+    private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final List<TranslateMessage> messages;
 
 
-    public LiteralVisitor(Request request, Prologue prologue, List<TranslateMessage> messages)
+    public LiteralVisitor(SparqlDatabaseConfiguration config, Prologue prologue, List<TranslateMessage> messages)
     {
-        this.request = request;
+        this.config = config;
         this.prologue = prologue;
         this.messages = messages;
     }
@@ -66,7 +66,7 @@ public class LiteralVisitor extends BaseVisitor<Literal>
             if(type == null)
                 return new Literal(value);
 
-            Literal literal = new Literal(value, request.getConfiguration().getDataType(type), type);
+            Literal literal = new Literal(value, config.getDataType(type), type);
 
             if(type.equals(rdfLangStringType.getTypeIri()))
                 messages.add(new TranslateMessage(MessageType.invalidDatatype, Range.compute(ctx.iri()),

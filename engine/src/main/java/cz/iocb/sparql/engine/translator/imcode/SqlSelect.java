@@ -10,15 +10,20 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIn
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.ResultTag;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.parser.model.OrderCondition.Direction;
 import cz.iocb.sparql.engine.request.Request;
@@ -30,107 +35,212 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 public class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
-    private final LinkedHashMap<String, Direction> orderByVariables;
-    private final HashSet<String> distinctVariables;
+    private final List<String> projections;
+    private final LinkedHashMap<String, Direction> orderBy;
+    private final List<String> simpleOrderBy;
     private final BigInteger offset;
     private final BigInteger limit;
+    private final boolean distinct;
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child, HashSet<String> distinctVariables,
-            LinkedHashMap<String, Direction> orderByVariables, BigInteger offset, BigInteger limit)
+    protected SqlSelect(List<String> projections, SqlIntercode child, LinkedHashMap<String, Direction> orderBy,
+            BigInteger offset, BigInteger limit, List<String> simpleOrderBy, boolean distinct)
+    {
+        super(child.getVariables().restrict(projections), child.isDeterministic());
+
+        this.child = child;
+        this.projections = projections;
+        this.orderBy = orderBy;
+        this.simpleOrderBy = simpleOrderBy;
+        this.offset = offset;
+        this.limit = limit;
+        this.distinct = distinct;
+    }
+
+
+    protected SqlSelect(UsedVariables variables, SqlIntercode child, boolean distinct,
+            LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
         super(variables, child.isDeterministic());
 
         this.child = child;
-        this.distinctVariables = distinctVariables;
-        this.orderByVariables = orderByVariables;
+        this.projections = null;
+        this.orderBy = orderBy;
+        this.simpleOrderBy = List.of();
         this.offset = offset;
         this.limit = limit;
+        this.distinct = distinct;
     }
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child, HashSet<String> distinctVariables,
-            LinkedHashMap<String, Direction> orderByVariables)
+    public static SqlIntercode create(Request request, Set<String> variables, SqlIntercode child, boolean distinct,
+            LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
-        this(variables, child, distinctVariables, orderByVariables, null, null);
+        if(child == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(limit != null && limit.compareTo(BigInteger.valueOf(0)) <= 0)
+            return SqlNoSolution.get();
+
+        if(child == SqlEmptySolution.get())
+        {
+            if(offset == null && limit == null)
+                return SqlEmptySolution.get();
+
+            if(offset != null && offset.compareTo(BigInteger.valueOf(0)) > 0)
+                return SqlNoSolution.get();
+        }
+
+        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
+
+        for(Entry<String, Direction> e : orderBy.entrySet())
+            if(child.getVariables().get(e.getKey()) != null)
+                stripedOrderBy.put(e.getKey(), e.getValue());
+
+        if(distinct && variables.containsAll(stripedOrderBy.keySet()))
+        {
+            child = SqlDistinct.create(request, child, variables);
+            distinct = false;
+        }
+
+        return new SqlSelect(child.getVariables().restrict(variables), child, distinct, stripedOrderBy, offset, limit);
     }
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child, BigInteger offset, BigInteger limit)
+    public static SqlIntercode create(Request request, Set<String> variables, SqlIntercode child, BigInteger offset,
+            BigInteger limit, boolean distinct)
     {
-        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>(), offset, limit);
+        return create(request, variables, child, distinct, new LinkedHashMap<String, Direction>(), offset, limit);
     }
 
 
-    public SqlSelect(UsedVariables variables, SqlIntercode child)
+    public static SqlSelect createTopLevel(Request request, List<String> projections, SqlIntercode child,
+            boolean distinct, LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit,
+            List<String> simpleOrderBy)
     {
-        this(variables, child, new HashSet<String>(), new LinkedHashMap<String, Direction>(), null, null);
+        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
+
+        for(Entry<String, Direction> e : orderBy.entrySet())
+            if(child.getVariables().get(e.getKey()) != null)
+                stripedOrderBy.put(e.getKey(), e.getValue());
+
+
+        List<String> stripedSimpleOrderBy = new ArrayList<String>();
+
+        for(String var : simpleOrderBy)
+            if(child.getVariables().get(var) != null && !stripedOrderBy.containsKey(var))
+                stripedSimpleOrderBy.add(var);
+
+        if(child.getVariables().restrict(stripedSimpleOrderBy).getNonConstantColumns().isEmpty())
+            stripedSimpleOrderBy = List.of();
+
+
+        if(distinct && projections.containsAll(stripedOrderBy.keySet()))
+        {
+            child = SqlDistinct.create(request, child, new HashSet<String>(projections));
+            distinct = false;
+        }
+
+        return new SqlSelect(projections, child, stripedOrderBy, offset, limit, stripedSimpleOrderBy, distinct);
+    }
+
+
+    public static SqlSelect createTopLevel(Request request, List<String> projections, SqlIntercode child,
+            boolean distinct, LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit)
+    {
+        return createTopLevel(request, projections, child, distinct, orderBy, offset, limit, List.of());
+    }
+
+
+    public static SqlSelect createTopLevel(Request request, List<String> projections, SqlIntercode child,
+            BigInteger offset, BigInteger limit)
+    {
+        return createTopLevel(request, projections, child, false, new LinkedHashMap<String, Direction>(), offset, limit,
+                List.of());
+    }
+
+
+    public static SqlSelect createTopLevel(Request request, List<String> projections, SqlIntercode child)
+    {
+        return createTopLevel(request, projections, child, false, new LinkedHashMap<String, Direction>(), null, null,
+                List.of());
+    }
+
+
+    public SqlSelect addExternalLimits(BigInteger offset, BigInteger limit, List<String> order)
+    {
+        if(!isTopLevel() || !simpleOrderBy.isEmpty())
+            throw new UnsupportedOperationException();
+
+        BigInteger zero = BigInteger.valueOf(0);
+
+        BigInteger innerOffset = this.offset == null ? zero : this.offset;
+        BigInteger innerLimit = this.limit;
+
+        BigInteger outerOffset = offset == null ? zero : offset;
+        BigInteger outerLimit = limit;
+
+        if(innerLimit != null)
+            innerLimit = innerLimit.subtract(outerOffset).max(zero);
+
+        BigInteger newOffset = outerOffset.add(innerOffset);
+
+        if(newOffset.equals(zero))
+            newOffset = null;
+
+        BigInteger newLimit = null;
+
+        if(innerLimit != null && outerLimit != null)
+            newLimit = outerLimit.min(innerLimit);
+        else if(innerLimit != null)
+            newLimit = innerLimit;
+        else
+            newLimit = outerLimit;
+
+        if(newLimit != null && newLimit.compareTo(zero) <= 0)
+            return new SqlSelect(projections, SqlNoSolution.get(), new LinkedHashMap<>(), null, null, List.of(),
+                    distinct);
+
+
+        ArrayList<String> newOrderBy = new ArrayList<String>(order);
+
+        if(newLimit != null || newOffset != null)
+            for(String var : projections)
+                if(!orderBy.containsKey(var) && !newOrderBy.contains(var))
+                    newOrderBy.add(var);
+
+        return new SqlSelect(projections, child, orderBy, newOffset, newLimit, newOrderBy, distinct);
+    }
+
+
+    public SqlSelect optimize(Request request)
+    {
+        if(!isTopLevel())
+            throw new UnsupportedOperationException();
+
+        SqlIntercode optimizedChild = child.optimize(request, new HashSet<String>(projections), false);
+        return createTopLevel(request, projections, optimizedChild, distinct, orderBy, offset, limit, simpleOrderBy);
     }
 
 
     @Override
     public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
     {
+        if(isTopLevel())
+            throw new UnsupportedOperationException();
+
         if(restrictions == null)
             return this;
 
-        restrictions = new HashSet<String>(restrictions);
-        restrictions.retainAll(variables.getNames());
-
-        if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && limit == null
-                && (offset == null || offset.equals(BigInteger.ZERO)))
-            return child.optimize(request, restrictions, reduced);
-
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
-        childRestrictions.addAll(orderByVariables.keySet());
-        childRestrictions.addAll(distinctVariables);
+        childRestrictions.addAll(orderBy.keySet());
 
-        SqlIntercode optimizedChild = child.optimize(request, childRestrictions,
-                !distinctVariables.isEmpty() || reduced);
+        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, reduced);
 
-        if(orderByVariables.isEmpty() && distinctVariables.isEmpty() && optimizedChild instanceof SqlSelect inner)
-        {
-            BigInteger zero = BigInteger.valueOf(0);
+        if(orderBy.isEmpty() && limit == null && (offset == null || offset.equals(BigInteger.ZERO)))
+            return optimizedChild;
 
-            BigInteger innerOffset = inner.offset == null ? zero : inner.offset;
-            BigInteger innerLimit = inner.limit;
-
-            BigInteger outerOffset = offset == null ? zero : offset;
-            BigInteger outerLimit = limit;
-
-            if(innerLimit != null)
-                innerLimit = innerLimit.subtract(outerOffset).max(zero);
-
-            BigInteger newOffset = outerOffset.add(innerOffset);
-
-            if(newOffset.equals(zero))
-                newOffset = null;
-
-            BigInteger newLimit = null;
-
-            if(innerLimit != null && outerLimit != null)
-                newLimit = outerLimit.min(innerLimit);
-            else if(innerLimit != null)
-                newLimit = innerLimit;
-            else
-                newLimit = outerLimit;
-
-            if(newLimit.compareTo(zero) <= 0)
-                return SqlNoSolution.get();
-
-
-            return new SqlSelect(inner.getChild().getVariables(), inner.getChild(), inner.getDistinctVariables(),
-                    inner.getOrderByVariables(), newOffset, newLimit);
-        }
-
-        LinkedHashMap<String, Direction> optimizedOrderByVariables = new LinkedHashMap<String, Direction>();
-
-        for(Entry<String, Direction> entry : orderByVariables.entrySet())
-            if(optimizedChild.getVariables().get(entry.getKey()) != null)
-                optimizedOrderByVariables.put(entry.getKey(), entry.getValue());
-
-        return new SqlSelect(optimizedChild.getVariables().restrict(restrictions), optimizedChild, distinctVariables,
-                optimizedOrderByVariables, offset, limit);
+        return create(request, restrictions, optimizedChild, distinct, orderBy, offset, limit);
     }
 
 
@@ -139,50 +249,72 @@ public class SqlSelect extends SqlIntercode
     {
         StringBuilder builder = new StringBuilder();
 
-        boolean useRow = orderByVariables.keySet().stream().anyMatch(v -> !distinctVariables.contains(v));
-
-        if(!distinctVariables.isEmpty() && !orderByVariables.isEmpty() && useRow)
+        if(!isTopLevel())
         {
             builder.append("SELECT ");
-            builder.append(translateSelectVariables(variables));
+            builder.append(translateInnerSelectVariables(variables));
+
+            if(distinct)
+            {
+                builder.append(" FROM (SELECT ");
+                builder.append(translateInnerSelectVariables(variables));
+                builder.append(", row_number() OVER (");
+                builder.append(translateOrderBy(false));
+                builder.append(") AS \"#rn\"");
+            }
+
             builder.append(" FROM (");
+            builder.append(child.translate(request));
+            builder.append(") AS tab");
         }
-
-
-        builder.append("SELECT ");
-
-        builder.append(translateSelectVariables(variables));
-
-        if(!distinctVariables.isEmpty() && !orderByVariables.isEmpty() && useRow)
+        else if(child instanceof SqlUnion union && orderBy.isEmpty() && simpleOrderBy.isEmpty())
         {
-            builder.append(", row_number() OVER (");
-            builder.append(translateOrderBy());
-            builder.append(") AS \"#rn\"");
-        }
+            assert !distinct;
 
-        builder.append(" FROM (");
-        builder.append(child.translate(request));
-        builder.append(") AS tab");
+            for(int i = 0; i < union.getChilds().size(); i++)
+            {
+                if(i > 0)
+                    builder.append(" UNION ALL ");
 
-        if(distinctVariables.isEmpty() && !orderByVariables.isEmpty())
-            builder.append(translateOrderBy());
+                SqlIntercode branch = union.getChilds().get(i);
 
-
-        if(!distinctVariables.isEmpty())
-        {
-            if(!orderByVariables.isEmpty() && useRow)
+                builder.append("SELECT ");
+                builder.append(translateSelectVariables(projections, variables, branch.getVariables()));
+                builder.append(" FROM (");
+                builder.append(branch.translate(request));
                 builder.append(") AS tab");
+            }
+        }
+        else
+        {
+            builder.append("SELECT ");
+            builder.append(translateSelectVariables(projections, variables, child.getVariables()));
 
-            builder.append(" GROUP BY ");
-            builder.append(translateSelectVariables(child.getVariables().restrict(distinctVariables)));
+            if(distinct)
+            {
+                builder.append(" FROM (SELECT ");
+                builder.append(translateInnerSelectVariables(variables));
+                builder.append(", row_number() OVER (");
+                builder.append(translateOrderBy(false));
+                builder.append(") AS \"#rn\"");
+            }
 
-            if(!orderByVariables.isEmpty() && !useRow)
-                builder.append(translateOrderBy());
+            builder.append(" FROM (");
+            builder.append(child.translate(request));
+            builder.append(") AS tab");
 
-            if(!orderByVariables.isEmpty() && useRow)
-                builder.append(" ORDER BY min(\"#rn\")");
         }
 
+        if(distinct)
+        {
+            builder.append(") AS tab GROUP BY ");
+            builder.append(translateInnerSelectVariables(variables)); // FIXME
+            builder.append(" ORDER BY min(\"#rn\")");
+        }
+        else if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())
+        {
+            builder.append(translateOrderBy(true));
+        }
 
         if(limit != null)
             builder.append(" LIMIT ").append(limit.toString());
@@ -194,7 +326,107 @@ public class SqlSelect extends SqlIntercode
     }
 
 
-    private String translateSelectVariables(UsedVariables variables)
+    public static String translateSelectVariables(Collection<String> projections, UsedVariables variables,
+            UsedVariables childVariables)
+    {
+        StringBuilder builder = new StringBuilder();
+        boolean hasSelect = false;
+
+        for(String variableName : projections)
+        {
+            UsedVariable variable = variables.get(variableName);
+            UsedVariable childVariable = childVariables.get(variableName);
+
+            if(variable == null || variable.getClasses().isEmpty())
+            {
+                appendComma(builder, hasSelect);
+                hasSelect = true;
+
+                builder.append("NULL AS \"");
+                builder.append(variableName.replaceFirst("^@", ""));
+                builder.append('#');
+                builder.append(ResultTag.NULL.getTag());
+                builder.append('"');
+            }
+            else
+            {
+                Set<ResourceClass> classes = variable.getClasses();
+
+                LinkedHashMap<List<ResultTag>, List<ResourceClass>> resultClasses = new LinkedHashMap<>();
+
+                for(ResourceClass resClass : classes)
+                {
+                    List<ResourceClass> list = resultClasses.get(resClass.getResultTags());
+
+                    if(list == null)
+                    {
+                        list = new ArrayList<ResourceClass>();
+                        resultClasses.put(resClass.getResultTags(), list);
+                    }
+
+                    list.add(resClass);
+                }
+
+                for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
+                {
+                    List<ResultTag> tags = entry.getKey();
+                    List<ResourceClass> fullClasses = entry.getValue();
+
+                    Set<ResourceClass> childClasses = childVariable != null ? childVariable.getClasses() :
+                            new HashSet<ResourceClass>();
+
+                    List<ResourceClass> resClasses = fullClasses.stream().filter(c -> childClasses.contains(c))
+                            .collect(toList());
+
+                    for(int part = 0; part < tags.size(); part++)
+                    {
+                        appendComma(builder, hasSelect);
+                        hasSelect = true;
+
+                        if(resClasses.size() == 0)
+                        {
+                            builder.append("NULL::" + tags.get(part).getSqlType());
+                        }
+                        else
+                        {
+                            if(resClasses.size() > 1)
+                                builder.append("coalesce(");
+
+                            for(int i = 0; i < resClasses.size(); i++)
+                            {
+                                appendComma(builder, i > 0);
+
+                                ResourceClass resClass = resClasses.get(i);
+                                builder.append(resClass.toResult(childVariable.getMapping(resClass)).get(part));
+                            }
+
+                            if(resClasses.size() > 1)
+                                builder.append(")");
+                        }
+
+                        builder.append(" AS \"");
+
+                        builder.append(variableName.replaceFirst("^@", ""));
+                        builder.append('#');
+                        builder.append(tags.get(part).getTag());
+                        builder.append('"');
+                    }
+                }
+            }
+        }
+
+        if(!hasSelect)
+        {
+            builder.append("1 AS \"*#");
+            builder.append(ResultTag.NULL.getTag());
+            builder.append('"');
+        }
+
+        return builder.toString();
+    }
+
+
+    private String translateInnerSelectVariables(UsedVariables variables)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -209,14 +441,14 @@ public class SqlSelect extends SqlIntercode
     }
 
 
-    private String translateOrderBy()
+    private String translateOrderBy(boolean withSimple)
     {
         StringBuilder builder = new StringBuilder();
 
         builder.append(" ORDER BY ");
         boolean hasOrderCondition = false;
 
-        for(Entry<String, Direction> order : orderByVariables.entrySet())
+        for(Entry<String, Direction> order : orderBy.entrySet())
         {
             String varName = order.getKey();
             UsedVariable variable = child.getVariables().get(varName);
@@ -513,36 +745,31 @@ public class SqlSelect extends SqlIntercode
             }
         }
 
+        if(withSimple && !simpleOrderBy.isEmpty())
+        {
+            HashSet<Column> usedColumns = new HashSet<Column>();
+
+            for(String varName : simpleOrderBy)
+            {
+                for(Column column : child.getVariable(varName).getNonConstantColumns())
+                {
+                    if(usedColumns.add(column))
+                    {
+                        appendComma(builder, hasOrderCondition);
+                        hasOrderCondition = true;
+
+                        builder.append(column);
+                    }
+                }
+            }
+        }
+
         return builder.toString();
     }
 
 
-    public LinkedHashMap<String, Direction> getOrderByVariables()
+    private boolean isTopLevel()
     {
-        return orderByVariables;
-    }
-
-
-    public HashSet<String> getDistinctVariables()
-    {
-        return distinctVariables;
-    }
-
-
-    public SqlIntercode getChild()
-    {
-        return child;
-    }
-
-
-    public final BigInteger getLimit()
-    {
-        return limit;
-    }
-
-
-    public final BigInteger getOffset()
-    {
-        return offset;
+        return projections != null;
     }
 }

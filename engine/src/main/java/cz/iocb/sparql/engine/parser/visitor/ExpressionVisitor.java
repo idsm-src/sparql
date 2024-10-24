@@ -56,13 +56,11 @@ import cz.iocb.sparql.engine.parser.model.expression.FunctionCallExpression;
 import cz.iocb.sparql.engine.parser.model.expression.InExpression;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.parser.model.expression.UnaryExpression;
-import cz.iocb.sparql.engine.request.Request;
 
 
 
 public class ExpressionVisitor extends BaseVisitor<Expression>
 {
-    private final Request request;
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
@@ -71,11 +69,10 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     private final List<TranslateMessage> messages;
 
 
-    public ExpressionVisitor(Request request, Prologue prologue, Stack<VarOrIri> services, VariableScopes scopes,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+    public ExpressionVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
-        this.request = request;
-        this.config = request.getConfiguration();
+        this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.scopes = scopes;
@@ -287,7 +284,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         if(superResult != null)
             return superResult;
 
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(request, prologue, services, scopes, usedBlankNodes,
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
                 messages);
 
         ParseTree functionNameNode = ctx.children.get(0);
@@ -312,7 +309,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         try
         {
             return new ExistsExpression(
-                    new GraphPatternVisitor(request, prologue, services, scopes, usedBlankNodes, messages)
+                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
                             .visit(ctx.groupGraphPattern()),
                     false);
         }
@@ -331,7 +328,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         try
         {
             return new ExistsExpression(
-                    new GraphPatternVisitor(request, prologue, services, scopes, usedBlankNodes, messages)
+                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
                             .visit(ctx.groupGraphPattern()),
                     true);
         }
@@ -344,7 +341,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 
     private FunctionCallExpression parseFunctionCall(IRI iri, ArgListContext ctx)
     {
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(request, prologue, services, scopes, usedBlankNodes,
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
                 messages);
 
         List<Expression> arguments = argumentsVisitor.visit(ctx);
@@ -387,42 +384,42 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     @Override
     public Literal visitRdfLiteral(RdfLiteralContext ctx)
     {
-        return new LiteralVisitor(request, prologue, messages).visitRdfLiteral(ctx);
+        return new LiteralVisitor(config, prologue, messages).visitRdfLiteral(ctx);
     }
 
 
     @Override
     public Literal visitNumericLiteral(NumericLiteralContext ctx)
     {
-        return new LiteralVisitor(request, prologue, messages).visitNumericLiteral(ctx);
+        return new LiteralVisitor(config, prologue, messages).visitNumericLiteral(ctx);
     }
 
 
     @Override
     public Literal visitNumericLiteralPositive(NumericLiteralPositiveContext ctx)
     {
-        return new LiteralVisitor(request, prologue, messages).visitNumericLiteralPositive(ctx);
+        return new LiteralVisitor(config, prologue, messages).visitNumericLiteralPositive(ctx);
     }
 
 
     @Override
     public Literal visitNumericLiteralNegative(NumericLiteralNegativeContext ctx)
     {
-        return new LiteralVisitor(request, prologue, messages).visitNumericLiteralNegative(ctx);
+        return new LiteralVisitor(config, prologue, messages).visitNumericLiteralNegative(ctx);
     }
 
 
     @Override
     public Literal visitBooleanLiteral(BooleanLiteralContext ctx)
     {
-        return new LiteralVisitor(request, prologue, messages).visitBooleanLiteral(ctx);
+        return new LiteralVisitor(config, prologue, messages).visitBooleanLiteral(ctx);
     }
 }
 
 
 class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 {
-    private final Request request;
+    private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
     private final Stack<VarOrIri> services;
     private final VariableScopes scopes;
@@ -430,10 +427,10 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     private final List<TranslateMessage> messages;
     private boolean foundDistinct = false;
 
-    public ArgumentsVisitor(Request request, Prologue prologue, Stack<VarOrIri> services, VariableScopes scopes,
-            HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+    public ArgumentsVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
+            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
     {
-        this.request = request;
+        this.config = config;
         this.prologue = prologue;
         this.services = services;
         this.scopes = scopes;
@@ -451,7 +448,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
         return contexts.stream()
-                .map(new ExpressionVisitor(request, prologue, services, scopes, usedBlankNodes, messages)::visit)
+                .map(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)::visit)
                 .collect(toList());
     }
 
@@ -477,7 +474,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         if(ctx.var() != null)
         {
             List<Expression> result = new ArrayList<>();
-            result.add(new ExpressionVisitor(request, prologue, services, scopes, usedBlankNodes, messages)
+            result.add(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
                     .visit(ctx.var()));
             return result;
         }
@@ -496,7 +493,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     @Override
     public List<Expression> visitAggregate(AggregateContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(request, prologue, services, scopes, usedBlankNodes,
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes,
                 messages);
 
         if(ctx.DISTINCT() != null)

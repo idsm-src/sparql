@@ -37,7 +37,7 @@ public class SqlTableAccess extends SqlIntercode
     private final boolean reduced;
 
 
-    private SqlTableAccess(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
+    protected SqlTableAccess(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
     {
         super(getExternalVariables(internal, conditions), true);
 

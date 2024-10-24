@@ -110,7 +110,6 @@ import cz.iocb.sparql.engine.translator.imcode.SqlMerge;
 import cz.iocb.sparql.engine.translator.imcode.SqlMinus;
 import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlProcedureCall;
-import cz.iocb.sparql.engine.translator.imcode.SqlQuery;
 import cz.iocb.sparql.engine.translator.imcode.SqlSelect;
 import cz.iocb.sparql.engine.translator.imcode.SqlUnion;
 import cz.iocb.sparql.engine.translator.imcode.SqlValues;
@@ -172,10 +171,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         datasets = selectQuery.getSelect().getDataSets();
 
         Select select = selectQuery.getSelect();
-        SqlIntercode translatedSelect = visitElement(select);
-        List<String> variables = select.getVariablesInScope().stream().map(v -> v.getSqlName()).collect(toList());
-
-        return new SqlQuery(variables, translatedSelect);
+        return visitElement(select);
     }
 
 
@@ -187,14 +183,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         Variable variable = new Variable(null, "@ask");
 
-        LinkedHashSet<String> variablesInScope = new LinkedHashSet<String>();
-        variablesInScope.add(variable.getName());
-
         SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
         SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, new UsedVariables());
         SqlIntercode bind = SqlBind.bind(request, variable.getSqlName(), expression, SqlEmptySolution.get());
 
-        return new SqlQuery(variablesInScope, bind);
+        return SqlSelect.createTopLevel(request, List.of(variable.getName()), bind);
     }
 
 
@@ -207,11 +200,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Variable subject = new Variable(null, "@subject");
         Variable predicate = new Variable(null, "@predikate");
         Variable object = new Variable(null, "@object");
-
-        Set<String> restrictions = new LinkedHashSet<String>();
-        restrictions.add(subject.getSqlName());
-        restrictions.add(predicate.getSqlName());
-        restrictions.add(object.getSqlName());
 
         PathTranslateVisitor visitor = new PathTranslateVisitor(request, this, datasets);
         SqlIntercode select = visitElement(describeQuery.getSelect());
@@ -252,7 +240,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return new SqlQuery(restrictions, SqlUnion.union(unionList)).optimize(request);
+        List<String> variables = List.of(subject.getSqlName(), predicate.getSqlName(), object.getSqlName());
+        return SqlSelect.createTopLevel(request, variables, SqlUnion.union(unionList));
     }
 
 
@@ -272,7 +261,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             templates.add(new Template(triple.getSubject(), (Node) triple.getPredicate(), triple.getObject()));
         }
 
-        return new SqlQuery(SqlConstruct.getColumns(), SqlDistinct.create(request,
+        return SqlSelect.createTopLevel(request, SqlConstruct.getColumns(), SqlDistinct.create(request,
                 SqlConstruct.construct(request, templates, source), new HashSet<>(SqlConstruct.getColumns())));
     }
 
@@ -515,38 +504,23 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        UsedVariables variables = new UsedVariables();
+        Set<String> variables = new HashSet<String>();
 
         for(Projection projection : select.getProjections())
-        {
-            String variableName = projection.getVariable().getSqlName();
-
-            UsedVariable variable = translatedWhereClause.getVariables().get(variableName);
-
-            if(variable != null)
-                variables.add(variable);
-        }
-
+            variables.add(projection.getVariable().getSqlName());
 
         if(select.isSubSelect() && getGraph() instanceof Variable)
-        {
-            String graphVariableName = ((Variable) getGraph()).getSqlName();
-
-            UsedVariable variable = translatedWhereClause.getVariables().get(graphVariableName);
-
-            if(variable != null)
-                variables.add(variable);
-        }
+            variables.add(((Variable) getGraph()).getSqlName());
 
 
-        HashSet<String> distinctVariables = new HashSet<String>();
+        if(select.isSubSelect())
+            return SqlSelect.create(request, variables, translatedWhereClause, select.isDistinct(), orderByVariables,
+                    select.getOffset(), select.getLimit());
 
-        if(select.isDistinct())
-            for(Projection projection : select.getProjections())
-                distinctVariables.add(projection.getVariable().getSqlName());
+        List<String> selectVariables = select.getVariablesInScope().stream().map(v -> v.getSqlName()).collect(toList());
 
-        return new SqlSelect(variables, translatedWhereClause, distinctVariables, orderByVariables, select.getOffset(),
-                select.getLimit());
+        return SqlSelect.createTopLevel(request, selectVariables, translatedWhereClause, select.isDistinct(),
+                orderByVariables, select.getOffset(), select.getLimit());
     }
 
 
@@ -1584,9 +1558,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             /* evaluate context pattern */
 
             BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
-            SqlSelect sqlSelect = new SqlSelect(context.getVariables(), context, null, limit);
-            SqlQuery query = new SqlQuery(contextVariables, sqlSelect);
-
+            SqlSelect query = SqlSelect.createTopLevel(request, new ArrayList<String>(contextVariables), context, null,
+                    limit);
             String code = query.optimize(request).translate(request);
 
             try(Result result = new Result(ResultType.SELECT, request.getStatement().executeQuery(code),
@@ -1882,8 +1855,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SqlQuery translate(Query sparqlQuery, BigInteger offset, BigInteger limit, boolean optimize)
-            throws SQLException
+    public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<String> order,
+            boolean optimize) throws SQLException
     {
         variableOccurrences = new HashMap<String, List<Range>>();
 
@@ -1912,19 +1885,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         try
         {
-            SqlQuery imcode = (SqlQuery) visitElement(sparqlQuery);
+            SqlSelect imcode = (SqlSelect) visitElement(sparqlQuery);
 
             if(imcode == null)
                 return null;
 
-            if(offset != null || limit != null)
-            {
-                SqlSelect select = new SqlSelect(imcode.getChild().getVariables(), imcode.getChild(), offset, limit);
-                imcode = new SqlQuery(imcode.getSelectedVariables(), select);
-            }
+            if(offset != null || limit != null || !order.isEmpty())
+                imcode = imcode.addExternalLimits(offset, limit, order);
 
             if(optimize)
-                imcode = (SqlQuery) imcode.optimize(request);
+                imcode = imcode.optimize(request);
 
             return imcode;
         }

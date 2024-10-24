@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.request;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.sql.Connection;
@@ -46,12 +47,64 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.parser.visitor.QueryVisitor;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
-import cz.iocb.sparql.engine.translator.imcode.SqlQuery;
+import cz.iocb.sparql.engine.translator.imcode.SqlSelect;
 
 
 
 public class Request implements AutoCloseable
 {
+    public static class PreparedQuery
+    {
+        private final String query;
+        private final List<DataSet> dataSets;
+        private final Query syntaxTree;
+        private final List<TranslateMessage> messages;
+        private final ResultType type;
+
+        public PreparedQuery(String query, List<DataSet> dataSets, Query syntaxTree, List<TranslateMessage> messages)
+        {
+            this.query = query;
+            this.dataSets = dataSets;
+            this.syntaxTree = syntaxTree;
+            this.messages = messages;
+
+            this.type = switch(syntaxTree)
+            {
+                case SelectQuery s -> ResultType.SELECT;
+                case AskQuery a -> ResultType.ASK;
+                case DescribeQuery d -> ResultType.DESCRIBE;
+                case ConstructQuery c -> ResultType.CONSTRUCT;
+                default -> null;
+            };
+        }
+
+        public final String getQuery()
+        {
+            return query;
+        }
+
+        public final List<DataSet> getDataSets()
+        {
+            return dataSets;
+        }
+
+        public final Query getSyntaxTree()
+        {
+            return syntaxTree;
+        }
+
+        public final List<TranslateMessage> getMessages()
+        {
+            return messages;
+        }
+
+        public final ResultType getResultType()
+        {
+            return type;
+        }
+    }
+
+
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
     private final SparqlDatabaseConfiguration config;
@@ -65,7 +118,6 @@ public class Request implements AutoCloseable
 
     private long begin;
     private long timeout;
-    private int fetchSize;
     private boolean canceled;
 
 
@@ -89,7 +141,7 @@ public class Request implements AutoCloseable
             if(hasErrors(messages))
                 return messages;
 
-            QueryVisitor queryVisitor = new QueryVisitor(this, messages);
+            QueryVisitor queryVisitor = new QueryVisitor(getConfiguration(), messages);
             Query syntaxTree = queryVisitor.visit(context);
 
             if(hasErrors(messages))
@@ -99,7 +151,7 @@ public class Request implements AutoCloseable
                 syntaxTree.getSelect().setDataSets(dataSets);
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
-            translateVisitor.translate(syntaxTree, null, null, false);
+            translateVisitor.translate(syntaxTree, null, null, List.of(), false);
 
             logger.trace("query check");
         }
@@ -125,14 +177,15 @@ public class Request implements AutoCloseable
     }
 
 
-    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
-            throws TranslateExceptions, SQLException
+    public PreparedQuery prepareQuery(String query, List<DataSet> dataSets) throws TranslateExceptions
     {
         try
         {
-            MDC.put("sparql", query);
+            String datasets = dataSets == null ? "" : dataSets.stream()
+                    .map(d -> (d.isDefault() ? "FROM " : "FROM NAMED") + d.getSourceSelector()).collect(joining(" "));
 
-            getConnection(); // time is measured after a connection is established
+            MDC.put("sparql", query);
+            MDC.put("datasets", datasets);
 
             List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
@@ -141,7 +194,7 @@ public class Request implements AutoCloseable
 
             checkForErrors(messages);
 
-            QueryVisitor queryVisitor = new QueryVisitor(this, messages);
+            QueryVisitor queryVisitor = new QueryVisitor(getConfiguration(), messages);
             Query syntaxTree = queryVisitor.visit(context);
 
             checkForErrors(messages);
@@ -149,49 +202,68 @@ public class Request implements AutoCloseable
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
 
+            return new PreparedQuery(query, dataSets, syntaxTree, messages);
+        }
+        catch(TranslateExceptions e)
+        {
+            logger.info("query translation error: " + e.getMessage());
+            throw e;
+        }
+        catch(Throwable e)
+        {
+            logger.error("unexpected error: " + e.getMessage(), e);
+            throw e;
+        }
+        finally
+        {
+            MDC.remove("sparql");
+            MDC.remove("datasets");
+        }
+    }
 
-            this.fetchSize = fetchSize;
+
+
+    public Result execute(PreparedQuery query, List<String> order, int offset, int limit, int fetchSize, long timeout)
+            throws TranslateExceptions, SQLException
+    {
+        try
+        {
+            String datasets = query.getDataSets() == null ? "" : query.getDataSets().stream()
+                    .map(d -> (d.isDefault() ? "FROM " : "FROM NAMED") + d.getSourceSelector()).collect(joining(" "));
+
+            MDC.put("sparql", query.getQuery());
+            MDC.put("datasets", datasets);
+
+            List<TranslateMessage> messages = new LinkedList<TranslateMessage>(query.getMessages());
+            Query syntaxTree = query.getSyntaxTree();
+            ResultType type = query.getResultType();
+
+
+            int border = syntaxTree instanceof ConstructQuery cnst ? fetchSize / cnst.getTemplates().size() : fetchSize;
+            Select select = syntaxTree.getSelect();
+
+            if(syntaxTree instanceof AskQuery)
+                fetchSize = 0;
+            else if(syntaxTree instanceof DescribeQuery)
+                fetchSize = 0;
+            if(limit >= 0 && limit <= fetchSize)
+                fetchSize = 0;
+            else if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(border)) <= 0)
+                fetchSize = 0;
+            else if(select.getGroupByConditions().isEmpty() && select.isInAggregateMode())
+                fetchSize = 0;
+
+
+            getConnection(); // time is measured after a connection is established
+
             this.timeout = timeout;
             this.begin = System.nanoTime();
-
-
-            ResultType type = null;
-
-            if(syntaxTree instanceof SelectQuery)
-            {
-                type = ResultType.SELECT;
-
-                Select select = syntaxTree.getSelect();
-
-                if(limit > 0 && limit <= fetchSize)
-                    this.fetchSize = 0;
-
-                if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(fetchSize)) <= 0)
-                    this.fetchSize = 0;
-
-                if(select.getGroupByConditions().isEmpty() && select.isInAggregateMode())
-                    this.fetchSize = 0;
-            }
-            else if(syntaxTree instanceof AskQuery)
-            {
-                type = ResultType.ASK;
-                this.fetchSize = 0;
-            }
-            else if(syntaxTree instanceof DescribeQuery)
-            {
-                type = ResultType.DESCRIBE;
-                this.fetchSize = 0;
-            }
-            else if(syntaxTree instanceof ConstructQuery)
-            {
-                type = ResultType.CONSTRUCT;
-            }
 
             BigInteger newOffset = syntaxTree instanceof AskQuery || offset <= 0 ? null : BigInteger.valueOf(offset);
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
-            SqlQuery imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, true);
+            SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order, true);
 
             String code = imcode.translate(this);
 
@@ -201,14 +273,32 @@ public class Request implements AutoCloseable
 
             checkForErrors(messages);
 
-            return new Result(type, getStatement().executeQuery(code), begin, timeout);
+            return new Result(type, getStatement(fetchSize).executeQuery(code), begin, timeout);
+        }
+        catch(TranslateExceptions e)
+        {
+            logger.info("query translation error: " + e.getMessage());
+
+            if(statement != null)
+                statement.close();
+
+            throw e;
+        }
+        catch(SQLException e)
+        {
+            if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
+                logger.warn("query timeout: " + e.getMessage());
+            else
+                logger.error("query evaluation error: " + e.getMessage());
+
+            if(statement != null)
+                statement.close();
+
+            throw e;
         }
         catch(Throwable e)
         {
-            if(e instanceof TranslateExceptions)
-                logger.info("query translation error: " + e.getMessage());
-            else
-                logger.error("query evaluation error: " + e.getMessage(), e);
+            logger.error("unexpected error: " + e.getMessage(), e);
 
             if(statement != null)
                 statement.close();
@@ -218,8 +308,23 @@ public class Request implements AutoCloseable
         finally
         {
             MDC.remove("sparql");
+            MDC.remove("datasets");
             MDC.remove("sql");
         }
+    }
+
+
+    public Result execute(String query, List<DataSet> dataSets, List<String> order, int offset, int limit,
+            int fetchSize, long timeout) throws TranslateExceptions, SQLException
+    {
+        return execute(prepareQuery(query, dataSets), order, offset, limit, fetchSize, timeout);
+    }
+
+
+    public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
+            throws TranslateExceptions, SQLException
+    {
+        return execute(query, dataSets, List.of(), offset, limit, fetchSize, timeout);
     }
 
 
@@ -336,7 +441,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public synchronized Statement getStatement()
+    public synchronized Statement getStatement(int fetchSize)
     {
         try
         {
@@ -360,6 +465,12 @@ public class Request implements AutoCloseable
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    public synchronized Statement getStatement()
+    {
+        return getStatement(0);
     }
 
 
