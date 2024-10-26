@@ -60,5 +60,11 @@ public abstract class IriClass extends ResourceClass
     }
 
 
+    public List<Column> toOrderColumns(List<Column> columns)
+    {
+        return List.of(toExpression(columns));
+    }
+
+
     public abstract String getPrefix(List<Column> columns);
 }

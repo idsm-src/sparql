@@ -27,12 +27,12 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    private final SqlCheck sqlCheck;
-    private final String sqlQuery;
-    private final Pattern pattern;
-    private final String regexp;
-    private final Function function;
-    private final List<Function> inverseFunction;
+    protected final SqlCheck sqlCheck;
+    protected final String sqlQuery;
+    protected final Pattern pattern;
+    protected final String regexp;
+    protected final Function function;
+    protected final List<Function> inverseFunction;
 
 
     public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,

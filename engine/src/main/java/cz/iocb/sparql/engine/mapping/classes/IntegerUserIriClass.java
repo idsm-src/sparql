@@ -100,6 +100,27 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> toOrderColumns(List<Column> columns)
+    {
+        if(suffix == null && length > 0)
+            return columns;
+
+        String code = String.format("(%s)::varchar", columns.get(0));
+
+        if(length > 0)
+            code = String.format("lpad(%s, %d, '0')", code, length);
+        else if(length < 0)
+            code = String.format("CASE WHEN 1%0" + (-1 - length) + "d <= (%s) THEN %s ELSE lpad(%s, %d, '0') END", 0,
+                    columns.get(0), code, code, -length);
+
+        if(suffix != null)
+            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
+
+        return List.of(new ExpressionColumn("(" + code + ")"));
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         return prefix;

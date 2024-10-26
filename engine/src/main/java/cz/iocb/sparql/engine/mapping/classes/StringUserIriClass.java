@@ -94,6 +94,17 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> toOrderColumns(List<Column> columns)
+    {
+        if(suffix == null)
+            return columns;
+
+        return List.of(new ExpressionColumn(
+                String.format("(%s || '%s')::varchar", columns.get(0), suffix.replaceAll("'", "''"))));
+    }
+
+
+    @Override
     public String getPrefix(List<Column> columns)
     {
         return prefix;

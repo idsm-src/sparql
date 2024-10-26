@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultTag;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
@@ -524,28 +525,43 @@ public class SqlSelect extends SqlIntercode
 
             if(iris.size() > 0)
             {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
                 if(iris.size() > 1)
+                {
+                    appendComma(builder, hasOrderCondition);
+                    hasOrderCondition = true;
+
                     builder.append("coalesce(");
 
-                boolean hasVariants = false;
+                    boolean hasVariants = false;
 
-                for(ResourceClass res : iris)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
+                    for(ResourceClass res : iris)
+                    {
+                        appendComma(builder, hasVariants);
+                        hasVariants = true;
 
-                    //TODO: use better approach
-                    builder.append(res.toGeneralClass(variable.getMapping(res), false).get(0));
-                }
+                        builder.append(res.toExpression(variable.getMapping(res)));
+                    }
 
-                if(iris.size() > 1)
                     builder.append(")");
 
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
+                    if(order.getValue() == Direction.Descending)
+                        builder.append(" DESC");
+                }
+                else
+                {
+                    IriClass iriClass = (IriClass) iris.iterator().next();
+
+                    for(Column col : iriClass.toOrderColumns(variable.getMapping(iriClass)))
+                    {
+                        appendComma(builder, hasOrderCondition);
+                        hasOrderCondition = true;
+
+                        builder.append(col);
+
+                        if(order.getValue() == Direction.Descending)
+                            builder.append(" DESC");
+                    }
+                }
             }
 
 
