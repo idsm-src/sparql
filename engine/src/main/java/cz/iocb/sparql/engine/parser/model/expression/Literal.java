@@ -33,7 +33,7 @@ public class Literal extends BaseComplexNode implements Expression, Node
     private final Object value;
     private final String languageTag;
     private final IRI type;
-    private final boolean isTypeSupported;
+    private final DataType datatype;
     private final boolean isSimple;
 
 
@@ -43,7 +43,7 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.value = xsdStringType.parse(value);
         this.languageTag = null;
         this.type = xsdStringType.getTypeIri();
-        this.isTypeSupported = true;
+        this.datatype = xsdStringType;
         this.isSimple = true;
     }
 
@@ -54,32 +54,9 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.value = rdfLangStringType.parse(value);
         this.languageTag = languageTag.toLowerCase();
         this.type = rdfLangStringType.getTypeIri();
-        this.isTypeSupported = true;
+        this.datatype = rdfLangStringType;
         this.isSimple = false;
     }
-
-    /*
-    public Literal(String value, IRI typeIri)
-    {
-        this.stringValue = value;
-        this.languageTag = null;
-        this.type = typeIri;
-        this.isSimple = false;
-    
-        DataType dataType = Request.currentRequest().getConfiguration().getDataType(typeIri);
-    
-        if(dataType == null)
-        {
-            this.value = null;
-            this.isTypeSupported = false;
-        }
-        else
-        {
-            this.value = dataType.parse(value);
-            this.isTypeSupported = true;
-        }
-    }
-    */
 
 
     public Literal(String value, DataType datatype, IRI typeIri)
@@ -87,10 +64,10 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.stringValue = value;
         this.languageTag = null;
         this.type = typeIri;
+        this.datatype = datatype;
         this.isSimple = false;
 
         this.value = datatype == null ? null : datatype.parse(value);
-        this.isTypeSupported = datatype != null;
     }
 
 
@@ -99,10 +76,10 @@ public class Literal extends BaseComplexNode implements Expression, Node
         this.stringValue = value;
         this.languageTag = null;
         this.type = datatype.getTypeIri();
+        this.datatype = datatype;
         this.isSimple = false;
 
         this.value = datatype.parse(value);
-        this.isTypeSupported = true;
     }
 
 
@@ -130,9 +107,15 @@ public class Literal extends BaseComplexNode implements Expression, Node
     }
 
 
+    public DataType getDataType()
+    {
+        return datatype;
+    }
+
+
     public boolean isTypeSupported()
     {
-        return isTypeSupported;
+        return datatype != null;
     }
 
 

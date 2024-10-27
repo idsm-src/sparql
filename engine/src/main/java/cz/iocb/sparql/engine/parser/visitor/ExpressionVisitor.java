@@ -7,8 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Stack;
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.tree.ParseTree;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.grammar.SparqlParser.AdditiveExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.AggregateContext;
@@ -40,6 +40,9 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryNegationExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnarySignedLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VarContext;
+import cz.iocb.sparql.engine.mapping.classes.DataType;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
+import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.parser.Position;
 import cz.iocb.sparql.engine.parser.Range;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -63,21 +66,26 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 {
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
+    private final Stack<VarOrIri> graphs;
     private final Stack<VarOrIri> services;
     private final VariableScopes scopes;
     private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
+    private final boolean allowAggregates;
 
 
-    public ExpressionVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+    public ExpressionVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
+            Stack<VarOrIri> services, VariableScopes scopes, HashSet<String> usedBlankNodes,
+            List<TranslateMessage> messages, boolean allowAggregates)
     {
         this.config = config;
         this.prologue = prologue;
+        this.graphs = graphs;
         this.services = services;
         this.scopes = scopes;
         this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
+        this.allowAggregates = allowAggregates;
     }
 
 
@@ -151,8 +159,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         Literal signNumber = (Literal) (right instanceof Literal ? right : ((BinaryExpression) right).getLeft());
         Operator operator = signNumber.getStringValue().startsWith("+") ? Operator.Add : Operator.Subtract;
 
-        Literal fixed = new Literal(signNumber.getStringValue().substring(1),
-                config.getDataType(signNumber.getTypeIri()), signNumber.getTypeIri());
+        Literal fixed = new Literal(signNumber.getStringValue().substring(1), signNumber.getDataType());
         fixed.setRange(new Range(moveByOneCharacter(signNumber.getRange().getStart()), signNumber.getRange().getEnd()));
 
         if(!(right instanceof Literal))
@@ -281,19 +288,79 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     {
         // for alternatives that are handled in a special way ((NOT) EXISTS)
         Expression superResult = super.visitBuiltInCall(ctx);
+
         if(superResult != null)
             return superResult;
 
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
-                messages);
 
-        ParseTree functionNameNode = ctx.children.get(0);
-        String functionName = functionNameNode.getChildCount() == 0 ? functionNameNode.getText() :
-                functionNameNode.getChild(0).getText();
+        String functionName = ctx.children.get(0).getText();
+
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, allowAggregates);
 
         List<Expression> arguments = argumentsVisitor.visitBuiltInCall(ctx);
 
+        return new BuiltInCallExpression(functionName, arguments);
+    }
+
+
+    @Override
+    public Expression visitRegexExpression(RegexExpressionContext ctx)
+    {
+        String functionName = ctx.children.get(0).getText();
+
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, allowAggregates);
+
+        List<Expression> arguments = argumentsVisitor.visitRegexExpression(ctx);
+
+        return new BuiltInCallExpression(functionName, arguments);
+    }
+
+
+    @Override
+    public Expression visitSubStringExpression(SubStringExpressionContext ctx)
+    {
+        String functionName = ctx.children.get(0).getText();
+
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, allowAggregates);
+
+        List<Expression> arguments = argumentsVisitor.visitSubStringExpression(ctx);
+
+        return new BuiltInCallExpression(functionName, arguments);
+    }
+
+
+    @Override
+    public Expression visitStrReplaceExpression(StrReplaceExpressionContext ctx)
+    {
+        String functionName = ctx.children.get(0).getText();
+
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, allowAggregates);
+
+        List<Expression> arguments = argumentsVisitor.visitStrReplaceExpression(ctx);
+
+        return new BuiltInCallExpression(functionName, arguments);
+    }
+
+
+    @Override
+    public Expression visitAggregate(AggregateContext ctx)
+    {
+        if(!allowAggregates)
+            messages.add(new TranslateMessage(MessageType.invalidContextOfAggregate, Range.compute((ctx))));
+
+        String functionName = ctx.children.get(0).getText();
+
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, allowAggregates);
+
+        List<Expression> arguments = argumentsVisitor.visitAggregate(ctx);
+
         BuiltInCallExpression result = new BuiltInCallExpression(functionName, arguments);
+
         if(argumentsVisitor.foundDistinct())
             result.setDistinct(true);
 
@@ -309,7 +376,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         try
         {
             return new ExistsExpression(
-                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
+                    new GraphPatternVisitor(config, prologue, graphs, services, scopes, usedBlankNodes, messages)
                             .visit(ctx.groupGraphPattern()),
                     false);
         }
@@ -328,7 +395,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         try
         {
             return new ExistsExpression(
-                    new GraphPatternVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
+                    new GraphPatternVisitor(config, prologue, graphs, services, scopes, usedBlankNodes, messages)
                             .visit(ctx.groupGraphPattern()),
                     true);
         }
@@ -341,14 +408,44 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 
     private FunctionCallExpression parseFunctionCall(IRI iri, ArgListContext ctx)
     {
-        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, services, scopes, usedBlankNodes,
-                messages);
+        ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, false);
 
         List<Expression> arguments = argumentsVisitor.visit(ctx);
 
         FunctionCallExpression result = new FunctionCallExpression(iri, arguments);
+
         if(argumentsVisitor.foundDistinct())
             result.setDistinct(true);
+
+
+        if(!services.stream().allMatch(s -> s instanceof IRI && config.getServices().contains(s)))
+            return result;
+
+        IRI service = services.isEmpty() ? config.getServiceIri() : (IRI) services.peek();
+
+        DataType datatype = config.getDataType(iri);
+
+        //TODO: add support for casting to user literals
+        if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
+        {
+            if(arguments.size() != 1)
+                messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
+                        iri.toString(prologue), 1));
+        }
+        else
+        {
+            FunctionDefinition definition = config.getFunctions(service).get(iri.getValue());
+
+            if(definition == null)
+                messages.add(new TranslateMessage(MessageType.unimplementedFunction, iri.getRange(),
+                        iri.toString(prologue)));
+            else if(arguments.size() < definition.getRequiredArgumentCount()
+                    && arguments.size() > definition.getArgumentClasses().size())
+                messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
+                        iri.toString(prologue), definition.getArgumentClasses().size()));
+        }
+
         return result;
     }
 
@@ -421,21 +518,27 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 {
     private final SparqlDatabaseConfiguration config;
     private final Prologue prologue;
+    private final Stack<VarOrIri> graphs;
     private final Stack<VarOrIri> services;
     private final VariableScopes scopes;
     private final HashSet<String> usedBlankNodes;
     private final List<TranslateMessage> messages;
+    private final boolean allowAggregates;
     private boolean foundDistinct = false;
 
-    public ArgumentsVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> services,
-            VariableScopes scopes, HashSet<String> usedBlankNodes, List<TranslateMessage> messages)
+
+    public ArgumentsVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
+            Stack<VarOrIri> services, VariableScopes scopes, HashSet<String> usedBlankNodes,
+            List<TranslateMessage> messages, boolean allowAggregates)
     {
         this.config = config;
         this.prologue = prologue;
+        this.graphs = graphs;
         this.services = services;
         this.scopes = scopes;
         this.usedBlankNodes = usedBlankNodes;
         this.messages = messages;
+        this.allowAggregates = allowAggregates;
     }
 
 
@@ -447,9 +550,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
-        return contexts.stream()
-                .map(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)::visit)
-                .collect(toList());
+        return contexts.stream().map(new ExpressionVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,
+                messages, allowAggregates)::visit).collect(toList());
     }
 
 
@@ -458,6 +560,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     {
         // for alternatives that have their own rules
         List<Expression> superResult = super.visitBuiltInCall(ctx);
+
         if(superResult != null)
             return superResult;
 
@@ -474,8 +577,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
         if(ctx.var() != null)
         {
             List<Expression> result = new ArrayList<>();
-            result.add(new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes, messages)
-                    .visit(ctx.var()));
+            result.add(new ExpressionVisitor(config, prologue, graphs, services, scopes, usedBlankNodes, messages,
+                    allowAggregates).visit(ctx.var()));
             return result;
         }
 
@@ -493,8 +596,8 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     @Override
     public List<Expression> visitAggregate(AggregateContext ctx)
     {
-        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, services, scopes, usedBlankNodes,
-                messages);
+        ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, graphs, services, scopes,
+                usedBlankNodes, messages, false);
 
         if(ctx.DISTINCT() != null)
             foundDistinct = true;

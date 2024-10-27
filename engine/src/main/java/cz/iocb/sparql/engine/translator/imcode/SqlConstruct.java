@@ -23,7 +23,6 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -425,8 +424,8 @@ public class SqlConstruct extends SqlIntercode
                 if(!column.isLiteralAllowed())
                     return null;
 
-                DataType dataType = request.getConfiguration().getDataType(literal.getTypeIri());
-                LiteralClass resClass = dataType == null ? unsupportedLiteral : dataType.getResourceClass(literal);
+                LiteralClass resClass = literal.isTypeSupported() ? literal.getDataType().getResourceClass(literal) :
+                        unsupportedLiteral;
                 List<Column> columns = request.getColumns(resClass, literal);
                 return new UsedVariable(column.getName(), resClass, columns, false);
             }

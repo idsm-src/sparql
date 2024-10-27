@@ -25,6 +25,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 
+//TODO: add support for binding parameter and result variables
 public class SqlProcedureCall extends SqlIntercode
 {
     private static final String resultName = "@res";

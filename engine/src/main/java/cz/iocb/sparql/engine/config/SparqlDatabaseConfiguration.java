@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.config;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateType;
@@ -109,7 +108,6 @@ public class SparqlDatabaseConfiguration
         addDataType(xsdDayTimeDurationType);
         addDataType(xsdDateType);
         addDataType(xsdDateTimeType);
-        addDataType(rdfLangStringType);
     }
 
 

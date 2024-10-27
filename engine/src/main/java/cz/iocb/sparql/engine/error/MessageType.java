@@ -61,7 +61,15 @@ public enum MessageType
 
     variableUsedBeforeBind(
             ERROR,
-            "Variable '%s' introduced by BIND or GROUP BY clauses cannot be used in any pattern preceding this clause."),
+            "Variable '%s' introduced by BIND clauses cannot be used in any pattern preceding this clause."),
+
+    variableUsedBeforeGroupBy(
+            ERROR,
+            "Variable '%s' introduced by GROUP BY clauses cannot be used in any pattern preceding this clause."),
+
+    variableUsedBeforeProjection(
+            ERROR,
+            "Variable '%s' introduced by projection have to be unused in select clause before."),
 
     noResultParameter(
             ERROR,
@@ -96,8 +104,6 @@ public enum MessageType
     unnecessaryMinus(ERROR, "The MINUS clause has no effect."),
 
     repeatOfValuesVariable(ERROR, "Variable '%s' cannot be used twice in a VALUES clause."),
-
-    nestedAggregateFunction(ERROR, "Aggregate functions cannot be nested."),
 
     serviceContextLimitExceeded(ERROR, "The limit of service calls has been exceeded."),
 

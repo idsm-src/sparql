@@ -24,17 +24,15 @@ import cz.iocb.sparql.engine.mapping.classes.DateTimeConstantZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
+//TODO: add support for casting to user literals
 public class SqlCast extends SqlUnary
 {
-    private static final List<LiteralClass> supportedClasses = List.of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdFloat,
-            xsdDouble, xsdInteger, xsdDecimal, xsdDateTime, xsdDate, xsdDayTimeDuration, xsdString);
-
-
     private final ResourceClass resourceClass;
 
 
@@ -112,6 +110,11 @@ public class SqlCast extends SqlUnary
             else if(operandClass == iri)
             {
                 builder.append(getOperand().translate(request));
+            }
+            else if(operandClass instanceof UserLiteralClass)
+            {
+                builder.append(getOperand().translate(request));
+                builder.append("::varchar");
             }
             else
             {
@@ -270,6 +273,13 @@ public class SqlCast extends SqlUnary
                 builder.append(variable.asResource(request, resClass).get(0));
             }
 
+            /* user datatype casts */
+            else if(resClass instanceof UserLiteralClass)
+            {
+                builder.append(variable.getExpressionValue(resClass));
+                builder.append("::varchar");
+            }
+
             /* standard literal casts */
             else if(resClass instanceof LiteralClass)
             {
@@ -296,15 +306,13 @@ public class SqlCast extends SqlUnary
 
     private static ResourceClass resultCastClass(ResourceClass from, ResourceClass to)
     {
-        assert getSupportedClasses().contains(to);
-
         if(from == rdfLangString || from == unsupportedLiteral)
             return null;
 
         if(isIri(from) && to == xsdString)
             return xsdString;
 
-        if(!getSupportedClasses().contains(from) && !isDateTime(from) && !isDate(from))
+        if(!(from instanceof LiteralClass) && !isDateTime(from) && !isDate(from))
             return null;
 
         if(from == to)
@@ -361,7 +369,7 @@ public class SqlCast extends SqlUnary
         if(from == iri && to == xsdString)
             return false;
 
-        if(!getSupportedClasses().contains(from))
+        if(!(from instanceof LiteralClass))
             return true;
 
         if(from == to)
@@ -395,11 +403,5 @@ public class SqlCast extends SqlUnary
             return false;
 
         return true;
-    }
-
-
-    public static List<LiteralClass> getSupportedClasses()
-    {
-        return supportedClasses;
     }
 }

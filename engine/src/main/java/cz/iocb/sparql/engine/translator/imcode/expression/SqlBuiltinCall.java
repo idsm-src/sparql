@@ -350,7 +350,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 }
                 else
                 {
-                    Set<ResourceClass> resourceClasses = asSet(unsupportedLiteral);
+                    Set<ResourceClass> resourceClasses = asSet(unsupportedLiteral, rdfLangString);
                     request.getConfiguration().getDataTypes()
                             .forEach(d -> resourceClasses.add(d.getGeneralLiteralClass()));
 

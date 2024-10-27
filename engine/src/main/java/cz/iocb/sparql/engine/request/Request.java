@@ -27,9 +27,7 @@ import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.Parser;
@@ -45,6 +43,7 @@ import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.parser.visitor.QueryVisitor;
 import cz.iocb.sparql.engine.request.Result.ResultType;
+import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
 import cz.iocb.sparql.engine.translator.imcode.SqlSelect;
 
@@ -61,6 +60,7 @@ public class Request implements AutoCloseable
         private final ResultType type;
 
         public PreparedQuery(String query, List<DataSet> dataSets, Query syntaxTree, List<TranslateMessage> messages)
+                throws TranslateExceptions
         {
             this.query = query;
             this.dataSets = dataSets;
@@ -126,7 +126,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public List<TranslateMessage> check(String query, List<DataSet> dataSets, long timeout) throws SQLException
+    public List<TranslateMessage> check(String query, List<DataSet> dataSets, long timeout)
     {
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
@@ -149,17 +149,11 @@ public class Request implements AutoCloseable
             if(dataSets != null && !dataSets.isEmpty())
                 syntaxTree.getSelect().setDataSets(dataSets);
 
-            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, false);
-            translateVisitor.translate(syntaxTree, null, null, List.of(), false);
-
             logger.trace("query check");
         }
         catch(Throwable e)
         {
             logger.error("sparql check error: " + e.getMessage(), e);
-
-            if(statement != null)
-                statement.close();
         }
         finally
         {
@@ -170,7 +164,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public List<TranslateMessage> check(String query) throws SQLException
+    public List<TranslateMessage> check(String query)
     {
         return check(query, null, 0);
     }
@@ -218,13 +212,12 @@ public class Request implements AutoCloseable
 
 
     public Result execute(PreparedQuery query, List<String> order, int offset, int limit, int fetchSize, long timeout)
-            throws TranslateExceptions, SQLException
+            throws SQLException, ServiceException
     {
         try
         {
             MDC.put("sparql", query.getQuery());
 
-            List<TranslateMessage> messages = new LinkedList<TranslateMessage>(query.getMessages());
             Query syntaxTree = query.getSyntaxTree();
             ResultType type = query.getResultType();
 
@@ -252,7 +245,7 @@ public class Request implements AutoCloseable
             BigInteger newOffset = syntaxTree instanceof AskQuery || offset <= 0 ? null : BigInteger.valueOf(offset);
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
-            TranslateVisitor translateVisitor = new TranslateVisitor(this, messages, true);
+            TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order, true);
 
             String code = imcode.translate(this);
@@ -261,18 +254,7 @@ public class Request implements AutoCloseable
 
             logger.trace("query evaluation");
 
-            checkForErrors(messages);
-
             return new Result(type, getStatement(fetchSize).executeQuery(code), begin, timeout);
-        }
-        catch(TranslateExceptions e)
-        {
-            logger.info("query translation error: " + e.getMessage());
-
-            if(statement != null)
-                statement.close();
-
-            throw e;
         }
         catch(SQLException e)
         {
@@ -280,6 +262,15 @@ public class Request implements AutoCloseable
                 logger.warn("query timeout: " + e.getMessage());
             else
                 logger.error("query evaluation error: " + e.getMessage());
+
+            if(statement != null)
+                statement.close();
+
+            throw e;
+        }
+        catch(ServiceException e)
+        {
+            logger.error("query evaluation error: " + e.getMessage());
 
             if(statement != null)
                 statement.close();
@@ -304,32 +295,34 @@ public class Request implements AutoCloseable
 
 
     public Result execute(String query, List<DataSet> dataSets, List<String> order, int offset, int limit,
-            int fetchSize, long timeout) throws TranslateExceptions, SQLException
+            int fetchSize, long timeout) throws TranslateExceptions, SQLException, ServiceException
     {
         return execute(prepareQuery(query, dataSets), order, offset, limit, fetchSize, timeout);
     }
 
 
     public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
-            throws TranslateExceptions, SQLException
+            throws TranslateExceptions, SQLException, ServiceException
     {
         return execute(query, dataSets, List.of(), offset, limit, fetchSize, timeout);
     }
 
 
-    public Result execute(String query) throws TranslateExceptions, SQLException
+    public Result execute(String query) throws TranslateExceptions, SQLException, ServiceException
     {
         return execute(query, null, 0, -1, 0, 0);
     }
 
 
-    public Result execute(String query, List<DataSet> dataSets) throws TranslateExceptions, SQLException
+    public Result execute(String query, List<DataSet> dataSets)
+            throws TranslateExceptions, SQLException, ServiceException
     {
         return execute(query, dataSets, 0, -1, 0, 0);
     }
 
 
-    public Result execute(String query, int offset, int limit, long timeout) throws TranslateExceptions, SQLException
+    public Result execute(String query, int offset, int limit, long timeout)
+            throws TranslateExceptions, SQLException, ServiceException
     {
         return execute(query, null, offset, limit, 0, timeout);
     }
@@ -483,26 +476,13 @@ public class Request implements AutoCloseable
 
     public ResourceClass getResourceClass(Node value)
     {
-        if(value instanceof Literal)
+        return switch(value)
         {
-            Literal literal = (Literal) value;
-            DataType datatype = getConfiguration().getDataType(literal.getTypeIri());
-            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
-
-            return resourceClass;
-        }
-        else if(value instanceof IRI iri)
-        {
-            return getIriClass(iri);
-        }
-        else if(value instanceof BlankNodeLiteral)
-        {
-            return ((BlankNodeLiteral) value).getResourceClass();
-        }
-        else
-        {
-            return null;
-        }
+            case Literal lit -> lit.isTypeSupported() ? lit.getDataType().getResourceClass(lit) : unsupportedLiteral;
+            case IRI iri -> getIriClass(iri);
+            case BlankNodeLiteral bn -> bn.getResourceClass();
+            default -> null;
+        };
     }
 
 

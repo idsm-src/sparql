@@ -10,9 +10,7 @@ import java.util.List;
 import java.util.Map;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -32,26 +30,13 @@ public abstract class ResultHandler implements AutoCloseable
 
     protected final ResourceClass getResourceClass(Request request, Node value, String variable)
     {
-        if(value instanceof Literal)
+        return switch(value)
         {
-            Literal literal = (Literal) value;
-            DataType datatype = request.getConfiguration().getDataType(literal.getTypeIri());
-            LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
-
-            return resourceClass;
-        }
-        else if(value instanceof IRI iri)
-        {
-            return getIriClass(request, iri, variable);
-        }
-        else if(value instanceof BlankNodeLiteral)
-        {
-            return ((BlankNodeLiteral) value).getResourceClass();
-        }
-        else
-        {
-            return null;
-        }
+            case Literal lit -> lit.isTypeSupported() ? lit.getDataType().getResourceClass(lit) : unsupportedLiteral;
+            case IRI iri -> getIriClass(request, iri, variable);
+            case BlankNodeLiteral bn -> bn.getResourceClass();
+            default -> null;
+        };
     }
 
 

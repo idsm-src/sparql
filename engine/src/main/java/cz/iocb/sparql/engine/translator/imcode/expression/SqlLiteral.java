@@ -5,7 +5,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
@@ -42,8 +41,8 @@ public class SqlLiteral extends SqlNodeValue
         if(literal.equals(falseLiteral))
             return falseValue;
 
-        DataType datatype = request.getConfiguration().getDataType(literal.getTypeIri());
-        LiteralClass resourceClass = datatype == null ? unsupportedLiteral : datatype.getResourceClass(literal);
+        LiteralClass resourceClass = literal.isTypeSupported() ? literal.getDataType().getResourceClass(literal) :
+                unsupportedLiteral;
 
         return new SqlLiteral(literal, resourceClass);
     }

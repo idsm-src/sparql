@@ -16,12 +16,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -37,7 +35,6 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.error.MessageType;
-import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -65,7 +62,6 @@ import cz.iocb.sparql.engine.parser.model.VarOrIri;
 import cz.iocb.sparql.engine.parser.model.Variable;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.expression.BuiltInCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.ExistsExpression;
 import cz.iocb.sparql.engine.parser.model.expression.Expression;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.parser.model.pattern.Bind;
@@ -84,7 +80,6 @@ import cz.iocb.sparql.engine.parser.model.pattern.Service;
 import cz.iocb.sparql.engine.parser.model.pattern.Union;
 import cz.iocb.sparql.engine.parser.model.pattern.Values;
 import cz.iocb.sparql.engine.parser.model.pattern.Values.ValuesList;
-import cz.iocb.sparql.engine.parser.model.triple.BlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.parser.model.triple.Triple;
 import cz.iocb.sparql.engine.parser.model.triple.Verb;
@@ -139,25 +134,21 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private final Stack<IRI> serviceRestrictions = new Stack<>();
     private final Stack<VarOrIri> graphRestrictions = new Stack<>();
-    private final List<TranslateMessage> messages;
 
     private final SparqlDatabaseConfiguration configuration;
     private final List<UserIriClass> iriClasses;
-    private final boolean evalSeriveces;
 
     private HashMap<String, List<Range>> variableOccurrences;
     private List<DataSet> datasets;
     private Prologue prologue;
 
 
-    public TranslateVisitor(Request request, List<TranslateMessage> messages, boolean evalSeriveces)
+    public TranslateVisitor(Request request)
     {
         this.request = request;
 
         this.configuration = request.getConfiguration();
         this.iriClasses = configuration.getIriClasses();
-        this.messages = messages;
-        this.evalSeriveces = evalSeriveces;
 
         serviceRestrictions.add(configuration.getServiceIri());
         graphRestrictions.add(null);
@@ -269,9 +260,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Select select)
     {
-        checkProjectionVariables(select);
-
-
         // translate the WHERE clause
         GraphPattern pattern = select.getPattern();
 
@@ -355,13 +343,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 groupByVars.add(variable.getSqlName());
 
-                if(select.getPattern().getVariablesInScope().contains(variable))
-                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
-                            groupBy.getVariable().getRange(), variable.getName()));
-
-
-                checkExpressionForUnGroupedSolutions(groupBy.getExpression());
-
                 ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request,
                         translatedWhereClause.getVariables(), this);
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
@@ -413,26 +394,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
 
 
-            for(BuiltInCallExpression expression : rewriter.getAggregations().values())
-            {
-                if(expression.getArguments().size() > 0)
-                {
-                    new ElementVisitor<Void>()
-                    {
-                        @Override
-                        public Void visit(BuiltInCallExpression call)
-                        {
-                            if(call.isAggregateFunction())
-                                messages.add(
-                                        new TranslateMessage(MessageType.nestedAggregateFunction, call.getRange()));
-
-                            return null;
-                        }
-                    }.visitElement(expression.getArguments().get(0));
-                }
-            }
-
-
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request,
                     translatedWhereClause.getVariables(), this);
 
@@ -458,22 +419,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
         // translate projection expressions
-        List<Variable> inScopeVariables = new LinkedList<Variable>(select.getPattern().getVariablesInScope());
-
         for(Projection projection : projections)
         {
             if(projection.getExpression() != null)
             {
                 Bind bind = new Bind(projection.getExpression(), projection.getVariable());
-
-                Variable variable = projection.getVariable();
-
-                if(inScopeVariables.contains(variable))
-                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind, bind.getVariable().getRange(),
-                            variable.getName()));
-
-                inScopeVariables.add(variable);
-
                 translatedWhereClause = translateBind(bind, translatedWhereClause);
             }
         }
@@ -654,19 +604,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Values values)
     {
-        ArrayList<String> variables = new ArrayList<String>();
-
-        for(int i = 0; i < values.getVariables().size(); i++)
-        {
-            Variable variable = values.getVariables().get(i);
-
-            if(variables.contains(variable.getName()))
-                messages.add(new TranslateMessage(MessageType.repeatOfValuesVariable,
-                        values.getVariables().get(i).getRange(), variable.getName()));
-
-            variables.add(variable.getName());
-        }
-
         List<List<Node>> lines = new ArrayList<List<Node>>(values.getValuesLists().size());
 
         for(ValuesList list : values.getValuesLists())
@@ -734,345 +671,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private void checkProjectionVariables(Select select)
-    {
-        HashSet<String> vars = new HashSet<>();
-
-        for(Projection projection : select.getProjections())
-        {
-            if(vars.contains(projection.getVariable().getName()))
-                messages.add(new TranslateMessage(MessageType.repeatOfProjectionVariable,
-                        projection.getVariable().getRange(), projection.getVariable().getName()));
-
-            vars.add(projection.getVariable().getName());
-        }
-
-        if(!select.isInAggregateMode())
-            return;
-
-        HashSet<String> groupVars = new HashSet<>();
-
-        for(GroupCondition groupCondition : select.getGroupByConditions())
-        {
-            if(groupCondition.getVariable() != null)
-                groupVars.add(groupCondition.getVariable().getName());
-            else if(groupCondition.getExpression() instanceof Variable)
-                groupVars.add(((Variable) groupCondition.getExpression()).getName());
-        }
-
-        for(Projection projection : select.getProjections())
-        {
-            if(projection.getExpression() != null)
-                checkExpressionForGroupedSolutions(projection.getExpression(), groupVars);
-            else
-                checkExpressionForGroupedSolutions(projection.getVariable(), groupVars);
-        }
-    }
-
-
-    private void checkExpressionForGroupedSolutions(Expression expresion, HashSet<String> groupByVars)
-    {
-        new ElementVisitor<Void>()
-        {
-            private boolean inAggregateFunction = false;
-
-            @Override
-            public Void visit(BuiltInCallExpression func)
-            {
-                boolean state = inAggregateFunction;
-                inAggregateFunction |= func.isAggregateFunction();
-                super.visit(func);
-                inAggregateFunction = state;
-
-                return null;
-            }
-
-            @Override
-            public Void visit(Variable var)
-            {
-                String name = var.getName();
-
-                if(!inAggregateFunction && !groupByVars.contains(name))
-                    messages.add(
-                            new TranslateMessage(MessageType.invalidVariableOutsideAggregate, var.getRange(), name));
-
-                return null;
-            }
-
-            @Override
-            public Void visit(ExistsExpression expr)
-            {
-                return null;
-            }
-        }.visitElement(expresion);
-    }
-
-
-    private void checkExpressionForUnGroupedSolutions(Expression expresion)
-    {
-        new ElementVisitor<Void>()
-        {
-            @Override
-            public Void visit(BuiltInCallExpression call)
-            {
-                if(call.isAggregateFunction())
-                    messages.add(new TranslateMessage(MessageType.invalidContextOfAggregate, call.getRange()));
-
-                return null;
-            }
-
-            @Override
-            public Void visit(GroupGraph expr)
-            {
-                return null;
-            }
-
-            @Override
-            public Void visit(Select expr)
-            {
-                return null;
-            }
-        }.visitElement(expresion);
-    }
-
-
-    public List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
-    {
-        HashSet<Pattern> callPatterns = new HashSet<Pattern>();
-        HashMap<Node, List<Parameter>> parameterNodeMap = new HashMap<Node, List<Parameter>>();
-        HashMap<Node, List<Parameter>> resultNodeMap = new HashMap<Node, List<Parameter>>();
-
-        HashMap<Node, HashSet<Range>> parameterNodeOccurences = new HashMap<Node, HashSet<Range>>();
-        HashMap<Node, HashSet<Range>> resultNodeOccurences = new HashMap<Node, HashSet<Range>>();
-
-
-        for(Pattern pattern : patterns)
-        {
-            if(!(pattern instanceof Triple))
-                continue;
-
-            Triple triple = (Triple) pattern;
-            Verb predicate = triple.getPredicate();
-
-            if(predicate instanceof IRI)
-            {
-                IRI procedureName = (IRI) predicate;
-                ProcedureDefinition definition = configuration.getProcedures(getService())
-                        .get(procedureName.getValue());
-
-                if(definition != null)
-                {
-                    callPatterns.add(triple);
-
-                    Node parameterNode = triple.getObject();
-
-                    if(parameterNode instanceof VariableOrBlankNode)
-                    {
-                        parameterNodeMap.put(parameterNode, new ArrayList<Parameter>());
-
-                        if(!parameterNodeOccurences.containsKey(parameterNode)
-                                && !resultNodeOccurences.containsKey(parameterNode))
-                            parameterNodeOccurences.put(parameterNode, new LinkedHashSet<Range>());
-                        else
-                            messages.add(new TranslateMessage(MessageType.reuseOfParameterNode,
-                                    parameterNode.getRange(), procedureName.toString(prologue)));
-                    }
-                    else
-                    {
-                        messages.add(new TranslateMessage(MessageType.invalidProcedureCallObject,
-                                parameterNode.getRange(), procedureName.toString(prologue)));
-                    }
-
-
-                    if(!definition.isSimple())
-                    {
-                        Node resultNode = triple.getSubject();
-
-                        if(resultNode instanceof VariableOrBlankNode)
-                        {
-                            resultNodeMap.put(resultNode, new ArrayList<Parameter>());
-
-                            if(!parameterNodeOccurences.containsKey(resultNode)
-                                    && !resultNodeOccurences.containsKey(resultNode))
-                                resultNodeOccurences.put(resultNode, new LinkedHashSet<Range>());
-                            else
-                                messages.add(new TranslateMessage(MessageType.reuseOfResultNode, resultNode.getRange(),
-                                        procedureName.toString(prologue)));
-                        }
-                        else
-                        {
-                            messages.add(new TranslateMessage(MessageType.invalidMultiProcedureCallSubject,
-                                    resultNode.getRange(), procedureName.toString(prologue)));
-                        }
-                    }
-                }
-            }
-            else
-            {
-                new ElementVisitor<Void>()
-                {
-                    @Override
-                    public Void visit(IRI iri)
-                    {
-                        //TODO: could be supported in a future version
-                        if(configuration.getProcedures(getService()).get(iri.getValue()) != null)
-                            messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange()));
-
-                        return null;
-                    }
-                }.visitElement(predicate);
-            }
-        }
-
-
-
-        List<Pattern> resultPatterns = new ArrayList<Pattern>(patterns);
-
-        Iterator<Pattern> iterator = resultPatterns.iterator();
-
-        while(iterator.hasNext())
-        {
-            Pattern pattern = iterator.next();
-
-            if(!(pattern instanceof Triple))
-                continue;
-
-            Triple triple = (Triple) pattern;
-
-            if(callPatterns.contains(triple))
-                continue;
-
-
-            List<Parameter> parameters = parameterNodeMap.get(triple.getSubject());
-
-            if(parameters != null)
-            {
-                iterator.remove();
-                parameterNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
-
-                if(triple.getPredicate() instanceof IRI)
-                    parameters.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
-                else
-                    messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
-                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
-            }
-
-
-            List<Parameter> results = resultNodeMap.get(triple.getSubject());
-
-            if(results != null)
-            {
-                iterator.remove();
-                resultNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
-
-                if(triple.getPredicate() instanceof IRI)
-                    results.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
-                else
-                    messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
-                            triple.getPredicate().getRange())); //TODO: could be supported in a future version
-            }
-        }
-
-
-        for(Pattern pattern : resultPatterns)
-        {
-            if(pattern instanceof Triple && !callPatterns.contains(pattern))
-            {
-                Node object = ((Triple) pattern).getObject();
-
-                if(object instanceof BlankNode)
-                {
-                    if(parameterNodeOccurences.containsKey(object))
-                        messages.add(new TranslateMessage(MessageType.invalidParameterBlankNodeOccurence,
-                                object.getRange(), ((BlankNode) object).getName()));
-
-                    if(resultNodeOccurences.containsKey(object))
-                        messages.add(new TranslateMessage(MessageType.invalidResultBlankNodeOccurence,
-                                object.getRange(), ((BlankNode) object).getName()));
-                }
-            }
-        }
-
-
-        for(Entry<Node, HashSet<Range>> entry : parameterNodeOccurences.entrySet())
-        {
-            if(entry.getKey() instanceof Variable)
-            {
-                String variable = ((Variable) entry.getKey()).getName();
-
-                for(Range occurrence : variableOccurrences.get(variable))
-                    if(occurrence != entry.getKey().getRange() && !entry.getValue().contains(occurrence))
-                        messages.add(new TranslateMessage(MessageType.invalidParameterVariableOccurence, occurrence,
-                                variable));
-            }
-        }
-
-
-        for(Entry<Node, HashSet<Range>> entry : resultNodeOccurences.entrySet())
-        {
-            if(entry.getKey() instanceof Variable)
-            {
-                String variable = ((Variable) entry.getKey()).getName();
-
-                for(Range occurrence : variableOccurrences.get(variable))
-                    if(occurrence != entry.getKey().getRange() && !entry.getValue().contains(occurrence))
-                        messages.add(
-                                new TranslateMessage(MessageType.invalidResultVariableOccurence, occurrence, variable));
-            }
-        }
-
-
-        ListIterator<Pattern> listIterator = resultPatterns.listIterator();
-
-        while(listIterator.hasNext())
-        {
-            Pattern pattern = listIterator.next();
-
-            if(!callPatterns.contains(pattern))
-                continue;
-
-            Triple triple = (Triple) pattern;
-
-            IRI name = (IRI) triple.getPredicate();
-            ProcedureDefinition definition = configuration.getProcedures(getService()).get(name.getValue());
-
-            List<Parameter> parameters = parameterNodeMap.get(triple.getObject());
-
-            if(parameters == null)
-                parameters = new ArrayList<Parameter>();
-
-
-            if(definition.isSimple())
-            {
-                ProcedureCall call = new ProcedureCall(triple.getSubject(), name, parameters);
-                listIterator.set(call);
-            }
-            else
-            {
-                List<Parameter> results = resultNodeMap.get(triple.getSubject());
-
-                if(results == null)
-                    results = new ArrayList<Parameter>();
-
-                MultiProcedureCall call = new MultiProcedureCall(results, name, parameters);
-                listIterator.set(call);
-            }
-        }
-
-
-        return resultPatterns;
-    }
-
-
     private SqlIntercode translatePatternList(List<Pattern> patterns, SqlIntercode base)
     {
         SqlIntercode translatedGroupPattern = base;
 
         LinkedList<Filter> filters = new LinkedList<>();
-        LinkedList<Variable> inScopeVariables = new LinkedList<Variable>();
 
-        for(Pattern pattern : assembleProcedureCalls(patterns))
+        for(Pattern pattern : patterns)
         {
             if(pattern instanceof Optional)
             {
@@ -1102,7 +707,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
 
                 translatedGroupPattern = translateLeftJoin(translatedGroupPattern, translatedPattern, optionalFilters);
-                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else if(pattern instanceof Minus)
             {
@@ -1110,14 +714,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(pattern instanceof Bind)
             {
-                Variable variable = ((Bind) pattern).getVariable();
-
-                if(inScopeVariables.contains(variable))
-                    messages.add(new TranslateMessage(MessageType.variableUsedBeforeBind,
-                            ((Bind) pattern).getVariable().getRange(), variable.getName()));
-
                 translatedGroupPattern = translateBind((Bind) pattern, translatedGroupPattern);
-                inScopeVariables.add(variable);
             }
             else if(pattern instanceof Filter)
             {
@@ -1126,7 +723,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else if(pattern instanceof ProcedureCallBase)
             {
                 translatedGroupPattern = translateProcedureCall((ProcedureCallBase) pattern, translatedGroupPattern);
-                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else if(pattern instanceof Service)
             {
@@ -1134,14 +730,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 filters.clear();
 
                 translatedGroupPattern = translateService((Service) pattern, translatedGroupPattern);
-                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
             else
             {
                 SqlIntercode translatedPattern = visitElement(pattern);
 
                 translatedGroupPattern = SqlJoin.join(translatedGroupPattern, translatedPattern);
-                inScopeVariables.addAll(pattern.getVariablesInScope());
             }
         }
 
@@ -1161,8 +755,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             for(Filter filter : optionalFilters)
             {
-                checkExpressionForUnGroupedSolutions(filter.getConstraint());
-
                 ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request, variables, this);
                 SqlExpressionIntercode expression = SqlEffectiveBooleanValue
                         .create(visitor.visitElement(filter.getConstraint()));
@@ -1188,8 +780,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         String variableName = bind.getVariable().getSqlName();
 
-        checkExpressionForUnGroupedSolutions(bind.getExpression());
-
         ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request,
                 translatedGroupPattern.getVariables(), this);
         SqlExpressionIntercode expression = visitor.visitElement(bind.getExpression());
@@ -1208,8 +798,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         for(Filter filter : filters)
         {
-            checkExpressionForUnGroupedSolutions(filter.getConstraint());
-
             ExpressionTranslateVisitor visitor = new ExpressionTranslateVisitor(request, groupPattern.getVariables(),
                     this);
             SqlExpressionIntercode expression = SqlEffectiveBooleanValue
@@ -1335,16 +923,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         UsedVariables contextVariables = context.getVariables();
 
 
-        /* check graph */
-
-        if(getGraph() != null)
-        {
-            messages.add(new TranslateMessage(MessageType.procedureCallInsideGraph,
-                    procedureCallBase.getProcedure().getRange(), procedureName.toString(prologue)));
-        }
-
-
-        /* check parameters */
+        /* process parameters */
 
         ExpressionTranslateVisitor translator = new ExpressionTranslateVisitor(request, contextVariables, this);
 
@@ -1358,45 +937,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             String parameterName = parameter.getName().getValue();
             ParameterDefinition parameterDefinition = procedureDefinition.getParameter(parameterName);
 
-            if(parameterDefinition == null)
-            {
-                messages.add(new TranslateMessage(MessageType.invalidParameterPredicate, parameter.getName().getRange(),
-                        parameter.getName().toString(prologue), procedureCallBase.getProcedure().toString(prologue)));
-            }
-            else if(parameterNodes.get(parameterDefinition) != null)
-            {
-                messages.add(new TranslateMessage(MessageType.repeatOfParameterPredicate,
-                        parameter.getName().getRange(), parameter.getName().toString(prologue)));
-            }
-            else
-            {
-                SqlExpressionIntercode value = translator.visitElement(parameter.getValue());
+            SqlExpressionIntercode value = translator.visitElement(parameter.getValue());
 
-                if(value == SqlNull.get())
-                    messages.add(new TranslateMessage(MessageType.unboundedParameterValue,
-                            parameter.getValue().getRange(), parameter.getName().toString(prologue)));
+            if(value == SqlNull.get())
+                return SqlNoSolution.get();
 
-                parameterNodes.put(parameterDefinition, (SqlNodeValue) value);
-            }
+            parameterNodes.put(parameterDefinition, (SqlNodeValue) value);
         }
 
 
         for(Entry<ParameterDefinition, SqlNodeValue> entry : parameterNodes.entrySet())
         {
-            SqlNodeValue parameterValue = entry.getValue();
-
-            if(parameterValue == null)
-            {
-                ParameterDefinition parameterDefinition = entry.getKey();
-
-                if(parameterDefinition.getDefaultValue() != null)
-                    entry.setValue((SqlNodeValue) translator.visitElement(parameterDefinition.getDefaultValue()));
-                else
-                    messages.add(new TranslateMessage(MessageType.missingParameterPredicate,
-                            procedureCallBase.getProcedure().getRange(),
-                            new IRI(parameterDefinition.getParamName()).toString(prologue),
-                            procedureCallBase.getProcedure().toString(prologue)));
-            }
+            if(entry.getValue() == null)
+                entry.setValue((SqlNodeValue) translator.visitElement(entry.getKey().getDefaultValue()));
         }
 
 
@@ -1436,34 +989,19 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 String parameterName = resultParameter.getName().getValue();
                 ResultDefinition resultDefinition = procedureDefinition.getResult(parameterName);
 
-                if(resultDefinition == null)
+                Node result = resultParameter.getValue();
+
+                if(!(result instanceof VariableOrBlankNode)
+                        || used.contains(((VariableOrBlankNode) result).getSqlName()))
                 {
-                    messages.add(new TranslateMessage(MessageType.invalidResultPredicate,
-                            resultParameter.getName().getRange(), resultParameter.getName().toString(prologue),
-                            procedureCallBase.getProcedure().toString(prologue)));
-
+                    Variable fakeResult = createVariable(variablePrefix);
+                    conditions.put(fakeResult, result);
+                    result = fakeResult;
                 }
-                else if(resultNodes.get(resultDefinition) != null)
-                {
-                    messages.add(new TranslateMessage(MessageType.repeatOfResultPredicate,
-                            resultParameter.getName().getRange(), resultParameter.getName().toString(prologue)));
-                }
-                else
-                {
-                    Node result = resultParameter.getValue();
 
-                    if(!(result instanceof VariableOrBlankNode)
-                            || used.contains(((VariableOrBlankNode) result).getSqlName()))
-                    {
-                        Variable fakeResult = createVariable(variablePrefix);
-                        conditions.put(fakeResult, result);
-                        result = fakeResult;
-                    }
+                used.add(((VariableOrBlankNode) result).getSqlName());
 
-                    used.add(((VariableOrBlankNode) result).getSqlName());
-
-                    resultNodes.put(resultDefinition, ((VariableOrBlankNode) result).getSqlName());
-                }
+                resultNodes.put(resultDefinition, ((VariableOrBlankNode) result).getSqlName());
             }
         }
 
@@ -1524,9 +1062,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return result;
         }
 
-        if(!evalSeriveces)
-            return context;
-
 
         /* create variable lists */
 
@@ -1573,10 +1108,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                     if(rows.size() > serviceContextLimit)
                     {
-                        messages.add(new TranslateMessage(MessageType.serviceContextLimitExceeded, service.getRange()));
-                        return context;
+                        //TODO: use failback variant
+                        throw new ServiceException(MessageType.serviceContextLimitExceeded.getText());
                     }
                 }
+            }
+            catch(ServiceException e)
+            {
+                throw new ServiceRuntimeException(e);
             }
             catch(SQLException e)
             {
@@ -1703,8 +1242,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     e.printStackTrace();
 
                     if(!service.isSilent())
-                        messages.add(
-                                new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
+                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
 
                     return context;
                 }
@@ -1833,20 +1371,22 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     if(e instanceof SAXException && results.size() >= serviceResultLimit)
                     {
-                        messages.add(new TranslateMessage(MessageType.serviceResultLimitExceeded, service.getRange()));
+                        throw new ServiceException(
+                                String.format(MessageType.serviceResultLimitExceeded.getText(), endpoint));
                     }
                     else
                     {
-                        messages.add(
-                                new TranslateMessage(MessageType.badServiceEndpoint, service.getRange(), endpoint));
                         e.printStackTrace();
+                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
                     }
-
-                    return context;
                 }
             }
 
             return results.get();
+        }
+        catch(ServiceException e)
+        {
+            throw new ServiceRuntimeException(e);
         }
         catch(SQLException e)
         {
@@ -1856,7 +1396,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<String> order,
-            boolean optimize) throws SQLException
+            boolean optimize) throws SQLException, ServiceException
     {
         variableOccurrences = new HashMap<String, List<Range>>();
 
@@ -1898,6 +1438,10 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             return imcode;
         }
+        catch(ServiceRuntimeException e)
+        {
+            throw(ServiceException) e.getCause();
+        }
         catch(SQLRuntimeException e)
         {
             throw(SQLException) e.getCause();
@@ -1932,11 +1476,5 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     public Prologue getPrologue()
     {
         return prologue;
-    }
-
-
-    public List<TranslateMessage> getMessages()
-    {
-        return messages;
     }
 }

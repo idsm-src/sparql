@@ -2,10 +2,8 @@ package cz.iocb.sparql.engine.translator;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
-import cz.iocb.sparql.engine.error.MessageType;
-import cz.iocb.sparql.engine.error.TranslateMessage;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.DataType;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.parser.Element;
 import cz.iocb.sparql.engine.parser.ElementVisitor;
@@ -30,13 +28,11 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlCast;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExists;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionError;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlFunctionCall;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlInExpression;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlUnaryArithmetic;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
@@ -49,7 +45,6 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     private final UsedVariables variables;
     private final TranslateVisitor parent;
     private final Prologue prologue;
-    private final List<TranslateMessage> messages;
 
 
     public ExpressionTranslateVisitor(Request request, UsedVariables variables, TranslateVisitor parent)
@@ -58,16 +53,12 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         this.variables = variables;
         this.parent = parent;
         this.prologue = parent.getPrologue();
-        this.messages = parent.getMessages();
     }
 
 
     @Override
     public SqlExpressionIntercode visitElement(Element element)
     {
-        if(element == null)
-            return SqlExpressionError.create();
-
         return super.visitElement(element);
     }
 
@@ -192,43 +183,14 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         for(Expression expression : functionCallExpression.getArguments())
             arguemnts.add(visitElement(expression));
 
+        DataType datatype = request.getConfiguration().getDataType(iri);
 
-        Optional<LiteralClass> resourceClass = SqlCast.getSupportedClasses().stream()
-                .filter(r -> r.getTypeIri().equals(iri)).findFirst();
-
-        if(resourceClass.isPresent())
-        {
-            if(arguemnts.size() != 1)
-            {
-                messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
-                        iri.toString(prologue), 1));
-
-                return SqlNull.get();
-            }
-
-            return SqlCast.create(resourceClass.get(), arguemnts.get(0));
-        }
-
+        //TODO: add support for casting to user literals
+        if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
+            return SqlCast.create(datatype.getGeneralLiteralClass(), arguemnts.get(0));
 
         FunctionDefinition definition = request.getConfiguration().getFunctions(parent.getService())
                 .get(iri.getValue());
-
-        if(definition == null)
-        {
-            messages.add(
-                    new TranslateMessage(MessageType.unimplementedFunction, iri.getRange(), iri.toString(prologue)));
-
-            return SqlExpressionError.create();
-        }
-
-        if(arguemnts.size() < definition.getRequiredArgumentCount()
-                && arguemnts.size() > definition.getArgumentClasses().size())
-        {
-            messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),
-                    iri.toString(prologue), definition.getArgumentClasses().size()));
-
-            return SqlExpressionError.create();
-        }
 
         return SqlFunctionCall.create(definition, arguemnts);
     }
