@@ -100,6 +100,7 @@ public class EndpointServlet extends HttpServlet
     private SparqlDatabaseConfiguration sparqlConfig;
     private int fetchSize = 1000;
     private long timeout = 1000 * 1000000000l;
+    private long maxTimeout = 6000 * 1000000000l;
 
 
     @Override
@@ -113,16 +114,22 @@ public class EndpointServlet extends HttpServlet
                 throw new IllegalArgumentException("resource name is not set");
 
 
-            String fetchSizeValue = config.getInitParameter("fetch-size");
+            String fetchSizeParameter = config.getInitParameter("fetch-size");
 
-            if(fetchSizeValue != null)
-                fetchSize = Integer.parseInt(fetchSizeValue);
+            if(fetchSizeParameter != null)
+                fetchSize = Integer.parseInt(fetchSizeParameter);
 
 
-            String timeoutValue = config.getInitParameter("timeout");
+            String timeoutParameter = config.getInitParameter("timeout");
 
-            if(timeoutValue != null)
-                timeout = Integer.parseInt(timeoutValue) * 1000000000l;
+            if(timeoutParameter != null)
+                timeout = Integer.parseInt(timeoutParameter) * 1000000000l;
+
+
+            String maxTimeoutParameter = config.getInitParameter("max-timeout");
+
+            if(maxTimeoutParameter != null)
+                maxTimeout = Integer.parseInt(maxTimeoutParameter) * 1000000000l;
 
 
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
@@ -170,7 +177,7 @@ public class EndpointServlet extends HttpServlet
                 namedGraphs = null;
             }
 
-            process(req, res, query, defaultGraphs, namedGraphs);
+            process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req));
         }
     }
 
@@ -193,7 +200,7 @@ public class EndpointServlet extends HttpServlet
             query = new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
 
-        process(req, res, query, defaultGraphs, namedGraphs);
+        process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req));
     }
 
 
@@ -209,6 +216,24 @@ public class EndpointServlet extends HttpServlet
 
         if(filename != null)
             res.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    }
+
+
+    private long getTimeout(HttpServletRequest req)
+    {
+        String timeoutParameter = req.getParameter("timeout");
+
+        if(timeoutParameter == null)
+            return timeout;
+
+        try
+        {
+            return Math.min(maxTimeout, Math.max(1l, Integer.parseInt(timeoutParameter)) * 1000000000l);
+        }
+        catch(NumberFormatException e)
+        {
+            return timeout;
+        }
     }
 
 
@@ -258,7 +283,7 @@ public class EndpointServlet extends HttpServlet
 
 
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
-            String[] namedGraphs) throws IOException
+            String[] namedGraphs, long timeout) throws IOException
     {
         if(query == null)
         {
