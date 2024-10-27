@@ -3,10 +3,12 @@ package cz.iocb.sparql.endpoint;
 import static cz.iocb.sparql.endpoint.EndpointServlet.OutputType.RDF_JSON;
 import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.SUBJECT;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.joining;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -23,6 +25,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
@@ -209,6 +212,51 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    private String getRequestString(HttpServletRequest req)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(req.getRequestURI());
+
+        int hasParam = 0;
+
+
+        String maxrows = req.getParameter("maxrows");
+
+        if(maxrows != null)
+            builder.append((hasParam++ == 0 ? "&" : "?") + "maxrows=" + URLEncoder.encode(maxrows, UTF_8));
+
+
+        String timeout = req.getParameter("timeout");
+
+        if(timeout != null)
+            builder.append((hasParam++ == 0 ? "&" : "?") + "timeout=" + URLEncoder.encode(timeout, UTF_8));
+
+
+        String[] defaultGraphUris = req.getParameterValues("default-graph-uri");
+
+        if(defaultGraphUris != null)
+            for(String v : defaultGraphUris)
+                builder.append((hasParam++ == 0 ? "&" : "?") + "default-graph-uri=" + URLEncoder.encode(v, UTF_8));
+
+
+        String[] namedGraphUris = req.getParameterValues("named-graph-uri");
+
+        if(namedGraphUris != null)
+            for(String v : namedGraphUris)
+                builder.append((hasParam++ == 0 ? "&" : "?") + "named-graph-uri=" + URLEncoder.encode(v, UTF_8));
+
+
+        String query = req.getParameter("query");
+
+        if(query != null)
+            builder.append((hasParam++ == 0 ? "&" : "?") + "query=" + URLEncoder.encode(query, UTF_8));
+
+
+        return builder.toString();
+    }
+
+
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs) throws IOException
     {
@@ -259,6 +307,8 @@ public class EndpointServlet extends HttpServlet
 
         try
         {
+            MDC.put("request", getRequestString(req));
+
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
             try(Request request = engine.getRequest())
@@ -366,7 +416,7 @@ public class EndpointServlet extends HttpServlet
         {
             res.resetBuffer();
 
-            if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
+            if(e.getErrorCode() == 0 && ("57014".equals(e.getSQLState()) || "fetch timeout".equals(e.getMessage())))
             {
                 res.setStatus(HttpServletResponse.SC_REQUEST_TIMEOUT);
                 res.setContentType("text/plain");
@@ -400,6 +450,10 @@ public class EndpointServlet extends HttpServlet
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             res.setContentType("text/plain");
             res.getWriter().println("error: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+        }
+        finally
+        {
+            MDC.remove("request");
         }
     }
 

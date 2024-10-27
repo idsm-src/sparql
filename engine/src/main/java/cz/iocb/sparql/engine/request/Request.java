@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.request;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.sql.Connection;
@@ -127,7 +126,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public List<TranslateMessage> check(String query, List<DataSet> dataSets, int timeout) throws SQLException
+    public List<TranslateMessage> check(String query, List<DataSet> dataSets, long timeout) throws SQLException
     {
         List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
@@ -181,11 +180,7 @@ public class Request implements AutoCloseable
     {
         try
         {
-            String datasets = dataSets == null ? "" : dataSets.stream()
-                    .map(d -> (d.isDefault() ? "FROM " : "FROM NAMED") + d.getSourceSelector()).collect(joining(" "));
-
             MDC.put("sparql", query);
-            MDC.put("datasets", datasets);
 
             List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
 
@@ -217,7 +212,6 @@ public class Request implements AutoCloseable
         finally
         {
             MDC.remove("sparql");
-            MDC.remove("datasets");
         }
     }
 
@@ -228,11 +222,7 @@ public class Request implements AutoCloseable
     {
         try
         {
-            String datasets = query.getDataSets() == null ? "" : query.getDataSets().stream()
-                    .map(d -> (d.isDefault() ? "FROM " : "FROM NAMED") + d.getSourceSelector()).collect(joining(" "));
-
             MDC.put("sparql", query.getQuery());
-            MDC.put("datasets", datasets);
 
             List<TranslateMessage> messages = new LinkedList<TranslateMessage>(query.getMessages());
             Query syntaxTree = query.getSyntaxTree();
@@ -308,7 +298,6 @@ public class Request implements AutoCloseable
         finally
         {
             MDC.remove("sparql");
-            MDC.remove("datasets");
             MDC.remove("sql");
         }
     }
@@ -346,13 +335,13 @@ public class Request implements AutoCloseable
     }
 
 
-    private boolean hasErrors(List<TranslateMessage> messages)
+    private static boolean hasErrors(List<TranslateMessage> messages)
     {
         return messages.stream().anyMatch(m -> m.getCategory() == MessageCategory.ERROR);
     }
 
 
-    private void checkForErrors(List<TranslateMessage> messages) throws TranslateExceptions
+    private static void checkForErrors(List<TranslateMessage> messages) throws TranslateExceptions
     {
         List<TranslateMessage> errors = messages.stream().filter(m -> m.getCategory() == MessageCategory.ERROR)
                 .collect(toList());
