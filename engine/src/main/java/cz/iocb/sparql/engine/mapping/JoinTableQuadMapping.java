@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.mapping;
 import java.util.Collections;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.Table;
 
@@ -104,7 +103,7 @@ public class JoinTableQuadMapping extends QuadMapping
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
-                Collections.nCopies(tables.size(), new Conditions(new Condition())));
+                Collections.nCopies(tables.size(), new Conditions(true)));
     }
 
 

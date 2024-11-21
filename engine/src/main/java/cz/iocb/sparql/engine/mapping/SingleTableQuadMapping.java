@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.mapping;
 
-import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.Table;
 
@@ -15,7 +14,7 @@ public class SingleTableQuadMapping extends QuadMapping
     public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate,
             NodeMapping object)
     {
-        this(table, graph, subject, predicate, object, new Conditions(new Condition()));
+        this(table, graph, subject, predicate, object, new Conditions(true));
     }
 
 

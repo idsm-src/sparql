@@ -13,8 +13,10 @@ public class Conditions
     private Set<Condition> conditions = new HashSet<Condition>();
 
 
-    public Conditions()
+    public Conditions(boolean value)
     {
+        if(value)
+            add(new Condition());
     }
 
 
@@ -44,7 +46,7 @@ public class Conditions
 
     public static Conditions and(Conditions left, Condition right)
     {
-        Conditions result = new Conditions();
+        Conditions result = new Conditions(false);
 
         for(Condition l : left.conditions)
             result.add(Condition.and(l, right));
@@ -55,7 +57,7 @@ public class Conditions
 
     public static Conditions and(Conditions left, Conditions right)
     {
-        Conditions result = new Conditions();
+        Conditions result = new Conditions(false);
 
         for(Condition l : left.conditions)
             for(Condition r : right.conditions)
@@ -68,12 +70,34 @@ public class Conditions
     public static Conditions or(Conditions left, Conditions right)
     {
         if(left.isTrue() || right.isTrue())
-            return new Conditions(new Condition());
+            return new Conditions(true);
 
-        Conditions result = new Conditions();
+        Conditions result = new Conditions(false);
 
         result.add(left);
         result.add(right);
+
+        return result;
+    }
+
+
+    public static Conditions and(Conditions... conditions)
+    {
+        Conditions result = new Conditions(true);
+
+        for(Conditions condition : conditions)
+            result = and(result, condition);
+
+        return result;
+    }
+
+
+    public static Conditions or(Conditions... conditions)
+    {
+        Conditions result = new Conditions(true);
+
+        for(Conditions condition : conditions)
+            result = or(result, condition);
 
         return result;
     }

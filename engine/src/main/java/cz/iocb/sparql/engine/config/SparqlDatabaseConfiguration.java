@@ -355,7 +355,7 @@ public class SparqlDatabaseConfiguration
     public void addQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
             NodeMapping object)
     {
-        addQuadMapping(table, graph, subject, predicate, object, new Conditions(new Condition()));
+        addQuadMapping(table, graph, subject, predicate, object, new Conditions(true));
     }
 
 
@@ -385,7 +385,7 @@ public class SparqlDatabaseConfiguration
             NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object,
-                Collections.nCopies(tables.size(), new Conditions(new Condition())));
+                Collections.nCopies(tables.size(), new Conditions(true)));
     }
 
 
@@ -737,7 +737,7 @@ public class SparqlDatabaseConfiguration
 
     public Conditions createAreEqualCondition(String column, String... values)
     {
-        Conditions result = new Conditions();
+        Conditions result = new Conditions(false);
 
         for(String value : values)
         {

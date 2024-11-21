@@ -504,7 +504,7 @@ public class SqlConstruct extends SqlIntercode
 
     private static Conditions createConditions(DatabaseSchema schema, Table table, UsedVariable var)
     {
-        Conditions conditions = new Conditions();
+        Conditions conditions = new Conditions(false);
 
         for(List<Column> cols : var.getMappings().values())
         {

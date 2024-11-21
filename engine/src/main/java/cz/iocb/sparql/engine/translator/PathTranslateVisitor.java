@@ -392,7 +392,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             if(mapping.match(request, graph, subject, predicate, object))
             {
                 SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object,
-                        new Conditions(new Condition()));
+                        new Conditions(true));
                 unionList.add(translated);
             }
         }
@@ -434,12 +434,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                         continue;
 
                     SqlIntercode translated = translateMapping(mapping, graph, subject, null, object,
-                            new Conditions(new Condition()));
+                            new Conditions(true));
                     unionList.add(translated);
                 }
                 else
                 {
-                    Conditions extraConditions = new Conditions(new Condition());
+                    Conditions extraConditions = new Conditions(true);
 
                     for(IRI node : negatedIriSet)
                     {
@@ -448,7 +448,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                             ParametrisedIriMapping pm = (ParametrisedIriMapping) mapping.getPredicate();
                             List<Column> columns = pm.getColumns(request);
                             List<Column> values = request.getColumns(pm.getResourceClass(request), node);
-                            Conditions conditions = new Conditions();
+                            Conditions conditions = new Conditions(false);
 
                             for(int i = 0; i < columns.size(); i++)
                             {

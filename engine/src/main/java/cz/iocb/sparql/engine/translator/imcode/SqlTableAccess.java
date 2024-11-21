@@ -68,7 +68,7 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode create(Table table, UsedVariables internal)
     {
-        return new SqlTableAccess(table, new Conditions(new Condition()), internal, false);
+        return new SqlTableAccess(table, new Conditions(true), internal, false);
     }
 
 
@@ -425,7 +425,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
         // conditions added by right table
-        Conditions rightConditions = new Conditions();
+        Conditions rightConditions = new Conditions(false);
 
         for(Condition cnd : right.conditions.getConditions())
         {
@@ -787,7 +787,7 @@ public class SqlTableAccess extends SqlIntercode
 
     private static Conditions remap(Map<Column, Column> map, Conditions conditions)
     {
-        Conditions result = new Conditions();
+        Conditions result = new Conditions(false);
 
         for(Condition condition : conditions.getConditions())
             result.add(remap(map, condition));

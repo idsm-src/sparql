@@ -90,7 +90,7 @@ public class SqlValues extends SqlIntercode
 
     public Conditions asConditions(UsedVariables outerVariables)
     {
-        Conditions conditions = new Conditions();
+        Conditions conditions = new Conditions(false);
 
         for(int i = 0; i < size; i++) // iteruji přes jednotlivé řádky ...
         {
