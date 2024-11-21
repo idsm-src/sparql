@@ -78,10 +78,6 @@ public class SqlCast extends SqlUnary
     @Override
     public String translate(Request request)
     {
-        if(getOperand().isBoxed() == false && getOperand().getResourceClasses().stream().allMatch(r -> isIri(r)))
-            return getOperand().translate(request); // iri is already a string
-
-
         if(!(getOperand() instanceof SqlVariable))
         {
             ResourceClass operandClass = getOperand().getExpressionResourceClass();
@@ -107,7 +103,7 @@ public class SqlCast extends SqlUnary
                 builder.append(((DateConstantZoneClass) operandClass).getZone());
                 builder.append("'::int4)");
             }
-            else if(operandClass == iri)
+            else if(operandClass instanceof IriClass)
             {
                 builder.append(getOperand().translate(request));
             }

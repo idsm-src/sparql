@@ -1391,7 +1391,7 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append("(" + operand.translate(request) + ")::varchar");
                     }
-                    else if(operandClass == xsdString || operandClass == iri)
+                    else if(operandClass == xsdString || operandClass instanceof IriClass)
                     {
                         builder.append(operand.translate(request));
                     }
