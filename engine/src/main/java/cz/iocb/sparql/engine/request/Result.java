@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Vector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.mapping.classes.ResultTag;
 
 
@@ -35,6 +37,8 @@ public class Result implements AutoCloseable
         SELECT, ASK, DESCRIBE, CONSTRUCT
     }
 
+
+    private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
     private static final DecimalFormat decimalFormat;
     private static final long USECS_PER_DAY = 86400000000l;
@@ -104,7 +108,10 @@ public class Result implements AutoCloseable
     public boolean next() throws SQLException
     {
         if(count++ % checkSize == 0 && timeout > 0 && timeout < System.nanoTime() - begin)
-            throw new SQLException("fetch timeout");
+        {
+            logger.warn("fetch timeout");
+            throw new SQLException("fetch timeout", "57014", 0);
+        }
 
         if(!rs.next())
             return false;

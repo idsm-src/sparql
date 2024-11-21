@@ -427,7 +427,13 @@ public class EndpointServlet extends HttpServlet
         }
         catch(TranslateExceptions e)
         {
-            res.resetBuffer();
+            try
+            {
+                res.resetBuffer();
+            }
+            catch(Throwable x)
+            {
+            }
 
             res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             res.setContentType("text/plain");
@@ -439,9 +445,15 @@ public class EndpointServlet extends HttpServlet
         }
         catch(SQLException e)
         {
-            res.resetBuffer();
+            try
+            {
+                res.resetBuffer();
+            }
+            catch(Throwable x)
+            {
+            }
 
-            if(e.getErrorCode() == 0 && ("57014".equals(e.getSQLState()) || "fetch timeout".equals(e.getMessage())))
+            if(e.getErrorCode() == 0 && "57014".equals(e.getSQLState()))
             {
                 res.setStatus(HttpServletResponse.SC_REQUEST_TIMEOUT);
                 res.setContentType("text/plain");
@@ -470,7 +482,13 @@ public class EndpointServlet extends HttpServlet
             e.printStackTrace(System.err);
             System.err.println("EndpointServlet: log end");
 
-            res.resetBuffer();
+            try
+            {
+                res.resetBuffer();
+            }
+            catch(Throwable x)
+            {
+            }
 
             res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             res.setContentType("text/plain");

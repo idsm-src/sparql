@@ -229,6 +229,7 @@ public class Request implements AutoCloseable
                 fetchSize = 0;
             else if(syntaxTree instanceof DescribeQuery)
                 fetchSize = 0;
+
             if(limit >= 0 && limit <= fetchSize)
                 fetchSize = 0;
             else if(select.getLimit() != null && select.getLimit().compareTo(BigInteger.valueOf(border)) <= 0)
@@ -431,14 +432,9 @@ public class Request implements AutoCloseable
                 throw new SQLException("query was canceled");
 
             if(statement == null)
-            {
-                Statement statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY,
-                        ResultSet.CONCUR_READ_ONLY);
-                statement.setFetchSize(fetchSize);
+                statement = getConnection().createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
-                this.statement = statement;
-            }
-
+            statement.setFetchSize(fetchSize);
             statement.setQueryTimeout(getStatementTimeout());
 
             return statement;
