@@ -1054,7 +1054,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             serviceRestrictions.add((IRI) name);
             graphRestrictions.add(null);
 
-            SqlIntercode result = translatePatternList(((GroupGraph) service.getPattern()).getPatterns(), context);
+            Pattern pattern = service.getPattern();
+            List<Pattern> patterns = pattern instanceof GroupGraph group ? group.getPatterns() : List.of(pattern);
+
+            //FIXME: passing context in this way may cause conflicts with the standard
+            SqlIntercode result = translatePatternList(patterns, context);
 
             graphRestrictions.pop();
             serviceRestrictions.pop();
