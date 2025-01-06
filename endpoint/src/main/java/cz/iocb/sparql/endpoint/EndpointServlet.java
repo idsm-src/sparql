@@ -25,6 +25,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
@@ -95,6 +97,8 @@ public class EndpointServlet extends HttpServlet
     {
     }
 
+
+    private static final Logger logger = LoggerFactory.getLogger(EndpointServlet.class);
 
     private Engine engine;
     private SparqlDatabaseConfiguration sparqlConfig;
@@ -285,54 +289,54 @@ public class EndpointServlet extends HttpServlet
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs, long timeout) throws IOException
     {
-        if(query == null)
-        {
-            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            return;
-        }
-
-
-        List<DataSet> dataSets = new ArrayList<>();
-
-        try
-        {
-            if(defaultGraphs != null)
-                for(String defaultGraph : defaultGraphs)
-                    dataSets.add(new DataSet(new IRI(defaultGraph), true));
-
-            if(namedGraphs != null)
-                for(String namedGraph : namedGraphs)
-                    dataSets.add(new DataSet(new IRI(namedGraph), false));
-        }
-        catch(IllegalArgumentException e)
-        {
-            res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            return;
-        }
-
-
-        // IOCB SPARQL protocol extension
-        String warnings = req.getParameter("warnings");
-
-
-        int limit = -1;
-
-        // Virtuoso extension
-        try
-        {
-            String value = req.getParameter("maxrows");
-
-            if(value != null)
-                limit = Integer.parseInt(value);
-        }
-        catch(NumberFormatException e)
-        {
-        }
-
-
         try
         {
             MDC.put("request", getRequestString(req));
+
+            if(query == null)
+            {
+                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                return;
+            }
+
+
+            List<DataSet> dataSets = new ArrayList<>();
+
+            try
+            {
+                if(defaultGraphs != null)
+                    for(String defaultGraph : defaultGraphs)
+                        dataSets.add(new DataSet(new IRI(defaultGraph), true));
+
+                if(namedGraphs != null)
+                    for(String namedGraph : namedGraphs)
+                        dataSets.add(new DataSet(new IRI(namedGraph), false));
+            }
+            catch(IllegalArgumentException e)
+            {
+                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                return;
+            }
+
+
+            // IOCB SPARQL protocol extension
+            String warnings = req.getParameter("warnings");
+
+
+            int limit = -1;
+
+            // Virtuoso extension
+            try
+            {
+                String value = req.getParameter("maxrows");
+
+                if(value != null)
+                    limit = Integer.parseInt(value);
+            }
+            catch(NumberFormatException e)
+            {
+            }
+
 
             boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
 
@@ -496,6 +500,15 @@ public class EndpointServlet extends HttpServlet
         }
         finally
         {
+            int status = res.getStatus();
+
+            switch(res.getStatus())
+            {
+                case HttpServletResponse.SC_OK -> logger.info(Integer.toString(status));
+                case HttpServletResponse.SC_INTERNAL_SERVER_ERROR -> logger.error(Integer.toString(status));
+                default -> logger.warn(Integer.toString(status));
+            }
+
             MDC.remove("request");
         }
     }
