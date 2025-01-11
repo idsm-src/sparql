@@ -219,7 +219,11 @@ public class SqlSelect extends SqlIntercode
         if(!isTopLevel())
             throw new UnsupportedOperationException();
 
-        SqlIntercode optimizedChild = child.optimize(request, new HashSet<String>(projections), false);
+        HashSet<String> childRestrictions = new HashSet<String>(projections);
+        childRestrictions.addAll(orderBy.keySet());
+        childRestrictions.addAll(simpleOrderBy);
+
+        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, false);
         return createTopLevel(request, projections, optimizedChild, distinct, orderBy, offset, limit, simpleOrderBy);
     }
 
@@ -235,6 +239,7 @@ public class SqlSelect extends SqlIntercode
 
         HashSet<String> childRestrictions = new HashSet<String>(restrictions);
         childRestrictions.addAll(orderBy.keySet());
+        childRestrictions.addAll(simpleOrderBy);
 
         SqlIntercode optimizedChild = child.optimize(request, childRestrictions, reduced);
 
