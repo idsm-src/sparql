@@ -1227,7 +1227,7 @@ public class EndpointServlet extends HttpServlet
             if(!result.get(0).equals(subject))
             {
                 if(subject != null)
-                    out.println(" .\n");
+                    out.print(" .\n");
 
                 subject = result.get(0);
                 predicate = null;
@@ -1255,7 +1255,7 @@ public class EndpointServlet extends HttpServlet
         }
 
         if(subject != null)
-            out.println(" .\n");
+            out.print(" .\n");
     }
 
 
