@@ -176,7 +176,7 @@ public class EndpointServlet extends HttpServlet
 
             if(query == null)
             {
-                query = "construct {?s ?p ?o} where { graph " + sparqlConfig.getDescriptionGraphIri() + " {?s ?p ?o}}";
+                query = sparqlConfig.getServiceDescriptionQuery();
                 defaultGraphs = null;
                 namedGraphs = null;
             }

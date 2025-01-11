@@ -60,8 +60,8 @@ import cz.iocb.sparql.engine.request.IriCache;
 
 public class SparqlDatabaseConfiguration
 {
-    private final IRI serviceIri;
-    private final IRI descriptionGraphIri;
+    protected final IRI serviceIri;
+    protected final IRI descriptionGraphIri;
 
     protected DatabaseSchema databaseSchema;
     protected DataSource connectionPool;
@@ -606,9 +606,9 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    public IRI getDescriptionGraphIri()
+    public String getServiceDescriptionQuery()
     {
-        return descriptionGraphIri;
+        return "construct {?s ?p ?o} where { graph " + descriptionGraphIri + " {?s ?p ?o}}";
     }
 
 
