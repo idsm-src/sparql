@@ -254,7 +254,7 @@ public class SqlJoin extends SqlIntercode
         {
             for(UsedVariable v : child.getVariables().getValues())
             {
-                if(child.hasConstantVariable(v.getName()))
+                if(v.isConstant())
                 {
                     UsedVariable old = constants.put(v.getName(), v);
 
@@ -279,7 +279,7 @@ public class SqlJoin extends SqlIntercode
                     {
                         UsedVariable v = access.getInternalVariable(e.getKey());
 
-                        if(v != null && !child.hasConstantVariable(e.getKey()))
+                        if(v != null && !v.isConstant() && v.getMapping(e.getValue().getResourceClass()) != null)
                         {
                             cnd.addAreEqual(e.getValue().getMapping(), v.getMapping(e.getValue().getResourceClass()));
                             skip.put(e.getKey(), e.getValue());
