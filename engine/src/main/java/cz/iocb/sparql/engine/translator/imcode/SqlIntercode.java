@@ -2,17 +2,19 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Table;
-import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
@@ -94,242 +96,191 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    protected static UsedVariables getJoinUsedVariables(UsedVariables left, UsedVariables right, Table leftTable,
-            Table rightTable, Set<String> restrictions, Map<Column, Column> map)
+    protected static UsedVariables getJoinUsedVariables(List<UsedVariables> allVars, List<Table> tables,
+            Set<String> restrictions, Map<Column, Column> map)
     {
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
 
         UsedVariables variables = new UsedVariables();
 
-        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left, right))
+        for(String name : allVars.stream().flatMap(v -> v.getNames().stream()).collect(toSet()))
         {
-            UsedVariable leftVar = pair.getLeftVariable();
-            UsedVariable rightVar = pair.getRightVariable();
+            List<UsedVariable> vars = allVars.stream().map(v -> v.get(name)).toList();
+            List<UsedVariable> defs = vars.stream().filter(v -> v != null).toList();
 
-            boolean leftCanBeNull = leftVar == null ? true : leftVar.canBeNull();
-            boolean rightCanBeNull = rightVar == null ? true : rightVar.canBeNull();
-
-            UsedVariable variable = new UsedVariable(pair.getName(), leftCanBeNull && rightCanBeNull);
-
-            for(PairedClass pairedClass : pair.getClasses())
+            if(defs.stream().anyMatch(v -> !v.canBeNull()))
             {
-                ResourceClass leftClass = pairedClass.getLeftClass();
-                ResourceClass rightClass = pairedClass.getRightClass();
+                defs = defs.stream().filter(v -> !v.canBeNull()).toList();
+                Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(defs)), defs);
 
-                if(leftClass == null)
-                {
-                    if(leftCanBeNull)
-                        addMapping(variable, rightClass, rightTable, rightVar.getMapping(rightClass), columnMap);
-                }
-                else if(rightClass == null)
-                {
-                    if(rightCanBeNull)
-                        addMapping(variable, leftClass, leftTable, leftVar.getMapping(leftClass), columnMap);
-                }
-                else if(leftClass == rightClass)
-                {
-                    List<Column> leftMapping = leftVar.getMapping(leftClass);
-                    List<Column> rightMapping = rightVar.getMapping(rightClass);
+                if(resClasses.isEmpty())
+                    return null;
 
-                    if(leftCanBeNull && rightCanBeNull)
-                        addMapping(variable, leftClass, leftTable, rightTable, leftMapping, rightMapping, columnMap);
-                    else if(rightCanBeNull)
-                        addMapping(variable, leftClass, leftTable, leftMapping, columnMap);
-                    else if(leftCanBeNull)
-                        addMapping(variable, rightClass, rightTable, rightMapping, columnMap);
-                    else if(!addMapping(variable, leftClass, leftTable, leftMapping, rightMapping, columnMap))
-                        return null;
-                }
-                else if(leftClass.getGeneralClass() == rightClass)
-                {
-                    List<Column> leftMapping = leftVar.getMapping(leftClass);
-                    List<Column> rightMapping = rightVar.getMapping(rightClass);
+                UsedVariable var = createUsedVariable(name, resClasses, vars, tables, columnMap, false);
 
-                    if(!leftCanBeNull)
-                        addMapping(variable, leftClass, leftTable, leftMapping, columnMap);
-                    else if(!rightCanBeNull)
-                        addMapping(variable, rightClass, rightTable, rightMapping, columnMap);
-                    else if(variable.getMapping(rightClass) == null) // if už tam není ...
-                        addMapping(variable, rightClass, rightTable, leftTable, rightMapping, leftVar, columnMap);
-                }
-                else if(leftClass == rightClass.getGeneralClass())
-                {
-                    List<Column> leftMapping = leftVar.getMapping(leftClass);
-                    List<Column> rightMapping = rightVar.getMapping(rightClass);
+                if(var == null)
+                    return null;
 
-                    if(!rightCanBeNull)
-                        addMapping(variable, rightClass, rightTable, rightMapping, columnMap);
-                    else if(!leftCanBeNull)
-                        addMapping(variable, leftClass, leftTable, leftMapping, columnMap);
-                    else if(variable.getMapping(leftClass) == null)//???
-                        addMapping(variable, leftClass, leftTable, rightTable, leftMapping, rightVar, columnMap);
-                }
-                else
-                {
-                    assert false;
-                }
+                variables.add(var);
             }
+            else
+            {
+                Set<ResourceClass> resClasses = cleanSpecificClasses(collectClasses(defs));
+                UsedVariable var = createUsedVariable(name, resClasses, vars, tables, columnMap, true);
 
-            if(variable.getClasses().isEmpty())
-                return null;
-
-            if(restrictions == null || restrictions.contains(pair.getName()))
-                variables.add(variable);
+                variables.add(var);
+            }
         }
 
         columnMap.entrySet().forEach(e -> map.put(e.getValue(), e.getKey()));
 
-        return variables;
+        return variables.restrict(restrictions);
     }
 
 
-    private static boolean addMapping(UsedVariable variable, ResourceClass resClass, Table leftTable,
-            List<Column> leftMapping, List<Column> rightMapping, Map<Column, Column> columnMap)
+    private static UsedVariable createUsedVariable(String name, Set<ResourceClass> resClasses, List<UsedVariable> vars,
+            List<Table> tables, Map<Column, Column> columnMap, boolean canBeNull)
     {
-        List<Column> columns = resClass.createColumns(variable.getName());
-        List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
+        UsedVariable variable = new UsedVariable(name, canBeNull);
 
-        for(int i = 0; i < resClass.getColumnCount(); i++)
+        if(!canBeNull)
         {
-            Column left = leftMapping.get(i);
-            Column right = rightMapping.get(i);
-
-            if(left instanceof ConstantColumn && right instanceof ConstantColumn && !left.equals(right))
-                return false;
-
-            if(left instanceof ConstantColumn)
+            for(ResourceClass resClass : resClasses)
             {
-                mapping.add(left);
-            }
-            else if(right instanceof ConstantColumn)
-            {
-                mapping.add(right);
-            }
-            else
-            {
-                Column access = left.fromTable(leftTable);
-                Column column = columnMap.get(access);
+                List<List<Column>> mappings = new ArrayList<>();
 
-                if(column == null)
+                for(int i = 0; i < vars.size(); i++)
                 {
-                    column = columns.get(i);
-                    columnMap.put(access, column);
+                    UsedVariable var = vars.get(i);
+
+                    if(var == null || var.canBeNull() || !var.containsClass(resClass))
+                        continue;
+
+                    mappings.add(toTableColumns(tables.get(i), var.getMapping(resClass)));
                 }
 
-                mapping.add(column);
+                if(IntStream.range(0, resClass.getColumnCount()).anyMatch(i -> mappings.stream().map(m -> m.get(i))
+                        .filter(c -> c instanceof ConstantColumn).distinct().count() > 1))
+                    return null;
+
+                List<Column> columns = selectColumns(resClass, mappings);
+
+                variable.addMapping(resClass, getMappedColuns(resClass.createColumns(name), columns, columnMap));
+            }
+        }
+        else
+        {
+            for(ResourceClass resClass : resClasses)
+            {
+                List<List<Column>> variants = new ArrayList<>();
+
+                for(int i = 0; i < vars.size(); i++)
+                {
+                    UsedVariable var = vars.get(i);
+                    Table table = tables.get(i);
+
+                    if(var == null)
+                        continue;
+
+                    for(ResourceClass specClass : var.getCompatibleClasses(resClass))
+                    {
+                        List<Column> columns = toTableColumns(table, var.getMapping(specClass));
+                        variants.add(resClass == specClass ? columns : specClass.toGeneralClass(columns, true));
+                    }
+                }
+
+                List<Column> columns = coalesceVariants(resClass.getColumnCount(), variants);
+
+                variable.addMapping(resClass, getMappedColuns(resClass.createColumns(name), columns, columnMap));
             }
         }
 
-        variable.addMapping(resClass, mapping);
-        return true;
+        return variable;
     }
 
 
-    private static void addMapping(UsedVariable variable, ResourceClass resClass, Table table, List<Column> originals,
-            Map<Column, Column> columnMap)
+    private static List<Column> selectColumns(ResourceClass resClass, List<List<Column>> mappings)
     {
-        List<Column> columns = resClass.createColumns(variable.getName());
-        List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
-
-        for(int i = 0; i < resClass.getColumnCount(); i++)
-        {
-            Column original = originals.get(i);
-
-            if(original instanceof ConstantColumn)
-            {
-                mapping.add(original);
-            }
-            else if(original instanceof TableColumn && table == null)
-            {
-                mapping.add(original);
-            }
-            else
-            {
-                Column access = original.fromTable(table);
-                Column column = columnMap.get(access);
-
-                if(column == null)
-                {
-                    column = columns.get(i);
-                    columnMap.put(access, column);
-                }
-
-                mapping.add(column);
-            }
-        }
-
-        variable.addMapping(resClass, mapping);
+        return IntStream
+                .range(0, resClass.getColumnCount()).mapToObj(i -> mappings.stream().map(m -> m.get(i))
+                        .filter(c -> c instanceof ConstantColumn).findFirst().orElse(mappings.getFirst().get(i)))
+                .toList();
     }
 
 
-    private static void addMapping(UsedVariable variable, ResourceClass resClass, Table leftTable, Table rightTable,
-            List<Column> leftMapping, List<Column> rightMapping, Map<Column, Column> columnMap)
+    private static List<Column> getMappedColuns(List<Column> output, List<Column> input, Map<Column, Column> map)
     {
-        List<Column> columns = resClass.createColumns(variable.getName());
-        List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
+        List<Column> mapping = new ArrayList<>();
 
-        for(int i = 0; i < resClass.getColumnCount(); i++)
+        for(int i = 0; i < output.size(); i++)
         {
-            Column left = leftMapping.get(i).fromTable(leftTable);
-            Column right = rightMapping.get(i).fromTable(rightTable);
-
-            ExpressionColumn access = new ExpressionColumn("coalesce(" + left + ", " + right + ")");
-            Column column = columnMap.get(access);
+            Column access = input.get(i);
+            Column column = map.get(access);
 
             if(column == null)
             {
-                column = columns.get(i);
-                columnMap.put(access, column);
+                column = output.get(i);
+                map.put(access, column);
             }
 
             mapping.add(column);
         }
 
-        variable.addMapping(resClass, mapping);
+        return mapping;
     }
 
 
-    private static void addMapping(UsedVariable variable, ResourceClass resClass, Table genTable, Table specTable,
-            List<Column> genMapping, UsedVariable specVariable, Map<Column, Column> columnMap)
+    private static List<Column> coalesceVariants(int cols, List<List<Column>> variants)
     {
-        Set<ResourceClass> compatible = specVariable.getCompatibleClasses(resClass);
+        if(variants.size() == 1)
+            return variants.getFirst();
 
-        List<Column> columns = resClass.createColumns(variable.getName());
-        List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
+        return IntStream
+                .range(0, cols).mapToObj(i -> (Column) new ExpressionColumn(variants.stream()
+                        .map(l -> l.get(i).toString()).distinct().sorted().collect(joining(", ", "coalesce(", ")"))))
+                .toList();
+    }
 
-        for(int i = 0; i < resClass.getColumnCount(); i++)
-        {
-            StringBuilder builder = new StringBuilder();
 
-            builder.append("coalesce(");
+    private static Set<ResourceClass> selectSharedClasses(Set<ResourceClass> classes, List<UsedVariable> variables)
+    {
+        return classes.stream().filter(
+                c -> variables.stream().allMatch(v -> v.containsClass(c) || v.containsClass(c.getGeneralClass())))
+                .collect(toSet());
+    }
 
-            builder.append(genMapping.get(i).fromTable(genTable));
 
-            for(ResourceClass specClass : compatible)
-            {
-                List<Column> tableColumns = variable.getMapping(specClass).stream().map(c -> c.fromTable(specTable))
-                        .collect(toList());
+    private static Set<ResourceClass> cleanSpecificClasses(Set<ResourceClass> classes)
+    {
+        return classes.stream().filter(r -> r == r.getGeneralClass() || !classes.contains(r.getGeneralClass()))
+                .collect(toSet());
+    }
 
-                builder.append(", ");
-                builder.append(specClass.toGeneralClass(tableColumns, true).get(i));
-            }
 
-            builder.append(")");
+    static Set<ResourceClass> cleanGeneralClasses(Set<ResourceClass> classes)
+    {
+        return classes.stream().filter(r -> classes.stream().noneMatch(x -> x != r && x.getGeneralClass() == r))
+                .collect(toSet());
+    }
 
-            ExpressionColumn access = new ExpressionColumn(builder.toString());
 
-            Column column = columnMap.get(access);
+    private static Set<ResourceClass> collectClasses(List<UsedVariable> variables)
+    {
+        return variables.stream().flatMap(v -> v.getClasses().stream()).collect(toSet());
+    }
 
-            if(column == null)
-            {
-                column = columns.get(i);
-                columnMap.put(access, column);
-            }
 
-            mapping.add(column);
-        }
+    static List<Column> toTableColumns(Table table, List<Column> columns)
+    {
+        return columns.stream().map(c -> c.fromTable(table)).toList();
+    }
 
-        variable.addMapping(resClass, mapping);
+
+    protected static UsedVariables getJoinUsedVariables(UsedVariables left, UsedVariables right, Table leftTable,
+            Table rightTable, Set<String> restrictions, Map<Column, Column> map)
+    {
+        return getJoinUsedVariables(Arrays.asList(left, right), Arrays.asList(leftTable, rightTable), restrictions,
+                map);
     }
 
 
@@ -371,6 +322,22 @@ public abstract class SqlIntercode extends SqlBaseClass
         }
 
         return true;
+    }
+
+
+    public static String generateJoinCondition(List<UsedVariables> vars, List<Table> tables)
+    {
+        int size = vars.size();
+
+        List<String> conditions = IntStream.range(0, size)
+                .mapToObj(i -> IntStream.range(i + 1, size)
+                        .mapToObj(j -> generateJoinCondition(vars.get(i), vars.get(j), tables.get(i), tables.get(j))))
+                .flatMap(c -> c).filter(c -> c != null).toList();
+
+        if(conditions.isEmpty())
+            return null;
+
+        return conditions.stream().collect(joining(" AND ", "(", ")"));
     }
 
 

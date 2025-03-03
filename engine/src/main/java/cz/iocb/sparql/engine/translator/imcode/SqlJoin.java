@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -23,21 +24,19 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 public class SqlJoin extends SqlIntercode
 {
-    private static final Table leftTable = new Table("tab0");
-    private static final Table rightTable = new Table("tab1");
-
+    private final List<Table> tables;
     private final List<SqlIntercode> childs;
-    private final List<UsedVariables> variables;
-    private final List<Map<Column, Column>> columnMaps;
+    private final Map<Column, Column> columnMap;
 
 
-    protected SqlJoin(List<SqlIntercode> childs, List<UsedVariables> variables, List<Map<Column, Column>> columnMaps)
+    protected SqlJoin(List<SqlIntercode> childs, List<Table> tables, UsedVariables variables,
+            Map<Column, Column> columnMap)
     {
-        super(variables.get(variables.size() - 1), childs.stream().allMatch(c -> c.isDeterministic()));
+        super(variables, childs.stream().allMatch(c -> c.isDeterministic()));
 
         this.childs = childs;
-        this.variables = variables;
-        this.columnMaps = columnMaps;
+        this.columnMap = columnMap;
+        this.tables = tables;
     }
 
 
@@ -72,47 +71,39 @@ public class SqlJoin extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        String translate = childs.get(0).translate(request);
-        UsedVariables leftVariables = childs.get(0).getVariables();
+        Set<Column> columns = variables.getNonConstantColumns();
 
-        for(int i = 1; i < childs.size(); i++)
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("SELECT ");
+
+        if(!columns.isEmpty())
+            builder.append(columns.stream().map(c -> columnMap.get(c) + " AS " + c).collect(joining(", ")));
+        else
+            builder.append("1");
+
+        builder.append(" FROM ");
+
+        for(int i = 0; i < childs.size(); i++)
         {
-            Set<Column> columns = variables.get(i - 1).getNonConstantColumns();
-            Map<Column, Column> map = columnMaps.get(i - 1);
+            if(i > 0)
+                builder.append(", ");
 
-            StringBuilder builder = new StringBuilder();
-
-            builder.append("SELECT ");
-
-            if(!columns.isEmpty())
-                builder.append(columns.stream().map(c -> map.get(c) + " AS " + c).collect(joining(", ")));
-            else
-                builder.append("1");
-
-            builder.append(" FROM (");
-            builder.append(translate);
-            builder.append(" ) AS ");
-            builder.append(leftTable);
-
-            builder.append(", (");
+            builder.append("(");
             builder.append(childs.get(i).translate(request));
-            builder.append(" ) AS ");
-            builder.append(rightTable);
-
-            String condition = generateJoinCondition(leftVariables, childs.get(i).getVariables(), leftTable,
-                    rightTable);
-
-            if(condition != null)
-            {
-                builder.append(" WHERE ");
-                builder.append(condition);
-            }
-
-            leftVariables = variables.get(i - 1);
-            translate = builder.toString();
+            builder.append(") AS ");
+            builder.append(tables.get(i));
         }
 
-        return translate;
+        String condition = generateJoinCondition(childs.stream().map(c -> c.getVariables()).collect(toList()), tables);
+
+        if(condition != null)
+        {
+            builder.append(" WHERE ");
+            builder.append(condition);
+        }
+
+        return builder.toString();
     }
 
 
@@ -379,26 +370,17 @@ public class SqlJoin extends SqlIntercode
         if(childs.size() == 1)
             return childs.get(0);
 
-        UsedVariables variables = childs.get(0).getVariables();
-        List<UsedVariables> variablesChain = new ArrayList<UsedVariables>(childs.size() - 1);
-        List<Map<Column, Column>> columnMaps = new ArrayList<Map<Column, Column>>(childs.size() - 1);
 
-        for(int i = 1; i < childs.size(); i++)
-        {
-            Map<Column, Column> map = new HashMap<Column, Column>();
-            variables = getJoinUsedVariables(variables, childs.get(i).getVariables(), leftTable, rightTable, null, map);
+        List<Table> tables = IntStream.range(0, childs.size()).mapToObj(i -> new Table("tab" + i)).collect(toList());
 
-            if(variables == null)
-                return SqlNoSolution.get();
+        Map<Column, Column> columnMap = new HashMap<Column, Column>();
+        List<UsedVariables> allVars = childs.stream().map(c -> c.getVariables()).toList();
+        UsedVariables variables = getJoinUsedVariables(allVars, tables, restrictions, columnMap);
 
-            if(i == childs.size() - 1)
-                variables = variables.restrict(restrictions);
+        if(variables == null)
+            return SqlNoSolution.get();
 
-            variablesChain.add(variables);
-            columnMaps.add(map);
-        }
-
-        return new SqlJoin(childs, variablesChain, columnMaps);
+        return new SqlJoin(childs, tables, variables, columnMap);
     }
 
 
