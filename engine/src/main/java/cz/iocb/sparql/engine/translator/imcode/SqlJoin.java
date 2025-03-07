@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.translator.imcode.SqlTableAccess.remap;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 import java.util.stream.IntStream;
@@ -15,8 +17,10 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -40,9 +44,9 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    public static SqlIntercode join(SqlIntercode left, SqlIntercode right)
+    public static SqlIntercode join(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return convertToIntercode(expand(List.of(left, right)), null);
+        return convertToIntercode(request, expand(List.of(left, right)), null);
     }
 
 
@@ -58,13 +62,158 @@ public class SqlJoin extends SqlIntercode
         unionList = reoptimizeUnion(request, unionList, restrictions, reduced);
         unionList = reduceUnion(request, unionList, restrictions);
 
-        return convertToIntercode(unionList, restrictions);
+        return convertToIntercode(request, unionList, restrictions);
     }
 
 
-    private static SqlIntercode convertToIntercode(List<List<SqlIntercode>> unionList, Set<String> restrictions)
+    private static SqlIntercode convertToIntercode(Request request, List<List<SqlIntercode>> unionList,
+            Set<String> restrictions)
     {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+        // just to be sure
+        unionList = unionList.stream().map(innerList -> innerList.stream().collect(toList())).collect(toList());
+
+        for(List<SqlIntercode> newChilds : unionList)
+        {
+            for(SqlRecursive recursive : newChilds.stream().filter(c -> c instanceof SqlRecursive)
+                    .map(c -> (SqlRecursive) c).toList())
+            {
+                List<SqlIntercode> accesses = newChilds.stream().filter(c -> c instanceof SqlTableAccess).toList();
+
+                List<SqlIntercode> newInitChilds = new ArrayList<SqlIntercode>(accesses);
+                newInitChilds.add(recursive.init);
+
+                SqlIntercode newRecursive = SqlRecursive
+                        .create(request, SqlJoin.join(newInitChilds, restrictions), recursive.next, recursive.beginName,
+                                recursive.joinName, recursive.endVar.getName(), recursive.graphName, restrictions)
+                        .optimize(request, restrictions, false);
+
+                newChilds.remove(recursive);
+                newChilds.removeAll(accesses);
+                newChilds.add(newRecursive);
+
+                break; //TODO: process others
+            }
+
+            for(SqlIntercode recursive : newChilds.stream()
+                    .filter(c -> c instanceof SqlDistinct d && d.getChild() instanceof SqlUnion).toList())
+            {
+                SqlDistinct distinct = (SqlDistinct) recursive;
+                SqlUnion union = (SqlUnion) distinct.getChild();
+
+
+                List<SqlTableAccess> candidates = newChilds.stream().filter(c -> c instanceof SqlTableAccess)
+                        .map(c -> (SqlTableAccess) c).toList();
+
+                List<SqlTableAccess> distinctParts = union.getChilds().stream().filter(c -> c instanceof SqlTableAccess)
+                        .map(c -> (SqlTableAccess) c).toList();
+
+
+                for(SqlTableAccess candidate : candidates)
+                {
+                    HashSet<String> shared = new HashSet<String>(candidate.getVariables().getNames());
+                    shared.retainAll(distinct.getVariables().getNames());
+
+                    for(SqlTableAccess distinctPart : distinctParts)
+                    {
+                        SqlIntercode intercode = tryReduceJoin(schema, candidate, distinctPart, shared);
+
+                        if(intercode != null)
+                        {
+                            newChilds.remove(distinct);
+                            newChilds.remove(candidate);
+                            newChilds.add(intercode);
+                        }
+                    }
+                }
+            }
+        }
+
         return SqlUnion.union(unionList.stream().map(l -> join(l, restrictions)).collect(toList()));
+    }
+
+
+    private static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess candidate, SqlTableAccess distinct,
+            HashSet<String> shared)
+    {
+        if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
+                .equals(distinct.getVariables().getNonConstantColumns()))
+            return null;
+
+        for(String s : shared)
+        {
+            UsedVariable v1 = candidate.getInternalVariable(s);
+            UsedVariable v2 = distinct.getInternalVariable(s);
+
+            if(v1 == null || v2 == null || v1.canBeNull() || v2.canBeNull() || v1.getMappings().size() != 1
+                    || v2.getMappings().size() != 1 || !v1.getResourceClass().equals(v2.getResourceClass())
+                    || !new UsedPairedVariable(v1, v2).isJoinable())
+                return null;
+        }
+
+        if(Objects.equals(distinct.getTable(), candidate.getTable()))
+        {
+            if(!Conditions.and(candidate.getConditions(), distinct.getConditions()).equals(candidate.getConditions()))
+                return null;
+
+            for(String s : shared)
+            {
+                List<Column> cols1 = candidate.getInternalVariable(s).getMapping();
+                List<Column> cols2 = distinct.getInternalVariable(s).getMapping();
+
+                for(int i = 0; i < cols1.size(); i++)
+                    if(!candidate.getConditions().getEqualColumns(cols1.get(i)).contains(cols2.get(i)))
+                        return null;
+            }
+
+            if(!distinct.getInternalVariables().restrict(shared).getNonConstantColumns()
+                    .equals(distinct.getVariables().getNonConstantColumns()))
+                return null;
+
+
+            UsedVariables internal = new UsedVariables(candidate.getInternalVariables());
+
+            for(UsedVariable v : distinct.getVariables().getValues())
+                if(!shared.contains(v.getName()))
+                    internal.add(new UsedVariable(v));
+
+            return SqlTableAccess.create(candidate.getTable(), candidate.getConditions(), internal,
+                    candidate.getReduced());
+        }
+        else
+        {
+            List<List<ColumnPair>> keys = schema.getForeignKeys(distinct.getTable(), candidate.getTable());
+
+            if(keys == null)
+                return null;
+
+            for(List<ColumnPair> key : keys)
+            {
+                Map<Column, Column> map = new HashMap<Column, Column>();
+
+                for(ColumnPair pair : key)
+                    for(Column c : distinct.getConditions().getEqualColumns(pair.getLeft()))
+                        map.put(c, pair.getRight());
+
+                if(!map.keySet().containsAll(distinct.getVariables().getNonConstantColumns()))
+                    continue;
+
+                if(!map.keySet().containsAll(distinct.getConditions().getNonConstantColumns()))
+                    continue;
+
+                SqlTableAccess remapped = (SqlTableAccess) SqlTableAccess.create(candidate.getTable(),
+                        remap(map, distinct.getConditions()), remap(map, distinct.getInternalVariables()),
+                        distinct.getReduced());
+
+                SqlIntercode intercode = tryReduceJoin(schema, candidate, remapped, shared);
+
+                if(intercode != null)
+                    return intercode;
+            }
+        }
+
+        return null;
     }
 
 

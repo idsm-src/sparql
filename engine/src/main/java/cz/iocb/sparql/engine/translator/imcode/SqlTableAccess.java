@@ -156,6 +156,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
+    @Override
     public boolean isDistinct(Request request, Collection<String> selected)
     {
         if(table == null)
@@ -728,7 +729,18 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static UsedVariable remap(Map<Column, Column> map, UsedVariable var)
+    protected static UsedVariables remap(Map<Column, Column> map, UsedVariables vars)
+    {
+        UsedVariables result = new UsedVariables();
+
+        for(UsedVariable var : vars.getValues())
+            result.add(remap(map, var));
+
+        return result;
+    }
+
+
+    protected static UsedVariable remap(Map<Column, Column> map, UsedVariable var)
     {
         UsedVariable result = new UsedVariable(var.getName(), var.canBeNull());
 
@@ -739,7 +751,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static List<Column> remap(Map<Column, Column> map, List<Column> columns)
+    protected static List<Column> remap(Map<Column, Column> map, List<Column> columns)
     {
         List<Column> result = new ArrayList<Column>();
 
@@ -750,7 +762,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static Column remap(Map<Column, Column> map, Column column)
+    protected static Column remap(Map<Column, Column> map, Column column)
     {
         if(column == null)
             return null;
@@ -765,7 +777,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static Condition remap(Map<Column, Column> map, Condition conditions)
+    protected static Condition remap(Map<Column, Column> map, Condition conditions)
     {
         Condition result = new Condition();
 
@@ -785,7 +797,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static Conditions remap(Map<Column, Column> map, Conditions conditions)
+    protected static Conditions remap(Map<Column, Column> map, Conditions conditions)
     {
         Conditions result = new Conditions(false);
 
@@ -922,7 +934,7 @@ public class SqlTableAccess extends SqlIntercode
             }
         }
 
-        if(canBeLimited)
+        if(canBeLimited && table != null)
             builder.append(" LIMIT 1");
 
         return builder.toString();
@@ -944,6 +956,12 @@ public class SqlTableAccess extends SqlIntercode
     protected Conditions getConditions()
     {
         return conditions;
+    }
+
+
+    protected UsedVariables getInternalVariables()
+    {
+        return internal;
     }
 
 

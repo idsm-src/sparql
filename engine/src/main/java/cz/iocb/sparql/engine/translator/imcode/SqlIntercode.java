@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -488,5 +489,11 @@ public abstract class SqlIntercode extends SqlBaseClass
             return null;
 
         return condition.stream().sorted().collect(joining(" OR ", "(", ")"));
+    }
+
+
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return false;
     }
 }

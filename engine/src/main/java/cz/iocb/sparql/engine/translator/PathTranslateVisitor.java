@@ -146,59 +146,6 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         List<Path> path = sequencePath.getChildren();
 
-        if(path.isEmpty())
-        {
-            if(subject instanceof VariableOrBlankNode && object instanceof VariableOrBlankNode)
-            {
-                String subjectName = ((VariableOrBlankNode) subject).getSqlName();
-                String objectName = ((VariableOrBlankNode) object).getSqlName();
-
-                SqlIntercode subjects = visitElement(parent.createVariable(variablePrefix), subject,
-                        parent.createVariable(variablePrefix));
-
-                SqlIntercode objects = visitElement(parent.createVariable(variablePrefix),
-                        parent.createVariable(variablePrefix), subject);
-
-                Set<String> distinctVariables = new HashSet<String>();
-                distinctVariables.add(subjectName);
-                distinctVariables.add(objectName);
-
-                if(graph instanceof VariableOrBlankNode)
-                    distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
-
-                SqlIntercode child = SqlDistinct.create(request, SqlUnion.union(List.of(subjects, objects)),
-                        distinctVariables);
-
-                return SqlBind.bind(request, objectName, SqlVariable.create(subjectName, child.getVariables()), child);
-            }
-            else if(subject instanceof VariableOrBlankNode)
-            {
-                String subjectName = ((VariableOrBlankNode) subject).getSqlName();
-
-                SqlExpressionIntercode expression = getExpression(request, object, new UsedVariables());
-
-                return SqlBind.bind(request, subjectName, expression, SqlEmptySolution.get());
-            }
-            else if(object instanceof VariableOrBlankNode)
-            {
-                String objectName = ((VariableOrBlankNode) object).getSqlName();
-
-                SqlExpressionIntercode expression = getExpression(request, subject, new UsedVariables());
-
-                return SqlBind.bind(request, objectName, expression, SqlEmptySolution.get());
-            }
-            else
-            {
-                SqlIntercode child = SqlEmptySolution.get();
-
-                SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, false,
-                        child.getVariables());
-
-                return SqlFilter.filter(request, List.of(filter), child);
-            }
-        }
-
-
         List<Node> nodes = new ArrayList<Node>(path.size() + 1);
 
         nodes.add(subject);
@@ -212,7 +159,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode result = SqlEmptySolution.get();
 
         for(int i = 0; i < path.size(); i++)
-            result = (SqlJoin.join(result, visitElement(path.get(i), nodes.get(i), nodes.get(i + 1))));
+            result = (SqlJoin.join(request, result, visitElement(path.get(i), nodes.get(i), nodes.get(i + 1))));
 
         return result;
     }
@@ -231,21 +178,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         Set<String> distinct = Stream.of(subject, object).filter(e -> e instanceof VariableOrBlankNode)
                 .map(e -> ((VariableOrBlankNode) e).getSqlName()).collect(toSet());
 
-
         if(repeatedPath.getKind() == Kind.ZeroOrOne)
-        {
-            SqlIntercode child = SqlDistinct.create(request, visitElement(repeatedPath.getChild(), subject, object),
-                    distinct);
-            SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, true,
-                    child.getVariables());
-
-            return SqlFilter.filter(request, List.of(filter), child);
-        }
+            return SqlDistinct.create(request, SqlUnion.union(List.of(translateZeroPath(subject, object),
+                    visitElement(repeatedPath.getChild(), subject, object))), distinct);
 
 
         Variable joinNode = parent.createVariable(variablePrefix);
         String joinName = joinNode.getSqlName();
-
+        String graphName = graph instanceof VariableOrBlankNode v ? v.getSqlName() : null;
 
         // if it is more suitable, the reverse order is used
         if(!(object instanceof VariableOrBlankNode) && subject instanceof VariableOrBlankNode)
@@ -254,11 +194,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinNode);
 
             return SqlRecursive.create(request, init, next, null, joinName,
-                    ((VariableOrBlankNode) subject).getSqlName());
+                    ((VariableOrBlankNode) subject).getSqlName(), graphName);
         }
 
 
-        //NOTE: repeatedPath.getKind() == Kind.OneOrMore implies cndNode == null
         Node cndNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? null : object;
         Node endNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? object :
                 parent.createVariable(variablePrefix);
@@ -266,7 +205,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         String beginName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getSqlName() : null;
         String endName = ((VariableOrBlankNode) endNode).getSqlName();
 
-        SqlIntercode init = visitElement(repeatedPath.getChild(), subject, endNode);
+        SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endNode) :
+                visitElement(repeatedPath.getChild(), subject, endNode);
 
         if(init == SqlNoSolution.get())
             return SqlNoSolution.get();
@@ -274,7 +214,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
 
         if(next == SqlNoSolution.get())
-            return SqlDistinct.create(request, visitElement(repeatedPath.getChild(), subject, object), distinct);
+            return SqlDistinct.create(request, init, distinct);
 
         UsedVariable initBeginVar = init.getVariables().get(beginName);
         UsedVariable nextEndVar = next.getVariables().get(endName);
@@ -284,20 +224,11 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             return SqlDistinct.create(request, visitElement(repeatedPath.getChild(), subject, object), distinct);
 
 
-        SqlIntercode intercode = SqlRecursive.create(request, init, next, beginName, joinName, endName);
+        SqlIntercode intercode = SqlRecursive.create(request, init, next, beginName, joinName, endName, graphName);
 
         if(cndNode != null)
         {
             SqlExpressionIntercode filter = getComparisonExpression(request, cndNode, endNode, false,
-                    intercode.getVariables());
-            intercode = SqlFilter.filter(request, List.of(filter), intercode);
-        }
-
-        if(repeatedPath.getKind() == Kind.ZeroOrMore)
-        {
-            //NOTE: variants in which subject is equal to object are processed elsewhere
-
-            SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, true,
                     intercode.getVariables());
             intercode = SqlFilter.filter(request, List.of(filter), intercode);
         }
@@ -475,6 +406,61 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    private SqlIntercode translateZeroPath(Node subject, Node object)
+    {
+        if(subject instanceof VariableOrBlankNode && object instanceof VariableOrBlankNode)
+        {
+            String subjectName = ((VariableOrBlankNode) subject).getSqlName();
+            String objectName = ((VariableOrBlankNode) object).getSqlName();
+
+            SqlIntercode subjects = visitElement(parent.createVariable(variablePrefix), subject,
+                    parent.createVariable(variablePrefix));
+
+            SqlIntercode objects = visitElement(parent.createVariable(variablePrefix),
+                    parent.createVariable(variablePrefix), subject);
+
+            Set<String> distinctVariables = new HashSet<String>();
+            distinctVariables.add(subjectName);
+            distinctVariables.add(objectName);
+
+            if(graph instanceof VariableOrBlankNode)
+                distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
+
+            SqlIntercode union = SqlUnion.union(List.of(subjects, objects));
+
+            SqlIntercode bind = SqlBind.bind(request, objectName, SqlVariable.create(subjectName, union.getVariables()),
+                    union);
+
+            return SqlDistinct.create(request, bind, distinctVariables);
+        }
+        else if(subject instanceof VariableOrBlankNode)
+        {
+            String subjectName = ((VariableOrBlankNode) subject).getSqlName();
+
+            SqlExpressionIntercode expression = getExpression(request, object, new UsedVariables());
+
+            return SqlBind.bind(request, subjectName, expression, SqlEmptySolution.get());
+        }
+        else if(object instanceof VariableOrBlankNode)
+        {
+            String objectName = ((VariableOrBlankNode) object).getSqlName();
+
+            SqlExpressionIntercode expression = getExpression(request, subject, new UsedVariables());
+
+            return SqlBind.bind(request, objectName, expression, SqlEmptySolution.get());
+        }
+        else
+        {
+            SqlIntercode child = SqlEmptySolution.get();
+
+            SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, false,
+                    child.getVariables());
+
+            return SqlFilter.filter(request, List.of(filter), child);
+        }
+    }
+
+
     private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object,
             Conditions predicateConditions)
     {
@@ -545,7 +531,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 SqlIntercode acess = getTableAccess(request, table, conditions, maps);
 
-                result = SqlJoin.join(result, acess);
+                result = SqlJoin.join(request, result, acess);
             }
 
             return result;

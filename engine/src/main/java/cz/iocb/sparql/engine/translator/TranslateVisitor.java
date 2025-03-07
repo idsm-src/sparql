@@ -220,12 +220,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlIntercode source = SqlFilter.filter(request, List.of(filter), select);
 
                 SqlIntercode subjectPattern = visitor.translate(null, variable, predicate, object);
-                subjectPattern = SqlJoin.join(source, subjectPattern);
+                subjectPattern = SqlJoin.join(request, source, subjectPattern);
                 subjectPattern = SqlBind.bind(request, subject.getSqlName(), expression, subjectPattern);
                 unionList.add(subjectPattern);
 
                 SqlIntercode objectPattern = visitor.translate(null, subject, predicate, variable);
-                objectPattern = SqlJoin.join(source, objectPattern);
+                objectPattern = SqlJoin.join(request, source, objectPattern);
                 objectPattern = SqlBind.bind(request, object.getSqlName(), expression, objectPattern);
                 unionList.add(objectPattern);
             }
@@ -415,7 +415,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         // translate final values clause
         if(select.getValues() != null)
-            translatedWhereClause = SqlJoin.join(translatedWhereClause, visitElement(select.getValues()));
+            translatedWhereClause = SqlJoin.join(request, translatedWhereClause, visitElement(select.getValues()));
 
 
         // translate projection expressions
@@ -556,7 +556,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     for(Node g : graphs)
                         values.add(List.of(g));
 
-                    translatedPattern = SqlJoin.join(translatedPattern, translateValues(List.of(varName), values));
+                    translatedPattern = SqlJoin.join(request, translatedPattern,
+                            translateValues(List.of(varName), values));
                 }
                 else if(variable == null)
                 {
@@ -573,7 +574,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
                     for(Node g : graphs)
-                        unionList.add(SqlJoin.join(translatedPattern,
+                        unionList.add(SqlJoin.join(request, translatedPattern,
                                 translateValues(List.of(varName), List.of(List.of(g)))));
 
                     translatedPattern = SqlUnion.union(unionList);
@@ -735,7 +736,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             {
                 SqlIntercode translatedPattern = visitElement(pattern);
 
-                translatedGroupPattern = SqlJoin.join(translatedGroupPattern, translatedPattern);
+                translatedGroupPattern = SqlJoin.join(request, translatedGroupPattern, translatedPattern);
             }
         }
 
@@ -1006,7 +1007,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
 
-        SqlIntercode intercode = SqlProcedureCall.create(procedureDefinition, parameterNodes, resultNodes, context);
+        SqlIntercode intercode = SqlProcedureCall.create(request, procedureDefinition, parameterNodes, resultNodes,
+                context);
 
         for(Entry<Variable, Node> entry : conditions.entrySet())
         {

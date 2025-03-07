@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,7 +55,7 @@ public class SqlDistinct extends SqlIntercode
         if(child == SqlEmptySolution.get())
             return SqlEmptySolution.get();
 
-        if(child instanceof SqlTableAccess access && access.isDistinct(request, distinctVariables))
+        if(child.isDistinct(request, distinctVariables))
             return child.optimize(request, restrictions, true);
 
 
@@ -115,7 +116,10 @@ public class SqlDistinct extends SqlIntercode
 
 
         if(optChild instanceof SqlUnion union)
-            return expandUnionByResourceClasses(request, union, distinctVariables, restrictions);
+        {
+            List<SqlIntercode> segs = expandUnionByResourceClasses(request, union, distinctVariables);
+            return SqlUnion.union(segs.stream().map(s -> create(request, s, distinctVariables, restrictions)).toList());
+        }
 
         return create(request, optChild, distinctVariables, restrictions);
     }
@@ -179,8 +183,8 @@ public class SqlDistinct extends SqlIntercode
     }
 
 
-    private static SqlIntercode expandUnionByResourceClasses(Request request, SqlUnion union,
-            Set<String> distinctVariables, Set<String> restrictions)
+    protected static List<SqlIntercode> expandUnionByResourceClasses(Request request, SqlUnion union,
+            Set<String> distinctVariables)
     {
         List<Pair<List<Set<ResourceClass>>, List<SqlIntercode>>> sorts = new ArrayList<>();
 
@@ -249,17 +253,17 @@ public class SqlDistinct extends SqlIntercode
             SqlIntercode item = SqlUnion.union(reduceDistinctUnion(s.getValue(), schema));
 
             if(item instanceof SqlUnion subUnion)
-                list.add(expandUnionByConstantColumns(request, subUnion, distinctVariables, restrictions));
+                list.addAll(expandUnionByConstantColumns(request, subUnion, distinctVariables));
             else
-                list.add(create(request, item, distinctVariables, restrictions));
+                list.add(item);
         }
 
-        return SqlUnion.union(list);
+        return list;
     }
 
 
-    private static SqlIntercode expandUnionByConstantColumns(Request request, SqlUnion union,
-            Set<String> distinctVariables, Set<String> restrictions)
+    private static List<SqlIntercode> expandUnionByConstantColumns(Request request, SqlUnion union,
+            Set<String> distinctVariables)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
@@ -298,13 +302,13 @@ public class SqlDistinct extends SqlIntercode
         List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 
         for(List<SqlIntercode> l : rev.values())
-            list.add(create(request, SqlUnion.union(reduceDistinctUnion(l, schema)), distinctVariables, restrictions));
+            list.add(SqlUnion.union(reduceDistinctUnion(l, schema)));
 
-        return SqlUnion.union(list);
+        return list;
     }
 
 
-    private static ArrayList<SqlIntercode> reduceDistinctUnion(List<SqlIntercode> childs, DatabaseSchema schema)
+    private static List<SqlIntercode> reduceDistinctUnion(List<SqlIntercode> childs, DatabaseSchema schema)
     {
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
@@ -337,5 +341,12 @@ public class SqlDistinct extends SqlIntercode
     public final SqlIntercode getChild()
     {
         return child;
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return selected.containsAll(distinctVariables);
     }
 }

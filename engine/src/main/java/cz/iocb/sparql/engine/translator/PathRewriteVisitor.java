@@ -134,10 +134,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         else
             rewrite = new RepeatedPath(Kind.ZeroOrMore, ((RepeatedPath) child).getChild());
 
-        if(rewrite.getKind() == Kind.OneOrMore)
-            return rewrite;
-
-        return new AlternativePath(List.of(rewrite, new SequencePath(new LinkedList<Path>())));
+        return rewrite;
     }
 
 

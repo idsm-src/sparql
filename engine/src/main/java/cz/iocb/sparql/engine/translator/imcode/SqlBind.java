@@ -147,7 +147,18 @@ public class SqlBind extends SqlIntercode
                 break;
         }
 
+        if(optChild instanceof SqlTableAccess access && optExpression instanceof SqlVariable variable)
+        {
+            UsedVariable var = access.getInternalVariable(variable.getName());
 
+            if(var == null)
+                return access;
+
+            UsedVariables internal = new UsedVariables(access.getInternalVariables());
+            internal.add(new UsedVariable(variableName, var.getMappings(), var.canBeNull()));
+
+            return SqlTableAccess.create(access.getTable(), access.getConditions(), internal, access.getReduced());
+        }
 
         return bind(request, variableName, optExpression, optChild, restrictions, reduced);
     }

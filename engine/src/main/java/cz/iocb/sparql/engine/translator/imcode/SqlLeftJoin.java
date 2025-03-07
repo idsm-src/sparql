@@ -61,11 +61,12 @@ public class SqlLeftJoin extends SqlIntercode
         if(left == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(right == SqlNoSolution.get() || right == SqlEmptySolution.get() || !isJoinable(left, right, conditions))
+        if(right == SqlNoSolution.get() || right == SqlEmptySolution.get()
+                || !isJoinable(request, left, right, conditions))
             return left.optimize(request, restrictions, reduce);
 
         if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-            return SqlJoin.join(left, right).optimize(request, restrictions, reduce);
+            return SqlJoin.join(request, left, right).optimize(request, restrictions, reduce);
 
         if(left instanceof SqlUnion)
         {
@@ -86,7 +87,8 @@ public class SqlLeftJoin extends SqlIntercode
             List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : ((SqlUnion) right).getChilds())
-                if(isJoinable(left, child, optimize(request, conditions, left.getVariables(), child.getVariables())))
+                if(isJoinable(request, left, child,
+                        optimize(request, conditions, left.getVariables(), child.getVariables())))
                     unionList.add(child);
 
             right = SqlUnion.union(unionList);
@@ -95,7 +97,7 @@ public class SqlLeftJoin extends SqlIntercode
             if(!(right instanceof SqlUnion))
                 return leftJoin(request, left, right, conditions, restrictions, reduce);
             else if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-                return SqlJoin.join(left, right).optimize(request, restrictions, reduce);
+                return SqlJoin.join(request, left, right).optimize(request, restrictions, reduce);
         }
 
         if(left instanceof SqlTableAccess l && right instanceof SqlTableAccess r && conditions.isEmpty())
@@ -121,13 +123,14 @@ public class SqlLeftJoin extends SqlIntercode
     }
 
 
-    private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
+    private static boolean isJoinable(Request request, SqlIntercode left, SqlIntercode right,
+            List<SqlExpressionIntercode> conditions)
     {
         if(conditions.stream().anyMatch(f -> f == SqlNull.get() || f == falseValue
                 || (f instanceof SqlBinaryComparison && ((SqlBinaryComparison) f).isAlwaysFalseOrNull())))
             return false;
 
-        if(SqlJoin.join(left, right) == SqlNoSolution.get())
+        if(SqlJoin.join(request, left, right) == SqlNoSolution.get())
             return false;
 
         return true;

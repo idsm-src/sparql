@@ -51,7 +51,7 @@ public class SqlProcedureCall extends SqlIntercode
     }
 
 
-    protected static SqlIntercode create(ProcedureDefinition procedure,
+    protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Set<String> restrictions)
     {
@@ -131,15 +131,15 @@ public class SqlProcedureCall extends SqlIntercode
         if(originalChild == null)
             return call;
 
-        return SqlJoin.join(call, originalChild);
+        return SqlJoin.join(request, call, originalChild);
     }
 
 
-    public static SqlIntercode create(ProcedureDefinition procedure,
+    public static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child)
     {
-        return create(procedure, parameters, results, child, null);
+        return create(request, procedure, parameters, results, child, null);
     }
 
 
@@ -164,7 +164,7 @@ public class SqlProcedureCall extends SqlIntercode
         //FIXME: is procedure deterministic?
         SqlIntercode optimized = child.optimize(request, childRestrictions, reduced);
 
-        return create(procedure, parameters, restrictedResults, optimized, restrictions);
+        return create(request, procedure, parameters, restrictedResults, optimized, restrictions);
     }
 
 

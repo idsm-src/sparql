@@ -6,6 +6,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -160,5 +161,12 @@ public class SqlFilter extends SqlIntercode
         builder.append(conditions.stream().map(cnd -> cnd.translate(request)).collect(joining(" AND ")));
 
         return builder.toString();
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return child.isDistinct(request, selected);
     }
 }
