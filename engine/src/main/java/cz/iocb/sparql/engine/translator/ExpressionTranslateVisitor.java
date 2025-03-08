@@ -170,7 +170,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
         SqlIntercode pattern = parent.visitElement(existsExpression.getPattern());
-        return SqlExists.create(existsExpression.isNegated(), pattern, variables);
+        return SqlExists.create(request, existsExpression.isNegated(), pattern, variables);
     }
 
 

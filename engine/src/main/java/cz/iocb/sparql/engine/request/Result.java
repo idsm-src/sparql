@@ -15,15 +15,16 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringTy
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Vector;
+import java.util.Map;
+import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.mapping.classes.ResultTag;
@@ -49,13 +50,12 @@ public class Result implements AutoCloseable
             'e', 'f' };
 
     protected final ResultType type;
+    protected final Map<String, List<List<ResultTag>>> description;
     protected final HashMap<String, Integer> varNames = new HashMap<String, Integer>();
-    protected final Vector<String> heads = new Vector<String>();
+    protected final List<String> heads = new ArrayList<String>();
     protected RdfNode[] rowData;
 
-    private final HashMap<String, Integer> columnNames = new HashMap<String, Integer>();
     private final ResultSet rs;
-    private final ResultSetMetaData metadata;
 
     private final long begin;
     private final long timeout;
@@ -74,34 +74,23 @@ public class Result implements AutoCloseable
     }
 
 
-    public Result(ResultType type, ResultSet rs, long begin, long timeout) throws SQLException
+    public Result(ResultType type, Map<String, List<List<ResultTag>>> description, ResultSet rs, long begin,
+            long timeout) throws SQLException
     {
         this.rs = rs;
-        this.metadata = rs.getMetaData();
-
-        String lastName = null;
-
-        for(int i = 0; i < metadata.getColumnCount(); i++)
-        {
-            String column = metadata.getColumnName(i + 1);
-            String name = column.replaceAll("#.*", "");
-
-            if(!name.equals(lastName))
-            {
-                lastName = name;
-                varNames.put(name, heads.size());
-                heads.add(name);
-            }
-
-            columnNames.put(column, heads.size() - 1);
-        }
-
-        this.rowData = new RdfNode[heads.size()];
+        this.description = description;
+        this.rowData = new RdfNode[description.size()];
 
         this.type = type;
         this.begin = begin;
         this.timeout = timeout;
         this.checkSize = Math.max(100, rs.getFetchSize());
+
+        for(String var : description.keySet())
+        {
+            varNames.put(var, varNames.size());
+            heads.add(var);
+        }
     }
 
 
@@ -119,103 +108,107 @@ public class Result implements AutoCloseable
         for(int i = 0; i < rowData.length; i++)
             rowData[i] = null;
 
-        for(int i = 0; i < metadata.getColumnCount(); i++)
+        int i = 1;
+        int idx = 0;
+
+        for(Entry<String, List<List<ResultTag>>> entry : description.entrySet())
         {
-            String name = metadata.getColumnName(i + 1);
-            String tagName = name.replaceAll(".*#", "");
-            String lexical = rs.getString(i + 1);
-            Object value = rs.getObject(i + 1);
-            int idx = columnNames.get(name);
-
-            ResultTag tag = ResultTag.get(tagName);
-
-            if(lexical != null)
+            for(ResultTag tag : entry.getValue().stream().flatMap(t -> t.stream()).toList())
             {
-                switch(tag)
+                String lexical = rs.getString(i);
+                Object value = rs.getObject(i);
+                i++;
+
+                if(lexical != null)
                 {
-                    case NULL:
-                        rowData[idx] = null;
-                        break;
+                    switch(tag)
+                    {
+                        case NULL:
+                            rowData[idx] = null;
+                            break;
 
-                    case BLANKNODEINT:
-                        rowData[idx] = new BNode(encodeIBlankNodeLabel((Long) value));
-                        break;
+                        case BLANKNODEINT:
+                            rowData[idx] = new BNode(encodeIBlankNodeLabel((Long) value));
+                            break;
 
-                    case BLANKNODESTR:
-                        rowData[idx] = new BNode(encodeSBlankNodeLabel((String) value));
-                        break;
+                        case BLANKNODESTR:
+                            rowData[idx] = new BNode(encodeSBlankNodeLabel((String) value));
+                            break;
 
-                    case IRI:
-                        rowData[idx] = new IriNode((String) value);
-                        break;
+                        case IRI:
+                            rowData[idx] = new IriNode((String) value);
+                            break;
 
-                    case BOOLEAN:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
-                        break;
+                        case BOOLEAN:
+                            rowData[idx] = new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
+                            break;
 
-                    case SHORT:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
-                        break;
+                        case SHORT:
+                            rowData[idx] = new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
+                            break;
 
-                    case INT:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
-                        break;
+                        case INT:
+                            rowData[idx] = new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
+                            break;
 
-                    case LONG:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
-                        break;
+                        case LONG:
+                            rowData[idx] = new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
+                            break;
 
-                    case FLOAT:
-                        Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
-                        rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatType.getTypeIri());
-                        break;
+                        case FLOAT:
+                            Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
+                            rowData[idx] = new TypedLiteral(decimalFormat.format(data), xsdFloatType.getTypeIri());
+                            break;
 
-                    case DOUBLE:
-                        rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
-                        break;
+                        case DOUBLE:
+                            rowData[idx] = new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
+                            break;
 
-                    case INTEGER:
-                        rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdIntegerType.getTypeIri());
-                        break;
+                        case INTEGER:
+                            rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                    xsdIntegerType.getTypeIri());
+                            break;
 
-                    case DECIMAL:
-                        rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdDecimalType.getTypeIri());
-                        break;
+                        case DECIMAL:
+                            rowData[idx] = new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                    xsdDecimalType.getTypeIri());
+                            break;
 
-                    case DATETIME:
-                        rowData[idx] = new TypedLiteral(lexical, xsdDateTimeType.getTypeIri());
-                        break;
+                        case DATETIME:
+                            rowData[idx] = new TypedLiteral(lexical, xsdDateTimeType.getTypeIri());
+                            break;
 
-                    case DATE:
-                        rowData[idx] = new TypedLiteral(lexical, xsdDateType.getTypeIri());
-                        break;
+                        case DATE:
+                            rowData[idx] = new TypedLiteral(lexical, xsdDateType.getTypeIri());
+                            break;
 
-                    case DAYTIMEDURATION:
-                        rowData[idx] = new TypedLiteral(durationToString((Long) value),
-                                xsdDayTimeDurationType.getTypeIri());
-                        break;
+                        case DAYTIMEDURATION:
+                            rowData[idx] = new TypedLiteral(durationToString((Long) value),
+                                    xsdDayTimeDurationType.getTypeIri());
+                            break;
 
-                    case STRING:
-                        rowData[idx] = new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
-                        break;
+                        case STRING:
+                            rowData[idx] = new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
+                            break;
 
-                    case LANGSTRING:
-                        String lang = rs.getString(name.replaceAll("#.*", "") + "#" + ResultTag.LANG.getTag());
-                        rowData[idx] = new LanguageTaggedLiteral(value.toString(), lang);
-                        break;
+                        case LANGSTRING:
+                            String lang = rs.getString(i);
+                            rowData[idx] = new LanguageTaggedLiteral(value.toString(), lang);
+                            break;
 
-                    case LITERAL:
-                        String type = rs.getString(name.replaceAll("#.*", "") + "#" + ResultTag.TYPE.getTag());
-                        rowData[idx] = new TypedLiteral(value.toString(), type);
+                        case LITERAL:
+                            String type = rs.getString(i);
+                            rowData[idx] = new TypedLiteral(value.toString(), type);
 
-                    case LANG:
-                    case TYPE:
-                        // ignore supplementary literal tags
-                        break;
+                        case LANG:
+                        case TYPE:
+                            // ignore supplementary literal tags
+                            break;
+                    }
                 }
             }
+
+            idx++;
         }
 
         return true;
@@ -239,7 +232,7 @@ public class Result implements AutoCloseable
     }
 
 
-    public Vector<String> getHeads()
+    public List<String> getHeads()
     {
         return heads;
     }

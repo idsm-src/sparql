@@ -113,6 +113,7 @@ public class Request implements AutoCloseable
 
     private Connection connection;
     private Statement statement;
+    private ColumnMap columnMap = new ColumnMap();
     private List<Table> tables = new ArrayList<Table>();
 
     private long begin;
@@ -255,7 +256,8 @@ public class Request implements AutoCloseable
 
             logger.trace("query evaluation");
 
-            return new Result(type, getStatement(fetchSize).executeQuery(code), begin, timeout);
+            return new Result(type, imcode.getResultDescription(), getStatement(fetchSize).executeQuery(code), begin,
+                    timeout);
         }
         catch(SQLException e)
         {
@@ -455,6 +457,12 @@ public class Request implements AutoCloseable
     public SparqlDatabaseConfiguration getConfiguration()
     {
         return config;
+    }
+
+
+    public ColumnMap getColumnMap()
+    {
+        return columnMap;
     }
 
 

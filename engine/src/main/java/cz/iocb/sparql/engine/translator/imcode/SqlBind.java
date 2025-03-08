@@ -64,10 +64,12 @@ public class SqlBind extends SqlIntercode
             return child.optimize(request, restrictions, reduced);
 
         if(child instanceof SqlUnion)
-            return SqlUnion.union(((SqlUnion) child)
-                    .getChilds().stream().map(c -> bind(request, variableName,
-                            expression.optimize(request, c.getVariables()), c, restrictions, reduced))
-                    .collect(toList())).optimize(request, restrictions, reduced);
+            return SqlUnion.union(request,
+                    ((SqlUnion) child)
+                            .getChilds().stream().map(c -> bind(request, variableName,
+                                    expression.optimize(request, c.getVariables()), c, restrictions, reduced))
+                            .collect(toList()))
+                    .optimize(request, restrictions, reduced);
 
 
         /* standard bind */
@@ -110,7 +112,8 @@ public class SqlBind extends SqlIntercode
             }
 
             UsedVariable bindVariable = new UsedVariable(variableName, expression.canBeNull());
-            resClasses.stream().forEach(res -> bindVariable.addMapping(res, res.createColumns(variableName)));
+            resClasses.stream().forEach(
+                    res -> bindVariable.addMapping(res, res.createColumns(request.getColumnMap(), variableName)));
             variable = bindVariable;
         }
 

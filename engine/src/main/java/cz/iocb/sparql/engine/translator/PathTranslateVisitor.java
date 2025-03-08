@@ -136,7 +136,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(AlternativePath alternativePath)
     {
-        return SqlUnion.union(
+        return SqlUnion.union(request,
                 alternativePath.getChildren().stream().map(c -> visitElement(c, subject, object)).collect(toList()));
     }
 
@@ -179,7 +179,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 .map(e -> ((VariableOrBlankNode) e).getSqlName()).collect(toSet());
 
         if(repeatedPath.getKind() == Kind.ZeroOrOne)
-            return SqlDistinct.create(request, SqlUnion.union(List.of(translateZeroPath(subject, object),
+            return SqlDistinct.create(request, SqlUnion.union(request, List.of(translateZeroPath(subject, object),
                     visitElement(repeatedPath.getChild(), subject, object))), distinct);
 
 
@@ -269,7 +269,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         if(!invNegIriSet.isEmpty() && negIriSet.isEmpty())
             return translateNegatedPath(object, invNegIriSet, subject);
 
-        return SqlUnion.union(List.of(translateNegatedPath(subject, negIriSet, object),
+        return SqlUnion.union(request, List.of(translateNegatedPath(subject, negIriSet, object),
                 translateNegatedPath(object, invNegIriSet, subject)));
     }
 
@@ -328,7 +328,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlUnion.union(unionList);
+        return SqlUnion.union(request, unionList);
     }
 
 
@@ -402,7 +402,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlUnion.union(unionList);
+        return SqlUnion.union(request, unionList);
     }
 
 
@@ -426,7 +426,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             if(graph instanceof VariableOrBlankNode)
                 distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
 
-            SqlIntercode union = SqlUnion.union(List.of(subjects, objects));
+            SqlIntercode union = SqlUnion.union(request, List.of(subjects, objects));
 
             SqlIntercode bind = SqlBind.bind(request, objectName, SqlVariable.create(subjectName, union.getVariables()),
                     union);

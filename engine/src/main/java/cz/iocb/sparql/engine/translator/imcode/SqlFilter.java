@@ -63,12 +63,13 @@ public class SqlFilter extends SqlIntercode
 
         if(child instanceof SqlUnion)
             return SqlUnion
-                    .union(((SqlUnion) child).getChilds().stream()
-                            .map(p -> filter(request,
-                                    conditions.stream().map(c -> c.optimize(request, p.getVariables()))
-                                            .collect(toList()),
-                                    p, restrictions, reduced))
-                            .collect(toList()))
+                    .union(request,
+                            ((SqlUnion) child).getChilds().stream()
+                                    .map(p -> filter(request,
+                                            conditions.stream().map(c -> c.optimize(request, p.getVariables()))
+                                                    .collect(toList()),
+                                            p, restrictions, reduced))
+                                    .collect(toList()))
                     .optimize(request, restrictions, reduced);
 
         /* standard filter */

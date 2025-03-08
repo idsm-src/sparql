@@ -35,7 +35,7 @@ public class SqlUnion extends SqlIntercode
     }
 
 
-    public static SqlIntercode union(List<SqlIntercode> branches)
+    public static SqlIntercode union(Request request, List<SqlIntercode> branches)
     {
         /* special cases */
 
@@ -109,7 +109,7 @@ public class SqlUnion extends SqlIntercode
 
             for(ResourceClass resourceClass : entry.getValue())
             {
-                List<Column> columns = resourceClass.createColumns(variable.getName());
+                List<Column> columns = resourceClass.createColumns(request.getColumnMap(), variable.getName());
                 List<Column> mapping = new ArrayList<Column>(resourceClass.getColumnCount());
 
                 for(int i = 0; i < resourceClass.getColumnCount(); i++)
@@ -205,7 +205,7 @@ public class SqlUnion extends SqlIntercode
         if(restrictions == null)
             return this;
 
-        return union(childs.stream().map(c -> c.optimize(request, restrictions, reduced)).collect(toList()));
+        return union(request, childs.stream().map(c -> c.optimize(request, restrictions, reduced)).collect(toList()));
     }
 
 

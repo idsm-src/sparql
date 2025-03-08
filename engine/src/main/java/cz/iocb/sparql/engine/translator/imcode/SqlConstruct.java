@@ -119,7 +119,7 @@ public class SqlConstruct extends SqlIntercode
             return SqlNoSolution.get();
 
         if(child instanceof SqlUnion union)
-            return SqlUnion.union(
+            return SqlUnion.union(request,
                     union.getChilds().stream().map(c -> construct(request, templates, bnOffset, c)).collect(toList()));
 
 
@@ -221,7 +221,7 @@ public class SqlConstruct extends SqlIntercode
 
             for(ResourceClass resourceClass : entry.getValue())
             {
-                List<Column> columns = resourceClass.createColumns(variable.getName());
+                List<Column> columns = resourceClass.createColumns(request.getColumnMap(), variable.getName());
                 List<Column> mapping = new ArrayList<Column>(resourceClass.getColumnCount());
 
                 for(int i = 0; i < resourceClass.getColumnCount(); i++)

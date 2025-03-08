@@ -6,6 +6,7 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.request.ColumnMap;
 
 
 
@@ -57,12 +58,13 @@ public abstract class ResourceClass
     }
 
 
-    public List<Column> createColumns(String variable)
+    public List<Column> createColumns(ColumnMap map, String variable)
     {
         List<Column> columns = new ArrayList<Column>(sqlTypes.size());
 
         for(int i = 0; i < sqlTypes.size(); i++)
-            columns.add(new TableColumn(variable + "#" + name + (sqlTypes.size() > 0 ? "_par" + i : "")));
+            columns.add(
+                    new TableColumn(map.getSafeName(variable + "#" + name + (sqlTypes.size() > 0 ? "_par" + i : ""))));
 
         return columns;
     }

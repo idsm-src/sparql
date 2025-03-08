@@ -218,7 +218,7 @@ public class SparqlTest
         {
             Result it = request.execute(query);
 
-            if(it.getHeads().get(0).equals("*"))
+            if(it.getHeads().isEmpty())
             {
                 while(it.next())
                 {

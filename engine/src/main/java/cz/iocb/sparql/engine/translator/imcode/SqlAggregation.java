@@ -106,7 +106,8 @@ public class SqlAggregation extends SqlIntercode
                 }
 
                 UsedVariable variable = new UsedVariable(entry.getKey(), entry.getValue().canBeNull());
-                resClasses.stream().forEach(res -> variable.addMapping(res, res.createColumns(entry.getKey())));
+                resClasses.stream().forEach(
+                        res -> variable.addMapping(res, res.createColumns(request.getColumnMap(), entry.getKey())));
                 variables.add(variable);
             }
         }
@@ -191,13 +192,13 @@ public class SqlAggregation extends SqlIntercode
 
             for(List<SqlIntercode> part : parts.values())
             {
-                SqlIntercode child = SqlUnion.union(part).optimize(request, childRestrictions, optChildReduce);
+                SqlIntercode child = SqlUnion.union(request, part).optimize(request, childRestrictions, optChildReduce);
                 Map<String, SqlExpressionIntercode> aggs = optimizeAggregations(request, optAggregations, child);
                 result.add(aggregate(request, groupVariables, aggs, child, restrictions).optimize(request, restrictions,
                         reduced));
             }
 
-            return SqlUnion.union(result);
+            return SqlUnion.union(request, result);
         }
 
 
@@ -285,7 +286,7 @@ public class SqlAggregation extends SqlIntercode
                 }
             }
 
-            SqlIntercode optUnion = SqlUnion.union(unionList);
+            SqlIntercode optUnion = SqlUnion.union(request, unionList);
 
             List<SqlExpressionIntercode> args = List.of(SqlVariable.create("@bind", optUnion.getVariables()));
             SqlExpressionIntercode expr = SqlBuiltinCall.create(request, "sum", false, args);

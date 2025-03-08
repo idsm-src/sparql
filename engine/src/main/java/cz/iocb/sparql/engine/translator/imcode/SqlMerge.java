@@ -33,13 +33,13 @@ public class SqlMerge extends SqlIntercode
     }
 
 
-    public static SqlIntercode create(String variable1, String variable2, SqlIntercode child)
+    public static SqlIntercode create(Request request, String variable1, String variable2, SqlIntercode child)
     {
-        return create(variable1, variable2, child, null);
+        return create(request, variable1, variable2, child, null);
     }
 
 
-    protected static SqlIntercode create(String variable1, String variable2, SqlIntercode child,
+    protected static SqlIntercode create(Request request, String variable1, String variable2, SqlIntercode child,
             Set<String> restrictions)
     {
         /* special cases */
@@ -48,8 +48,8 @@ public class SqlMerge extends SqlIntercode
             return SqlNoSolution.get();
 
         if(child instanceof SqlUnion)
-            return SqlUnion.union(((SqlUnion) child).getChilds().stream()
-                    .map(c -> create(variable1, variable2, c, restrictions)).collect(toList()));
+            return SqlUnion.union(request, ((SqlUnion) child).getChilds().stream()
+                    .map(c -> create(request, variable1, variable2, c, restrictions)).collect(toList()));
 
 
         /* special merge */
@@ -66,7 +66,7 @@ public class SqlMerge extends SqlIntercode
         }
 
         Map<Column, Column> map = new HashMap<Column, Column>();
-        UsedVariables variables = getJoinUsedVariables(usedVars1, usedVars2, null, null, restrictions, map);
+        UsedVariables variables = getJoinUsedVariables(request, usedVars1, usedVars2, null, null, restrictions, map);
 
         if(variables == null)
             return SqlNoSolution.get();
@@ -93,7 +93,7 @@ public class SqlMerge extends SqlIntercode
         if(optimizedContext.getVariables().get(variable2) == null)
             return child.optimize(request, restrictions, reduced);
 
-        return create(variable1, variable2, optimizedContext, restrictions);
+        return create(request, variable1, variable2, optimizedContext, restrictions);
     }
 
 

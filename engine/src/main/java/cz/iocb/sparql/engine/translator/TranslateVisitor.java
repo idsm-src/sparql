@@ -175,7 +175,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         Variable variable = new Variable(null, "@ask");
 
         SqlIntercode translatedSelect = visitElement(askQuery.getSelect());
-        SqlExpressionIntercode expression = SqlExists.create(false, translatedSelect, new UsedVariables());
+        SqlExpressionIntercode expression = SqlExists.create(request, false, translatedSelect, new UsedVariables());
         SqlIntercode bind = SqlBind.bind(request, variable.getSqlName(), expression, SqlEmptySolution.get());
 
         return SqlSelect.createTopLevel(request, List.of(variable.getName()), bind);
@@ -232,7 +232,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         }
 
         List<String> variables = List.of(subject.getSqlName(), predicate.getSqlName(), object.getSqlName());
-        return SqlSelect.createTopLevel(request, variables, SqlUnion.union(unionList));
+        return SqlSelect.createTopLevel(request, variables, SqlUnion.union(request, unionList));
     }
 
 
@@ -536,7 +536,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         graphRestrictions.pop();
 
         if(rename)
-            translatedPattern = SqlMerge.create(((Variable) graph.getName()).getSqlName(),
+            translatedPattern = SqlMerge.create(request, ((Variable) graph.getName()).getSqlName(),
                     ((Variable) graphVariable).getSqlName(), translatedPattern);
 
 
@@ -567,7 +567,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         unionList.add(
                                 SqlBind.bind(request, varName, SqlIri.create(request, (IRI) g), translatedPattern));
 
-                    translatedPattern = SqlUnion.union(unionList);
+                    translatedPattern = SqlUnion.union(request, unionList);
                 }
                 else
                 {
@@ -577,7 +577,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         unionList.add(SqlJoin.join(request, translatedPattern,
                                 translateValues(List.of(varName), List.of(List.of(g)))));
 
-                    translatedPattern = SqlUnion.union(unionList);
+                    translatedPattern = SqlUnion.union(request, unionList);
                 }
             }
         }
@@ -598,7 +598,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(Union union)
     {
-        return SqlUnion.union(union.getPatterns().stream().map(p -> visitElement(p)).collect(toList()));
+        return SqlUnion.union(request, union.getPatterns().stream().map(p -> visitElement(p)).collect(toList()));
     }
 
 
@@ -751,7 +751,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(!optionalFilters.isEmpty())
         {
-            UsedVariables variables = SqlLeftJoin.getExpressionVariables(translatedGroupPattern.getVariables(),
+            UsedVariables variables = SqlLeftJoin.getExpressionVariables(request, translatedGroupPattern.getVariables(),
                     translatedPattern.getVariables());
 
             for(Filter filter : optionalFilters)
@@ -880,7 +880,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
 
 
-                List<Column> tableColumns = resClass.createColumns(variableNames.get(i));
+                List<Column> tableColumns = resClass.createColumns(request.getColumnMap(), variableNames.get(i));
                 List<Column> mapping = new ArrayList<Column>(resClass.getColumnCount());
 
                 for(int j = 0; j < resClass.getColumnCount(); j++)
@@ -1033,7 +1033,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 var = (VariableOrBlankNode) result;
             }
 
-            intercode = SqlMerge.create(var.getSqlName(), fakeResult.getSqlName(), intercode);
+            intercode = SqlMerge.create(request, var.getSqlName(), fakeResult.getSqlName(), intercode);
         }
 
         return intercode;
@@ -1103,8 +1103,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     limit);
             String code = query.optimize(request).translate(request);
 
-            try(Result result = new Result(ResultType.SELECT, request.getStatement().executeQuery(code),
-                    request.getBegin(), request.getTimeout()))
+            try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
+                    request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
             {
                 varIndexes = result.getVariableIndexes();
 

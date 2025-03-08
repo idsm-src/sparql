@@ -43,7 +43,8 @@ public class SqlExists extends SqlExpressionIntercode
     }
 
 
-    public static SqlExpressionIntercode create(boolean negated, SqlIntercode pattern, UsedVariables variables)
+    public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
+            UsedVariables variables)
     {
         if(pattern == SqlNoSolution.get())
             return negated ? trueValue : falseValue;
@@ -64,7 +65,7 @@ public class SqlExists extends SqlExpressionIntercode
                     unionList.add(child);
             }
 
-            return new SqlExists(negated, SqlUnion.union(unionList), variables);
+            return new SqlExists(negated, SqlUnion.union(request, unionList), variables);
         }
 
 
@@ -80,7 +81,7 @@ public class SqlExists extends SqlExpressionIntercode
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
     {
-        return create(negated, pattern.optimize(request, variables.getNames(), true), variables);
+        return create(request, negated, pattern.optimize(request, variables.getNames(), true), variables);
     }
 
 

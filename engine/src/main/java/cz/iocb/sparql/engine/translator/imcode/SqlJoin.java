@@ -72,7 +72,7 @@ public class SqlJoin extends SqlIntercode
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         // just to be sure
-        unionList = unionList.stream().map(innerList -> innerList.stream().collect(toList())).collect(toList());
+        //unionList = unionList.stream().map(innerList -> innerList.stream().collect(toList())).collect(toList());
 
         for(List<SqlIntercode> newChilds : unionList)
         {
@@ -84,9 +84,9 @@ public class SqlJoin extends SqlIntercode
                 List<SqlIntercode> newInitChilds = new ArrayList<SqlIntercode>(accesses);
                 newInitChilds.add(recursive.init);
 
-                SqlIntercode newRecursive = SqlRecursive
-                        .create(request, SqlJoin.join(newInitChilds, restrictions), recursive.next, recursive.beginName,
-                                recursive.joinName, recursive.endVar.getName(), recursive.graphName, restrictions)
+                SqlIntercode newRecursive = SqlRecursive.create(request,
+                        SqlJoin.join(request, newInitChilds, restrictions), recursive.next, recursive.beginName,
+                        recursive.joinName, recursive.endVar.getName(), recursive.graphName, restrictions)
                         .optimize(request, restrictions, false);
 
                 newChilds.remove(recursive);
@@ -130,16 +130,16 @@ public class SqlJoin extends SqlIntercode
             }
         }
 
-        return SqlUnion.union(unionList.stream().map(l -> join(l, restrictions)).collect(toList()));
+        return SqlUnion.union(request, unionList.stream().map(l -> join(request, l, restrictions)).collect(toList()));
     }
 
 
     private static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess candidate, SqlTableAccess distinct,
             HashSet<String> shared)
     {
-        if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
-                .equals(distinct.getVariables().getNonConstantColumns()))
-            return null;
+        //if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
+        //        .equals(distinct.getVariables().getNonConstantColumns()))
+        //    return null;
 
         for(String s : shared)
         {
@@ -511,7 +511,7 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static SqlIntercode join(List<SqlIntercode> childs, Set<String> restrictions)
+    private static SqlIntercode join(Request request, List<SqlIntercode> childs, Set<String> restrictions)
     {
         if(childs.size() == 0)
             return SqlEmptySolution.get();
@@ -524,7 +524,7 @@ public class SqlJoin extends SqlIntercode
 
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
         List<UsedVariables> allVars = childs.stream().map(c -> c.getVariables()).toList();
-        UsedVariables variables = getJoinUsedVariables(allVars, tables, restrictions, columnMap);
+        UsedVariables variables = getJoinUsedVariables(request, allVars, tables, restrictions, columnMap);
 
         if(variables == null)
             return SqlNoSolution.get();

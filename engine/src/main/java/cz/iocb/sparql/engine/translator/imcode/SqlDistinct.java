@@ -118,7 +118,8 @@ public class SqlDistinct extends SqlIntercode
         if(optChild instanceof SqlUnion union)
         {
             List<SqlIntercode> segs = expandUnionByResourceClasses(request, union, distinctVariables);
-            return SqlUnion.union(segs.stream().map(s -> create(request, s, distinctVariables, restrictions)).toList());
+            return SqlUnion.union(request,
+                    segs.stream().map(s -> create(request, s, distinctVariables, restrictions)).toList());
         }
 
         return create(request, optChild, distinctVariables, restrictions);
@@ -250,7 +251,7 @@ public class SqlDistinct extends SqlIntercode
 
         for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
         {
-            SqlIntercode item = SqlUnion.union(reduceDistinctUnion(s.getValue(), schema));
+            SqlIntercode item = SqlUnion.union(request, reduceDistinctUnion(s.getValue(), schema));
 
             if(item instanceof SqlUnion subUnion)
                 list.addAll(expandUnionByConstantColumns(request, subUnion, distinctVariables));
@@ -302,7 +303,7 @@ public class SqlDistinct extends SqlIntercode
         List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 
         for(List<SqlIntercode> l : rev.values())
-            list.add(SqlUnion.union(reduceDistinctUnion(l, schema)));
+            list.add(SqlUnion.union(request, reduceDistinctUnion(l, schema)));
 
         return list;
     }

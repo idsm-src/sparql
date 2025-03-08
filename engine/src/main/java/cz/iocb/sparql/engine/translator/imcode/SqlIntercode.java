@@ -97,8 +97,8 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    protected static UsedVariables getJoinUsedVariables(List<UsedVariables> allVars, List<Table> tables,
-            Set<String> restrictions, Map<Column, Column> map)
+    protected static UsedVariables getJoinUsedVariables(Request request, List<UsedVariables> allVars,
+            List<Table> tables, Set<String> restrictions, Map<Column, Column> map)
     {
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
 
@@ -117,7 +117,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 if(resClasses.isEmpty())
                     return null;
 
-                UsedVariable var = createUsedVariable(name, resClasses, vars, tables, columnMap, false);
+                UsedVariable var = createUsedVariable(request, name, resClasses, vars, tables, columnMap, false);
 
                 if(var == null)
                     return null;
@@ -127,7 +127,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             else
             {
                 Set<ResourceClass> resClasses = cleanSpecificClasses(collectClasses(defs));
-                UsedVariable var = createUsedVariable(name, resClasses, vars, tables, columnMap, true);
+                UsedVariable var = createUsedVariable(request, name, resClasses, vars, tables, columnMap, true);
 
                 variables.add(var);
             }
@@ -139,8 +139,8 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    private static UsedVariable createUsedVariable(String name, Set<ResourceClass> resClasses, List<UsedVariable> vars,
-            List<Table> tables, Map<Column, Column> columnMap, boolean canBeNull)
+    private static UsedVariable createUsedVariable(Request request, String name, Set<ResourceClass> resClasses,
+            List<UsedVariable> vars, List<Table> tables, Map<Column, Column> columnMap, boolean canBeNull)
     {
         UsedVariable variable = new UsedVariable(name, canBeNull);
 
@@ -166,7 +166,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                 List<Column> columns = selectColumns(resClass, mappings);
 
-                variable.addMapping(resClass, getMappedColuns(resClass.createColumns(name), columns, columnMap));
+                variable.addMapping(resClass,
+                        getMappedColuns(resClass.createColumns(request.getColumnMap(), name), columns, columnMap));
             }
         }
         else
@@ -192,7 +193,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                 List<Column> columns = coalesceVariants(resClass.getColumnCount(), variants);
 
-                variable.addMapping(resClass, getMappedColuns(resClass.createColumns(name), columns, columnMap));
+                variable.addMapping(resClass,
+                        getMappedColuns(resClass.createColumns(request.getColumnMap(), name), columns, columnMap));
             }
         }
 
@@ -277,11 +279,11 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    protected static UsedVariables getJoinUsedVariables(UsedVariables left, UsedVariables right, Table leftTable,
-            Table rightTable, Set<String> restrictions, Map<Column, Column> map)
+    protected static UsedVariables getJoinUsedVariables(Request request, UsedVariables left, UsedVariables right,
+            Table leftTable, Table rightTable, Set<String> restrictions, Map<Column, Column> map)
     {
-        return getJoinUsedVariables(Arrays.asList(left, right), Arrays.asList(leftTable, rightTable), restrictions,
-                map);
+        return getJoinUsedVariables(request, Arrays.asList(left, right), Arrays.asList(leftTable, rightTable),
+                restrictions, map);
     }
 
 

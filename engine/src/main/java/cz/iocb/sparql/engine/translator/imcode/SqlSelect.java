@@ -10,14 +10,13 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIn
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -42,6 +41,7 @@ public class SqlSelect extends SqlIntercode
     private final BigInteger offset;
     private final BigInteger limit;
     private final boolean distinct;
+    private final Map<String, List<List<ResultTag>>> description;
 
 
     protected SqlSelect(List<String> projections, SqlIntercode child, LinkedHashMap<String, Direction> orderBy,
@@ -56,6 +56,17 @@ public class SqlSelect extends SqlIntercode
         this.offset = offset;
         this.limit = limit;
         this.distinct = distinct;
+        this.description = new LinkedHashMap<>();
+
+        for(String varName : projections)
+        {
+            UsedVariable var = variables.get(varName);
+
+            if(var == null || var.getClasses().isEmpty())
+                description.put(varName, List.of(List.of(ResultTag.NULL)));
+            else
+                description.put(varName, var.getClasses().stream().map(c -> c.getResultTags()).distinct().toList());
+        }
     }
 
 
@@ -71,6 +82,7 @@ public class SqlSelect extends SqlIntercode
         this.offset = offset;
         this.limit = limit;
         this.distinct = distinct;
+        this.description = null;
     }
 
 
@@ -285,7 +297,7 @@ public class SqlSelect extends SqlIntercode
                 SqlIntercode branch = union.getChilds().get(i);
 
                 builder.append("SELECT ");
-                builder.append(translateSelectVariables(projections, variables, branch.getVariables()));
+                builder.append(translateSelectVariables(description, branch.getVariables()));
                 builder.append(" FROM (");
                 builder.append(branch.translate(request));
                 builder.append(") AS tab");
@@ -294,7 +306,7 @@ public class SqlSelect extends SqlIntercode
         else
         {
             builder.append("SELECT ");
-            builder.append(translateSelectVariables(projections, variables, child.getVariables()));
+            builder.append(translateSelectVariables(description, child.getVariables()));
 
             if(distinct)
             {
@@ -332,18 +344,18 @@ public class SqlSelect extends SqlIntercode
     }
 
 
-    public static String translateSelectVariables(Collection<String> projections, UsedVariables variables,
-            UsedVariables childVariables)
+    private static String translateSelectVariables(Map<String, List<List<ResultTag>>> description,
+            UsedVariables variables)
     {
         StringBuilder builder = new StringBuilder();
         boolean hasSelect = false;
 
-        for(String variableName : projections)
+        for(Entry<String, List<List<ResultTag>>> entry : description.entrySet())
         {
-            UsedVariable variable = variables.get(variableName);
-            UsedVariable childVariable = childVariables.get(variableName);
+            String variableName = entry.getKey();
+            List<List<ResultTag>> tagss = entry.getValue();
 
-            if(variable == null || variable.getClasses().isEmpty())
+            if(tagss.isEmpty())
             {
                 appendComma(builder, hasSelect);
                 hasSelect = true;
@@ -356,33 +368,12 @@ public class SqlSelect extends SqlIntercode
             }
             else
             {
-                Set<ResourceClass> classes = variable.getClasses();
-
-                LinkedHashMap<List<ResultTag>, List<ResourceClass>> resultClasses = new LinkedHashMap<>();
-
-                for(ResourceClass resClass : classes)
+                for(List<ResultTag> tags : tagss)
                 {
-                    List<ResourceClass> list = resultClasses.get(resClass.getResultTags());
+                    UsedVariable variable = variables.get(variableName);
 
-                    if(list == null)
-                    {
-                        list = new ArrayList<ResourceClass>();
-                        resultClasses.put(resClass.getResultTags(), list);
-                    }
-
-                    list.add(resClass);
-                }
-
-                for(Entry<List<ResultTag>, List<ResourceClass>> entry : resultClasses.entrySet())
-                {
-                    List<ResultTag> tags = entry.getKey();
-                    List<ResourceClass> fullClasses = entry.getValue();
-
-                    Set<ResourceClass> childClasses = childVariable != null ? childVariable.getClasses() :
-                            new HashSet<ResourceClass>();
-
-                    List<ResourceClass> resClasses = fullClasses.stream().filter(c -> childClasses.contains(c))
-                            .collect(toList());
+                    List<ResourceClass> resClasses = variable == null ? List.of() :
+                            variable.getClasses().stream().filter(c -> tags.equals(c.getResultTags())).toList();
 
                     for(int part = 0; part < tags.size(); part++)
                     {
@@ -403,7 +394,7 @@ public class SqlSelect extends SqlIntercode
                                 appendComma(builder, i > 0);
 
                                 ResourceClass resClass = resClasses.get(i);
-                                builder.append(resClass.toResult(childVariable.getMapping(resClass)).get(part));
+                                builder.append(resClass.toResult(variable.getMapping(resClass)).get(part));
                             }
 
                             if(resClasses.size() > 1)
@@ -427,6 +418,10 @@ public class SqlSelect extends SqlIntercode
             builder.append(ResultTag.NULL.getTag());
             builder.append('"');
         }
+
+        System.err.println();
+        System.err.println(builder.toString());
+        System.err.println();
 
         return builder.toString();
     }
@@ -792,5 +787,11 @@ public class SqlSelect extends SqlIntercode
     private boolean isTopLevel()
     {
         return projections != null;
+    }
+
+
+    public Map<String, List<List<ResultTag>>> getResultDescription()
+    {
+        return description;
     }
 }

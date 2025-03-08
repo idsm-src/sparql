@@ -4,13 +4,13 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,7 +45,7 @@ public class StoredResultHandler extends ResultHandler
     private final Map<String, Integer> counts = new HashMap<String, Integer>();
     private final Map<Column, Column> constants = new HashMap<Column, Column>();
 
-    private final LinkedHashMap<Column, Vector<Column>> data = new LinkedHashMap<Column, Vector<Column>>();
+    private final LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
     int rowCount;
     int batchCount;
 
@@ -79,7 +79,7 @@ public class StoredResultHandler extends ResultHandler
 
             if(cols == null)
             {
-                cols = resClass.createColumns(entry.getKey());
+                cols = resClass.createColumns(request.getColumnMap(), entry.getKey());
                 variable.addMapping(resClass, cols);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
@@ -97,12 +97,11 @@ public class StoredResultHandler extends ResultHandler
 
             for(int i = 0; i < vals.size(); i++)
             {
-                Vector<Column> v = data.get(cols.get(i));
+                List<Column> v = data.get(cols.get(i));
 
                 if(v == null)
                 {
-                    v = new Vector<Column>(batchSize);
-                    v.setSize(batchSize);
+                    v = Collections.nCopies(batchSize, (Column) null);
                     data.put(cols.get(i), v);
                 }
 
@@ -156,13 +155,10 @@ public class StoredResultHandler extends ResultHandler
 
             LinkedHashMap<Column, List<Column>> values = new LinkedHashMap<Column, List<Column>>();
 
-            for(Entry<Column, Vector<Column>> entry : data.entrySet())
+            for(Entry<Column, List<Column>> entry : data.entrySet())
             {
                 if(columns.contains(entry.getKey()))
-                {
-                    entry.getValue().setSize(rowCount);
-                    values.put(entry.getKey(), entry.getValue());
-                }
+                    values.put(entry.getKey(), entry.getValue().subList(0, rowCount));
             }
 
             return SqlValues.create(vars, values, rowCount);
@@ -231,7 +227,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
         if(data.isEmpty())
-            data.put(new TableColumn("__"), new Vector<Column>(batchCount));
+            data.put(new TableColumn("__"), new ArrayList<Column>(batchCount));
 
         String insert = "insert into " + table
                 + data.keySet().stream().map(c -> c.toString()).collect(joining(", ", "(", ") values "))

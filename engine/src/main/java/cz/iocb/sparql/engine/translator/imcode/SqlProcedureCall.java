@@ -123,8 +123,8 @@ public class SqlProcedureCall extends SqlIntercode
 
 
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
-        UsedVariables variables = getJoinUsedVariables(callVariables, child.getVariables(), null, null, null, columnMap)
-                .restrict(restrictions);
+        UsedVariables variables = getJoinUsedVariables(request, callVariables, child.getVariables(), null, null, null,
+                columnMap).restrict(restrictions);
 
         SqlProcedureCall call = new SqlProcedureCall(variables, procedure, parameters, results, child, columnMap);
 

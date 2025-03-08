@@ -68,7 +68,7 @@ public class SqlRecursive extends SqlIntercode
 
         while(next instanceof SqlUnion union)
         {
-            UsedVariable endVar = createEndVar(endName, init, next);
+            UsedVariable endVar = createEndVar(request, endName, init, next);
 
             List<SqlIntercode> childs = union.getChilds().stream()
                     .filter(c -> (new UsedPairedVariable(endVar, c.getVariables().get(joinName))).isJoinable())
@@ -77,7 +77,7 @@ public class SqlRecursive extends SqlIntercode
             if(childs.size() == union.getChilds().size())
                 break;
 
-            next = SqlUnion.union(childs);
+            next = SqlUnion.union(request, childs);
         }
 
         while(next instanceof SqlUnion union)
@@ -105,7 +105,7 @@ public class SqlRecursive extends SqlIntercode
             if(childs.size() == union.getChilds().size())
                 break;
 
-            next = SqlUnion.union(childs);
+            next = SqlUnion.union(request, childs);
         }
 
         if(next == SqlNoSolution.get())
@@ -129,7 +129,7 @@ public class SqlRecursive extends SqlIntercode
 
                 for(Entry<ResourceClass, List<Column>> e : var.getMappings().entrySet())
                 {
-                    List<Column> safeNames = e.getKey().createColumns(v.getName());
+                    List<Column> safeNames = e.getKey().createColumns(request.getColumnMap(), v.getName());
 
                     v.addMapping(e.getKey(), IntStream.range(0, e.getValue().size()).mapToObj(i -> {
                         Column c = e.getValue().get(i);
@@ -145,7 +145,7 @@ public class SqlRecursive extends SqlIntercode
             }
         }
 
-        UsedVariable endVar = createEndVar(endName, init, next);
+        UsedVariable endVar = createEndVar(request, endName, init, next);
         variables.add(endVar);
 
 
@@ -184,8 +184,8 @@ public class SqlRecursive extends SqlIntercode
         if(beginName != null && initOpt instanceof SqlUnion union)
         {
             List<SqlIntercode> segs = SqlDistinct.expandUnionByResourceClasses(request, union, Set.of(beginName));
-            return SqlUnion.union(segs.stream()
-                    .map(s -> create(request, s, next, beginName, joinName, endVar.getName(), graphName, restrictions))
+            return SqlUnion.union(request, segs.stream().map(
+                    s -> create(request, s, nextOpt, beginName, joinName, endVar.getName(), graphName, restrictions))
                     .toList());
         }
 
@@ -320,7 +320,7 @@ public class SqlRecursive extends SqlIntercode
     }
 
 
-    private static UsedVariable createEndVar(String endName, SqlIntercode init, SqlIntercode next)
+    private static UsedVariable createEndVar(Request request, String endName, SqlIntercode init, SqlIntercode next)
     {
         UsedVariable endVar = new UsedVariable(endName, false);
 
@@ -332,11 +332,12 @@ public class SqlRecursive extends SqlIntercode
         for(ResourceClass initClass : initEndClasses)
         {
             if(nextEndClasses.contains(initClass))
-                endVar.addMapping(initClass, initClass.createColumns(endName));
+                endVar.addMapping(initClass, initClass.createColumns(request.getColumnMap(), endName));
             else if(nextEndClasses.contains(initClass.getGeneralClass()))
-                endVar.addMapping(initClass.getGeneralClass(), initClass.getGeneralClass().createColumns(endName));
+                endVar.addMapping(initClass.getGeneralClass(),
+                        initClass.getGeneralClass().createColumns(request.getColumnMap(), endName));
             else if(nextEndClasses.stream().noneMatch(r -> r.getGeneralClass() == initClass))
-                endVar.addMapping(initClass, initClass.createColumns(endName));
+                endVar.addMapping(initClass, initClass.createColumns(request.getColumnMap(), endName));
         }
 
         for(ResourceClass nextClass : nextEndClasses)
@@ -344,9 +345,10 @@ public class SqlRecursive extends SqlIntercode
             if(initEndClasses.contains(nextClass))
                 continue;
             else if(initEndClasses.contains(nextClass.getGeneralClass()))
-                endVar.addMapping(nextClass.getGeneralClass(), nextClass.getGeneralClass().createColumns(endName));
+                endVar.addMapping(nextClass.getGeneralClass(),
+                        nextClass.getGeneralClass().createColumns(request.getColumnMap(), endName));
             else if(initEndClasses.stream().noneMatch(r -> r.getGeneralClass() == nextClass))
-                endVar.addMapping(nextClass, nextClass.createColumns(endName));
+                endVar.addMapping(nextClass, nextClass.createColumns(request.getColumnMap(), endName));
         }
 
         return endVar;

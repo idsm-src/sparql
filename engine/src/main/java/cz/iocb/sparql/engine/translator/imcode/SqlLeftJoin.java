@@ -79,7 +79,7 @@ public class SqlLeftJoin extends SqlIntercode
                 unionList.add(leftJoin(request, child, right, conds, restrictions, reduce));
             }
 
-            return SqlUnion.union(unionList).optimize(request, restrictions, reduce);
+            return SqlUnion.union(request, unionList).optimize(request, restrictions, reduce);
         }
 
         if(right instanceof SqlUnion)
@@ -91,7 +91,7 @@ public class SqlLeftJoin extends SqlIntercode
                         optimize(request, conditions, left.getVariables(), child.getVariables())))
                     unionList.add(child);
 
-            right = SqlUnion.union(unionList);
+            right = SqlUnion.union(request, unionList);
             conditions = optimize(request, conditions, left.getVariables(), right.getVariables());
 
             if(!(right instanceof SqlUnion))
@@ -116,7 +116,7 @@ public class SqlLeftJoin extends SqlIntercode
         right = SqlStripConstantColumns.strip(right);
 
         Map<Column, Column> map = new HashMap<Column, Column>();
-        UsedVariables variables = getJoinUsedVariables(left.getVariables(), setCanBeNull(right.getVariables()),
+        UsedVariables variables = getJoinUsedVariables(request, left.getVariables(), setCanBeNull(right.getVariables()),
                 leftTable, rightTable, restrictions, map);
 
         return new SqlLeftJoin(variables, left, right, conditions, map);
@@ -148,10 +148,10 @@ public class SqlLeftJoin extends SqlIntercode
     }
 
 
-    public static UsedVariables getExpressionVariables(UsedVariables left, UsedVariables right)
+    public static UsedVariables getExpressionVariables(Request request, UsedVariables left, UsedVariables right)
     {
         Map<Column, Column> map = new HashMap<Column, Column>();
-        UsedVariables joinVariables = getJoinUsedVariables(left, right, leftTable, rightTable, null, map);
+        UsedVariables joinVariables = getJoinUsedVariables(request, left, right, leftTable, rightTable, null, map);
 
         UsedVariables variables = new UsedVariables();
 
@@ -206,7 +206,7 @@ public class SqlLeftJoin extends SqlIntercode
     private static List<SqlExpressionIntercode> optimize(Request request, List<SqlExpressionIntercode> conditions,
             UsedVariables left, UsedVariables right)
     {
-        UsedVariables variables = getExpressionVariables(left, right);
+        UsedVariables variables = getExpressionVariables(request, left, right);
 
         List<SqlExpressionIntercode> result = new ArrayList<SqlExpressionIntercode>(conditions.size());
 
