@@ -359,7 +359,9 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         if(select.isInAggregateMode())
         {
-            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor(this, groupByVars);
+            HashSet<String> validVars = new HashSet<String>(groupByVars);
+
+            ExpressionAggregationRewriteVisitor rewriter = new ExpressionAggregationRewriteVisitor(this, validVars);
 
             List<Filter> havingConditions = select.getHavingConditions().stream()
                     .map(e -> new Filter(rewriter.visitElement(e))).collect(toList());
@@ -377,6 +379,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     Projection rewrited = new Projection(rewriter.visitElement(projection.getExpression()),
                             projection.getVariable());
+                    validVars.add(projection.getVariable().getName());
                     rewrited.setRange(projection.getRange());
                     projections.add(rewrited);
                 }
