@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +27,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
     {
         super(name, sqlType);
 
-        List<String> iris = values.keySet().stream().map(i -> i.getValue()).sorted().collect(toList());
+        List<String> iris = values.keySet().stream().map(i -> i.getValue()).sorted().toList();
         String first = iris.getFirst();
         String last = iris.getLast();
 

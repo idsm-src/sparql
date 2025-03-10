@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.request;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static java.util.stream.Collectors.toList;
 import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -340,7 +339,7 @@ public class Request implements AutoCloseable
     private static void checkForErrors(List<TranslateMessage> messages) throws TranslateExceptions
     {
         List<TranslateMessage> errors = messages.stream().filter(m -> m.getCategory() == MessageCategory.ERROR)
-                .collect(toList());
+                .toList();
 
         if(!errors.isEmpty())
             throw new TranslateExceptions(errors);

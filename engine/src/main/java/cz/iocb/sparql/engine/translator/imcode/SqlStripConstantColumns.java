@@ -47,14 +47,14 @@ public class SqlStripConstantColumns extends SqlIntercode
 
                 for(Column column : entry.getValue())
                 {
-                    if(column instanceof ConstantColumn)
+                    if(column instanceof ConstantColumn constColumn)
                     {
                         TableColumn col = map.get(column);
 
                         if(col == null)
                         {
                             col = new TableColumn("#const" + map.size());
-                            map.put((ConstantColumn) column, col);
+                            map.put(constColumn, col);
                         }
 
                         mapping.add(col);

@@ -28,12 +28,12 @@ public class ProcedureCall extends ProcedureCallBase
         super(procedure, parameters);
         this.result = result;
 
-        if(result instanceof Variable)
-            variablesInScope.add((Variable) result);
+        if(result instanceof Variable variable)
+            variablesInScope.add(variable);
 
         for(Parameter parameter : parameters)
-            if(parameter.getValue() instanceof Variable)
-                variablesInScope.add((Variable) parameter.getValue());
+            if(parameter.getValue() instanceof Variable variable)
+                variablesInScope.add(variable);
     }
 
 

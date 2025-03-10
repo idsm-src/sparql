@@ -31,8 +31,8 @@ public class SimpleLiteralClass extends LiteralClass
     {
         Object value = ((Literal) node).getValue();
 
-        if(value instanceof String)
-            return List.of(new ConstantColumn((String) value, "varchar"));
+        if(value instanceof String string)
+            return List.of(new ConstantColumn(string, "varchar"));
         else
             return List.of(new ConstantColumn(value.toString(), sqlTypes.get(0)));
     }
@@ -85,8 +85,8 @@ public class SimpleLiteralClass extends LiteralClass
     {
         Object value = ((Literal) node).getValue();
 
-        if(value instanceof String)
-            return new ConstantColumn((String) value, "varchar");
+        if(value instanceof String string)
+            return new ConstantColumn(string, "varchar");
         else
             return new ConstantColumn(value.toString(), sqlTypes.get(0));
     }

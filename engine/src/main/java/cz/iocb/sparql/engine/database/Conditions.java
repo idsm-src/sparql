@@ -1,9 +1,9 @@
 package cz.iocb.sparql.engine.database;
 
+import static java.util.stream.Collectors.toSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 
@@ -117,19 +117,19 @@ public class Conditions
 
     public Set<Column> getEqualTableColumns(Column col)
     {
-        return conditions.stream().flatMap(c -> c.getEqualTableColumns(col).stream()).collect(Collectors.toSet());
+        return conditions.stream().flatMap(c -> c.getEqualTableColumns(col).stream()).collect(toSet());
     }
 
 
     public Set<Column> getEqualColumns(Column col)
     {
-        return conditions.stream().flatMap(c -> c.getEqualColumns(col).stream()).collect(Collectors.toSet());
+        return conditions.stream().flatMap(c -> c.getEqualColumns(col).stream()).collect(toSet());
     }
 
 
     public Set<Column> getNonConstantColumns()
     {
-        return conditions.stream().flatMap(c -> c.getNonConstantColumns().stream()).collect(Collectors.toSet());
+        return conditions.stream().flatMap(c -> c.getNonConstantColumns().stream()).collect(toSet());
     }
 
 

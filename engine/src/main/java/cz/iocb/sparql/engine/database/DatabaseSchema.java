@@ -254,18 +254,12 @@ public class DatabaseSchema
 
     public boolean isNullableColumn(Table table, Column column)
     {
-        if(column instanceof ConstantColumn)
-            return false;
-
-        if(column instanceof ExpressionColumn)
-            return true;
-
-        List<Column> columns = nullableColumns.get(table);
-
-        if(columns == null)
-            return false;
-
-        return columns.contains(column);
+        return switch(column)
+        {
+            case ConstantColumn col -> false;
+            case ExpressionColumn col -> true;
+            default -> nullableColumns.getOrDefault(table, List.of()).contains(column);
+        };
     }
 
 

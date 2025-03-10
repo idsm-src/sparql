@@ -13,7 +13,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
@@ -301,10 +300,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     {
         StringBuilder builder = new StringBuilder();
 
-        if(operand instanceof SqlVariable)
+        if(operand instanceof SqlVariable variable)
         {
-            SqlVariable variable = (SqlVariable) operand;
-
             boolean hasOuterVariants = false;
 
             if(variable.getResourceClasses().size() > 1)
@@ -359,17 +356,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     {
         StringBuilder builder = new StringBuilder();
 
-        if(operand instanceof SqlVariable)
+        if(operand instanceof SqlVariable variable)
         {
-            SqlVariable variable = (SqlVariable) operand;
-
             List<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> r == resourceClass
                             || isNumeric(r) && isNumeric(resourceClass) && isNumericCompatibleWith(r, resourceClass)
                             || isDateTime(r) && isDateTime(resourceClass) || isDate(r) && isDate(resourceClass)
                             || isIri(r) && isIri(resourceClass) || isIntBlankNode(r) && isIntBlankNode(resourceClass)
                             || isStrBlankNode(r) && isStrBlankNode(resourceClass))
-                    .collect(toList());
+                    .toList();
 
 
             boolean hasAlternative = false;
@@ -464,10 +459,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     {
         StringBuilder builder = new StringBuilder();
 
-        if(operand instanceof SqlVariable)
+        if(operand instanceof SqlVariable variable)
         {
-            SqlVariable variable = (SqlVariable) operand;
-
             boolean hasAlternative = false;
 
             if(requestedClasses.size() > 1)
@@ -502,8 +495,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand,
             ResourceClass resourceClass)
     {
-        if(operand instanceof SqlVariable)
-            return ((SqlVariable) operand).getExpressionValue(resourceClass).toString();
+        if(operand instanceof SqlVariable variable)
+            return variable.getExpressionValue(resourceClass).toString();
         else if(!operand.isBoxed())
             return operand.translate(request);
         else if(resourceClass == xsdString)
@@ -515,10 +508,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand)
     {
-        if(operand instanceof SqlVariable)
+        if(operand instanceof SqlVariable variable)
         {
             StringBuilder builder = new StringBuilder();
-            SqlVariable variable = (SqlVariable) operand;
 
             Set<ResourceClass> compatible = operand.getResourceClasses().stream().filter(r -> isStringLiteral(r))
                     .collect(toSet());

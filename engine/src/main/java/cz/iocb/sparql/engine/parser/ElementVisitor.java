@@ -95,7 +95,7 @@ public abstract class ElementVisitor<T>
 
     public T visitElements(Collection<? extends Element> elements)
     {
-        return aggregateResult(StreamUtils.mapList(elements, this::visitElement));
+        return aggregateResult(elements.stream().map(this::visitElement).toList());
     }
 
     public T visit(SelectQuery selectQuery)

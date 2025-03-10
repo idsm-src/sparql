@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -51,24 +50,18 @@ public class SqlBinaryArithmetic extends SqlBinary
 
     private static boolean canBeDecimalZero(SqlExpressionIntercode operand)
     {
-        if(!(operand instanceof SqlLiteral))
+        if(!(operand instanceof SqlLiteral literal))
             return true;
 
-        Literal literal = ((SqlLiteral) operand).getLiteral();
-        Object value = literal.getValue();
-
-        if(value instanceof Short)
-            return (Short) value == 0;
-        else if(value instanceof Integer)
-            return (Integer) value == 0;
-        else if(value instanceof Long)
-            return (Long) value == 0l;
-        else if(value instanceof BigInteger)
-            return ((BigInteger) value).equals(BigInteger.ZERO);
-        else if(value instanceof BigDecimal)
-            return ((BigDecimal) value).equals(BigDecimal.ZERO);
-
-        return false;
+        return switch(literal.getLiteral().getValue())
+        {
+            case Short number -> number == 0;
+            case Integer number -> number == 0;
+            case Long number -> number == 0l;
+            case BigInteger number -> number.equals(BigInteger.ZERO);
+            case BigDecimal number -> number.equals(BigDecimal.ZERO);
+            default -> false;
+        };
     }
 
 

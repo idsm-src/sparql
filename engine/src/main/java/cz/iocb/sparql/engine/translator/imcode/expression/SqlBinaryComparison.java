@@ -96,10 +96,9 @@ public class SqlBinaryComparison extends SqlBinary
         {
             for(ResourceClass rightClass : right.getResourceClasses())
             {
-                if(leftClass instanceof DateConstantZoneClass && rightClass instanceof DateConstantZoneClass
-                        && (operator == Operator.Equals || operator == Operator.NotEquals)
-                        && getTimezoneDiff((DateConstantZoneClass) leftClass, (DateConstantZoneClass) rightClass)
-                                % SECS_PER_DAY != 0)
+                if((operator == Operator.Equals || operator == Operator.NotEquals)
+                        && leftClass instanceof DateConstantZoneClass l && rightClass instanceof DateConstantZoneClass r
+                        && getTimezoneDiff(l, r) % SECS_PER_DAY != 0)
                 {
                     // is always different
                     isAlwaysNull = false;
@@ -274,7 +273,7 @@ public class SqlBinaryComparison extends SqlBinary
 
             ResourceClass cmpClass = SqlExpressionIntercode.getExpressionResourceClass(cmpClasses);
 
-            if(cmpClass instanceof UserLiteralClass)
+            if(cmpClass instanceof UserLiteralClass userClass)
             {
                 //TODO: add special treatment
 
@@ -284,7 +283,7 @@ public class SqlBinaryComparison extends SqlBinary
                 builder.append("(");
                 builder.append(left);
                 builder.append(" ");
-                builder.append(((UserLiteralClass) cmpClass).getOperatorCode(operator));
+                builder.append(userClass.getOperatorCode(operator));
                 builder.append(" ");
                 builder.append(right);
                 builder.append(")");
@@ -429,9 +428,8 @@ public class SqlBinaryComparison extends SqlBinary
             }
             else if(isDate(leftClass))
             {
-                if(leftClass instanceof DateConstantZoneClass && rightClass instanceof DateConstantZoneClass
-                        && getTimezoneDiff((DateConstantZoneClass) leftClass,
-                                (DateConstantZoneClass) rightClass) < SECS_PER_DAY)
+                if(leftClass instanceof DateConstantZoneClass l && rightClass instanceof DateConstantZoneClass r
+                        && getTimezoneDiff(l, r) < SECS_PER_DAY)
                 {
                     Operator effectiveOperator = operator;
 
@@ -455,25 +453,22 @@ public class SqlBinaryComparison extends SqlBinary
 
                     //NOTE: it is assumed that default timezone is UTC
 
-                    if(leftClass instanceof DateConstantZoneClass && (((DateConstantZoneClass) leftClass).getZone() == 0
-                            || ((DateConstantZoneClass) leftClass).getZone() == Integer.MIN_VALUE))
+                    if(leftClass instanceof DateConstantZoneClass constantZoneClass
+                            && (constantZoneClass.getZone() == 0 || constantZoneClass.getZone() == Integer.MIN_VALUE))
                         left = lcols.get(0) + "::timestamp";
-                    else if(leftClass instanceof DateConstantZoneClass)
-                        left = "(" + lcols.get(0) + " + make_interval(secs => "
-                                + ((DateConstantZoneClass) leftClass).getZone() + "))";
+                    else if(leftClass instanceof DateConstantZoneClass constantZoneClass)
+                        left = "(" + lcols.get(0) + " + make_interval(secs => " + constantZoneClass.getZone() + "))";
                     else
                         left = "(" + lcols.get(0) + " + make_interval(secs => CASE " + lcols.get(1)
                                 + " WHEN -2147483648 THEN 0 ELSE " + lcols.get(1) + " END))";
 
                     //NOTE: it is assumed that default timezone is UTC
 
-                    if(rightClass instanceof DateConstantZoneClass
-                            && (((DateConstantZoneClass) rightClass).getZone() == 0
-                                    || ((DateConstantZoneClass) rightClass).getZone() == Integer.MIN_VALUE))
+                    if(rightClass instanceof DateConstantZoneClass constantZoneClass
+                            && (constantZoneClass.getZone() == 0 || constantZoneClass.getZone() == Integer.MIN_VALUE))
                         right = rcols.get(0) + "::timestamp";
-                    else if(rightClass instanceof DateConstantZoneClass)
-                        right = "(" + rcols.get(0) + " + make_interval(secs => "
-                                + ((DateConstantZoneClass) rightClass).getZone() + "))";
+                    else if(rightClass instanceof DateConstantZoneClass constantZoneClass)
+                        right = "(" + rcols.get(0) + " + make_interval(secs => " + constantZoneClass.getZone() + "))";
                     else
                         right = "(" + rcols.get(0) + " + make_interval(secs => CASE " + rcols.get(1)
                                 + " WHEN -2147483648 THEN 0 ELSE " + rcols.get(1) + " END))";
@@ -537,14 +532,14 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append("(" + left + ", " + right + ")");
                 }
             }
-            else if(leftClass instanceof UserLiteralClass)
+            else if(leftClass instanceof UserLiteralClass userClass)
             {
                 //TODO: add special treatment
 
                 builder.append("(");
                 builder.append(leftCols.get(0));
                 builder.append(" ");
-                builder.append(((UserLiteralClass) leftClass).getOperatorCode(operator));
+                builder.append(userClass.getOperatorCode(operator));
                 builder.append(" ");
                 builder.append(rightCols.get(0));
                 builder.append(")");

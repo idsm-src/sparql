@@ -36,33 +36,24 @@ public abstract class LiteralClass extends ResourceClass
     @Override
     public boolean match(Statement statement, Node node)
     {
-        if(node instanceof VariableOrBlankNode)
-            return true;
-
-        if(!(node instanceof Literal))
-            return false;
-
-        Literal literal = (Literal) node;
-        IRI literalTypeIri = literal.getTypeIri();
-
-        if(typeIri == null)
+        return switch(node)
         {
-            if(literal.isTypeSupported() && literal.getValue() != null)
-                return false;
-        }
-        else
-        {
-            if(literal.getValue() == null)
-                return false;
+            case VariableOrBlankNode var -> true;
+            case Literal literal ->
+            {
+                IRI literalTypeIri = literal.getTypeIri();
 
-            if(!typeIri.equals(literalTypeIri))
-                return false;
-
-            if(typeIri.equals(rdfLangString.getTypeIri()) && literal.getLanguageTag() == null)
-                return false;
-        }
-
-        return true;
+                if(typeIri == null)
+                    yield !literal.isTypeSupported() || literal.getValue() == null;
+                else if(literal.getValue() == null)
+                    yield false;
+                else if(typeIri.equals(literalTypeIri))
+                    yield !typeIri.equals(rdfLangString.getTypeIri()) || literal.getLanguageTag() == null;
+                else
+                    yield false;
+            }
+            default -> false;
+        };
     }
 
 

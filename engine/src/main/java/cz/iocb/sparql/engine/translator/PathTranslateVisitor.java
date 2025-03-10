@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.translator;
 
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -97,17 +96,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
         Set<String> restrictions = new HashSet<String>();
 
-        if(graph instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) graph).getSqlName());
+        if(graph instanceof VariableOrBlankNode var)
+            restrictions.add(var.getSqlName());
 
-        if(subject instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) subject).getSqlName());
+        if(subject instanceof VariableOrBlankNode var)
+            restrictions.add(var.getSqlName());
 
-        if(predicate instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) predicate).getSqlName());
+        if(predicate instanceof VariableOrBlankNode var)
+            restrictions.add(var.getSqlName());
 
-        if(object instanceof VariableOrBlankNode)
-            restrictions.add(((VariableOrBlankNode) object).getSqlName());
+        if(object instanceof VariableOrBlankNode var)
+            restrictions.add(var.getSqlName());
 
         return intercode;
     }
@@ -137,7 +136,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     public SqlIntercode visit(AlternativePath alternativePath)
     {
         return SqlUnion.union(request,
-                alternativePath.getChildren().stream().map(c -> visitElement(c, subject, object)).collect(toList()));
+                alternativePath.getChildren().stream().map(c -> visitElement(c, subject, object)).toList());
     }
 
 
@@ -255,10 +254,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         {
             for(Path child : ((AlternativePath) ((BracketedPath) negatedPath.getChild()).getChild()).getChildren())
             {
-                if(child instanceof IRI)
-                    negIriSet.add((IRI) child);
-                else if(child instanceof InversePath)
-                    invNegIriSet.add((IRI) ((InversePath) child).getChild());
+                if(child instanceof IRI iri)
+                    negIriSet.add(iri);
+                else if(child instanceof InversePath inversePath)
+                    invNegIriSet.add((IRI) inversePath.getChild());
             }
         }
 
@@ -357,9 +356,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(mapping.match(request, graph, subject, fakePredicate, object))
             {
-                if(mapping.getPredicate() instanceof ConstantIriMapping)
+                if(mapping.getPredicate() instanceof ConstantIriMapping constIriMapping)
                 {
-                    IRI predicate = (IRI) ((ConstantIriMapping) mapping.getPredicate()).getValue();
+                    IRI predicate = (IRI) constIriMapping.getValue();
 
                     if(negatedIriSet.contains(predicate))
                         continue;
@@ -408,10 +407,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private SqlIntercode translateZeroPath(Node subject, Node object)
     {
-        if(subject instanceof VariableOrBlankNode && object instanceof VariableOrBlankNode)
+        if(subject instanceof VariableOrBlankNode subjectVar && object instanceof VariableOrBlankNode objectVar)
         {
-            String subjectName = ((VariableOrBlankNode) subject).getSqlName();
-            String objectName = ((VariableOrBlankNode) object).getSqlName();
+            String subjectName = subjectVar.getSqlName();
+            String objectName = objectVar.getSqlName();
 
             SqlIntercode subjects = visitElement(parent.createVariable(variablePrefix), subject,
                     parent.createVariable(variablePrefix));
@@ -423,8 +422,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             distinctVariables.add(subjectName);
             distinctVariables.add(objectName);
 
-            if(graph instanceof VariableOrBlankNode)
-                distinctVariables.add(((VariableOrBlankNode) graph).getSqlName());
+            if(graph instanceof VariableOrBlankNode graphVar)
+                distinctVariables.add(graphVar.getSqlName());
 
             SqlIntercode union = SqlUnion.union(request, List.of(subjects, objects));
 
@@ -433,17 +432,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             return SqlDistinct.create(request, bind, distinctVariables);
         }
-        else if(subject instanceof VariableOrBlankNode)
+        else if(subject instanceof VariableOrBlankNode variable)
         {
-            String subjectName = ((VariableOrBlankNode) subject).getSqlName();
+            String subjectName = variable.getSqlName();
 
             SqlExpressionIntercode expression = getExpression(request, object, new UsedVariables());
 
             return SqlBind.bind(request, subjectName, expression, SqlEmptySolution.get());
         }
-        else if(object instanceof VariableOrBlankNode)
+        else if(object instanceof VariableOrBlankNode variable)
         {
-            String objectName = ((VariableOrBlankNode) object).getSqlName();
+            String objectName = variable.getSqlName();
 
             SqlExpressionIntercode expression = getExpression(request, subject, new UsedVariables());
 
@@ -464,9 +463,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object,
             Conditions predicateConditions)
     {
-        if(qmapping instanceof SingleTableQuadMapping)
+        if(qmapping instanceof SingleTableQuadMapping mapping)
         {
-            SingleTableQuadMapping mapping = (SingleTableQuadMapping) qmapping;
             Conditions conditions = Conditions.and(mapping.getConditions(), predicateConditions);
 
             List<MappedNode> maps = new ArrayList<MappedNode>();
@@ -477,10 +475,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             return getTableAccess(request, mapping.getTable(), conditions, maps);
         }
-        else if(qmapping instanceof JoinTableQuadMapping)
+        else if(qmapping instanceof JoinTableQuadMapping mapping)
         {
-            JoinTableQuadMapping mapping = (JoinTableQuadMapping) qmapping;
-
             List<Table> tables = mapping.getTables();
             List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
@@ -567,9 +563,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(schema.isNullableColumn(table, column))
                     condition.addIsNotNull(column);
 
-            if(node instanceof VariableOrBlankNode)
+            if(node instanceof VariableOrBlankNode variable)
             {
-                String variableName = ((VariableOrBlankNode) node).getSqlName();
+                String variableName = variable.getSqlName();
                 UsedVariable other = variables.get(variableName);
 
                 if(other == null)
@@ -616,15 +612,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private static SqlExpressionIntercode getExpression(Request request, Node node, UsedVariables variables)
     {
-        if(node instanceof VariableOrBlankNode)
-            return SqlVariable.create(((VariableOrBlankNode) node).getSqlName(), variables);
-
-        if(node instanceof IRI)
-            return SqlIri.create(request, (IRI) node);
-
-        if(node instanceof Literal)
-            return SqlLiteral.create(request, (Literal) node);
-
-        return null;
+        return switch(node)
+        {
+            case VariableOrBlankNode variable -> SqlVariable.create(variable.getSqlName(), variables);
+            case IRI iri -> SqlIri.create(request, iri);
+            case Literal literal -> SqlLiteral.create(request, literal);
+            default -> null;
+        };
     }
 }

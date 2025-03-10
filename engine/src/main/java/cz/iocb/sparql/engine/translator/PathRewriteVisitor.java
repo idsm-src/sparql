@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toCollection;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -28,8 +29,8 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         {
             Path rewrited = visitElement(child);
 
-            if(rewrited instanceof AlternativePath)
-                alternatives.addAll(((AlternativePath) rewrited).getChildren());
+            if(rewrited instanceof AlternativePath alternativePath)
+                alternatives.addAll(alternativePath.getChildren());
             else
                 alternatives.add(rewrited);
         }
@@ -48,19 +49,19 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         {
             Path rewrited = visitElement(child);
 
-            if(rewrited instanceof AlternativePath)
+            if(rewrited instanceof AlternativePath alternativePath)
             {
                 List<List<Path>> tmp = new LinkedList<List<Path>>();
 
                 for(List<Path> s1 : sequences)
                 {
-                    for(Path s2 : ((AlternativePath) rewrited).getChildren())
+                    for(Path s2 : alternativePath.getChildren())
                     {
                         List<Path> merged = new LinkedList<Path>(s1);
                         tmp.add(merged);
 
-                        if(s2 instanceof SequencePath)
-                            merged.addAll(((SequencePath) s2).getChildren());
+                        if(s2 instanceof SequencePath sequencePath)
+                            merged.addAll(sequencePath.getChildren());
                         else
                             merged.add(s2);
                     }
@@ -68,9 +69,9 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
 
                 sequences = tmp;
             }
-            else if(rewrited instanceof SequencePath)
+            else if(rewrited instanceof SequencePath sequencePath)
             {
-                sequences.stream().forEach(s -> s.addAll(((SequencePath) rewrited).getChildren()));
+                sequences.stream().forEach(s -> s.addAll(sequencePath.getChildren()));
             }
             else
             {
@@ -81,7 +82,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         if(sequences.size() == 1)
             return new SequencePath(sequences.get(0));
 
-        return new AlternativePath(sequences.stream().map(p -> new SequencePath(p)).collect(toList()));
+        return new AlternativePath(sequences.stream().map(p -> (Path) new SequencePath(p)).toList());
     }
 
 
@@ -91,11 +92,12 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
         switch(path.getChild())
         {
             case AlternativePath child:
-                return visitElement(new AlternativePath(
-                        child.getChildren().stream().map(p -> new InversePath(p)).collect(toList())));
+                return visitElement(
+                        new AlternativePath(child.getChildren().stream().map(p -> (Path) new InversePath(p)).toList()));
 
             case SequencePath child:
-                List<Path> rev = child.getChildren().stream().map(p -> new InversePath(p)).collect(toList());
+                List<Path> rev = child.getChildren().stream().map(p -> (Path) new InversePath(p))
+                        .collect(toCollection(ArrayList::new));
                 Collections.reverse(rev);
                 return visitElement(new SequencePath(rev));
 
@@ -127,12 +129,12 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
 
         RepeatedPath rewrite = null;
 
-        if(!(child instanceof RepeatedPath))
+        if(!(child instanceof RepeatedPath repeatedPath))
             rewrite = new RepeatedPath(path.getKind(), child);
-        else if(((RepeatedPath) child).getKind() == path.getKind())
-            rewrite = new RepeatedPath(path.getKind(), ((RepeatedPath) child).getChild());
+        else if(repeatedPath.getKind() == path.getKind())
+            rewrite = new RepeatedPath(path.getKind(), repeatedPath.getChild());
         else
-            rewrite = new RepeatedPath(Kind.ZeroOrMore, ((RepeatedPath) child).getChild());
+            rewrite = new RepeatedPath(Kind.ZeroOrMore, repeatedPath.getChild());
 
         return rewrite;
     }

@@ -419,10 +419,6 @@ public class SqlSelect extends SqlIntercode
             builder.append('"');
         }
 
-        System.err.println();
-        System.err.println(builder.toString());
-        System.err.println();
-
         return builder.toString();
     }
 

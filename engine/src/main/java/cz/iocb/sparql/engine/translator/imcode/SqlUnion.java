@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +38,7 @@ public class SqlUnion extends SqlIntercode
     {
         /* special cases */
 
-        branches = branches.stream().filter(i -> i != SqlNoSolution.get()).collect(toList());
+        branches = branches.stream().filter(i -> i != SqlNoSolution.get()).toList();
 
         if(branches.isEmpty())
             return SqlNoSolution.get();
@@ -82,8 +81,8 @@ public class SqlUnion extends SqlIntercode
 
         for(SqlIntercode branch : branches)
         {
-            if(branch instanceof SqlUnion)
-                childs.addAll(((SqlUnion) branch).childs);
+            if(branch instanceof SqlUnion union)
+                childs.addAll(union.childs);
             else
                 childs.add(branch);
         }
@@ -205,7 +204,7 @@ public class SqlUnion extends SqlIntercode
         if(restrictions == null)
             return this;
 
-        return union(request, childs.stream().map(c -> c.optimize(request, restrictions, reduced)).collect(toList()));
+        return union(request, childs.stream().map(c -> c.optimize(request, restrictions, reduced)).toList());
     }
 
 

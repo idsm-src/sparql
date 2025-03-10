@@ -184,17 +184,19 @@ public class DateTimeClass extends LiteralClass
 
     public static String getDateTime(Literal literal)
     {
-        if(literal.getValue() instanceof OffsetDateTime)
-            return ((OffsetDateTime) literal.getValue()).atZoneSameInstant(ZoneOffset.UTC).format(dateTimeFormatter);
-        else
-            return ((LocalDateTime) literal.getValue()).format(localDateTimeFormatter);
+        return switch(literal.getValue())
+        {
+            case OffsetDateTime value -> value.atZoneSameInstant(ZoneOffset.UTC).format(dateTimeFormatter);
+            case LocalDateTime value -> value.format(localDateTimeFormatter);
+            default -> null;
+        };
     }
 
 
     public static int getZone(Literal literal)
     {
-        if(literal.getValue() instanceof OffsetDateTime)
-            return ((OffsetDateTime) literal.getValue()).getOffset().getTotalSeconds();
+        if(literal.getValue() instanceof OffsetDateTime value)
+            return value.getOffset().getTotalSeconds();
 
         return Integer.MIN_VALUE;
     }

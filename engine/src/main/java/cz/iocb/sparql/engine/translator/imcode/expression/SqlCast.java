@@ -83,24 +83,24 @@ public class SqlCast extends SqlUnary
             ResourceClass operandClass = getOperand().getExpressionResourceClass();
             StringBuilder builder = new StringBuilder();
 
-            if(operandClass instanceof DateTimeConstantZoneClass)
+            if(operandClass instanceof DateTimeConstantZoneClass constantZoneClass)
             {
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_datetime(");
                 builder.append(getOperand().translate(request));
                 builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) operandClass).getZone());
+                builder.append(constantZoneClass.getZone());
                 builder.append("'::int4)");
             }
-            else if(operandClass instanceof DateConstantZoneClass)
+            else if(operandClass instanceof DateConstantZoneClass constantZoneClass)
             {
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_date(");
                 builder.append(getOperand().translate(request));
                 builder.append(", '");
-                builder.append(((DateConstantZoneClass) operandClass).getZone());
+                builder.append(constantZoneClass.getZone());
                 builder.append("'::int4)");
             }
             else if(operandClass instanceof IriClass)
@@ -170,20 +170,20 @@ public class SqlCast extends SqlUnary
                 builder.append(((DateTimeConstantZoneClass) resClass).getZone());
                 builder.append("'::int4)");
             }
-            else if(resClass instanceof DateTimeConstantZoneClass && castClass == xsdDateTime)
+            else if(resClass instanceof DateTimeConstantZoneClass zone && castClass == xsdDateTime)
             {
                 builder.append("sparql.zoneddatetime_create(");
                 builder.append(variable.getExpressionValue(resClass));
                 builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append(zone.getZone());
                 builder.append("'::int4)");
             }
-            else if(resClass instanceof DateTimeConstantZoneClass && castClass instanceof DateConstantZoneClass)
+            else if(resClass instanceof DateTimeConstantZoneClass zone && castClass instanceof DateConstantZoneClass)
             {
                 builder.append("sparql.cast_as_plain_date_from_datetime(");
                 builder.append(variable.getExpressionValue(resClass));
                 builder.append(", '");
-                builder.append(((DateTimeConstantZoneClass) resClass).getZone());
+                builder.append(zone.getZone());
                 builder.append("'::int4)");
             }
 

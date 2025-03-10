@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.parser.visitor;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringType;
-import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -162,10 +161,10 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         Literal fixed = new Literal(signNumber.getStringValue().substring(1), signNumber.getDataType());
         fixed.setRange(new Range(moveByOneCharacter(signNumber.getRange().getStart()), signNumber.getRange().getEnd()));
 
-        if(!(right instanceof Literal))
-            ((BinaryExpression) right).setLeft(fixed);
+        if(right instanceof BinaryExpression expression)
+            expression.setLeft(fixed);
 
-        return new BinaryExpression(operator, left, right instanceof Literal ? fixed : right);
+        return new BinaryExpression(operator, left, right instanceof BinaryExpression ? right : fixed);
     }
 
 
@@ -222,7 +221,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         if(ctx == null)
             return new ArrayList<>();
 
-        return ctx.expression().stream().map(this::visit).collect(toList());
+        return ctx.expression().stream().map(this::visit).toList();
     }
 
 
@@ -551,7 +550,7 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
         return contexts.stream().map(new ExpressionVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,
-                messages, allowAggregates)::visit).collect(toList());
+                messages, allowAggregates)::visit).toList();
     }
 
 

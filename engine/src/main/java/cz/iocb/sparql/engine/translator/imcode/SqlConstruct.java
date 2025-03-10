@@ -5,7 +5,6 @@ import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColu
 import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -120,7 +119,7 @@ public class SqlConstruct extends SqlIntercode
 
         if(child instanceof SqlUnion union)
             return SqlUnion.union(request,
-                    union.getChilds().stream().map(c -> construct(request, templates, bnOffset, c)).collect(toList()));
+                    union.getChilds().stream().map(c -> construct(request, templates, bnOffset, c)).toList());
 
 
         List<UsedVariables> branches = new ArrayList<UsedVariables>(templates.size());

@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.translator;
 
-import static java.util.stream.Collectors.toList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,7 +48,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     public Expression visit(InExpression inExpression)
     {
         Expression left = visitElement(inExpression.getLeft());
-        List<Expression> right = inExpression.getRight().stream().map(e -> visitElement(e)).collect(toList());
+        List<Expression> right = inExpression.getRight().stream().map(e -> visitElement(e)).toList();
         Expression result = new InExpression(left, right, inExpression.isNegated());
         result.setRange(inExpression.getRange());
         return result;
@@ -88,7 +87,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
         else
         {
             List<Expression> arguments = builtInCallExpression.getArguments().stream().map(e -> visitElement(e))
-                    .collect(toList());
+                    .toList();
             Expression result = new BuiltInCallExpression(builtInCallExpression.getFunctionName(), arguments);
             result.setRange(builtInCallExpression.getRange());
             return result;
@@ -106,8 +105,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     @Override
     public Expression visit(FunctionCallExpression functionCallExpression)
     {
-        List<Expression> arguments = functionCallExpression.getArguments().stream().map(e -> visitElement(e))
-                .collect(toList());
+        List<Expression> arguments = functionCallExpression.getArguments().stream().map(e -> visitElement(e)).toList();
         Expression result = new FunctionCallExpression(functionCallExpression.getFunction(), arguments);
         result.setRange(functionCallExpression.getRange());
         return result;

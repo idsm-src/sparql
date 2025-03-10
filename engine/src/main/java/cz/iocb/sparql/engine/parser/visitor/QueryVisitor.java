@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.parser.visitor;
 
-import static cz.iocb.sparql.engine.parser.StreamUtils.mapList;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
 import java.net.URI;
@@ -253,7 +252,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             select.setReduced(true);
 
             if(ctx.askQuery().datasetClause() != null)
-                select.getDataSets().addAll(mapList(ctx.askQuery().datasetClause(), this::parseDataSet));
+                select.getDataSets().addAll(ctx.askQuery().datasetClause().stream().map(this::parseDataSet).toList());
 
             select.getGroupByConditions().addAll(parseGroupClause(ctx.askQuery().groupClause()));
             select.getHavingConditions().addAll(parseHavingClause(ctx.askQuery().havingClause()));
@@ -293,15 +292,16 @@ public class QueryVisitor extends BaseVisitor<Query>
             LinkedList<Projection> projections = new LinkedList<Projection>();
 
             for(VarOrIri resource : resources)
-                if(resource instanceof Variable)
-                    projections.add(new Projection((Variable) resource));
+                if(resource instanceof Variable variable)
+                    projections.add(new Projection(variable));
 
 
             Select select = withRange(new Select(projections, pattern, values, true), ctx);
             select.setReduced(true);
 
             if(ctx.describeQuery().datasetClause() != null)
-                select.getDataSets().addAll(mapList(ctx.describeQuery().datasetClause(), this::parseDataSet));
+                select.getDataSets()
+                        .addAll(ctx.describeQuery().datasetClause().stream().map(this::parseDataSet).toList());
 
             SolutionModifierContext solutionModifierCtx = ctx.describeQuery().solutionModifier();
 
@@ -331,14 +331,14 @@ public class QueryVisitor extends BaseVisitor<Query>
                     {
                         ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
                         Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListNotEmpty());
-                        expander.visit(new ComplexTriple(node, properties.collect(toList())));
+                        expander.visit(new ComplexTriple(node, properties.toList()));
                     }
                     else
                     {
                         ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNode());
                         Stream<Property> properties = triplesCtx.propertyList().propertyListNotEmpty() != null ?
                                 propertiesVisitor.visit(triplesCtx.propertyList()) : Stream.empty();
-                        expander.visit(new ComplexTriple(node, properties.collect(toList())));
+                        expander.visit(new ComplexTriple(node, properties.toList()));
                     }
                 }
             }
@@ -381,7 +381,8 @@ public class QueryVisitor extends BaseVisitor<Query>
             select.setReduced(true);
 
             if(ctx.constructQuery().datasetClause() != null)
-                select.getDataSets().addAll(mapList(ctx.constructQuery().datasetClause(), this::parseDataSet));
+                select.getDataSets()
+                        .addAll(ctx.constructQuery().datasetClause().stream().map(this::parseDataSet).toList());
 
             SolutionModifierContext solutionModifierCtx = ctx.constructQuery().solutionModifier();
 
@@ -500,7 +501,8 @@ public class QueryVisitor extends BaseVisitor<Query>
 
             if(!selectClauseCtx.selectVariable().isEmpty())
             {
-                for(Projection projection : mapList(selectClauseCtx.selectVariable(), this::parseProjection))
+                for(Projection projection : selectClauseCtx.selectVariable().stream().map(this::parseProjection)
+                        .toList())
                     if(projection != null)
                         projections.add(projection);
             }
@@ -594,7 +596,7 @@ public class QueryVisitor extends BaseVisitor<Query>
                 result.setReduced(true);
 
             if(dataSetClauseCtxs != null)
-                result.getDataSets().addAll(mapList(dataSetClauseCtxs, this::parseDataSet));
+                result.getDataSets().addAll(dataSetClauseCtxs.stream().map(this::parseDataSet).toList());
 
             result.getGroupByConditions().addAll(parseGroupClause(solutionModifierCtx.groupClause()));
             result.getHavingConditions().addAll(parseHavingClause(solutionModifierCtx.havingClause()));
@@ -636,8 +638,8 @@ public class QueryVisitor extends BaseVisitor<Query>
             {
                 if(groupCondition.getVariable() != null)
                     groupVars.add(groupCondition.getVariable().getName());
-                else if(groupCondition.getExpression() instanceof Variable)
-                    groupVars.add(((Variable) groupCondition.getExpression()).getName());
+                else if(groupCondition.getExpression() instanceof Variable variable)
+                    groupVars.add(variable.getName());
             }
 
             for(Projection projection : select.getProjections())
@@ -753,7 +755,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(ctx == null)
             return new ArrayList<GroupCondition>();
 
-        return mapList(ctx.groupCondition(), this::parseGroupCondition);
+        return ctx.groupCondition().stream().map(this::parseGroupCondition).toList();
     }
 
 
@@ -789,7 +791,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, graphs, services, scopes,
                 usedBlankNodes, messages, true);
 
-        return mapList(ctx.havingCondition(), expressionVisitor::visit);
+        return ctx.havingCondition().stream().map(expressionVisitor::visit).toList();
     }
 
 
@@ -798,7 +800,7 @@ public class QueryVisitor extends BaseVisitor<Query>
         if(ctx == null)
             return new ArrayList<OrderCondition>();
 
-        return mapList(ctx.orderCondition(), this::parseOrderCondition);
+        return ctx.orderCondition().stream().map(this::parseOrderCondition).toList();
     }
 
 
@@ -942,7 +944,7 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     public GraphPattern visitGroupGraphPatternSub(GroupGraphPatternSubContext ctx)
     {
         List<Pattern> patterns = new GroupGraphPatternVisitor(config, prologue, graphs, services, scopes,
-                usedBlankNodes, messages).visit(ctx).collect(toList());
+                usedBlankNodes, messages).visit(ctx).toList();
 
 
         HashSet<Variable> inScopeVariables = new HashSet<Variable>();
@@ -995,9 +997,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             Triple triple = (Triple) pattern;
             Verb predicate = triple.getPredicate();
 
-            if(predicate instanceof IRI)
+            if(predicate instanceof IRI procedureName)
             {
-                IRI procedureName = (IRI) predicate;
                 ProcedureDefinition definition = config.getProcedures(service).get(procedureName.getValue());
 
                 if(definition != null)
@@ -1091,8 +1092,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                 iterator.remove();
                 parameterNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
 
-                if(triple.getPredicate() instanceof IRI)
-                    parameters.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
+                if(triple.getPredicate() instanceof IRI iri)
+                    parameters.add(new Parameter(iri, triple.getObject()));
                 else
                     messages.add(new TranslateMessage(MessageType.invalidProcedureParameterValue,
                             triple.getPredicate().getRange())); //TODO: could be supported in a future version
@@ -1106,8 +1107,8 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                 iterator.remove();
                 resultNodeOccurences.get(triple.getSubject()).add(triple.getSubject().getRange());
 
-                if(triple.getPredicate() instanceof IRI)
-                    results.add(new Parameter((IRI) triple.getPredicate(), triple.getObject()));
+                if(triple.getPredicate() instanceof IRI iri)
+                    results.add(new Parameter(iri, triple.getObject()));
                 else
                     messages.add(new TranslateMessage(MessageType.invalidProcedureResultValue,
                             triple.getPredicate().getRange())); //TODO: could be supported in a future version
@@ -1121,15 +1122,15 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
             {
                 Node object = ((Triple) pattern).getObject();
 
-                if(object instanceof BlankNode)
+                if(object instanceof BlankNode bnode)
                 {
                     if(parameterNodeOccurences.containsKey(object))
                         messages.add(new TranslateMessage(MessageType.invalidParameterBlankNodeOccurence,
-                                object.getRange(), ((BlankNode) object).getName()));
+                                object.getRange(), bnode.getName()));
 
                     if(resultNodeOccurences.containsKey(object))
                         messages.add(new TranslateMessage(MessageType.invalidResultBlankNodeOccurence,
-                                object.getRange(), ((BlankNode) object).getName()));
+                                object.getRange(), bnode.getName()));
                 }
             }
         }
@@ -1481,13 +1482,13 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
             {
                 ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
                 Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPathNotEmpty());
-                triples.add(new ComplexTriple(node, properties.collect(toList())));
+                triples.add(new ComplexTriple(node, properties.toList()));
             }
             else
             {
                 ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNodePath());
                 Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPath());
-                triples.add(new ComplexTriple(node, properties.collect(toList())));
+                triples.add(new ComplexTriple(node, properties.toList()));
             }
         }
 
@@ -1548,7 +1549,7 @@ class PatternVisitor extends BaseVisitor<Pattern>
     @Override
     public Pattern visitGroupOrUnionGraphPattern(GroupOrUnionGraphPatternContext ctx)
     {
-        List<GraphPattern> patterns = mapList(ctx.groupGraphPattern(), graphPatternVisitor::visit);
+        List<GraphPattern> patterns = ctx.groupGraphPattern().stream().map(graphPatternVisitor::visit).toList();
 
         if(patterns.size() == 1)
         {
@@ -1644,8 +1645,8 @@ class PatternVisitor extends BaseVisitor<Pattern>
     {
         Variable variable = withRange(new Variable(scopes.addToScope(ctx.var().getText()), ctx.var().getText()),
                 ctx.var());
-        List<Values.ValuesList> valuesLists = mapList(ctx.dataBlockValue(),
-                value -> new Values.ValuesList(Collections.singleton(createVal(value))));
+        List<Values.ValuesList> valuesLists = ctx.dataBlockValue().stream()
+                .map(value -> new Values.ValuesList(Collections.singleton(createVal(value)))).toList();
 
         return withRange(new Values(Collections.singleton(variable), valuesLists), ctx);
     }
@@ -1654,8 +1655,8 @@ class PatternVisitor extends BaseVisitor<Pattern>
     @Override
     public Values visitInlineDataFull(InlineDataFullContext ctx)
     {
-        List<Variable> variables = mapList(ctx.var(),
-                var -> withRange(new Variable(scopes.addToScope(var.getText()), var.getText()), var));
+        List<Variable> variables = ctx.var().stream()
+                .map(var -> withRange(new Variable(scopes.addToScope(var.getText()), var.getText()), var)).toList();
         List<Values.ValuesList> valuesLists = new LinkedList<Values.ValuesList>();
 
 
@@ -1668,7 +1669,8 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
         for(DataBlockValuesContext block : ctx.dataBlockValues())
         {
-            List<Expression> values = mapList(block.dataBlockValue(), this::createVal);
+            List<Expression> values = block.dataBlockValue().stream().map(this::createVal)
+                    .collect(toCollection(ArrayList::new));
 
             if(values.size() != variables.size())
             {

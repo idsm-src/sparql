@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.parser.visitor;
 
-import static java.util.stream.Collectors.toList;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -41,7 +40,7 @@ public class PathVisitor extends BaseVisitor<Path>
 
     private List<Path> visitPathList(List<? extends ParserRuleContext> pathSequenceContexts)
     {
-        return pathSequenceContexts.stream().map(this::visit).collect(toList());
+        return pathSequenceContexts.stream().map(this::visit).toList();
     }
 
 

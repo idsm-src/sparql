@@ -1,7 +1,5 @@
 package cz.iocb.sparql.engine.parser.visitor;
 
-import static cz.iocb.sparql.engine.parser.StreamUtils.mapList;
-import static java.util.stream.Collectors.toList;
 import java.util.List;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateMessage;
@@ -106,7 +104,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public RdfCollection visitCollectionPath(CollectionPathContext ctx)
     {
-        List<ComplexNode> nodes = mapList(ctx.graphNodePath(), this::visit);
+        List<ComplexNode> nodes = ctx.graphNodePath().stream().map(this::visit).toList();
 
         return new RdfCollection(nodes);
     }
@@ -115,7 +113,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     @Override
     public RdfCollection visitCollection(CollectionContext ctx)
     {
-        List<ComplexNode> nodes = mapList(ctx.graphNode(), this::visit);
+        List<ComplexNode> nodes = ctx.graphNode().stream().map(this::visit).toList();
 
         return new RdfCollection(nodes);
     }
@@ -125,7 +123,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     public BlankNodePropertyList visitBlankNodePropertyListPath(BlankNodePropertyListPathContext ctx)
     {
         List<Property> properties = new PropertiesVisitor(config, prologue, scopes, messages)
-                .visit(ctx.propertyListPathNotEmpty()).collect(toList());
+                .visit(ctx.propertyListPathNotEmpty()).toList();
 
         return new BlankNodePropertyList(properties);
     }
@@ -135,7 +133,7 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     public BlankNodePropertyList visitBlankNodePropertyList(BlankNodePropertyListContext ctx)
     {
         List<Property> properties = new PropertiesVisitor(config, prologue, scopes, messages)
-                .visit(ctx.propertyListNotEmpty()).collect(toList());
+                .visit(ctx.propertyListNotEmpty()).toList();
 
         return new BlankNodePropertyList(properties);
     }

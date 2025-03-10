@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -371,9 +370,9 @@ public abstract class SqlIntercode extends SqlBaseClass
                     if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
                     {
                         List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass()).stream()
-                                .map(c -> c.fromTable(leftTable)).collect(toList());
+                                .map(c -> c.fromTable(leftTable)).toList();
                         List<Column> rightCols = rightVariable.getMapping(pairedClass.getRightClass()).stream()
-                                .map(c -> c.fromTable(rightTable)).collect(toList());
+                                .map(c -> c.fromTable(rightTable)).toList();
 
                         Set<String> compare = new HashSet<String>();
 
@@ -444,9 +443,9 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
             {
                 List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass()).stream()
-                        .map(c -> c.fromTable(leftTable)).collect(toList());
+                        .map(c -> c.fromTable(leftTable)).toList();
                 List<Column> rightCols = rightVariable.getMapping(pairedClass.getRightClass()).stream()
-                        .map(c -> c.fromTable(rightTable)).collect(toList());
+                        .map(c -> c.fromTable(rightTable)).toList();
 
                 Set<String> compare = new HashSet<String>();
 

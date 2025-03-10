@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.translator.imcode;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,10 +48,8 @@ public class SqlFilter extends SqlIntercode
         if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(child instanceof SqlFilter)
+        if(child instanceof SqlFilter filter)
         {
-            SqlFilter filter = (SqlFilter) child;
-
             ArrayList<SqlExpressionIntercode> merged = new ArrayList<SqlExpressionIntercode>();
             merged.addAll(((SqlFilter) child).conditions);
             merged.addAll(conditions);
@@ -61,15 +58,15 @@ public class SqlFilter extends SqlIntercode
                     restrictions == null ? filter.child : filter.child.optimize(request, restrictions, reduced));
         }
 
-        if(child instanceof SqlUnion)
+        if(child instanceof SqlUnion union)
             return SqlUnion
                     .union(request,
-                            ((SqlUnion) child).getChilds().stream()
+                            union.getChilds().stream()
                                     .map(p -> filter(request,
                                             conditions.stream().map(c -> c.optimize(request, p.getVariables()))
-                                                    .collect(toList()),
+                                                    .toList(),
                                             p, restrictions, reduced))
-                                    .collect(toList()))
+                                    .toList())
                     .optimize(request, restrictions, reduced);
 
         /* standard filter */
@@ -81,8 +78,7 @@ public class SqlFilter extends SqlIntercode
         {
             if(expression == SqlNull.get() || expression == falseValue)
                 isFalse = true;
-            else if(expression instanceof SqlBinaryComparison
-                    && ((SqlBinaryComparison) expression).isAlwaysFalseOrNull())
+            else if(expression instanceof SqlBinaryComparison binary && binary.isAlwaysFalseOrNull())
                 isFalse = true;
             else if(expression != trueValue)
                 validExpressions.add(expression);
@@ -121,7 +117,7 @@ public class SqlFilter extends SqlIntercode
                     reduced && optCnds.stream().allMatch(r -> r.isDeterministic()));
 
             List<SqlExpressionIntercode> newOptCnds = optCnds.stream()
-                    .map(c -> c.optimize(request, newOptChild.getVariables())).collect(toList());
+                    .map(c -> c.optimize(request, newOptChild.getVariables())).toList();
 
             Set<String> newCndVars = newOptCnds.stream().flatMap(c -> c.getReferencedVariables().stream())
                     .collect(toSet());

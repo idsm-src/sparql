@@ -194,11 +194,8 @@ public class DateConstantZoneClass extends LiteralClass
         if(!super.match(statement, node))
             return false;
 
-        if(!(node instanceof Literal))
-            return true;
-
-        if(DateClass.getZone((Literal) node) != zone)
-            return false;
+        if(node instanceof Literal literal)
+            return DateClass.getZone(literal) == zone;
 
         return true;
     }

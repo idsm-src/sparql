@@ -68,11 +68,11 @@ public class SqlLeftJoin extends SqlIntercode
         if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
             return SqlJoin.join(request, left, right).optimize(request, restrictions, reduce);
 
-        if(left instanceof SqlUnion)
+        if(left instanceof SqlUnion union)
         {
             List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-            for(SqlIntercode child : ((SqlUnion) left).getChilds())
+            for(SqlIntercode child : union.getChilds())
             {
                 List<SqlExpressionIntercode> conds = optimize(request, conditions, child.getVariables(),
                         right.getVariables());
@@ -82,11 +82,11 @@ public class SqlLeftJoin extends SqlIntercode
             return SqlUnion.union(request, unionList).optimize(request, restrictions, reduce);
         }
 
-        if(right instanceof SqlUnion)
+        if(right instanceof SqlUnion union)
         {
             List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-            for(SqlIntercode child : ((SqlUnion) right).getChilds())
+            for(SqlIntercode child : union.getChilds())
                 if(isJoinable(request, left, child,
                         optimize(request, conditions, left.getVariables(), child.getVariables())))
                     unionList.add(child);

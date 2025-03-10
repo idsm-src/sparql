@@ -15,9 +15,9 @@ public abstract class ComplexElementVisitor<T> extends ElementVisitor<T>
     @Override
     public T visitElement(Element element)
     {
-        if(element instanceof ComplexElement)
+        if(element instanceof ComplexElement complexElement)
         {
-            return visitElement((ComplexElement) element);
+            return visitElement(complexElement);
         }
 
         return super.visitElement(element);

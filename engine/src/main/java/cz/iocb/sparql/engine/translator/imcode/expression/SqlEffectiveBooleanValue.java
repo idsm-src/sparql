@@ -20,7 +20,6 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -41,18 +40,16 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
     {
-        if(operand instanceof SqlLiteral)
+        if(operand instanceof SqlLiteral literal)
         {
             ResourceClass literalClass = operand.getResourceClasses().iterator().next();
 
             if(!isEffectiveBooleanClass(literalClass))
                 return SqlNull.get();
 
-            Literal literal = ((SqlLiteral) operand).getLiteral();
-            Object value = literal.getValue();
+            Object value = literal.getLiteral().getValue();
 
-
-            if(literalClass == unsupportedLiteral && ebvTypes.contains(literal.getTypeIri()))
+            if(literalClass == unsupportedLiteral && ebvTypes.contains(literal.getLiteral().getTypeIri()))
                 return falseValue;
             else if(literalClass == xsdBoolean)
                 return getConstantCode((Boolean) value);
@@ -119,10 +116,8 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     {
         SqlExpressionIntercode operand = getOperand();
 
-        if(operand instanceof SqlVariable)
+        if(operand instanceof SqlVariable variable)
         {
-            SqlVariable variable = (SqlVariable) operand;
-
             Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> isEffectiveBooleanClass(r)).collect(toSet());
 

@@ -27,8 +27,8 @@ public class BaseVisitor<T> extends SparqlParserBaseVisitor<T>
     {
         T result = super.visit(tree);
 
-        if(result instanceof Element)
-            withRange((Element) result, (ParserRuleContext) tree);
+        if(result instanceof Element element)
+            withRange(element, (ParserRuleContext) tree);
 
         return result;
     }

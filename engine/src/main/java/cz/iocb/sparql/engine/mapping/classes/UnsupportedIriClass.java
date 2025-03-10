@@ -91,10 +91,12 @@ public class UnsupportedIriClass extends IriClass
     @Override
     public boolean match(Statement statement, Node node)
     {
-        if(node instanceof VariableOrBlankNode || node instanceof IRI)
-            return true;
-
-        return false;
+        return switch(node)
+        {
+            case VariableOrBlankNode var -> true;
+            case IRI iri -> true;
+            default -> false;
+        };
     }
 
 

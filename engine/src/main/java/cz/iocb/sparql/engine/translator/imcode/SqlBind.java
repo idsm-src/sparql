@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
@@ -63,12 +62,10 @@ public class SqlBind extends SqlIntercode
         if(expression == SqlNull.get() || restrictions != null && !restrictions.contains(variableName))
             return child.optimize(request, restrictions, reduced);
 
-        if(child instanceof SqlUnion)
+        if(child instanceof SqlUnion union)
             return SqlUnion.union(request,
-                    ((SqlUnion) child)
-                            .getChilds().stream().map(c -> bind(request, variableName,
-                                    expression.optimize(request, c.getVariables()), c, restrictions, reduced))
-                            .collect(toList()))
+                    union.getChilds().stream().map(c -> bind(request, variableName,
+                            expression.optimize(request, c.getVariables()), c, restrictions, reduced)).toList())
                     .optimize(request, restrictions, reduced);
 
 

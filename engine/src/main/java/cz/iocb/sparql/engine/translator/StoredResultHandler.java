@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -142,8 +141,7 @@ public class StoredResultHandler extends ResultHandler
             UsedVariable v = new UsedVariable(var.getName(), counts.getOrDefault(var.getName(), 0) < rowCount);
 
             for(Entry<ResourceClass, List<Column>> e : var.getMappings().entrySet())
-                v.addMapping(e.getKey(),
-                        e.getValue().stream().map(c -> constants.getOrDefault(c, c)).collect(toList()));
+                v.addMapping(e.getKey(), e.getValue().stream().map(c -> constants.getOrDefault(c, c)).toList());
 
             vars.add(v);
         }

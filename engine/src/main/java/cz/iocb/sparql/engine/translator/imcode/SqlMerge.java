@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -47,9 +46,9 @@ public class SqlMerge extends SqlIntercode
         if(child == SqlNoSolution.get())
             return SqlNoSolution.get();
 
-        if(child instanceof SqlUnion)
-            return SqlUnion.union(request, ((SqlUnion) child).getChilds().stream()
-                    .map(c -> create(request, variable1, variable2, c, restrictions)).collect(toList()));
+        if(child instanceof SqlUnion union)
+            return SqlUnion.union(request, union.getChilds().stream()
+                    .map(c -> create(request, variable1, variable2, c, restrictions)).toList());
 
 
         /* special merge */

@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -183,8 +182,7 @@ public class SqlAggregation extends SqlIntercode
             for(SqlIntercode child : union.getChilds())
             {
                 List<Map<ResourceClass, List<Column>>> key = groupVariables.stream()
-                        .map(v -> child.getVariable(v) == null ? null : child.getMappings(v))
-                        .collect(Collectors.toList());
+                        .map(v -> child.getVariable(v) == null ? null : child.getMappings(v)).toList();
                 parts.computeIfAbsent(key, (k) -> new ArrayList<SqlIntercode>()).add(child);
             }
 

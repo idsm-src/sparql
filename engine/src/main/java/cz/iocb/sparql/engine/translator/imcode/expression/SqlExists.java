@@ -4,7 +4,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,11 +52,11 @@ public class SqlExists extends SqlExpressionIntercode
             return negated ? falseValue : trueValue;
 
 
-        if(pattern instanceof SqlUnion)
+        if(pattern instanceof SqlUnion union)
         {
             List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-            for(SqlIntercode child : ((SqlUnion) pattern).getChilds())
+            for(SqlIntercode child : union.getChilds())
             {
                 ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(), variables);
 
@@ -101,7 +100,7 @@ public class SqlExists extends SqlExpressionIntercode
 
             for(Entry<ResourceClass, List<Column>> entry : var.getMappings().entrySet())
                 cndvar.addMapping(entry.getKey(),
-                        entry.getValue().stream().map(c -> map.containsKey(c) ? map.get(c) : c).collect(toList()));
+                        entry.getValue().stream().map(c -> map.containsKey(c) ? map.get(c) : c).toList());
 
             cndvariables.add(cndvar);
         }

@@ -25,14 +25,14 @@ public class Triple extends PatternElement implements BasicPattern
         this.object = object;
 
 
-        if(subject instanceof Variable)
-            variablesInScope.add((Variable) subject);
+        if(subject instanceof Variable variable)
+            variablesInScope.add(variable);
 
-        if(predicate instanceof Variable)
-            variablesInScope.add((Variable) predicate);
+        if(predicate instanceof Variable variable)
+            variablesInScope.add(variable);
 
-        if(object instanceof Variable)
-            variablesInScope.add((Variable) object);
+        if(object instanceof Variable variable)
+            variablesInScope.add(variable);
     }
 
 

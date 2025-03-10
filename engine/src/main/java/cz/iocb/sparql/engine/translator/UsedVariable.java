@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -143,7 +142,7 @@ public class UsedVariable
         }
 
         if(columns.size() == 0)
-            return resourceClass.getSqlTypes().stream().map(t -> new ConstantColumn(null, t)).collect(toList());
+            return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
 
         if(columns.size() == 1)
             return columns.get(0);

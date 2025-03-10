@@ -2,7 +2,7 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static cz.iocb.sparql.engine.translator.imcode.SqlTableAccess.remap;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toCollection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,7 +72,9 @@ public class SqlJoin extends SqlIntercode
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         // just to be sure
-        //unionList = unionList.stream().map(innerList -> innerList.stream().collect(toList())).collect(toList());
+        unionList = unionList.stream()
+                .map(innerList -> (List<SqlIntercode>) innerList.stream().collect(toCollection(ArrayList::new)))
+                .toList();
 
         for(List<SqlIntercode> newChilds : unionList)
         {
@@ -130,7 +132,7 @@ public class SqlJoin extends SqlIntercode
             }
         }
 
-        return SqlUnion.union(request, unionList.stream().map(l -> join(request, l, restrictions)).collect(toList()));
+        return SqlUnion.union(request, unionList.stream().map(l -> join(request, l, restrictions)).toList());
     }
 
 
@@ -244,7 +246,7 @@ public class SqlJoin extends SqlIntercode
             builder.append(tables.get(i));
         }
 
-        String condition = generateJoinCondition(childs.stream().map(c -> c.getVariables()).collect(toList()), tables);
+        String condition = generateJoinCondition(childs.stream().map(c -> c.getVariables()).toList(), tables);
 
         if(condition != null)
         {
@@ -331,11 +333,11 @@ public class SqlJoin extends SqlIntercode
             if(child == SqlNoSolution.get())
                 return new ArrayList<List<SqlIntercode>>(0);
 
-            if(child instanceof SqlUnion)
+            if(child instanceof SqlUnion union)
             {
                 List<List<SqlIntercode>> newUnionList = new ArrayList<List<SqlIntercode>>();
 
-                for(SqlIntercode unionChild : ((SqlUnion) child).getChilds())
+                for(SqlIntercode unionChild : union.getChilds())
                 {
                     List<SqlIntercode> itemList = getJoinList(unionChild);
 
@@ -520,7 +522,7 @@ public class SqlJoin extends SqlIntercode
             return childs.get(0);
 
 
-        List<Table> tables = IntStream.range(0, childs.size()).mapToObj(i -> new Table("tab" + i)).collect(toList());
+        List<Table> tables = IntStream.range(0, childs.size()).mapToObj(i -> new Table("tab" + i)).toList();
 
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
         List<UsedVariables> allVars = childs.stream().map(c -> c.getVariables()).toList();
@@ -566,8 +568,8 @@ public class SqlJoin extends SqlIntercode
 
     public final static List<SqlIntercode> getJoinList(SqlIntercode child)
     {
-        if(child instanceof SqlJoin)
-            return new ArrayList<SqlIntercode>(((SqlJoin) child).getChilds());
+        if(child instanceof SqlJoin join)
+            return new ArrayList<SqlIntercode>(join.getChilds());
         else
             return List.of(child);
     }

@@ -31,12 +31,12 @@ public class MultiProcedureCall extends ProcedureCallBase
         this.results = Collections.unmodifiableList(new ArrayList<>(results));
 
         for(Parameter result : results)
-            if(result.getValue() instanceof Variable)
-                variablesInScope.add((Variable) result.getValue());
+            if(result.getValue() instanceof Variable variable)
+                variablesInScope.add(variable);
 
         for(Parameter parameter : parameters)
-            if(parameter.getValue() instanceof Variable)
-                variablesInScope.add((Variable) parameter.getValue());
+            if(parameter.getValue() instanceof Variable variable)
+                variablesInScope.add(variable);
     }
 
 

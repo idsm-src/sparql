@@ -200,11 +200,8 @@ public class LangStringConstantTagClass extends LiteralClass
         if(!super.match(statement, node))
             return false;
 
-        if(!(node instanceof Literal))
-            return true;
-
-        if(!lang.equals(((Literal) node).getLanguageTag()))
-            return false;
+        if(node instanceof Literal literal)
+            return lang.equals(literal.getLanguageTag());
 
         return true;
     }

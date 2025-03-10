@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.parser.visitor;
 
-import static cz.iocb.sparql.engine.parser.StreamUtils.mapList;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -68,7 +67,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
         NodeVisitor nodeVisitor = new NodeVisitor(config, prologue, scopes, messages);
 
-        return mapList(ctx.objectPath(), nodeVisitor::visit);
+        return ctx.objectPath().stream().map(nodeVisitor::visit).toList();
     }
 
 
@@ -79,7 +78,7 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
         NodeVisitor nodeVisitor = new NodeVisitor(config, prologue, scopes, messages);
 
-        return mapList(ctx.object(), nodeVisitor::visit);
+        return ctx.object().stream().map(nodeVisitor::visit).toList();
     }
 
 

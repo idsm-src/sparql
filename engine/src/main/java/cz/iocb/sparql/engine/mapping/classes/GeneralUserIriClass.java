@@ -293,13 +293,12 @@ public class GeneralUserIriClass extends UserIriClass
     @Override
     public boolean match(Statement statement, Node node)
     {
-        if(node instanceof VariableOrBlankNode)
-            return true;
-
-        if(!(node instanceof IRI))
-            return false;
-
-        return match(statement, (IRI) node);
+        return switch(node)
+        {
+            case VariableOrBlankNode var -> true;
+            case IRI iri -> match(statement, iri);
+            default -> false;
+        };
     }
 
 

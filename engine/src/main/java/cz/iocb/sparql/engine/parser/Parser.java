@@ -84,8 +84,8 @@ public class Parser
                     int charPositionInLine, String msg, RecognitionException e)
             {
                 Range range;
-                if(offendingSymbol instanceof Token)
-                    range = Range.compute((Token) offendingSymbol, (Token) offendingSymbol);
+                if(offendingSymbol instanceof Token token)
+                    range = Range.compute(token, token);
                 else
                     range = new Range(new Position(line, charPositionInLine), null);
 
