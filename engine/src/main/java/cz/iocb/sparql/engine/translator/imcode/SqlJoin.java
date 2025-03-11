@@ -98,10 +98,11 @@ public class SqlJoin extends SqlIntercode
                 break; //TODO: process others
             }
 
-            for(SqlIntercode recursive : newChilds.stream()
+            loop:
+            for(SqlIntercode child : newChilds.stream()
                     .filter(c -> c instanceof SqlDistinct d && d.getChild() instanceof SqlUnion).toList())
             {
-                SqlDistinct distinct = (SqlDistinct) recursive;
+                SqlDistinct distinct = (SqlDistinct) child;
                 SqlUnion union = (SqlUnion) distinct.getChild();
 
 
@@ -117,6 +118,10 @@ public class SqlJoin extends SqlIntercode
                     HashSet<String> shared = new HashSet<String>(candidate.getVariables().getNames());
                     shared.retainAll(distinct.getVariables().getNames());
 
+                    if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
+                            .equals(distinct.getVariables().getNonConstantColumns()))
+                        continue;
+
                     for(SqlTableAccess distinctPart : distinctParts)
                     {
                         SqlIntercode intercode = tryReduceJoin(schema, candidate, distinctPart, shared);
@@ -126,6 +131,7 @@ public class SqlJoin extends SqlIntercode
                             newChilds.remove(distinct);
                             newChilds.remove(candidate);
                             newChilds.add(intercode);
+                            continue loop;
                         }
                     }
                 }
