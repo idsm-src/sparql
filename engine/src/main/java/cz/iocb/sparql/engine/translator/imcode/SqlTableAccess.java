@@ -209,11 +209,12 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+
+    static Set<Column> getJoinColumns(SqlTableAccess left, SqlTableAccess right)
     {
         // only the same tables can by merged
         if(!Objects.equals(left.table, right.table))
-            return false;
+            return Set.of();
 
 
         Set<Column> columns = new HashSet<Column>();
@@ -229,16 +230,16 @@ public class SqlTableAccess extends SqlIntercode
             //NOTE: currently, only simple join is taken into the account
 
             if(pair.getClasses().size() > 1)
-                return false;
+                return Set.of();
 
             if(leftVar.canBeNull() || rightVar.canBeNull())
                 if(!leftVar.equals(rightVar)) // TODO:  take representatives into account
-                    return false;
+                    return Set.of();
 
             for(PairedClass pairedClass : pair.getClasses())
             {
                 if(pairedClass.getLeftClass() != pairedClass.getRightClass())
-                    return false;
+                    return Set.of();
 
                 List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
                 List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
@@ -265,20 +266,20 @@ public class SqlTableAccess extends SqlIntercode
                     columns.add(pair.getLeft());
         }
 
+        return columns;
+    }
+
+
+    private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
+    {
+        Set<Column> columns = getJoinColumns(left, right);
+
         return schema.getCompatibleKey(left.table, columns) != null;
     }
 
 
-    private static List<ColumnPair> canBeJoinedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
-            SqlTableAccess child)
+    static Set<ColumnPair> getJoinColumnPairs(SqlTableAccess parent, SqlTableAccess child)
     {
-        if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table) == null)
-            return null;
-
-        if(parent.hasExpression())
-            return null;
-
-
         Set<ColumnPair> columns = new HashSet<ColumnPair>();
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(parent.internal, child.internal))
@@ -292,15 +293,15 @@ public class SqlTableAccess extends SqlIntercode
             //NOTE: currently, only simple join is taken into the account
 
             if(pair.getClasses().size() > 1)
-                return null;
+                return Set.of();
 
             if(parentVar.canBeNull() || childVar.canBeNull())
-                return null;
+                return Set.of();
 
             for(PairedClass pairedClass : pair.getClasses())
             {
                 if(pairedClass.getLeftClass() != pairedClass.getRightClass())
-                    return null;
+                    return Set.of();
 
                 List<Column> parentCols = parentVar.getMapping(pairedClass.getLeftClass());
                 List<Column> childCols = childVar.getMapping(pairedClass.getRightClass());
@@ -328,9 +329,24 @@ public class SqlTableAccess extends SqlIntercode
                     columns.add(new ColumnPair(pair.getLeft(), childColumn));
         }
 
+        return columns;
+    }
+
+
+    private static Set<ColumnPair> canBeJoinedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
+            SqlTableAccess child)
+    {
+        if(schema.getForeignKeys(parent.table, child.table).isEmpty())
+            return null;
+
+        if(parent.hasExpression())
+            return null;
+
+        Set<ColumnPair> columns = getJoinColumnPairs(parent, child);
+
         Set<Column> parentColumns = new HashSet<Column>();
         parentColumns.addAll(parent.conditions.getNonConstantColumns());
-        parentColumns.addAll(parent.getVariables().getNonConstantColumns());
+        parentColumns.addAll(parent.getInternalVariables().getNonConstantColumns());
 
         return schema.getCompatibleForeignKey(parent.table, child.table, columns, parentColumns);
     }
@@ -369,10 +385,10 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static List<ColumnPair> canBeDistinctUnionizedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
+    private static Set<ColumnPair> canBeDistinctUnionizedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
             SqlTableAccess child)
     {
-        if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table) == null)
+        if(parent.table == null || child.table == null || schema.getForeignKeys(parent.table, child.table).isEmpty())
             return null;
 
         // because we cannot rewrite expressions
@@ -489,7 +505,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
     {
         Condition joinCondition = new Condition();
         UsedVariables variables = new UsedVariables();
@@ -524,7 +540,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, List<ColumnPair> key,
+    static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, Set<ColumnPair> key,
             Set<String> restrictions)
     {
         Map<Column, Column> map = new HashMap<Column, Column>();
@@ -620,7 +636,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     private static SqlIntercode distinctUnionizeByForeignKey(SqlTableAccess parent, SqlTableAccess child,
-            List<ColumnPair> key)
+            Set<ColumnPair> key)
     {
         Conditions conditions = null;
 
@@ -680,13 +696,13 @@ public class SqlTableAccess extends SqlIntercode
     public static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
             Set<String> restrictions)
     {
-        List<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(schema, left, right);
+        Set<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(schema, left, right);
 
         if(dropLeft != null)
             return SqlTableAccess.joinByForeignKey(left, right, dropLeft, restrictions);
 
 
-        List<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(schema, right, left);
+        Set<ColumnPair> dropRight = SqlTableAccess.canBeJoinedByForeignKey(schema, right, left);
 
         if(dropRight != null)
             return SqlTableAccess.joinByForeignKey(right, left, dropRight, restrictions);
@@ -711,12 +727,12 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode tryReduceDistinctUnion(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
-        List<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
+        Set<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
 
         if(dropRight != null)
             return SqlTableAccess.distinctUnionizeByForeignKey(left, right, dropRight);
 
-        List<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, right, left);
+        Set<ColumnPair> dropLeft = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, right, left);
 
         if(dropLeft != null)
             return SqlTableAccess.distinctUnionizeByForeignKey(right, left, dropLeft);
@@ -808,7 +824,7 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private boolean hasExpression()
+    boolean hasExpression()
     {
         if(internal.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
             return true;

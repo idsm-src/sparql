@@ -79,7 +79,7 @@ public class DatabaseSchema
 
     private final HashMap<Table, List<Column>> nullableColumns = new HashMap<Table, List<Column>>();
     private final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
-    private final HashMap<TablePair, List<List<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<List<ColumnPair>>>();
+    private final HashMap<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<Set<ColumnPair>>>();
     private final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
 
 
@@ -213,15 +213,15 @@ public class DatabaseSchema
     {
         TablePair tablePair = new TablePair(parentTable, foreignTable);
 
-        List<List<ColumnPair>> foreignKeyList = foreignKeys.get(tablePair);
+        List<Set<ColumnPair>> foreignKeyList = foreignKeys.get(tablePair);
 
         if(foreignKeyList == null)
         {
-            foreignKeyList = new ArrayList<List<ColumnPair>>();
+            foreignKeyList = new ArrayList<Set<ColumnPair>>();
             foreignKeys.put(tablePair, foreignKeyList);
         }
 
-        ArrayList<ColumnPair> keyPairs = new ArrayList<ColumnPair>();
+        Set<ColumnPair> keyPairs = new HashSet<ColumnPair>();
 
         for(int i = 0; i < parentColumns.size(); i++)
             keyPairs.add(new ColumnPair(parentColumns.get(i), foreignColumns.get(i)));
@@ -270,29 +270,20 @@ public class DatabaseSchema
         if(keys == null)
             return null;
 
-        loop:
         for(List<Column> key : keys)
-        {
-            for(Column part : key)
-                if(!columns.contains(part))
-                    continue loop;
-
-            return key;
-        }
+            if(columns.containsAll(key))
+                return key;
 
         return null;
     }
 
 
-    public List<ColumnPair> isPartOfForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
+    public Set<ColumnPair> isPartOfForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
             Set<Column> extra)
     {
-        List<List<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
+        List<Set<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
 
-        if(keys == null)
-            return null;
-
-        for(List<ColumnPair> key : keys)
+        for(Set<ColumnPair> key : keys)
         {
             if(columns.stream().allMatch(k -> key.contains(k)))
             {
@@ -310,15 +301,12 @@ public class DatabaseSchema
     }
 
 
-    public List<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
+    public Set<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
             Set<Column> parentColumns)
     {
-        List<List<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
+        List<Set<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
 
-        if(keys == null)
-            return null;
-
-        for(List<ColumnPair> key : keys)
+        for(Set<ColumnPair> key : keys)
         {
             if(key.stream().allMatch(k -> columns.contains(k)))
             {
@@ -365,12 +353,12 @@ public class DatabaseSchema
     }
 
 
-    public List<List<ColumnPair>> getForeignKeys(Table parentTable, Table foreignTable)
+    public List<Set<ColumnPair>> getForeignKeys(Table parentTable, Table foreignTable)
     {
         if(parentTable == null || foreignTable == null)
-            return null;
+            return List.of();
 
-        return foreignKeys.get(new TablePair(parentTable, foreignTable));
+        return foreignKeys.getOrDefault(new TablePair(parentTable, foreignTable), List.of());
     }
 
 

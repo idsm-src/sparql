@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,5 +121,12 @@ public class SqlStripConstantColumns extends SqlIntercode
         builder.append(" ) AS tab");
 
         return builder.toString();
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return child.isDistinct(request, selected);
     }
 }

@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -273,5 +274,12 @@ public class SqlBind extends SqlIntercode
         }
 
         return builder.toString();
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return child.isDistinct(request, selected);
     }
 }

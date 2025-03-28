@@ -1,8 +1,8 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
-import static cz.iocb.sparql.engine.translator.imcode.SqlTableAccess.remap;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toCollection;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,6 +21,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
+import cz.iocb.sparql.engine.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -115,18 +116,14 @@ public class SqlJoin extends SqlIntercode
 
                 for(SqlTableAccess candidate : candidates)
                 {
-                    HashSet<String> shared = new HashSet<String>(candidate.getVariables().getNames());
-                    shared.retainAll(distinct.getVariables().getNames());
-
-                    if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
-                            .equals(distinct.getVariables().getNonConstantColumns()))
+                    if(!canBeDistinctUnionReduced(distinct, candidate))
                         continue;
 
                     for(SqlTableAccess distinctPart : distinctParts)
                     {
-                        SqlIntercode intercode = tryReduceJoin(schema, candidate, distinctPart, shared);
+                        SqlIntercode intercode = tryReduceDistinct(schema, candidate, distinctPart, restrictions);
 
-                        if(intercode != null)
+                        if(intercode instanceof SqlTableAccess a && a.getConditions().equals(candidate.getConditions()))
                         {
                             newChilds.remove(distinct);
                             newChilds.remove(candidate);
@@ -135,6 +132,14 @@ public class SqlJoin extends SqlIntercode
                         }
                     }
                 }
+
+
+                List<SqlIntercode> unionChilds = union.getChilds().stream()
+                        .filter(c -> newChilds.stream().allMatch(x -> UsedPairedVariable
+                                .getPairs(c.getVariables(), x.getVariables()).stream().allMatch(p -> p.isJoinable())))
+                        .toList();
+
+                SqlDistinct.create(request, SqlUnion.union(request, unionChilds), distinct.getVariables().getNames());
             }
         }
 
@@ -142,83 +147,70 @@ public class SqlJoin extends SqlIntercode
     }
 
 
-    private static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess candidate, SqlTableAccess distinct,
-            HashSet<String> shared)
+    private static boolean canBeDistinctUnionReduced(SqlDistinct distinct, SqlIntercode candidate)
     {
-        //if(!distinct.getVariables().restrict(shared).getNonConstantColumns()
-        //        .equals(distinct.getVariables().getNonConstantColumns()))
-        //    return null;
+        Set<Column> columns = new HashSet<Column>();
 
-        for(String s : shared)
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(distinct.getVariables(), candidate.getVariables()))
         {
-            UsedVariable v1 = candidate.getInternalVariable(s);
-            UsedVariable v2 = distinct.getInternalVariable(s);
+            UsedVariable distinctVar = pair.getLeftVariable();
+            UsedVariable candidateVar = pair.getRightVariable();
 
-            if(v1 == null || v2 == null || v1.canBeNull() || v2.canBeNull() || v1.getMappings().size() != 1
-                    || v2.getMappings().size() != 1 || !v1.getResourceClass().equals(v2.getResourceClass())
-                    || !new UsedPairedVariable(v1, v2).isJoinable())
-                return null;
+            if(distinctVar == null || candidateVar == null)
+                continue;
+
+            //NOTE: currently, only simple join is taken into the account
+
+            if(pair.getClasses().size() > 1)
+                return false;
+
+            if(distinctVar.canBeNull() || candidateVar.canBeNull())
+                return false;
+
+            for(PairedClass pairedClass : pair.getClasses())
+            {
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    return false;
+
+                columns.addAll(distinctVar.getMapping(pairedClass.getLeftClass()));
+            }
         }
 
+        return columns.containsAll(distinct.getVariables().getNonConstantColumns());
+    }
+
+
+    private static SqlIntercode tryReduceDistinct(DatabaseSchema schema, SqlTableAccess candidate,
+            SqlTableAccess distinct, Set<String> restrictions)
+    {
         if(Objects.equals(distinct.getTable(), candidate.getTable()))
         {
-            if(!Conditions.and(candidate.getConditions(), distinct.getConditions()).equals(candidate.getConditions()))
+            Set<Column> joinColumns = SqlTableAccess.getJoinColumns(distinct, candidate);
+
+            if(!joinColumns.containsAll(distinct.getVariables().getNonConstantColumns()))
                 return null;
 
-            for(String s : shared)
-            {
-                List<Column> cols1 = candidate.getInternalVariable(s).getMapping();
-                List<Column> cols2 = distinct.getInternalVariable(s).getMapping();
-
-                for(int i = 0; i < cols1.size(); i++)
-                    if(!candidate.getConditions().getEqualColumns(cols1.get(i)).contains(cols2.get(i)))
-                        return null;
-            }
-
-            if(!distinct.getInternalVariables().restrict(shared).getNonConstantColumns()
-                    .equals(distinct.getVariables().getNonConstantColumns()))
-                return null;
-
-
-            UsedVariables internal = new UsedVariables(candidate.getInternalVariables());
-
-            for(UsedVariable v : distinct.getVariables().getValues())
-                if(!shared.contains(v.getName()))
-                    internal.add(new UsedVariable(v));
-
-            return SqlTableAccess.create(candidate.getTable(), candidate.getConditions(), internal,
-                    candidate.getReduced());
+            return SqlTableAccess.joinByPrimaryKey(candidate, distinct, restrictions);
         }
         else
         {
-            List<List<ColumnPair>> keys = schema.getForeignKeys(distinct.getTable(), candidate.getTable());
-
-            if(keys == null)
+            if(distinct.hasExpression())
                 return null;
 
-            for(List<ColumnPair> key : keys)
-            {
-                Map<Column, Column> map = new HashMap<Column, Column>();
+            Set<ColumnPair> columns = SqlTableAccess.getJoinColumnPairs(distinct, candidate);
 
-                for(ColumnPair pair : key)
-                    for(Column c : distinct.getConditions().getEqualColumns(pair.getLeft()))
-                        map.put(c, pair.getRight());
+            Set<Column> parentColumns = new HashSet<Column>();
+            parentColumns.addAll(distinct.getConditions().getNonConstantColumns());
+            parentColumns.addAll(distinct.getInternalVariables().getNonConstantColumns());
 
-                if(!map.keySet().containsAll(distinct.getVariables().getNonConstantColumns()))
-                    continue;
+            if(!columns.stream().map(p -> p.getLeft()).collect(toSet()).containsAll(parentColumns))
+                return null;
 
-                if(!map.keySet().containsAll(distinct.getConditions().getNonConstantColumns()))
-                    continue;
+            List<Set<ColumnPair>> keys = schema.getForeignKeys(distinct.getTable(), candidate.getTable());
 
-                SqlTableAccess remapped = (SqlTableAccess) SqlTableAccess.create(candidate.getTable(),
-                        remap(map, distinct.getConditions()), remap(map, distinct.getInternalVariables()),
-                        distinct.getReduced());
-
-                SqlIntercode intercode = tryReduceJoin(schema, candidate, remapped, shared);
-
-                if(intercode != null)
-                    return intercode;
-            }
+            for(Set<ColumnPair> key : keys)
+                if(key.containsAll(columns))
+                    return SqlTableAccess.joinByForeignKey(distinct, candidate, columns, restrictions);
         }
 
         return null;
@@ -495,21 +487,28 @@ public class SqlJoin extends SqlIntercode
             {
                 for(int j = 0; j < i; j++)
                 {
+                    SqlIntercode merged = null;
+
                     if(optChilds.get(j) instanceof SqlTableAccess right)
                     {
                         Set<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
-                        SqlIntercode merged = SqlTableAccess.tryReduceJoin(schema, left, right, mergeRestrictions);
+                        merged = SqlTableAccess.tryReduceJoin(schema, left, right, mergeRestrictions);
+                    }
+                    else if(optChilds.get(j) instanceof SqlDistinct d && d.getChild() instanceof SqlTableAccess right)
+                    {
+                        Set<String> mergeRestrictions = getRestrictions(optChilds, i, j, restrictions);
+                        merged = tryReduceDistinct(schema, left, right, mergeRestrictions);
+                    }
 
-                        if(merged == SqlNoSolution.get())
-                            return List.of(SqlNoSolution.get());
+                    if(merged == SqlNoSolution.get())
+                        return List.of(SqlNoSolution.get());
 
-                        if(merged != null)
-                        {
-                            optChilds.set(i, merged);
-                            optChilds.remove(j);
-                            i -= 2;
-                            break;
-                        }
+                    if(merged != null)
+                    {
+                        optChilds.set(i, merged);
+                        optChilds.remove(j);
+                        i -= 2;
+                        break;
                     }
                 }
             }

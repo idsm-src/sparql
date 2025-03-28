@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -175,5 +176,12 @@ public class SqlMinus extends SqlIntercode
             return domCondition;
         else
             return "(" + joinCondition + ") AND (" + domCondition + ")";
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<String> selected)
+    {
+        return left.isDistinct(request, selected);
     }
 }
