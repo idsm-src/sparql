@@ -70,6 +70,7 @@ import cz.iocb.sparql.engine.request.BNode;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.IriNode;
 import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
+import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.RdfNode;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
@@ -186,7 +187,7 @@ public class SparqlTest
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationSyntaxTests")
     void doQueryEvaluationSyntaxTests(String name, String query)
-            throws SQLException, TranslateExceptions, ServiceException
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
         Engine engine = new Engine(config);
@@ -202,7 +203,7 @@ public class SparqlTest
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationTests")
     void doQueryEvaluationTests(String name, String query, List<Quad> quads, List<List<RdfNode>> expected)
-            throws SQLException, TranslateExceptions, ServiceException
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
 

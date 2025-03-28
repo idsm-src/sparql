@@ -38,6 +38,7 @@ import cz.iocb.sparql.engine.request.BNode;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.IriNode;
 import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
+import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.LiteralNode;
 import cz.iocb.sparql.engine.request.RdfNode;
 import cz.iocb.sparql.engine.request.Request;
@@ -105,6 +106,7 @@ public class EndpointServlet extends HttpServlet
     private int fetchSize = 1000;
     private long timeout = 1000 * 1000000000l;
     private long maxTimeout = 6000 * 1000000000l;
+    private int sqlSizeLimit = 0;
 
 
     @Override
@@ -134,6 +136,12 @@ public class EndpointServlet extends HttpServlet
 
             if(maxTimeoutParameter != null)
                 maxTimeout = Integer.parseInt(maxTimeoutParameter) * 1000000000l;
+
+
+            String sqlSizeLimitParameter = config.getInitParameter("sql-query-size-limit");
+
+            if(sqlSizeLimitParameter != null)
+                sqlSizeLimit = Integer.parseInt(sqlSizeLimitParameter);
 
 
             Context context = (Context) (new InitialContext()).lookup("java:comp/env");
@@ -181,7 +189,7 @@ public class EndpointServlet extends HttpServlet
                 namedGraphs = null;
             }
 
-            process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req));
+            process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req), sqlSizeLimit);
         }
     }
 
@@ -204,7 +212,7 @@ public class EndpointServlet extends HttpServlet
             query = new String(req.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 
 
-        process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req));
+        process(req, res, query, defaultGraphs, namedGraphs, getTimeout(req), sqlSizeLimit);
     }
 
 
@@ -287,7 +295,7 @@ public class EndpointServlet extends HttpServlet
 
 
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
-            String[] namedGraphs, long timeout) throws IOException
+            String[] namedGraphs, long timeout, int sqlSizeLimit) throws IOException
     {
         try
         {
@@ -346,7 +354,7 @@ public class EndpointServlet extends HttpServlet
                 OutputType format = detectOutputType(req, preparedQuery.getResultType());
                 List<String> order = format == RDF_JSON ? List.of(SUBJECT.getName(), PREDICATE.getName()) : List.of();
 
-                try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout))
+                try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout, sqlSizeLimit))
                 {
                     res.setContentType(format.getMime());
 
@@ -446,6 +454,23 @@ public class EndpointServlet extends HttpServlet
 
             for(TranslateMessage message : e.getMessages())
                 out.println(message.getCategory().getText() + ": " + message.getRange() + " " + message.getMessage());
+        }
+        catch(LimitExceedException e)
+        {
+            try
+            {
+                res.resetBuffer();
+            }
+            catch(Throwable x)
+            {
+            }
+
+            res.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            res.setContentType("text/plain");
+
+            PrintWriter out = res.getWriter();
+
+            out.println(e.getMessage());
         }
         catch(SQLException e)
         {

@@ -211,8 +211,8 @@ public class Request implements AutoCloseable
 
 
 
-    public Result execute(PreparedQuery query, List<String> order, int offset, int limit, int fetchSize, long timeout)
-            throws SQLException, ServiceException
+    public Result execute(PreparedQuery query, List<String> order, int offset, int limit, int fetchSize, long timeout,
+            int sqlSizeLimit) throws LimitExceedException, SQLException, ServiceException
     {
         try
         {
@@ -250,6 +250,9 @@ public class Request implements AutoCloseable
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order, true);
 
             String code = imcode.translate(this);
+
+            if(sqlSizeLimit > 0 && code.length() > sqlSizeLimit)
+                throw new LimitExceedException("generated SQL query exceeded the maximum allowed limit");
 
             MDC.put("sql", code);
 
@@ -297,34 +300,35 @@ public class Request implements AutoCloseable
 
 
     public Result execute(String query, List<DataSet> dataSets, List<String> order, int offset, int limit,
-            int fetchSize, long timeout) throws TranslateExceptions, SQLException, ServiceException
+            int fetchSize, long timeout)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
-        return execute(prepareQuery(query, dataSets), order, offset, limit, fetchSize, timeout);
+        return execute(prepareQuery(query, dataSets), order, offset, limit, fetchSize, timeout, 0);
     }
 
 
     public Result execute(String query, List<DataSet> dataSets, int offset, int limit, int fetchSize, long timeout)
-            throws TranslateExceptions, SQLException, ServiceException
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         return execute(query, dataSets, List.of(), offset, limit, fetchSize, timeout);
     }
 
 
-    public Result execute(String query) throws TranslateExceptions, SQLException, ServiceException
+    public Result execute(String query) throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         return execute(query, null, 0, -1, 0, 0);
     }
 
 
     public Result execute(String query, List<DataSet> dataSets)
-            throws TranslateExceptions, SQLException, ServiceException
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         return execute(query, dataSets, 0, -1, 0, 0);
     }
 
 
     public Result execute(String query, int offset, int limit, long timeout)
-            throws TranslateExceptions, SQLException, ServiceException
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         return execute(query, null, offset, limit, 0, timeout);
     }
