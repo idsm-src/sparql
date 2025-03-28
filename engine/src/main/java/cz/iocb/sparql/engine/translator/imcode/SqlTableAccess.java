@@ -422,8 +422,8 @@ public class SqlTableAccess extends SqlIntercode
         Set<Column> childColumns = new HashSet<Column>();
         childColumns.addAll(child.getVariables().getNonConstantColumns());
 
-        if(!parent.conditions.isTrue())
-            childColumns.addAll(parent.conditions.getNonConstantColumns());
+        if(!child.conditions.isTrue())
+            childColumns.addAll(child.conditions.getNonConstantColumns());
 
         return schema.isPartOfForeignKey(parent.table, child.table, columns, childColumns);
     }
