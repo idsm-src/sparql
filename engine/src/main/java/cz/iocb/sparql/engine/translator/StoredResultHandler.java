@@ -100,7 +100,7 @@ public class StoredResultHandler extends ResultHandler
 
                 if(v == null)
                 {
-                    v = Collections.nCopies(batchSize, (Column) null);
+                    v = new ArrayList<>(Collections.nCopies(batchSize, (Column) null));
                     data.put(cols.get(i), v);
                 }
 
