@@ -16,6 +16,7 @@ import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
@@ -475,6 +476,65 @@ public class SqlJoin extends SqlIntercode
 
                             break;
                         }
+                    }
+                }
+            }
+        }
+
+
+        for(int i = 0; i < optChilds.size(); i++)
+        {
+            if(optChilds.get(i) instanceof SqlTableAccess left)
+            {
+                for(int j = 0; j < i; j++)
+                {
+                    if(optChilds.get(j) instanceof SqlTableAccess right)
+                    {
+                        Condition additionalLeft = new Condition();
+                        Condition additionalRight = new Condition();
+
+                        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.getVariables(),
+                                right.getVariables()))
+                        {
+                            UsedVariable leftVar = pair.getLeftVariable();
+                            UsedVariable rightVar = pair.getRightVariable();
+
+                            if(leftVar == null || rightVar == null)
+                                continue;
+
+                            //NOTE: currently, only simple join is taken into the account
+
+                            if(pair.getClasses().size() > 1)
+                                continue;
+
+                            if(leftVar.canBeNull() || rightVar.canBeNull())
+                                continue;
+
+                            for(PairedClass pairedClass : pair.getClasses())
+                            {
+                                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                                    continue;
+
+                                List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
+                                List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
+
+                                for(int c = 0; c < leftCols.size(); c++)
+                                {
+                                    Column leftCol = leftCols.get(c);
+                                    Column rightCol = rightCols.get(c);
+
+                                    if(leftCol instanceof ConstantColumn)
+                                        additionalRight.addAreEqual(leftCol, rightCol);
+
+                                    if(rightCol instanceof ConstantColumn)
+                                        additionalLeft.addAreEqual(leftCol, rightCol);
+                                }
+                            }
+                        }
+
+                        if(Conditions.and(left.getConditions(), additionalLeft).isFalse()
+                                || Conditions.and(right.getConditions(), additionalRight).isFalse())
+                            return List.of(SqlNoSolution.get());
                     }
                 }
             }

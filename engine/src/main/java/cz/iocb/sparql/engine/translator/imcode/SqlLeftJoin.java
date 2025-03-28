@@ -130,7 +130,11 @@ public class SqlLeftJoin extends SqlIntercode
                 || (f instanceof SqlBinaryComparison && ((SqlBinaryComparison) f).isAlwaysFalseOrNull())))
             return false;
 
-        if(SqlJoin.join(request, left, right) == SqlNoSolution.get())
+        Set<String> restrictions = new HashSet<>();
+        restrictions.addAll(left.getVariables().getNames());
+        restrictions.addAll(right.getVariables().getNames());
+
+        if(SqlJoin.join(request, left, right).optimize(request, restrictions, false) == SqlNoSolution.get())
             return false;
 
         return true;
