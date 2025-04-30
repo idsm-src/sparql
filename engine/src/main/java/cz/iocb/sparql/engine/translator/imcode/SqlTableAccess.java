@@ -196,6 +196,10 @@ public class SqlTableAccess extends SqlIntercode
             if(variable.canBeNull())
                 return false;
 
+            //TODO: support multiple resource class ...
+            if(variable.getMappings().size() != 1)
+                return false;
+
             UsedVariable tableVariable = left.getVariables().get(variable.getName());
 
             if(tableVariable == null)
@@ -604,7 +608,7 @@ public class SqlTableAccess extends SqlIntercode
                 {
                     variables.add(leftVar);
                 }
-                else if(variables.get(pair.getName()) != null)
+                else if(variables.get(pair.getName()) == null)
                 {
                     ResourceClass resClass = rightVar.getResourceClass();
                     List<Column> columns = rightVar.getMapping(resClass);
