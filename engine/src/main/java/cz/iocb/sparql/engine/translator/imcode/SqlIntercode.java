@@ -37,7 +37,7 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced);
+    public abstract SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices);
 
 
     public abstract String translate(Request request);

@@ -36,9 +36,9 @@ public class SqlUnaryLogical extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode operand = getOperand().optimize(request, variables);
+        SqlExpressionIntercode operand = getOperand().optimize(request, variables, evalServices);
         return create(operand);
     }
 

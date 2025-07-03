@@ -50,18 +50,18 @@ public class SqlMinus extends SqlIntercode
                 shareVariables = true;
 
             if(!pair.isJoinable())
-                return left.optimize(request, restrictions, reduced);
+                return left.optimize(request, restrictions, reduced, false);
         }
 
         if(shareVariables == false)
-            return left.optimize(request, restrictions, reduced);
+            return left.optimize(request, restrictions, reduced, false);
 
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -73,8 +73,8 @@ public class SqlMinus extends SqlIntercode
         childRestrictions.retainAll(right.getVariables().getNames());
         childRestrictions.addAll(restrictions);
 
-        SqlIntercode optimizedLeft = left.optimize(request, childRestrictions, reduced);
-        SqlIntercode optimizedRight = right.optimize(request, childRestrictions, true);
+        SqlIntercode optimizedLeft = left.optimize(request, childRestrictions, reduced, evalServices);
+        SqlIntercode optimizedRight = right.optimize(request, childRestrictions, true, evalServices);
 
         return minus(request, optimizedLeft, optimizedRight, restrictions, reduced);
     }

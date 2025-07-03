@@ -1,16 +1,8 @@
 package cz.iocb.sparql.engine.translator;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringType;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.toSet;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.math.BigInteger;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,19 +15,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.error.MessageType;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
@@ -82,14 +65,7 @@ import cz.iocb.sparql.engine.parser.model.pattern.Values.ValuesList;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.parser.model.triple.Triple;
 import cz.iocb.sparql.engine.parser.model.triple.Verb;
-import cz.iocb.sparql.engine.request.IriNode;
-import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
-import cz.iocb.sparql.engine.request.RdfNode;
-import cz.iocb.sparql.engine.request.ReferenceNode;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.request.Result;
-import cz.iocb.sparql.engine.request.Result.ResultType;
-import cz.iocb.sparql.engine.request.TypedLiteral;
 import cz.iocb.sparql.engine.translator.imcode.SqlAggregation;
 import cz.iocb.sparql.engine.translator.imcode.SqlBind;
 import cz.iocb.sparql.engine.translator.imcode.SqlConstruct;
@@ -105,6 +81,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlMinus;
 import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlProcedureCall;
 import cz.iocb.sparql.engine.translator.imcode.SqlSelect;
+import cz.iocb.sparql.engine.translator.imcode.SqlServiceStub;
 import cz.iocb.sparql.engine.translator.imcode.SqlUnion;
 import cz.iocb.sparql.engine.translator.imcode.SqlValues;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
@@ -121,9 +98,6 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
-    private static final int serviceRedirectLimit = 3;
-    private static final int serviceContextLimit = 1000;
-    private static final int serviceResultLimit = 10000000;
     private static final String variablePrefix = "@additionalvar";
 
     private int variableId = 0;
@@ -1042,13 +1016,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         VarOrIri name = service.getName();
 
-        if(context == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(name instanceof Variable && context.getVariables().get(((Variable) name).getSqlName()) == null)
-            return SqlNoSolution.get();
-
-
         if(configuration.getServices().contains(name))
         {
             serviceRestrictions.add((IRI) name);
@@ -1066,335 +1033,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return result;
         }
 
-
-        /* create variable lists */
-
-        Set<String> contextVariables = context.getVariables().getNames();
-        HashMap<String, String> varmap = new HashMap<String, String>();
-        Set<String> mergedVariables = new HashSet<String>(contextVariables);
-        Set<Variable> sharedVariables = new HashSet<Variable>();
-
-        for(Variable var : service.getPattern().getVariablesInScope())
-        {
-            mergedVariables.add(var.getSqlName());
-            varmap.put(var.getName(), var.getSqlName());
-
-            if(contextVariables.contains(var.getSqlName()))
-                sharedVariables.add(var);
-        }
-
-
-        ArrayList<RdfNode[]> rows = new ArrayList<RdfNode[]>();
-        HashMap<String, Integer> varIndexes = null;
-
-        if(context == SqlEmptySolution.get())
-        {
-            rows.add(new RdfNode[0]);
-            varIndexes = new HashMap<String, Integer>();
-        }
-        else
-        {
-            /* evaluate context pattern */
-
-            BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
-            SqlSelect query = SqlSelect.createTopLevel(request, new ArrayList<String>(contextVariables), context, null,
-                    limit);
-            String code = query.optimize(request).translate(request);
-
-            try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
-                    request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
-            {
-                varIndexes = result.getVariableIndexes();
-
-                while(result.next())
-                {
-                    rows.add(result.getRow());
-
-                    if(rows.size() > serviceContextLimit)
-                    {
-                        //TODO: use failback variant
-                        throw new ServiceException(MessageType.serviceContextLimitExceeded.getText());
-                    }
-                }
-            }
-            catch(ServiceException e)
-            {
-                throw new ServiceRuntimeException(e);
-            }
-            catch(SQLException e)
-            {
-                throw new SQLRuntimeException(e);
-            }
-        }
-
-
-        /* create result */
-
-        ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
-        String serviceCode = visitor.getResultCode(service.getPattern());
-
-        try(ResultHandler results = new StoredResultHandler(request))
-        {
-            //ResultHandler results = new ValuesResultHandler(mergedVariables);
-
-            BlankNodeClass blankNodeClass = new UserStrBlankNodeClass(--serviceId);
-            int call = 0;
-
-            for(RdfNode[] row : rows)
-            {
-                String endpoint = null;
-
-                if(name instanceof IRI iri)
-                    endpoint = iri.getValue();
-                else if(row[varIndexes.get(((Variable) name).getSqlName())] instanceof IriNode)
-                    endpoint = row[varIndexes.get(((Variable) name).getSqlName())].getValue();
-                else
-                    continue;
-
-
-                /* build default result */
-
-                HashMap<String, Node> defaultResult = new HashMap<String, Node>();
-
-                for(String variable : contextVariables)
-                {
-                    Integer idx = varIndexes.get(variable);
-
-                    if(idx == null)
-                        continue;
-
-                    RdfNode term = row[idx];
-
-                    Node node = null;
-
-                    if(term instanceof IriNode)
-                        node = new IRI(term.getValue());
-                    else if(term instanceof LanguageTaggedLiteral literal)
-                        node = new Literal(term.getValue(), literal.getLanguage());
-                    else if(term instanceof TypedLiteral literal)
-                        node = new Literal(term.getValue(),
-                                request.getConfiguration().getDataType(new IRI(literal.getDatatype().getValue())),
-                                new IRI(literal.getDatatype().getValue()));
-                    else if(term instanceof ReferenceNode)
-                        node = new BlankNodeLiteral(term.getValue(), context.getVariables().get(variable).getClasses());
-
-                    defaultResult.put(variable, node);
-                }
-
-
-                /* build service query */
-
-                StringBuilder sparqlQueryBuilder = new StringBuilder();
-                sparqlQueryBuilder.append("select * where ");
-                sparqlQueryBuilder.append(serviceCode);
-
-                if(!sharedVariables.isEmpty())
-                {
-                    sparqlQueryBuilder.append("values (");
-
-                    for(Variable var : sharedVariables)
-                        sparqlQueryBuilder.append(" ?").append(var.getName());
-
-                    sparqlQueryBuilder.append(") {(");
-
-                    for(Variable variable : sharedVariables)
-                    {
-                        RdfNode term = row[varIndexes.get(variable.getSqlName())];
-
-                        if(term != null && (term instanceof IriNode || term.isLiteral()))
-                            sparqlQueryBuilder.append(term).append(" ");
-                        else
-                            sparqlQueryBuilder.append("undef ");
-                    }
-
-                    sparqlQueryBuilder.append(")}");
-                }
-
-
-                /* open connection */
-
-                HttpURLConnection connection = null;
-
-                try
-                {
-                    String url = endpoint;
-
-                    for(int i = 0; i <= serviceRedirectLimit && url != null; i++)
-                    {
-                        connection = (HttpURLConnection) (new URI(url)).toURL().openConnection();
-                        connection.setRequestMethod("POST");
-                        connection.setRequestProperty("content-type",
-                                "application/x-www-form-urlencoded; charset=UTF-8");
-                        connection.setRequestProperty("accept", "application/sparql-results+xml");
-                        connection.setDoOutput(true);
-
-                        try(OutputStream out = connection.getOutputStream())
-                        {
-                            out.write(
-                                    ("query=" + URLEncoder.encode(sparqlQueryBuilder.toString(), "UTF-8")).getBytes());
-                        }
-
-                        url = connection.getHeaderField("Location");
-                    }
-
-                    if(connection.getResponseCode() != HttpURLConnection.HTTP_OK)
-                        throw new IOException(connection.getResponseMessage());
-                }
-                catch(IOException | URISyntaxException e)
-                {
-                    e.printStackTrace();
-
-                    if(!service.isSilent())
-                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
-
-                    return context;
-                }
-
-
-                /* receive result*/
-
-                try
-                {
-                    final int bnprefix = call++;
-
-                    DefaultHandler handler = new DefaultHandler()
-                    {
-                        Set<String> used = new HashSet<String>();
-                        HashMap<String, Node> result = new HashMap<String, Node>();
-
-                        boolean skip;
-                        String variable;
-                        StringBuilder data;
-                        String datatype;
-                        String lang;
-
-                        @Override
-                        public void startElement(String uri, String localName, String qName, Attributes attributes)
-                                throws SAXException
-                        {
-                            if(qName.equalsIgnoreCase("result"))
-                            {
-                                skip = false;
-                                used.clear();
-                                result.clear();
-                                result.putAll(defaultResult);
-
-                                if(results.size() >= serviceResultLimit)
-                                    throw new SAXException();
-                            }
-                            else if(qName.equalsIgnoreCase("binding"))
-                            {
-                                variable = varmap.get(attributes.getValue("name"));
-                            }
-                            else if(qName.equalsIgnoreCase("literal"))
-                            {
-                                lang = attributes.getValue("xml:lang");
-                                datatype = attributes.getValue("datatype");
-                                data = new StringBuilder();
-                            }
-                            else if(qName.equalsIgnoreCase("uri") || qName.equalsIgnoreCase("bnode"))
-                            {
-                                data = new StringBuilder();
-                            }
-                        }
-
-                        @Override
-                        public void endElement(String uri, String localName, String qName) throws SAXException
-                        {
-                            if(qName.equalsIgnoreCase("result") && !skip)
-                            {
-                                try
-                                {
-                                    results.add(result);
-                                }
-                                catch(SQLException e)
-                                {
-                                    throw new SQLRuntimeException(e);
-                                }
-                            }
-                            else if(qName.equalsIgnoreCase("binding"))
-                            {
-                                variable = null;
-                            }
-
-                            Node node = null;
-
-                            if(qName.equalsIgnoreCase("uri"))
-                                node = new IRI(data.toString());
-                            else if(qName.equalsIgnoreCase("bnode"))
-                                node = new BlankNodeLiteral(bnprefix + "r" + data.toString(), blankNodeClass);
-                            else if(!qName.equalsIgnoreCase("literal"))
-                                return;
-                            else if(lang != null)
-                                node = new Literal(data.toString(), lang);
-                            else if(datatype != null)
-                                node = new Literal(data.toString(),
-                                        request.getConfiguration().getDataType(new IRI(datatype)), new IRI(datatype));
-                            else
-                                node = new Literal(data.toString(), xsdStringType);
-
-                            if(variable == null /*|| !serviceVariables.contains(variable)*/)
-                                return; // should not happen if the response is valid
-
-                            if(!used.add(variable))
-                                return; // should not happen if the response is valid
-
-                            if(defaultResult.get(variable) instanceof BlankNodeLiteral)
-                            {
-                                skip = true;
-                                return;
-                            }
-
-                            if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(node))
-                            {
-                                // should not happen if the response is correct
-                                skip = true;
-                                return;
-                            }
-
-                            result.put(variable, node);
-                        }
-
-                        @Override
-                        public void characters(char ch[], int start, int length)
-                        {
-                            if(data != null)
-                                data.append(new String(ch, start, length));
-                        }
-                    };
-
-                    try(InputStream input = connection.getInputStream())
-                    {
-                        SAXParserFactory factory = SAXParserFactory.newInstance();
-                        SAXParser saxParser = factory.newSAXParser();
-                        saxParser.parse(input, handler);
-                    }
-                }
-                catch(ParserConfigurationException | SAXException | IOException e)
-                {
-                    if(e instanceof SAXException && results.size() >= serviceResultLimit)
-                    {
-                        throw new ServiceException(
-                                String.format(MessageType.serviceResultLimitExceeded.getText(), endpoint));
-                    }
-                    else
-                    {
-                        e.printStackTrace();
-                        throw new ServiceException(String.format(MessageType.badServiceEndpoint.getText(), endpoint));
-                    }
-                }
-            }
-
-            return results.get();
-        }
-        catch(ServiceException e)
-        {
-            throw new ServiceRuntimeException(e);
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
-        }
+        return SqlServiceStub.create(request, name, service.getPattern(), context,
+                new UserStrBlankNodeClass(--serviceId), service.isSilent());
     }
 
 

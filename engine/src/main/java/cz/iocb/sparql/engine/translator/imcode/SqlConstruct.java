@@ -305,7 +305,7 @@ public class SqlConstruct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         Set<String> childRestrictions = new HashSet<String>();
 
@@ -314,7 +314,7 @@ public class SqlConstruct extends SqlIntercode
                 if(template.get(column) instanceof Variable variable)
                     childRestrictions.add(variable.getSqlName());
 
-        return construct(request, templates, bnOffset, child.optimize(request, childRestrictions, true));
+        return construct(request, templates, bnOffset, child.optimize(request, childRestrictions, true, evalServices));
     }
 
 

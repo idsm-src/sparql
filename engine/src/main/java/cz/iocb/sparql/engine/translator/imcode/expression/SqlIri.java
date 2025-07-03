@@ -32,7 +32,7 @@ public class SqlIri extends SqlNodeValue
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         return this;
     }

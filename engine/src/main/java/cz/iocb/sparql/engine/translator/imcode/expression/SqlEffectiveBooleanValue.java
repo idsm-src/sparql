@@ -105,9 +105,9 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        return create(getOperand().optimize(request, variables));
+        return create(getOperand().optimize(request, variables, evalServices));
     }
 
 

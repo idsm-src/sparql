@@ -56,12 +56,12 @@ public class SqlFunctionCall extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
-            optimized.add(argument.optimize(request, variables));
+            optimized.add(argument.optimize(request, variables, evalServices));
 
         return create(definition, optimized);
     }

@@ -75,7 +75,7 @@ public class SqlMerge extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -84,13 +84,13 @@ public class SqlMerge extends SqlIntercode
         contextRestrictions.add(variable1);
         contextRestrictions.add(variable2);
 
-        SqlIntercode optimizedContext = child.optimize(request, contextRestrictions, reduced);
+        SqlIntercode optimizedContext = child.optimize(request, contextRestrictions, reduced, evalServices);
 
         if(child.getVariables().get(variable1) == null && !restrictions.contains(variable1))
-            return child.optimize(request, restrictions, reduced);
+            return child.optimize(request, restrictions, reduced, evalServices);
 
         if(optimizedContext.getVariables().get(variable2) == null)
-            return child.optimize(request, restrictions, reduced);
+            return child.optimize(request, restrictions, reduced, evalServices);
 
         return create(request, variable1, variable2, optimizedContext, restrictions);
     }

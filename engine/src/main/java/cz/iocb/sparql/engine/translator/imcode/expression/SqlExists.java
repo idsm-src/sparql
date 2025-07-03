@@ -78,9 +78,9 @@ public class SqlExists extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        return create(request, negated, pattern.optimize(request, variables.getNames(), true), variables);
+        return create(request, negated, pattern.optimize(request, variables.getNames(), true, evalServices), variables);
     }
 
 

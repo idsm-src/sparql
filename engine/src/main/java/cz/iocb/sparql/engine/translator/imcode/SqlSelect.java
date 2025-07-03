@@ -235,13 +235,14 @@ public class SqlSelect extends SqlIntercode
         childRestrictions.addAll(orderBy.keySet());
         childRestrictions.addAll(simpleOrderBy);
 
-        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, false);
+        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, false, false).optimize(request,
+                childRestrictions, false, true);
         return createTopLevel(request, projections, optimizedChild, distinct, orderBy, offset, limit, simpleOrderBy);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(isTopLevel())
             throw new UnsupportedOperationException();
@@ -253,7 +254,7 @@ public class SqlSelect extends SqlIntercode
         childRestrictions.addAll(orderBy.keySet());
         childRestrictions.addAll(simpleOrderBy);
 
-        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, reduced);
+        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, reduced, evalServices);
 
         if(orderBy.isEmpty() && limit == null && (offset == null || offset.equals(BigInteger.ZERO)))
             return optimizedChild;

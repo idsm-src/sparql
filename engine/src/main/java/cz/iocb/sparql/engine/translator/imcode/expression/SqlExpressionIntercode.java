@@ -55,7 +55,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables);
+    public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices);
 
 
     public abstract String translate(Request request);

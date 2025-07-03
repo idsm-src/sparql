@@ -80,10 +80,10 @@ public class SqlBinaryArithmetic extends SqlBinary
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode left = getLeft().optimize(request, variables);
-        SqlExpressionIntercode right = getRight().optimize(request, variables);
+        SqlExpressionIntercode left = getLeft().optimize(request, variables, evalServices);
+        SqlExpressionIntercode right = getRight().optimize(request, variables, evalServices);
         return create(operator, left, right);
     }
 

@@ -144,7 +144,7 @@ public class SqlProcedureCall extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -162,7 +162,7 @@ public class SqlProcedureCall extends SqlIntercode
             childRestrictions.addAll(paramater.getReferencedVariables());
 
         //FIXME: is procedure deterministic?
-        SqlIntercode optimized = child.optimize(request, childRestrictions, reduced);
+        SqlIntercode optimized = child.optimize(request, childRestrictions, reduced, evalServices);
 
         return create(request, procedure, parameters, restrictedResults, optimized, restrictions);
     }

@@ -56,7 +56,7 @@ public class SqlDistinct extends SqlIntercode
             return SqlEmptySolution.get();
 
         if(child.isDistinct(request, distinctVariables))
-            return child.optimize(request, restrictions, true);
+            return child.optimize(request, restrictions, true, false);
 
 
         /* standard distinct */
@@ -72,7 +72,7 @@ public class SqlDistinct extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -80,11 +80,11 @@ public class SqlDistinct extends SqlIntercode
         HashSet<String> childRestriction = new HashSet<String>(restrictions);
         childRestriction.addAll(distinctVariables);
 
-        SqlIntercode optChild = child.optimize(request, childRestriction, true);
+        SqlIntercode optChild = child.optimize(request, childRestriction, true, evalServices);
 
 
         if(optChild instanceof SqlTableAccess access && access.isDistinct(request, distinctVariables))
-            return optChild.optimize(request, restrictions, reduced);
+            return optChild.optimize(request, restrictions, reduced, evalServices);
 
 
         if(optChild instanceof SqlJoin join)
@@ -111,7 +111,7 @@ public class SqlDistinct extends SqlIntercode
             }
 
             if(canBeEliminated)
-                return join.optimize(request, restrictions, reduced);
+                return join.optimize(request, restrictions, reduced, evalServices);
         }
 
 

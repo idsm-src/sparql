@@ -162,7 +162,7 @@ public class SqlRecursive extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -178,8 +178,8 @@ public class SqlRecursive extends SqlIntercode
         if(beginName != null)
             childRestrictions.add(beginName);
 
-        SqlIntercode initOpt = init.optimize(request, childRestrictions, reduced);
-        SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced);
+        SqlIntercode initOpt = init.optimize(request, childRestrictions, reduced, evalServices);
+        SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
 
         if(beginName != null && initOpt instanceof SqlUnion union)
         {

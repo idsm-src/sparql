@@ -34,9 +34,9 @@ public class SqlInExpression extends SqlExpressionIntercode
         }
 
         @Override
-        public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+        public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
         {
-            return create(operand.optimize(request, variables));
+            return create(operand.optimize(request, variables, evalServices));
         }
 
         @Override
@@ -101,14 +101,14 @@ public class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode right : rights)
-            optimized.add(right.optimize(request, variables));
+            optimized.add(right.optimize(request, variables, evalServices));
 
-        return create(negated, left.optimize(request, variables), optimized);
+        return create(negated, left.optimize(request, variables, evalServices), optimized);
     }
 
 

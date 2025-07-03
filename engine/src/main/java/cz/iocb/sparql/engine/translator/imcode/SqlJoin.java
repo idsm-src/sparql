@@ -48,28 +48,29 @@ public class SqlJoin extends SqlIntercode
 
     public static SqlIntercode join(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return convertToIntercode(request, expand(List.of(left, right)), null);
+        return convertToIntercode(request, expand(List.of(left, right)), null, false);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
 
         Set<String> childRestrictions = getRestrictions(childs, restrictions);
 
-        List<List<SqlIntercode>> unionList = expand(optimize(request, childs, childRestrictions, reduced));
-        unionList = reoptimizeUnion(request, unionList, restrictions, reduced);
+        List<List<SqlIntercode>> unionList = expand(
+                optimize(request, childs, childRestrictions, reduced, evalServices));
+        unionList = reoptimizeUnion(request, unionList, restrictions, reduced, evalServices);
         unionList = reduceUnion(request, unionList, restrictions);
 
-        return convertToIntercode(request, unionList, restrictions);
+        return convertToIntercode(request, unionList, restrictions, evalServices);
     }
 
 
     private static SqlIntercode convertToIntercode(Request request, List<List<SqlIntercode>> unionList,
-            Set<String> restrictions)
+            Set<String> restrictions, boolean evalServices)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
@@ -91,7 +92,7 @@ public class SqlJoin extends SqlIntercode
                 SqlIntercode newRecursive = SqlRecursive.create(request,
                         SqlJoin.join(request, newInitChilds, restrictions), recursive.next, recursive.beginName,
                         recursive.joinName, recursive.endVar.getName(), recursive.graphName, restrictions)
-                        .optimize(request, restrictions, false);
+                        .optimize(request, restrictions, false, evalServices);
 
                 newChilds.remove(recursive);
                 newChilds.removeAll(accesses);
@@ -273,19 +274,19 @@ public class SqlJoin extends SqlIntercode
 
 
     public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Set<String> restrictions,
-            boolean reduced)
+            boolean reduced, boolean evalServices)
     {
         List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
 
         for(SqlIntercode child : childs)
-            optimized.add(child.optimize(request, restrictions, reduced));
+            optimized.add(child.optimize(request, restrictions, reduced, evalServices));
 
         return optimized;
     }
 
 
     public static List<List<SqlIntercode>> reoptimizeUnion(Request request, List<List<SqlIntercode>> unionList,
-            Set<String> restrictions, boolean reduced)
+            Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         List<List<SqlIntercode>> optUnionList = new ArrayList<List<SqlIntercode>>();
         Stack<List<SqlIntercode>> unionStack = new Stack<List<SqlIntercode>>();
@@ -298,7 +299,7 @@ public class SqlJoin extends SqlIntercode
             Set<String> newRestrictions = getRestrictions(joinList, restrictions);
 
             if(!newRestrictions.containsAll(getVariables(joinList)))
-                unionStack.addAll(expand(reoptimizeJoin(request, joinList, newRestrictions, reduced)));
+                unionStack.addAll(expand(reoptimizeJoin(request, joinList, newRestrictions, reduced, evalServices)));
             else
                 optUnionList.add(joinList);
         }
@@ -308,7 +309,7 @@ public class SqlJoin extends SqlIntercode
 
 
     private static List<SqlIntercode> reoptimizeJoin(Request request, List<SqlIntercode> childs,
-            Set<String> restrictions, boolean reduced)
+            Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         List<SqlIntercode> optimized = new ArrayList<SqlIntercode>(childs.size());
 
@@ -316,7 +317,7 @@ public class SqlJoin extends SqlIntercode
             if(restrictions.containsAll(child.getVariables().getNames()))
                 optimized.add(child);
             else
-                optimized.add(child.optimize(request, restrictions, reduced));
+                optimized.add(child.optimize(request, restrictions, reduced, evalServices));
 
         return optimized;
     }

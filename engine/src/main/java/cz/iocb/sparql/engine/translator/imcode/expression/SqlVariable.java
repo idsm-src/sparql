@@ -36,7 +36,7 @@ public class SqlVariable extends SqlNodeValue
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         return create(variable.getName(), variables);
     }

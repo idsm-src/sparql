@@ -61,13 +61,15 @@ public class SqlBind extends SqlIntercode
             return SqlNoSolution.get();
 
         if(expression == SqlNull.get() || restrictions != null && !restrictions.contains(variableName))
-            return child.optimize(request, restrictions, reduced);
+            return child.optimize(request, restrictions, reduced, false);
 
         if(child instanceof SqlUnion union)
-            return SqlUnion.union(request,
-                    union.getChilds().stream().map(c -> bind(request, variableName,
-                            expression.optimize(request, c.getVariables()), c, restrictions, reduced)).toList())
-                    .optimize(request, restrictions, reduced);
+            return SqlUnion
+                    .union(request, union.getChilds().stream()
+                            .map(c -> bind(request, variableName, expression.optimize(request, c.getVariables(), false),
+                                    c, restrictions, reduced))
+                            .toList())
+                    .optimize(request, restrictions, reduced, false);
 
 
         /* standard bind */
@@ -123,13 +125,13 @@ public class SqlBind extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
 
         if(!restrictions.contains(variableName))
-            return child.optimize(request, restrictions, reduced);
+            return child.optimize(request, restrictions, reduced, evalServices);
 
         SqlExpressionIntercode optExpression = expression;
         SqlIntercode optChild = child;
@@ -141,8 +143,9 @@ public class SqlBind extends SqlIntercode
             HashSet<String> childRestrictions = new HashSet<String>(restrictions);
             childRestrictions.addAll(expressionVariables);
 
-            optChild = optChild.optimize(request, childRestrictions, reduced && optExpression.isDeterministic());
-            optExpression = optExpression.optimize(request, optChild.getVariables());
+            optChild = optChild.optimize(request, childRestrictions, reduced && optExpression.isDeterministic(),
+                    evalServices);
+            optExpression = optExpression.optimize(request, optChild.getVariables(), evalServices);
 
             if(optExpression.getReferencedVariables().equals(expressionVariables))
                 break;

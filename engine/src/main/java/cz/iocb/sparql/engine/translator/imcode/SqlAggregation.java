@@ -122,7 +122,7 @@ public class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced)
+    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
     {
         if(restrictions == null)
             return this;
@@ -138,8 +138,9 @@ public class SqlAggregation extends SqlIntercode
             if(restrictions.contains(entry.getKey()))
                 childRestrictions.addAll(entry.getValue().getReferencedVariables());
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduce);
-        Map<String, SqlExpressionIntercode> optAggregations = optimizeAggregations(request, aggregations, optChild);
+        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduce, evalServices);
+        Map<String, SqlExpressionIntercode> optAggregations = optimizeAggregations(request, aggregations, optChild,
+                evalServices);
 
 
         /* change count(var) on count(*) if possible  */
@@ -168,8 +169,8 @@ public class SqlAggregation extends SqlIntercode
 
         if(!newChildRestrictions.equals(childRestrictions))
         {
-            optChild = child.optimize(request, newChildRestrictions, optChildReduce);
-            optAggregations = optimizeAggregations(request, optAggregations, optChild);
+            optChild = child.optimize(request, newChildRestrictions, optChildReduce, evalServices);
+            optAggregations = optimizeAggregations(request, optAggregations, optChild, evalServices);
         }
 
 
@@ -190,10 +191,12 @@ public class SqlAggregation extends SqlIntercode
 
             for(List<SqlIntercode> part : parts.values())
             {
-                SqlIntercode child = SqlUnion.union(request, part).optimize(request, childRestrictions, optChildReduce);
-                Map<String, SqlExpressionIntercode> aggs = optimizeAggregations(request, optAggregations, child);
+                SqlIntercode child = SqlUnion.union(request, part).optimize(request, childRestrictions, optChildReduce,
+                        evalServices);
+                Map<String, SqlExpressionIntercode> aggs = optimizeAggregations(request, optAggregations, child,
+                        evalServices);
                 result.add(aggregate(request, groupVariables, aggs, child, restrictions).optimize(request, restrictions,
-                        reduced));
+                        reduced, evalServices));
             }
 
             return SqlUnion.union(request, result);
@@ -308,14 +311,14 @@ public class SqlAggregation extends SqlIntercode
                     distinctVars.add(v);
 
             SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars).optimize(request, distinctVars,
-                    true);
+                    true, evalServices);
             List<SqlExpressionIntercode> args = List.of(SqlVariable.create(var.getName(), child.getVariables()));
 
             Map<String, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
                     SqlBuiltinCall.create(request, "count", false, args));
 
             return aggregate(request, groupVariables, subAggregations, child, restrictions).optimize(request,
-                    restrictions, reduced);
+                    restrictions, reduced, evalServices);
         }
 
 
@@ -324,10 +327,10 @@ public class SqlAggregation extends SqlIntercode
 
 
     private Map<String, SqlExpressionIntercode> optimizeAggregations(Request request,
-            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
+            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, boolean evalServices)
     {
         LinkedHashMap<String, SqlExpressionIntercode> opt = new LinkedHashMap<String, SqlExpressionIntercode>();
-        aggregations.forEach((k, v) -> opt.put(k, v.optimize(request, child.getVariables())));
+        aggregations.forEach((k, v) -> opt.put(k, v.optimize(request, child.getVariables(), evalServices)));
 
         return opt;
     }
