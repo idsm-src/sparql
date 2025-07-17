@@ -1,0 +1,1731 @@
+### NXQ_00001 ###
+# Proteins phosphorylated and located in the cytoplasm
+# This query uses the term "Phosphoprotein" (via keyword KW-0597) and the UniProt subcellular location ontology term "Cytoplasm" (SL-0886).
+# Using the "childOf" allows to select for subcellular locations that are, in these ontologies, children of cytoplasm like for example "Cell cortex".
+select distinct ?entry where {
+  values ?cytoloc {cv:SL-0086 cv:GO_0005737} # SL and GO values for cytoplasm
+  ?entry :isoform ?iso.
+  ?iso :keyword / :term cv:KW-0597. # Phosphorylated
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?cytoloc.
+  minus {?loc  :negativeEvidence ?negev} # No negative localization evidence
+}
+
+
+### NXQ_00002 ###
+# Proteins that are located in both the nucleus and in the cytoplasm
+select distinct ?entry where {
+  values ?cytoloc {cv:GO_0005737 cv:SL-0086} # GO and SL values for cytoplasm
+  values ?nucloc {cv:GO_0005634 cv:SL-0191} # GO and SL values for nucleus
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc1, ?loc2 .
+  ?loc1 :term /:childOf ?cytoloc .
+  ?loc2 :term /:childOf ?nucloc .
+  minus {?loc1  :negativeEvidence ?negev} # No negative localization evidence
+  minus {?loc2  :negativeEvidence ?negev} # No negative localization evidence
+}
+
+
+### NXQ_00003 ###
+# Proteins with 7 transmembrane regions
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :topology ?statement.
+  ?statement a :TransmembraneRegion.
+} group by ?entry ?iso having(count( ?statement)=7)
+
+
+### NXQ_00004 ###
+# Proteins expressed in brain with IHC expression level: "high" but not expressed in testis
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  # get all expression
+  ?iso :expression ?e1.
+  # highly expressed in brain
+  ?e1 :term/:childOf cv:TS-0095;:evidence/:expressionLevel :High.
+  # not expressed in testis
+  ?iso :undetectedExpression ?e2.
+  ?e2 :term cv:TS-1030.
+  minus { ?iso :detectedExpression / :term / :childOf cv:TS-1030 }
+}
+
+
+### NXQ_00005 ###
+# Proteins located in mitochondrion and that lack a transit peptide
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739 } # SL and GO values for mitochondrion
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?mitoloc.
+  minus { ?iso :keyword /:term cv:KW-0809 } # Transit peptide
+  minus {?loc :negativeEvidence ?negev} # No negative localization evidence
+}
+
+
+### NXQ_00006 ###
+# Proteins whose genes are on chromosome 13 and are associated with a disease
+select distinct ?entry where {
+  ?entry :gene / :chromosome "13"^^xsd:string;
+  :isoform / :medical /rdf:type :Disease.
+}
+
+
+### NXQ_00007 ###
+# Proteins associated with diseases that are associated with cardiovascular aspects
+select distinct ?entry where {
+  ?entry :isoform /:medical / :term /:related / :childOf cv:D002318.
+}
+
+
+### NXQ_00008 ###
+# Proteins whose genes are less than 50000 bp away from the location of the gene coding for protein p53
+select distinct ?entry where {
+  entry:NX_P04637 :gene /:begin ?s;:gene/:chromosome ?chr.
+  ?entry :gene/:begin ?gs;:gene/:chromosome ?chr.
+  filter ( ?gs > (?s -50000) && ?gs <= (?s +50000) && ?entry != entry:NX_P04637 )
+}
+
+
+### NXQ_00009 ###
+# Proteins with 3 disulfide bonds and that are not annotated as hormones 
+select distinct ?entry where {
+  ?entry :isoform ?isoform.
+  ?isoform :ptm ?statement.
+  ?statement a :DisulfideBond.
+  minus { ?entry :isoform / :function / :term /:childOf cv:GO_0005179. } # GO Hormone activity
+} group by ?entry ?isoform having (count(?statement) =3 )
+
+
+### NXQ_00010 ###
+# Proteins that are glycosylated and are not located in the membrane
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :keyword / :term cv:KW-0325.
+  minus { ?iso :keyword / :term cv:KW-0812.} # KW for Transmembrane
+  minus { ?iso :topology / :term cv:CVTO_0004 } # intramembrane segment
+}
+
+
+### NXQ_00011 ###
+# Proteins that are expressed in liver and involved in transport
+# By using "related" for the CV term KW-0813 (keyword 'Transport') we also search using the GO biological process term GO_0006810.
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :detectedExpression/:term/:childOf cv:TS-0564.
+  cv:KW-0813 :related  ?tra.
+  ?iso :generalAnnotation / :term ?tra.
+}
+
+
+### NXQ_00012 ###
+# Proteins that interact with protein RBM17 and that are involved in splicing
+select distinct ?entry where {
+  entry:NX_Q96I25 :isoform / :interaction / :interactant ?entry.
+  ?entry :isoform / :keyword / :term cv:KW-0508
+}
+
+
+### NXQ_00013 ###
+# Proteins that have a protein kinase domain but lack protein kinase activity
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :region /:term cv:DO-00529.
+  minus { ?iso :enzymeClassification / :term /:childOf cv:2_7_-_- }
+}
+
+
+### NXQ_00014 ###
+# Proteins with one SH2 and two SH3 domains
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  #with 1 SH3
+  {select ?iso where{?iso :region ?stat1. ?stat1 :term cv:DO-00614
+  } group by ?iso having(count( ?stat1)=1)}
+  #with 2 SH2
+  {select ?iso where{?iso :region ?stat2. ?stat2 :term cv:DO-00615
+  } group by ?iso having(count( ?stat2)=2)}
+} group by ?entry
+
+
+### NXQ_00015 ###
+# Proteins with a PDZ domain that interact with at least one protein which is expressed in brain
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :region / :term cv:DO-00477. #PDZ domain
+  { ?iso :binaryInteraction/:interactant/:isoform/:detectedExpression/:term/:childOf cv:TS-0095 } union { ?iso :binaryInteraction/:interactant/:detectedExpression/:term/:childOf cv:TS-0095 } #brain
+}
+
+
+### NXQ_00016 ###
+# Proteins with a mature chain of less than 1000 amino acids which are secreted and do not contain cysteines in the mature chain
+# The search takes into account all isoforms so sometimes you may see cysteines in a displayed isoform but at least one of the isoform does not contain any cysteine.
+select distinct ?entry where {
+  values ?sloc {cv:GO_0005576 cv:SL-0243} # GO and SL values for secreted
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?anno .
+  ?anno :term /:childOf ?sloc .
+  ?iso :sequence / :chain ?seq. 
+  ?iso :matureProtein [ :start ?mstart ; :end ?mend]
+  minus { ?anno :negativeEvidence ?_ }
+  #
+  # minus {?iso :cellularComponent /:term cv:GO_0070062 .
+  #   minus {?iso :cellularComponent /:term /:childOf  cv:SL-0243 .}
+  # } 
+  # you can uncomment this to filters out extracellular exosome only location (2240 entries), 
+  # most of them evidenced only by large-scale proteomic analysis  
+  #
+  filter ((?mend-?mstart > 0) && (?mend-?mstart < 1000))	 
+  bind (?mend - ?mstart + 1 as ?mlen)	 
+  bind (substr(?seq, ?mstart, ?mlen) as ?mseq)	 
+  filter (!regex (?mseq,'C'))
+}
+
+
+### NXQ_00017 ###
+# Proteins larger than 1000 amino acids that are located in the nucleus and expressed in the nervous system
+select distinct ?entry where {
+  values ?nucloc {cv:GO_0005634 cv:SL-0191} # GO and SL values for nucleus
+  
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term/:childOf ?nucloc.
+  ?iso :detectedExpression/:term/:childOf cv:TS-1313.
+  ?iso :sequence/:length ?len.
+  minus {?loc :negativeEvidence ?negev} # No negative localization evidence
+  filter (?len>1000)
+}
+
+
+### NXQ_00018 ###
+# Proteins that are acetylated and methylated and located in the nucleus
+select distinct ?entry where {
+  values ?nucloc {cv:GO_0005634 cv:SL-0191} # GO and SL values for nucleus
+
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term/:childOf ?nucloc.
+  ?iso :keyword/:term cv:KW-0007,cv:KW-0488. # acetylated and methylated
+  minus {?loc :negativeEvidence ?negev} # No negative localization evidence
+}
+
+
+### NXQ_00019 ###
+# Proteins with more than 12 WD repeats (ie: with at least two beta-propellers)
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  {select ?iso where{
+    ?iso :repeat ?rep. ?rep :term cv:DO-00722
+   }
+  group by ?iso having(count( ?rep) > 12)}
+}
+
+
+### NXQ_00020 ###
+# Proteins with at least 2 HPA antibodies whose genes are located on chromosome 21 and that are highly expressed at IHC level in heart
+select ?entry where {
+  select distinct ?entry ?id where {
+    ?entry :gene / :chromosome "21"^^xsd:string .
+    ?entry :isoform / :expressionProfile ?s1.
+    ?s1 :term / :childOf cv:TS-0445.
+    ?s1 :evidence ?evi.
+    ?evi :expressionLevel :High.
+    ?evi :evidenceCode cv:ECO_0001055.
+    ?entry :isoform / :antibodyMapping ?map.
+	 ?map :evidence / :reference / :accession ?id . 
+  }
+} group by ?entry having (count(?id)>=2)
+
+
+### NXQ_00021 ###
+# Proteins with at least one HPA antibody that are located in the peroxisome
+select distinct ?entry where {
+  values ?peroxiloc {cv:GO_0005777  cv:SL-0204} # GO and SL values for peroxisome
+  
+  ?entry :isoform ?iso. 
+  ?iso :antibodyMapping ?map. 
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?peroxiloc. # peroxisomal
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+}
+
+
+### NXQ_00022 ###
+# Proteins with no function annotated
+# WARNING The previous version of this query included PE5 proteins
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ minus { ?iso :functionInfo ?_. }
+ minus { ?iso :catalyticActivity ?_ .} 
+ minus { ?iso :transportActivity ?_ .} 
+ minus { ?iso :pathway ?_. }
+ minus { 
+   ?iso :function / :term  ?fterm . 
+			  filter(?fterm != cv:GO_0005524 && ?fterm != cv:GO_0000287 && ?fterm != cv:GO_0005515 && ?fterm != cv:GO_0042802
+			    && ?fterm != cv:GO_0008270 && ?fterm != cv:GO_0051260 && ?fterm != cv:GO_0005509
+					  && ?fterm != cv:GO_0003676 && ?fterm != cv:GO_0003824 && ?fterm != cv:GO_0007165 && ?fterm != cv:GO_0035556
+					  && ?fterm != cv:GO_0035556 && ?fterm != cv:GO_0046914 && ?fterm != cv:GO_0046872)
+   }
+ minus { ?entry :existence :Uncertain }   # Remove PE5 proteins
+}
+
+
+### NXQ_00023 ###
+# Proteins that are involved in transport and located in a membrane and that are not glycosylated (experimentally or predicted)
+select distinct ?entry where {
+  ?entry :isoform  ?iso .
+  {
+    ?iso :goBiologicalProcess ?gofunc .
+	?gofunc :term / :childOf cv:GO_0006810. # GO value for transport
+	minus {?gofunc  :negativeEvidence ?negev} # No negative function evidence
+  } union {
+    ?iso :keyword / :term cv:KW-0813. # KW for transport
+  }
+  {   
+    ?iso :keyword / :term cv:KW-0812. # transmembrane
+  } union {
+     ?iso :topology / :term cv:CVTO_0004. # intramembrane
+  }  
+  minus { ?iso :keyword / :term cv:KW-0325 } # not a glycoprotein
+}
+
+
+### NXQ_00024 ###
+# Proteins with more than 10 reported interactions (of 'gold' quality)
+select distinct ?entry where {
+  ?entry :isoform/:binaryInteraction ?interaction.
+  ?interaction :interactant ?interactant; :quality :GOLD.
+  ?interactant a :Entry.
+} group by ?entry having (count(distinct ?interactant) > 10)
+
+
+### NXQ_00025 ###
+# Proteins with at least 50 interactors that are not associated with a disease
+# We exclude proteins that have either a disease annotation (Xref to Orphanet are considered  disease annotation) and proteins w Disease-category KWs
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :binaryInteraction/:interactant ?interactant.
+  minus { ?iso :medical / rdf:type :Disease. }
+  minus {?iso :keyword / :term cv:KW-0043} # tumor suppressor
+  minus {?iso :keyword / :term cv:KW-0772} # Systemic lupus erythematosus
+  minus {?iso :keyword / :term cv:KW-0026} # Alzheimer disease
+  minus {?iso :keyword / :term cv:KW-0219} # Diabetes mellitus
+} group by ?entry ?iso having (count(?interactant) >= 50)
+
+
+### NXQ_00026 ###
+# Proteins interacting with at least one protein which is located in the mitochondrion
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739} # SL and GO values for mitochondrion
+  
+  ?entry :isoform / :interaction ?it .
+  ?it :quality :GOLD . # remove this filter for lower quality interactions
+  ?it :interactant ?interactant.
+  { ?interactant :isoform / :cellularComponent ?loc } union { ?interactant :cellularComponent ?loc }
+  # the union allows to select also isoform-specific interactions
+  ?loc :term / :childOf ?mitoloc.
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+}
+
+
+### NXQ_00027 ###
+# Proteins with one or more glycosylation sites reported in PubMed:20570859 or PubMed:14760718
+select distinct ?entry ?publications where {
+  values ?publications {"PubMed:20570859"^^xsd:string "PubMed:14760718"^^xsd:string}
+  # get all assertions from the publications
+  ?entry :isoform/:glycosylationSite ?statement.
+  ?statement :evidence/:reference/:from ?publications
+}
+
+
+### NXQ_00028 ###
+# Proteins associated with a disease but without a disease-causing amino-acid substitution variant
+# COSMIC variants are not taken into account as the link between the variant and the cancer is not established
+select distinct ?entry where {
+  ?entry :isoform / :medical / rdf:type :Disease.
+  minus { ?entry :isoform / :variant / :disease ?_ . }
+}
+
+
+### NXQ_00029 ###
+# Proteins anchored to the membrane via a GPI-anchor
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :lipidationSite / rdfs:comment ?mod.
+  filter(contains(?mod,"GPI-anchor")).
+}
+
+
+### NXQ_00030 ###
+# Proteins whose gene is located in chromosome 2 that belongs to families with at least 5 members in the human proteome
+select ?entry where {
+  ?entry :family / :term/^:term/^:family ?member.
+  ?entry :gene / :chromosome "2"^^xsd:string .
+} group by ?entry having ( count(distinct ?member) >= 5 )
+
+
+### NXQ_00031 ###
+# Proteins with more than 10 alternative isoforms
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+} group by ?entry having (count(?iso)>10)
+
+
+### NXQ_00032 ###
+# Proteins with a coiled coil region and that are involved in transcription but do not contain a bZIP domain
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :function ?func .
+  ?func :term / :childOf  cv:GO_0006351. # Transcription
+  ?iso :region/rdf:type :CoiledCoilRegion.
+  minus {?func :negativeEvidence ?negev. } # no negative evidence
+  minus { ?iso :region/:term cv:DO-00078 }  # Bzip domain
+}
+
+
+### NXQ_00033 ###
+# Proteins with at least one phosphotyrosine but no phosphoserine or phosphothreonine
+select distinct ?entry where {
+  select ?entry ?iso (count(?ptm) as ?ptmCnt) where {
+    ?entry :isoform ?iso.
+    ?iso :modifiedResidue ?ptm.
+    ?ptm :term cv:PTM-0255 #phosphotyrosine.
+    minus { ?iso :modifiedResidue / :term cv:PTM-0253. } #phosphoserine
+    minus { ?iso :modifiedResidue / :term cv:PTM-0254. } #phosphothreonine
+  } group by ?entry ?iso having ( count(?ptm) >= 1 )
+}
+
+
+### NXQ_00034 ###
+# Proteins with at least one homeobox domain and with at least one variant in the homeobox domain(s)
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  # with >=1 homeobox domain
+  ?iso :region ?st1.
+  ?st1 :term cv:DO-00312;:start ?start;:end ?end.
+  # with >=1 variant
+  ?iso :variant ?var.
+  ?var :start ?varpos.
+  # one variant in the homeobox domain
+  filter (?varpos >=?start && ?varpos <=?end)
+}
+
+
+### NXQ_00035 ###
+# Proteins located in the mitochondrion and which are enzymes
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739} # SL and GO values for mitochondrion
+  
+  ?entry :classifiedWith/rdf:type :EnzymeClassificationCv.
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term / :childOf ?mitoloc.
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+}
+
+
+### NXQ_00036 ###
+# Proteins that are oxidoreductases and that bind to NAD/NADP
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :keyword /:term cv:KW-0560. #oxidoreductase
+  ?iso :keyword /:term ?kw
+  filter( ?kw in (cv:KW-0520,cv:KW-0521)) # NAD or NADP
+}
+
+
+### NXQ_00037 ###
+# Proteins that bind RNA but do not contain a RRM domain
+select distinct ?entry where {
+  ?entry :isoform ?iso .
+  ?iso :keyword /:term cv:KW-0694. #RNA-binding
+  minus {?iso :region/:term cv:DO-00581} #RRM
+}
+
+
+### NXQ_00038 ###
+# Proteins with at least one selenocysteine in their sequence
+select distinct ?entry where {
+  ?entry :isoform/:selenocysteine ?statement.
+}
+
+
+### NXQ_00039 ###
+# Proteins with a mutagenesis in a position that correspond to an annotated active site
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :mutagenesis /:start ?mutaPos.
+  ?iso :activeSite /:start ?actsitePos.
+  filter (?mutaPos=?actsitePos)
+}
+
+
+### NXQ_00040 ###
+# Proteins that are enzymes and with at least one mutagenesis site that decrease or abolish activity
+select distinct ?entry where {
+  ?entry :classifiedWith/rdf:type :EnzymeClassificationCv;:isoform ?iso.
+  ?iso :mutagenesis/rdfs:comment ?comment
+  filter regex(?comment, '(decrease|abolish).*activity','i')
+}
+
+
+### NXQ_00041 ###
+# Proteins that are annotated with GO "F" (function) terms prefixed by "Not"
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :goMolecularFunction ?statement.
+  ?statement :negativeEvidence ?ev.
+}
+
+
+### NXQ_00042 ###
+# Proteins that bind a metal and are secreted
+select distinct ?entry where {
+  values ?sloc {cv:GO_0005576 cv:SL-0243} # GO and SL values for secreted
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?sloc .  
+  ?iso :goMolecularFunction / :term /:childOf cv:GO_0046872 . # metal-binding	
+  minus {?sloc  :negativeEvidence ?negev} # No negative localization evidence
+  #minus {?iso :cellularComponent /:term cv:GO_0070062 .
+					 #minus {?iso :cellularComponent /:term /:childOf  cv:SL-0243 .}
+					#} # filters out extracellular exosome only location (2758 entries)
+}
+
+
+### NXQ_00043 ###
+# Proteins that bind zinc and are not oxidoreductase and not involved in transcription
+select distinct ?entry where {
+  ?entry :isoform ?iso .
+  ?iso :keyword / :term cv:KW-0479. # metal-binding
+  ?iso :keyword / :term cv:KW-0862. # zinc
+  minus {?iso :keyword / :term cv:KW-0804} # transcription
+  minus {?iso :keyword / :term cv:KW-0560} # oxidoreductase
+}
+
+
+### NXQ_00044 ###
+# Proteins involved in the Reactome pathway "Respiratory electron transport"
+select distinct ?entry where {
+  ?entry :isoform / :pathway ?p.
+  ?p :evidence /:reference ?xref.
+  ?xref :provenance db:Reactome; :accession "R-HSA-611105"^^xsd:string.
+}
+
+
+### NXQ_00045 ###
+# Proteins with an active site that is a proton acceptor
+select distinct ?entry ?comment where {
+  ?entry :isoform/ :activeSite /rdfs:comment ?comment.
+  filter (contains (?comment,'Proton acceptor'))
+}
+
+
+### NXQ_00047 ###
+# Proteins with a gene name that starts with "CLDN"
+select distinct ?entry where {
+  ?entry :gene / :name ?name.
+  filter (regex(?name, "^CLDN"))
+}
+
+
+### NXQ_00048 ###
+# Proteins with at least one variant of the type "C->X" (Cys to anything else) that are linked to one or more diseases
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :variant ?var.
+  ?var :disease ?_.	   
+  ?var :original "C"^^xsd:string.
+}
+
+
+### NXQ_00049 ###
+# Proteins with at least one variant of the types "A->R" or "R->A"
+select distinct ?entry where {
+  ?entry :isoform/:variant ?statement.
+  {?statement :original "A"^^xsd:string;:variation "R"^^xsd:string}
+  UNION
+  {?statement :original "R"^^xsd:string;:variation "A"^^xsd:string}
+}
+
+
+### NXQ_00051 ###
+# Proteins that have at least one 3D structure solved by NMR
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :pdbMapping ?map.
+  ?map :method ?meth
+  filter (contains(?meth,'NMR'))
+}
+
+
+### NXQ_00052 ###
+# Proteins with a sequence that does not contain a lysine in the mature region
+select distinct ?entry where {
+  ?entry :isoform ?iso .
+  ?iso :sequence / :chain ?seq.
+  ?iso :matureProtein [ :start ?mstart ; :end ?mend]
+  bind(?mend - ?mstart + 1 as ?mlen)
+  bind(substr(?seq, ?mstart, ?mlen) as ?mseq)
+  filter (!regex (?mseq,'K'))
+}
+
+
+### NXQ_00053 ###
+# Proteins which are involved in cell adhesion according to GO with an evidence which is not used in automatic assertion nor a sequence similarity evidence used in manual assertion
+select distinct ?entry where {
+  ?entry :isoform/:function ?statement.
+  ?statement :term / :childOf cv:GO_0007155.
+  ?statement :evidence/:evidenceCode ?ecode.
+  minus { ?statement :negativeEvidence ?negev. } # No negative function evidence
+  minus { ?ecode :childOf cv:ECO_0000501. } # Automatic assertion
+  minus { ?ecode :childOf cv:ECO_0000250. } # Sequence similarity evidence used in manual assertion
+}
+
+
+### NXQ_00054 ###
+# Proteins which are "Receptor binding" according to GO and have the Swiss-Prot keyword "Immunity"
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :function ?statement.
+  ?statement :term / :childOf cv:GO_0005102.
+  ?iso :keyword/:term cv:KW-0391.
+  minus { ?statement :negativeEvidence ?negev. } # No negative function evidence
+}
+
+
+### NXQ_00055 ###
+# Proteins which have genes of length greater than 2 million bp
+select distinct ?entry where {
+  ?entry :gene / :length ?l.
+  filter (?l > 2000000)
+}
+
+
+### NXQ_00057 ###
+# Proteins that are located in the mitochondrion with an experimental evidence originating not from HPA or DKFZ-GFP
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739} # SL and GO values for mitochondrion
+
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc.
+  ?loc :term /:childOf ?mitoloc.
+  ?loc :evidence /:assignedBy ?src.
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+  filter ( ?src not in (source:Human_protein_atlas, source:GFP-cDNAEMBL))
+}
+
+
+### NXQ_00058 ###
+# Proteins which are located on the genome next to a protein which is involved in spermatogenesis
+# In the future we will add / pre-calculate interesting predicates like :neighbor , :overlaps, ...
+select distinct (?neighbour as ?entry) (str(?gen) as ?spergen) where {
+  {
+  select distinct ?chr ?gen ?sperstart (MAX(?ldist) as ?lmin) (MIN(?rdist)  as ?rmin) where {
+     
+     ?entryx :isoform / :function ?func .
+	 ?func :term / :childOf cv:GO_0007283 . # Involvment in spermatogenesis
+     ?entryx :gene ?gene.
+     ?gene :begin ?sperstart; :end ?e; :chromosome ?chr; :name ?gen.
+     ?ngen :chromosome ?chr. 
+     ?ngen :begin ?n_begin; :end ?n_end .
+	 minus {?func  :negativeEvidence ?negev}     
+     filter ( ?n_end > (?sperstart - 1000000) && ?n_begin <= (?sperstart + 1000000)  && ?ngen != ?gene)
+     
+     bind(?sperstart - ?n_begin as ?dist)
+     bind(if(?dist<0,?dist,-1000000) as ?ldist)
+     bind(if(?dist>0,?dist,1000000) as ?rdist)
+     } group by ?chr ?gen ?sperstart
+  }
+  bind(?sperstart - ?lmin as ?lchrpos)
+  ?lgene :begin ?lchrpos; :chromosome ?chr; :name ?lgen.
+  bind(?sperstart - ?rmin as ?rchrpos)
+  ?rgene :begin ?rchrpos; :chromosome ?chr; :name ?rgen.
+  { ?neighbour :gene ?lgene. } # left gene
+	   union
+  { ?neighbour :gene ?rgene. } # right gene
+} order by ?gen
+
+
+### NXQ_00059 ###
+# Proteins that are glycosylated and phosphorylated on an extracellular topological domain
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :topologicalDomain ?topodom.
+  ?topodom :term cv:CVTO_0002.
+  ?topodom :start ?topostart ; :end ?topoend.
+  ?iso :positionalAnnotation ?annot,?annot2.
+  ?annot a :ModifiedResidue.
+  ?annot :term ?ptmtype.
+  filter (?ptmtype in (cv:PTM-0253, cv:PTM-0254, cv:PTM-0255))  
+  ?annot2 a :GlycosylationSite.
+  ?annot :start ?ptmpos.
+  ?annot2 :start ?glypos.
+ filter ((?ptmpos >= ?topostart) && (?ptmpos <= ?topoend))
+ filter ((?glypos >= ?topostart) && (?glypos <= ?topoend))
+}
+
+
+### NXQ_00060 ###
+# Proteins which have one or more negatively charged residue in a transmembrane domain
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :transmembraneRegion ?tm.
+  ?tm :start ?tmstart ; :end ?tmend.
+  ?iso :sequence /:chain ?chain.
+  bind (substr(?chain, ?tmstart, ?tmend - ?tmstart + 1) as ?tmseq)
+  filter (regex(?tmseq, '([DE]+.*[^DE]){1,}')) # Change the 1 for the number of acidic residues required (5 seems to be the max)
+}
+
+
+### NXQ_00061 ###
+# Proteins which have at least one 3D structure that spans the complete sequence of the mature protein
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :pdbMapping  ?pdbmap.
+  ?pdbmap :start ?pdbstart ; :end ?pdbend.
+  ?iso :matureProtein [ :start ?mstart ; :end ?mend]
+  filter (?mend-?mstart > 0)	 
+  filter ((?pdbstart <= ?mstart) && (?pdbend >= ?mend))
+}
+
+
+### NXQ_00062 ###
+# Proteins which have at least one zinc finger of any subtype
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :zincFingerRegion ?_.
+}
+
+
+### NXQ_00063 ###
+# Proteins that have at least one RRM RNA-binding domain and either no GO "RNA binding" or a GO "RNA binding" with evidence cv:ECO_0000501 or cv:ECO_0000250
+select distinct ?entry where {
+  {
+    ?entry :isoform ?iso.
+    # >=1 RRM RNA-binding domain
+    ?iso :region/:term cv:DO-00581.
+    # No GO "RNA binding" 
+    minus {
+      ?iso :function/:term /:childOf cv:GO_0003723
+    }
+  }
+  union{
+    ?entry :isoform ?iso.
+    # >=1 RRM RNA-binding domain
+    ?iso :region/:term cv:DO-00581.
+    # GO "RNA binding" with evidence IEA or ISS
+    ?iso :function ?s1.
+    ?s1 :term /:childOf cv:GO_0003723.
+    ?s1 :evidence /:evidenceCode /:childOf ?pcode.
+    minus { ?s1 :negativeEvidence ?negev. } # No negative function evidence
+    values ?pcode { cv:ECO_0000501 cv:ECO_0000250 }
+  }
+}
+
+
+### NXQ_00064 ###
+# Proteins which are enzymes and that have an incomplete EC number
+# An incomplete EC number contains at least one "-"
+select distinct ?entry where {
+  ?entry :isoform/ :enzymeClassification ?ec.
+  ?ec :term / rdfs:label ?eclabel.
+  filter regex(?eclabel, '-'^^xsd:string)
+}
+
+
+### NXQ_00065 ###
+# Proteins that have more than one catalytic activity
+select distinct ?entry where {
+  ?ec a :EnzymeClassificationCv.
+  ?entry :classifiedWith ?ec
+} group by ?entry having (count(?ec)>1)
+
+
+### NXQ_00066 ###
+# Proteins that are cytoplasmic with alternate O-glycosylation or phosphorylation at the same positions
+# Using PTM-0253 (phosphoserine), PTM-0254 (phosphothronine) and PTM-0255 (phosphotyrosine) for the phosphorylation sites
+select distinct ?entry where {
+  values ?cytoloc {cv:SL-0086 cv:GO_0005737} # SL and GO values for cytoplasm
+  
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?cytoloc .
+  ?iso :modifiedResidue /:term ?ptmtype.
+  ?iso :modifiedResidue /:start ?ptmpos.
+  ?iso :glycosylationSite /:start ?ptmpos.
+  minus {?loc  :negativeEvidence ?negev} # No negative localization evidence
+  filter (?ptmtype in (cv:PTM-0253, cv:PTM-0254, cv:PTM-0255)) 
+}
+
+
+### NXQ_00067 ###
+# Proteins with alternative acetylation or Ubl conjugation (SUMO or Ubiquitin) at the same positions
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :crossLink /:start ?ptmpos.
+  ?iso :modifiedResidue ?ptm.
+  ?ptm :start ?ptmpos.
+  ?ptm rdfs:comment ?comment.
+  # We use this filter to select acetylations
+  filter regex(?comment, "acetyl","i")
+}
+
+
+### NXQ_00068 ###
+# Proteins with a protein existence "At transcript level" (PE=2)
+select distinct ?entry where {
+  ?entry :existence :Evidence_at_transcript_level
+}
+
+
+### NXQ_00069 ###
+# Proteins which are the substrate of protein kinase SYK
+# You can search for autophosphorylated kinases by replacing the "SYK" filter by the 'auto' one (339 results)
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  {
+  ?iso :modifiedResidue ?ptm.
+  ?ptm :term ?ptmtype.
+  ?ptm rdfs:comment ?comment.
+  filter (?ptmtype in (cv:PTM-0253, cv:PTM-0254, cv:PTM-0255))  
+  filter regex(?comment, "SYK","i")
+  # filter regex(?comment, "auto","i")
+  }
+  union
+  {
+  ?iso :ptmInfo / rdfs:comment ?ptmtext . 
+  filter regex(?ptmtext, "SYK","i")	
+  #filter regex(?ptmtext, "autophos","i")	
+  }
+ }
+
+
+### NXQ_00070 ###
+# Proteins secreted but without a signal sequence
+select distinct ?entry where {
+  values ?sloc {cv:GO_0005576 cv:SL-0243} # GO and SL values for secreted
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term/:childOf ?sloc .
+  minus {?sloc  :negativeEvidence ?negev} # No negative localization evidence
+  minus {?iso :cellularComponent /:term cv:GO_0070062 .
+					 minus {?iso :cellularComponent /:term /:childOf  cv:SL-0243 .}
+					} # filters out extracellular exosome only location (2758 entries)
+  minus {?iso :signalPeptide ?_}
+}
+
+
+### NXQ_00072 ###
+# Proteins with a cross-reference to CCDS
+select distinct ?entry where {
+  ?entry :reference / :provenance db:CCDS.
+}
+
+
+### NXQ_00073 ###
+# Proteins with no known (annotated) domain
+select distinct ?entry where {
+  ?entry a :Entry.
+  minus { ?entry :isoform / :region/rdf:type :Domain}
+}
+
+
+### NXQ_00074 ###
+# Proteins belonging to a family with at least two members in the human proteome
+select distinct ?entry where {
+  ?entry :family / :term ?ac.
+  ?member :family / :term ?ac.
+} group by ?entry having (count(distinct ?member) >= 2 )
+
+
+### NXQ_00075 ###
+# Proteins which have been detected in the HUPO liver proteome set but not the HUPO plasma proteome set
+select distinct ?entry where {
+values ?pepsources { 
+        source:PeptideAtlas_human_Liver 
+        source:MassIVE_human_Liver
+       }
+  ?entry a :Entry.
+  ?entry :isoform / :peptideMapping / :evidence / :assignedBy ?pepsources .
+  minus { ?entry :isoform / :peptideMapping / :evidence / :assignedBy source:PeptideAtlas_human_Blood_Plasma . }
+  minus { ?entry :isoform / :peptideMapping / :evidence / :assignedBy source:MassIVE_human_Blood_Plasma . }
+}
+
+
+### NXQ_00076 ###
+# Proteins which are located in mitochondrion and have at least one HPA antibody and exist in at least one proteome identification sets
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739} # SL and GO values for mitochondrion
+  
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?mitoloc .
+  ?iso :antibodyMapping ?abmap.
+  ?iso :peptideMapping ?pepmap.
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+}
+
+
+### NXQ_00077 ###
+# Proteins which are expressed in liver according to IHC data but not found in HUPO liver proteome set
+select distinct ?entry where {
+  ?entry :isoform /:expression ?s1.
+  ?s1 :evidence ?evi;:term/:childOf cv:TS-0564. #Liver
+  ?evi :evidenceCode cv:ECO_0001055; :expressionLevel ?level .
+  filter (?level not in (:Negative))
+  minus { ?entry :isoform / :peptideMapping / :evidence / :assignedBy source:PeptideAtlas_human_Liver . }
+  minus { ?entry :isoform / :peptideMapping / :evidence / :assignedBy source:MassIVE_human_Liver . }
+}
+
+
+### NXQ_00078 ###
+# Proteins which have been identified in at least one proteomics set and that are secreted
+# If you don't consider extracellular exosome location as 'secreted' then remove the commented paragraph
+select distinct ?entry where {
+  values ?sloc {cv:GO_0005576 cv:SL-0243} # GO and SL values for secreted
+  ?entry :isoform ?iso.
+  ?iso :cellularComponent ?loc .
+  ?loc :term/:childOf ?sloc .
+  ?iso :peptideMapping ?map.
+  minus {?sloc  :negativeEvidence ?negev} # No negative localization evidence
+  #minus {?iso :cellularComponent /:term cv:GO_0070062 .
+  #					 minus {?iso :cellularComponent /:term /:childOf  cv:SL-0243 .}
+  #					} # you can uncomment this to filters out extracellular exosome only location (2240 entries), most of them evidenced only by large-scale proteomic analysis
+}
+
+
+### NXQ_00079 ###
+# Proteins with at least one 3D structure and that are phosphorylated
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :keyword / :term cv:KW-0597. # Phosphoprotein
+  ?iso :pdbMapping ?map.
+}
+
+
+### NXQ_00080 ###
+# Proteins with at least one 3D structure of resolution less than 3 Angstroms
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :pdbMapping ?map.
+  ?map :resolution ?res.
+  filter (?res <= 3.0)
+}
+
+
+### NXQ_00081 ###
+# Proteins with at least one 3D structure and that are located in the mitochondrion and are linked with a disease
+select distinct ?entry where {
+  values ?mitoloc {cv:SL-0173 cv:GO_0005739} # SL and GO values for mitochondrion
+
+  ?entry :isoform ?iso.
+  ?iso :pdbMapping ?map.
+  ?iso :medical/rdf:type :Disease.
+  ?iso :cellularComponent ?loc .
+  ?loc :term /:childOf ?mitoloc . # mitochondrial
+  minus { ?loc :negativeEvidence ?negev. } # No negative localization evidence
+}
+
+
+### NXQ_00082 ###
+# Proteins whose genes are on chromosome 21 that have "gold" variants not associated with a disease
+select distinct ?entry where {
+  ?entry :gene / :chromosome "21"^^xsd:string; :isoform / :variant ?variant.
+  ?variant :evidence / :quality :GOLD.
+  minus { ?variant :disease ?disease. }
+}
+
+
+### NXQ_00083 ###
+# Proteins that are expressed only in liver
+Select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :detectedExpression /:term ?tiss, ?tiss2.
+  ?tiss2 :childOf cv:TS-0564. # Liver
+} group by ?entry ?iso having(count(distinct ?tiss) = count(distinct ?tiss2))
+
+
+### NXQ_00084 ###
+# Proteins whose genes are on chromosome 18 and that are experimentally (cv:ECO_0000269) known to be glycosylated or phosphorylated or acetylated
+select distinct ?entry {
+  ?entry :gene / :chromosome "18"^^xsd:string.
+  ?entry :isoform ?iso.
+  {
+    ?iso :glycosylationSite ?ptm1.
+    ?ptm1 :evidence /:evidenceCode / :childOf cv:ECO_0000269
+  } 
+  union {
+    ?iso :modifiedResidue ?ptm2.
+    ?ptm2 rdfs:comment ?com.
+    ?ptm2 :evidence / :evidenceCode / :childOf cv:ECO_0000269
+    filter (regex(?com, '^phospho|acetyl','i'))
+  }
+}
+
+
+### NXQ_00085 ###
+# Proteins with Poly-Proline stretches
+select distinct ?entry where {
+  ?entry :isoform  ?iso .
+    ?iso :compositionallyBiasedRegion / rdfs:comment ?desc.
+  filter (contains(?desc,'Poly-Pro')).
+}
+
+
+### NXQ_00086 ###
+# Proteins whose genes are located in chromosome 2 region from 2p12 to 2p24.2
+select distinct ?entry where {
+  ?entry :gene  ?gene .
+  ?gene :chromosome "2"^^xsd:string .
+  ?gene :band ?band.
+  filter (str(?band) >= "p12" && str(?band) <= "p24.2" )
+}
+
+
+### NXQ_00087 ###
+# Proteins whose genes are on chromosome X and which do not have a ortholog in mouse
+select distinct ?entry where {
+  ?entry :gene / :chromosome "X"^^xsd:string .
+  minus { ?entry :reference / :provenance db:MGI . }
+}
+
+
+### NXQ_00089 ###
+# Protein that have a signal sequence which is not cleaved
+select distinct ?entry where {
+  ?entry :isoform / :signalPeptide / rdfs:comment ?comment .
+  filter(contains(?comment,"Not cleaved"))
+}
+
+
+### NXQ_00090 ###
+# Proteins which are linked to a disease and that do not have orthologs/paralogs in mouse
+select distinct ?entry where {
+  ?entry :isoform / :medical / rdf:type :Disease .
+  minus { ?entry :reference / :provenance db:MGI . }
+}
+
+
+### NXQ_00092 ###
+# Proteins with a sequence containing "FF.QYE" where "." is any single amino-acid
+select distinct ?entry where {
+  ?entry rdf:type :Entry.
+  ?entry :isoform / :sequence / :chain ?chain.
+  filter ( regex(?chain, "FF.QYE") )
+}
+
+
+### NXQ_00093 ###
+# Proteins with a sequence containing "FF.+QYE" where ".+" is any peptide of any length
+select distinct ?entry where {
+  ?entry :isoform / :sequence / :chain ?chain.
+  filter ( regex(?chain, "FF.+QYE") )
+}
+
+
+### NXQ_00097 ###
+# Proteins located on chromosome 2 and having at least one variant in a phosphorylated tyrosine
+select distinct ?entry where {
+  ?entry :gene / :chromosome "2"^^xsd:string .
+  ?entry :isoform ?iso.
+  ?iso :variant /:start ?varpos.
+  ?iso :modifiedResidue ?modres.
+  ?modres :term cv:PTM-0255.
+  ?modres :start ?varpos.
+}
+
+
+### NXQ_00099 ###
+# Secreted proteins that have at least one PTM in a position of a variant
+select distinct ?entry where {
+  values ?sloc {cv:GO_0005576 cv:SL-0243} # GO and SL values for secreted
+  ?entry :isoform ?iso .
+  ?iso :swissprotDisplayed true . # restricted to main isoform due to computing time (> 98% of sites)
+  ?iso :cellularComponent ?anno .
+  ?anno :quality :GOLD; :term /:childOf ?sloc. # secreted
+  ?iso :variant /:start ?varpos.
+  ?iso :ptm /:start ?varpos.
+  minus { ?anno :negativeEvidence ?_ }
+  # excludes "extracellular exosome"-only location, most of them evidenced only by large-scale proteomic analysis
+  minus { 
+	 ?iso :cellularComponent /:term cv:GO_0070062 . # extracellular exosome
+  	 minus { ?iso :cellularComponent /:term /:childOf  cv:SL-0243 .}
+  	} 
+}
+
+
+### NXQ_00103 ###
+# Proteins that do not have a cross-reference to an Ensembl ENSG
+select distinct ?entry where {
+  ?entry a :Entry.
+  minus { ?entry :reference / :provenance db:Ensembl . }
+}
+
+
+### NXQ_00104 ###
+# Proteins whose gene is on chromosome 21 with at least one disease annotation from Orphanet
+select distinct ?entry (str(?disname) as ?disease) where {
+  ?entry :isoform ?iso; :gene / :chromosome "21"^^xsd:string .
+  ?iso :disease ?medannot .
+  ?medannot rdfs:comment ?disname; :evidence / :assignedBy source:Orphanet.	 
+}
+
+
+### NXQ_00105 ###
+# Proteins with at least one cross-reference to SMR (Swiss Model Repository) but no cross-references to PDB
+select distinct ?entry where {
+  ?entry a :Entry.
+  ?entry :reference / :provenance db:SMR.
+  minus { ?entry :reference / :provenance db:PDB }
+}
+
+
+### NXQ_00106 ###
+# Proteins annotated as glycosylated but with no recorded glycosylation site
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :keyword / :term cv:KW-0325.
+  minus { ?entry :isoform /:glycosylationSite ?_.  }
+}
+
+
+### NXQ_00107 ###
+# Proteins with a protein existence not "At protein level" (PE=1) and with a HGNC approved gene name that contains "orf"
+select distinct ?entry where {
+  ?entry :existence ?level.
+  filter (?level != :Evidence_at_protein_level).
+  ?entry :reference ?r.
+  ?r :provenance db:HGNC ; :accession ?ac.
+  filter (regex(?ac,'orf')) .
+}
+
+
+### NXQ_00108 ###
+# Proteins that have a 3D structure in PDB that overlap by at least 50 amino acids with a SH3 domain
+select distinct ?entry where {
+  ?entry :isoform ?isoform.
+  ?isoform :pdbMapping ?struc.
+  ?struc :start ?s1 ; :end ?s2.
+  ?isoform :region ?dom.
+  ?dom :term cv:DO-00615 ; :start ?d1 ; :end ?d2.
+  bind ( if(?d2<?s2, ?d2, ?s2) - if(?d1>?s1, ?d1, ?s1) as ?overlap) .
+  filter (?overlap>50)
+}
+
+
+### NXQ_00109 ###
+# Proteins that have a MS-identified proteotypic peptide that maps partly or fully into a signal sequence
+select distinct ?entry ?overlap where {
+  ?entry :isoform ?iso.
+  #get Signal position (start is always 1)
+  ?iso :signalPeptide [:end ?s2] .
+  ?iso :peptideMapping ?pm .
+  ?pm :proteotypic true .
+  #get peptide position
+  ?pm :start ?p1 ; :end ?p2 .
+  #match positions
+  filter ( ?p1 < ?s2   )
+  bind ( if(?p2<?s2, ?p2, ?s2) - ?p1 as ?overlap) .
+  filter(?overlap > 2)
+}
+
+
+### NXQ_00111 ###
+# Proteins with one transmembrane domain and no annotated topology
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+   ?iso  :swissprotDisplayed true .
+   ?iso :topology ?tm.
+   ?tm a :TransmembraneRegion.
+   minus { ?iso :topology ?topodom.
+   ?topodom a :TopologicalDomain.
+   }
+} group by ?entry having (count( ?tm)=1)
+
+
+### NXQ_00112 ###
+# Proteins located in nucleus and nowhere else
+select ?entry where {
+  {
+  select  ?entry (count(?loc) as ?anyLoc) (sum(?inNucleus) as ?nucleusLoc)
+  where {
+    ?entry :isoform / :cellularComponent ?loc .
+    ?loc :evidence / :negative false .
+    ?loc :term ?locterm.
+    optional {{select distinct ?locterm (1 as ?inNucleus) where {
+      ?locterm :childOf / rdfs:label ?label.
+      filter (regex(?label, '^[Nn]ucleus$'))
+      }}}
+    }
+    group by ?entry
+  }
+  filter ( ?anyLoc = ?nucleusLoc)
+}
+
+
+### NXQ_00113 ###
+# Proteins with protein existence "At protein level" (PE=1) and at least one proteotypic peptide
+select distinct ?entry where {
+  ?entry :isoform / :peptideMapping ?pm .
+  ?entry :existence :Evidence_at_protein_level .
+  ?pm :proteotypic true .
+}
+
+
+### NXQ_00117 ###
+# Proteins with at least one sequence variant
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :variant ?var.
+}
+
+
+### NXQ_00118 ###
+# Proteins with at least one somatic variant
+# In this query we consider all COSMIC mutation to be somatic (which is not alwasy the case!).
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :variant ?var.
+ { 
+ ?var rdfs:comment ?comment.
+ filter (contains (?comment,'somatic'))
+ }
+ union
+ {
+ ?var :evidence ?ev.
+ ?ev :assignedBy source:Cosmic.
+ }
+}
+
+
+### NXQ_00119 ###
+# Proteins with at least one annotated mutagenesis site
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :mutagenesis ?mut.
+}
+
+
+### NXQ_00127 ###
+# Proteins with at least one known SUMOylation site
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :crossLink /rdfs:comment ?comment.
+  filter(contains (?comment,'SUMO'))
+}
+
+
+### NXQ_00128 ###
+# Proteins whose gene is annotated to be induced by interferons
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :induction /rdfs:comment ?comment.
+  filter(regex (?comment,'IFN|interferon',"i"))
+}
+
+
+### NXQ_00130 ###
+# Proteins with a DNA-binding region but not located in the nucleus
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?entry :gene / :name ?gen .
+  ?iso :dnaBindingRegion ?dnab.
+  minus { ?entry :isoform / :cellularComponent /:term /:childOf cv:SL-0191}  # SL for nucleus
+  minus { ?entry :isoform / :cellularComponent /:term /:childOf cv:GO_0005634} # GO for nucleus
+}
+
+
+### NXQ_00132 ###
+# Proteins with a 3D structure in complex with another human protein which is not reported as binary interactant
+select distinct ?entry where {
+  ?entry a :Entry.
+  ?entry :reference ?ref.
+  ?ref :provenance db:PDB; :accession ?ac.
+  ?entry2 a :Entry.
+  ?ac ^:accession/^:reference ?entry2.
+  filter(?entry != ?entry2).
+  minus{?entry :isoform /:binaryInteraction / :interactant ?entry2.}
+}
+
+
+### NXQ_00135 ###
+# Proteins involved in both Wnt and Hippo signaling pathways
+select distinct ?entry where {
+  ?entry :isoform  ?iso .
+  # cv:GO:0016055 wnt pathway
+  ?iso :goBiologicalProcess ?func1 .
+  ?func1 :term / :childOf cv:GO_0016055.
+  # cv:GO:0035329 Hippo pathway
+  ?iso :goBiologicalProcess ?func2 .
+  ?func2  :term / :childOf cv:GO_0035329.
+  minus { ?func1 :negativeEvidence ?negev. } # No negative function evidence
+  minus { ?func2 :negativeEvidence ?negev. } # No negative function evidence
+}
+
+
+### NXQ_00136 ###
+# Proteins whose sequence was updated in 2014
+select distinct ?entry where {
+  ?entry a :Entry.
+  ?entry :history / :lastSequenceUpdate ?sequpd.
+  filter(contains(?sequpd,"2014"))
+}
+
+
+### NXQ_00137 ###
+# Proteins that potentially interact with Class I PDZ domains (whose C-terminal sequence has a PDZ-binding consensus)
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :matureProtein / :end ?mend.
+  ?iso :sequence / :chain ?seq.
+  filter (strlen(?seq) > 2).
+  bind (substr(?seq, ?mend-2, 3) as ?cterseq).
+  filter(regex(?cterseq,'[ST].[ILV]')). # short motif consensus for C-terminal PDZ-binding
+}
+
+
+### NXQ_00138 ###
+# Proteins with 10 or more gold interactions with SH3 domain-containing proteins
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :interaction ?it.
+  ?it :quality :GOLD.
+  ?it :interactant ?interactant.
+  { ?interactant :isoform / :domain / :term cv:DO-00615 } union { ?interactant :domain / :term cv:DO-00615 } # SH3
+}
+group by ?entry having (count (distinct ?interactant) >= 10)
+
+
+### NXQ_00143 ###
+# Proteins for which none of the reported proteotypic peptides is from PeptideAtlas nor MassIVE
+select distinct ?entry where {
+?entry :isoform / :peptideMapping ?pm.
+?pm :proteotypic true .
+minus {
+	?entry :isoform / :peptideMapping ?pm2.
+	?pm2 :proteotypic true .
+	?pm2 :peptideSet ?pset .
+	filter(?pset = "MassIVE"^^xsd:string || ?pset = "PeptideAtlas"^^xsd:string)
+	}
+}
+
+
+### NXQ_00144 ###
+# Proteins that contains a sequence "QHP" where the Proline is amidated
+select distinct ?entry where {
+?entry :isoform ?isoform.
+?isoform :ptm ?ptm.
+?ptm :term cv:PTM-0257 . # Proline amide
+?ptm :start ?ptmpos .
+?isoform :sequence / :chain ?seq.
+bind(substr(?seq, ?ptmpos-2, 3) as ?modseq)
+filter ( regex(?modseq, "QHP") )
+}
+
+
+### NXQ_00145 ###
+# Proteins which include a mature chain of less or equal to 50 amino acid residues whose C-terminus is amidated
+select distinct ?entry where {
+?entry :isoform ?isoform.
+?isoform :ptm ?ptm.
+?ptm rdfs:comment ?comment.
+filter regex(?comment, "amid","i")
+?ptm :start ?ptmpos .
+?isoform :matureProtein [ :start ?mstart ; :end ?mend]
+filter ((?mend = ?ptmpos) && (?mend-?mstart < 50))
+}
+
+
+### NXQ_00146 ###
+# Proteins having at least 2 proteotypic peptides of 7 or 8aa but no proteotypic peptide >= 9 aa
+select distinct ?entry where {
+?entry :isoform / :peptideMapping ?pm.
+?pm :proteotypic true .
+?pm :peptideName ?pepid .
+#?pm :start ?pos1 ; :end ?pos2 .
+#filter((?pos2 - ?pos1 + 1) >= 7)  # This is not absolutely required for current query since 7 is the minimum length for accepted proteotypic peptides
+minus {
+ ?entry :isoform / :peptideMapping ?pm2.
+ ?pm2 :start ?p1 ; :end ?p2 .
+ ?pm2 :proteotypic true .
+ filter((?p2 - ?p1 + 1) >= 9)
+ }
+}
+group by ?entry having(count (distinct ?pepid) >= 2)
+
+
+### NXQ_00147 ###
+# Proteins with a variant having an impact on the nucleus localization at level GOLD
+select distinct ?entry 
+where {
+  values ?ioTerm {cv:GO_0005634} . # nucleus
+  ?entry :isoform / :proteoform / :phenotypicVariation ?phvar .
+  ?phvar :term / :childOf cv:ME_0000002 . # children of impact
+  ?phvar :evidence / :quality :GOLD .
+  ?phvar :impactedObject / :term ?ioTerm .
+}
+
+
+### NXQ_00202 ###
+# Proteins with from 2 to 4 transmembrane regions
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :topology ?statement.
+  ?statement a :TransmembraneRegion.
+} group by ?entry ?iso having(count( ?statement)>=2 && count( ?statement)<=4)
+
+
+### NXQ_00203 ###
+# Proteins with a mature chain of from 300 to 400 residues
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :matureProtein [ :start ?mstart ; :end ?mend].
+  filter (?mend-?mstart > 0). # chain fully defined
+  bind(?mend - ?mstart as ?mlen)	 
+  filter(?mlen >= 300 && ?mlen <= 400)
+}
+
+
+### NXQ_00204 ###
+# Proteins with protein existence "At transcript level" (PE=2) or "Inferred from homology" (PE=3) or "Predicted" (PE=4)
+select distinct ?entry where {
+  values ?level {
+#	:Evidence_at_protein_level    # PE=1  
+        :Evidence_at_transcript_level # PE=2
+        :Inferred_from_homology       # PE=3
+        :Predicted                    # PE=4
+#	:Uncertain                    # PE=5
+    }
+  ?entry a :Entry .
+  ?entry :existence ?level .
+}
+
+
+### NXQ_00208 ###
+# Proteins which are ion channels and are associated with a disease
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :keyword /:term cv:KW-0407. #ion channel
+  ?iso :medical / rdf:type :Disease.
+}
+
+
+### NXQ_00217 ###
+# Proteins associated with an incomplete EC number, no function annotated and high expression in liver
+select distinct ?entry where {
+   { 
+   ?entry :isoform ?isox.
+   ?isox :enzymeClassification / :term / rdfs:label ?eclabel.
+   filter regex(?eclabel, '-'^^xsd:string) # incomplete EC number
+   ?isox :highExpression /:term /:childOf cv:TS-0564. # highly expressed in liver
+
+   ?isox :functionInfo / rdfs:comment ?functext .
+   filter(strstarts(?functext,"Probable") || strstarts(?functext,"Putative")) 
+   }
+  UNION
+   { 
+   ?entry :isoform ?isox.
+   ?isox :enzymeClassification / :term / rdfs:label ?eclabel.
+   filter regex(?eclabel, '-'^^xsd:string) # incomplete EC number
+   ?isox :highExpression /:term /:childOf cv:TS-0564. # highly expressed in liver
+
+   minus {?isox :functionInfo ?_ }  # entries with no function at all
+   }
+}
+
+
+### NXQ_00218 ###
+# Proteins for which different splice isoforms have a different subcellular location or function
+#A0A1B0GVQ0,A0AVT1 ,A0PJK1...
+
+
+
+select distinct ?entry where {
+ {
+ ?entry :isoform ?iso1, ?iso2.
+ ?iso1 :swissprotDisplayed true .
+ ?iso2 :swissprotDisplayed false .
+
+ ?iso2 :function / :term ?functerm .
+ filter (?functerm != cv:GO_0005515) #protein-binding
+ minus {?iso1 :function / :term ?functerm .}
+ }
+ UNION
+ {
+ ?entry :isoform ?iso1, ?iso2.
+ ?iso1 :swissprotDisplayed true .
+ ?iso2 :swissprotDisplayed false .
+
+ ?iso2 :functionInfo / rdfs:comment ?functext .
+ minus {?iso1 :functionInfo / rdfs:comment ?functext .}
+ }
+ UNION
+ {
+ ?entry :isoform ?iso1, ?iso2.
+ ?iso1 :swissprotDisplayed true .
+ ?iso2 :swissprotDisplayed false .
+
+ ?iso2 :cellularComponent / :term ?locterm .
+ minus {?iso1 :cellularComponent / :term ?locterm}
+ }
+}
+
+
+### NXQ_00219 ###
+# Proteins entries from a list of gene names
+select distinct ?entry where {
+  values ?genename
+  {"UBA6"^^xsd:string "PXDNL"^^xsd:string "CNOT1"^^xsd:string "TCAF2"^^xsd:string "ARHGAP32"^^xsd:string "HACD1"^^xsd:string "AKR1B15"^^xsd:string "SGK1"^^xsd:string "MYO1C"^^xsd:string "LGALS9"^^xsd:string
+   "PIK3CD"^^xsd:string "PDE2A"^^xsd:string "DNM1L"^^xsd:string} # space or nl-separated
+  
+  ?entry :gene / :name ?genename .
+ }
+
+
+### NXQ_00220 ###
+# Proteins located on chromosome MT (mitochondrial) coded by a gene located on the plus strand
+select distinct ?entry where {
+  ?entry :gene ?gene .
+  ?gene :chromosome "MT"^^xsd:string; :strand "1"^^xsd:string .
+ }
+
+
+### NXQ_00221 ###
+# Proteins with RNA-seq expression level "not detected" and IHC expression level: "high" (same tissue or children)
+select distinct ?entry where {
+  ?entry :isoform ?iso .
+  ?iso :expression ?exp, ?exp2.
+  ?exp :term ?tiss .
+  ?exp :negativeEvidence / :evidenceCode cv:ECO_0000295. # RNA-seq
+  ?exp2 :quality :GOLD .
+  ?exp2 :term ?tiss2 .
+  ?exp2 :evidence ?evi2.
+  ?evi2 :evidenceCode cv:ECO_0001055. # IHC
+  ?evi2 :expressionLevel :High.
+  ?tiss2 :childOf ?tiss . # same tissue or children
+}
+
+
+### NXQ_00222 ###
+# Proteins with both RNA-seq expression and IHC expression level "high" in brain or one of its subparts
+select distinct ?entry where {
+  ?entry :isoform ?iso .
+  ?iso :expression ?exprna, ?expihc.
+  ?exprna :term ?rnatiss .
+  ?exprna :evidence ?evirna.
+  ?evirna :expressionLevel :Positive.
+  ?evirna :evidenceCode cv:ECO_0000295. # RNA-seq
+  ?rnatiss :childOf cv:TS-0095. #brain
+  ?expihc :quality :GOLD .
+  ?expihc :term ?ihctiss .
+  ?expihc :evidence ?eviihc.
+  ?eviihc :evidenceCode cv:ECO_0001055. #IHC
+  ?eviihc :expressionLevel :High.
+  ?ihctiss :childOf ?rnatiss .
+}
+
+
+### NXQ_00224 ###
+# Transmembrane proteins with at least 100 consecutive aa located in the EXTRACELLULAR OR LUMENAL compartment.
+select distinct ?entry where { 
+  ?entry :isoform ?iso. 
+  ?iso :topologicalDomain ?topdom . 
+  ?topdom :term ?topterm . 
+  filter (?topterm in (cv:CVTO_0002, cv:CVTO_0003, cv:CVTO_0007)) # extracellular, exoplasmic loop, lumenal
+  ?topdom :start ?domstart; :end ?domend . 
+  filter ((?domend - ?domstart) >= 100) 
+}
+
+
+### NXQ_00226 ###
+# Proteins with at least 2 validating peptides >=9aa found in blood plasma, urine or cerebrospinal fluid (criteria for biomarker)].
+select distinct ?entry where { 
+values ?pepsources { 
+        source:PeptideAtlas_human_Cerebrospinal_Fluid 
+        source:PeptideAtlas_human_Blood_Plasma 
+        source:PeptideAtlas_human_Urine 
+        source:MassIVE_human_Cerebrospinal_Fluid 
+        source:MassIVE_human_Blood_Plasma 
+        source:MassIVE_human_Urine 
+        } 
+  ?entry :isoform ?iso. 
+  ?iso :peptideMapping ?pm . 
+  ?pm :peptideName ?pepid .
+  ?pm :evidence / :assignedBy ?pepsources . 
+  ?pm :proteotypic true . 
+  ?pm  :start ?p1 ; :end ?p2 . 
+  filter(?p2-?p1 >= 8) # peptide length >= 9 
+} 
+group by ?entry having(count (distinct ?pepid) > 1) # at least two such peptides
+
+
+### NXQ_00227 ###
+# Proteins with at least 2 peptides >=9aa found in testis, but with no peptide identified in sperm [lost during sperm maturation]
+select distinct ?entry where {
+values ?pepsources { 
+        source:PeptideAtlas_human_Testis 
+        source:MassIVE_human_Testis 
+       }
+
+  ?entry :isoform ?iso.
+  ?iso :peptideMapping ?pm .
+  ?pm :proteotypic true .
+  ?pm :peptideName ?pepid . 
+  ?pm :evidence / :assignedBy  ?pepsources.
+  ?pm  :start ?p1 ; :end ?p2 .
+  filter(?p2-?p1 >= 8) #peplen >= 9
+  minus { ?iso :peptideMapping / :evidence / :assignedBy  source:PeptideAtlas_human_Sperm . }
+  minus { ?iso :peptideMapping / :evidence / :assignedBy  source:MassIVE_human_Sperm . }
+}
+group by ?entry having(count (distinct ?pepid) > 1) # at least two such peptides
+
+
+### NXQ_00228 ###
+# Proteins with at least 2 validating peptides >=9aa AND which are not overlapping found in blood plasma, urine or cerebrospinal fluid (criteria for biomarker).
+# Same query as NXQ_00226 but with constraint that peptides are not overlapping (takes much longer)
+select distinct ?entry where {
+values ?pepsources { 
+        source:PeptideAtlas_human_Cerebrospinal_Fluid 
+        source:PeptideAtlas_human_Blood_Plasma 
+        source:PeptideAtlas_human_Urine 
+        source:MassIVE_human_Cerebrospinal_Fluid 
+        source:MassIVE_human_Blood_Plasma 
+        source:MassIVE_human_Urine 
+        } 
+  ?entry :isoform ?iso. 
+  ?iso :peptideMapping ?pm, ?pm2 . 
+  ?pm :proteotypic true . 
+  ?pm2 :proteotypic true . 
+  ?pm  :start ?p1 ; :end ?p2 . 
+  filter(?p2-?p1 >= 8) # peptide length >= 9 
+  ?pm :evidence / :assignedBy ?pepsources . 
+  ?pm2 :evidence / :assignedBy ?pepsources . 
+  ?pm2  :start ?p21 ; :end ?p22 .
+  filter(?p22 - ?p21 >= 8) # peptide length >= 9
+  filter(?p2 < ?p21) # non-overlapping
+}
+
+
+### NXQ_00231 ###
+# Proteins with sequences 100% identical to other proteins
+select distinct ?entry where {
+  ?entry :isoform / :sequence / :chain ?chain1.
+  ?entry2 :isoform / :sequence / :chain ?chain2.
+  filter ( (?chain1 = ?chain2) && (?entry != ?entry2))
+}
+
+
+### NXQ_00233 ###
+# Proteins that are PE>1 with at least one proteotypic peptide of at least 9 amino-acids identified in a human sample 
+select distinct ?entry where {
+ values ?level {
+  	:Evidence_at_transcript_level # PE=2
+  	:Inferred_from_homology  	# PE=3
+  	:Predicted        	# PE=4
+	:Uncertain        	# PE=5
+	}
+ ?entry a :Entry .
+ ?entry :existence ?level .
+ ?entry :isoform / :peptideMapping ?pm.
+ ?pm :proteotypic true .
+ ?pm :start ?pos1 ; :end ?pos2 .
+ filter((?pos2 - ?pos1 + 1) >= 9)
+ }
+
+
+### NXQ_00234 ###
+# Proteins with at least two proteotypic synthetic peptides from SRMAtlas of at least 9 amino acids in length
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :srmPeptideMapping ?srm .
+ ?srm :start ?ps; :end ?pe .
+ filter(?pe - ?ps + 1 >= 9)
+ ?srm :proteotypic true .
+ ?srm :peptideName ?pepid .
+} 
+group by ?entry having(count(distinct ?pepid) > 1)
+
+
+### NXQ_00235 ###
+# Proteins with at least two antibodies available from Human Protein Atlas that have associated tissue expression annotations from immunohistochemistry studies 
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :antibodyMapping ?abmap.
+ ?abmap :evidence / :reference / :accession ?aid .
+ ?iso :expressionProfile / :evidence ?ev .
+ ?ev :evidenceCode cv:ECO_0001055.
+# ?ev :quality :GOLD .
+}
+group by ?entry having(count(distinct ?aid) > 1)
+order by ?entry
+
+
+### NXQ_00238 ###
+# Proteins that are lipoproteins
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :keyword / :term cv:KW-0449.
+}
+
+
+### NXQ_00242 ###
+# Proteins with a mitochondrial transit peptide
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :mitochondrialTransitPeptide ?mit.  
+}
+
+
+### NXQ_00243 ###
+# Proteins with a signal sequence 
+select distinct ?entry where {
+ ?entry :isoform ?iso.
+ ?iso :signalPeptide ?_.
+}
+
+
+### NXQ_00244 ###
+# Proteins with a variant having an impact on a binary interaction 
+select distinct ?entry ?interactant where  {
+  ?entry :isoform / :proteoform / :phenotypicVariation ?phvar .
+  ?phvar :term / :childOf cv:ME_0000002 . # children of impact
+  ?phvar :evidence / :quality :GOLD .
+  ?phvar :impactedObject / :interactant ?interactant.
+}
+
+
+### NXQ_00245 ###
+# Proteins with a propeptide 
+select distinct ?entry where  {
+  ?entry :isoform / :propeptide ?propep .
+}
+
+
+### NXQ_00247 ###
+# Proteins with a molecular weight less than 25 kDa
+# These proteins are amenable to top-down LC-MS proteomics.
+select distinct ?entry ?mw where {
+  ?entry :isoform / :sequence / :molecularWeight ?mw.
+  filter ( ?mw < 25000) 
+} order by ?mw
+
+
+### NXQ_00287 ###
+# Proteins with interactions obtained from x-ray crystallography
+select distinct ?entry where {
+  ?entry :isoform ?iso.
+  ?iso :binaryInteraction /:evidence ?ev.
+  ?ev :interactionDetectionMethod cv:MI_0114. # x-ray crystallography
+}
+
+
+### NXQ_00290 ###
+# Proteins that are enzymes requiring the cofactor Ca(2+) and with a calcium binding site
+select distinct ?entry ?name ?ec where {
+  ?entry :recommendedName /:fullName ?name.
+  ?entry :isoform ?iso.
+  ?iso :enzymeClassification /rdfs:comment ?ec.
+  ?iso :cofactor /:interactant /skos:exactMatch chebi:CHEBI_29108. # Ca(2+) cofactor
+  ?iso :metalBindingSite /:term cv:CVME_0001 # calcium binding site
+}
+order by asc(?ec)

@@ -2,12 +2,16 @@ package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.error.MessageCategory.ERROR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,10 +46,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.postgresql.Driver;
-import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -76,6 +81,9 @@ import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.request.TypedLiteral;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration;
+import cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration;
+import cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration;
 
 
 
@@ -88,36 +96,44 @@ public class SparqlTest
     }
 
 
+    static String dockerPath = "src/test/resources/docker";
+    static String imageName = new ImageFromDockerfile("sparql-test").withFileFromPath(".", Paths.get(dockerPath)).get();
+    static DockerImageName image = DockerImageName.parse(imageName).asCompatibleSubstituteFor("postgres");
+
     @Container @SuppressWarnings("resource")
-    private static final GenericContainer<?> myAppContainer = new GenericContainer<>(
-            new ImageFromDockerfile("sparql-test", false)
-                    .withFileFromPath("src/test/resources/docker", Paths.get("src/test/resources/docker"))
-                    .withDockerfile(Paths.get("src/test/resources/docker/Dockerfile"))).withExposedPorts(5432)
-                            .withEnv("POSTGRES_DB", "test").withEnv("POSTGRES_USER", "test")
-                            .withEnv("POSTGRES_PASSWORD", "openacces");
+    static PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image).withSharedMemorySize(1L << 30);
 
     private static final UserStrBlankNodeClass bnodeClass = new UserStrBlankNodeClass();
 
     private static DataSource connectionPool = null;
     private static DatabaseSchema schema = null;
     private static Model model = null;
+    private static Engine stringEngine = null;
+    private static Engine integerEngine = null;
+    private static Engine combinedEngine = null;
 
 
     @BeforeAll
     static void init() throws FileNotFoundException, IOException, SQLException
     {
-        String url = String.format("jdbc:postgresql://localhost:%d/test", myAppContainer.getMappedPort(5432));
-
         PoolProperties p = new PoolProperties();
-        p.setUrl(url);
-        p.setUsername("test");
-        p.setPassword("openacces");
+        p.setUrl(container.getJdbcUrl());
+        p.setUsername(container.getUsername());
+        p.setPassword(container.getPassword());
         connectionPool = new DataSource();
         connectionPool.setPoolProperties(p);
         connectionPool.setTestOnBorrow(true);
         connectionPool.setDriverClassName(Driver.class.getCanonicalName());
 
         schema = new DatabaseSchema(connectionPool);
+
+        SparqlDatabaseConfiguration stringConfig = new NeXtProtStringConfiguration(null, connectionPool, schema);
+        SparqlDatabaseConfiguration integerConfig = new NeXtProtIntegerConfiguration(null, connectionPool, schema);
+        SparqlDatabaseConfiguration combinedConfig = new NeXtProtCombinedConfiguration(null, connectionPool, schema);
+
+        stringEngine = new Engine(stringConfig);
+        integerEngine = new Engine(integerConfig);
+        combinedEngine = new Engine(combinedConfig);
 
         model = ModelFactory.createDefaultModel();
 
@@ -242,6 +258,46 @@ public class SparqlTest
         }
 
         MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
+    }
+
+
+    @DisplayName("NeXtProt String Tests")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getNextProtTests")
+    void doNextProtStringTests(String name, String query)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        try(Request request = stringEngine.getRequest())
+        {
+            request.execute(query);
+        }
+    }
+
+
+    @DisplayName("NeXtProt Integer Tests")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getNextProtTests")
+    void doNextProtIntegerTests(String name, String query)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        try(Request request = integerEngine.getRequest())
+        {
+            request.execute(query);
+        }
+    }
+
+
+
+    @DisplayName("NeXtProt Combined Tests")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getNextProtTests")
+    void doNextProtCombinedTests(String name, String query)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        try(Request request = combinedEngine.getRequest())
+        {
+            request.execute(query);
+        }
     }
 
 
@@ -411,6 +467,45 @@ public class SparqlTest
 
                 queries.add(Arguments.of(name, query, data, expected));
             }
+        }
+
+        return queries;
+    }
+
+
+    private static List<Arguments> getNextProtTests() throws URISyntaxException, IOException
+    {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        InputStream in = cl.getResourceAsStream("nextprot/queryset.sparql");
+
+        List<Arguments> queries = new LinkedList<Arguments>();
+
+        try(BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)))
+        {
+            String line = null;
+
+            String id = null;
+            StringBuffer query = null;
+
+            while((line = reader.readLine()) != null)
+            {
+                if(line.startsWith("### "))
+                {
+                    if(id != null)
+                        queries.add(Arguments.of(id, query.toString()));
+
+                    id = line.substring(4, line.length() - 4);
+                    query = new StringBuffer();
+                }
+                else if(!line.isEmpty())
+                {
+                    query.append(line);
+                    query.append('\n');
+                }
+            }
+
+            if(id != null)
+                queries.add(Arguments.of(id, query.toString()));
         }
 
         return queries;
