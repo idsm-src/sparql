@@ -3,7 +3,10 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
@@ -12,6 +15,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -80,11 +84,63 @@ public class SqlBinaryArithmetic extends SqlBinary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+        if(expected == null || expected.contains(xsdDouble))
+        {
+            set.add(xsdDouble);
+            set.add(xsdFloat);
+            set.add(xsdDecimal);
+            set.add(xsdInteger);
+            set.add(xsdShort);
+            set.add(xsdInt);
+            set.add(xsdLong);
+        }
+        else if(expected.contains(xsdFloat))
+        {
+            set.add(xsdFloat);
+            set.add(xsdDecimal);
+            set.add(xsdInteger);
+            set.add(xsdShort);
+            set.add(xsdInt);
+            set.add(xsdLong);
+        }
+        else if(expected.contains(xsdDecimal))
+        {
+            set.add(xsdDecimal);
+            set.add(xsdInteger);
+            set.add(xsdShort);
+            set.add(xsdInt);
+            set.add(xsdLong);
+        }
+        else if(expected.contains(xsdInteger) && operator != Operator.Divide)
+        {
+            set.add(xsdInteger);
+            set.add(xsdShort);
+            set.add(xsdInt);
+            set.add(xsdLong);
+        }
+        else
+        {
+            return new Restrictions();
+        }
+
+        return new Restrictions(getLeft().getRequirements(set), getRight().getRequirements(set));
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode left = getLeft().optimize(request, variables, evalServices);
-        SqlExpressionIntercode right = getRight().optimize(request, variables, evalServices);
-        return create(operator, left, right);
+        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+
+        if(optLeft == getLeft() && optRight == getRight())
+            return this;
+
+        return create(operator, optLeft, optRight);
     }
 
 

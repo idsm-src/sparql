@@ -7,6 +7,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -36,10 +37,21 @@ public class SqlUnaryLogical extends SqlUnary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return getOperand().getRequirements(Set.of(xsdBoolean));
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode operand = getOperand().optimize(request, variables, evalServices);
-        return create(operand);
+        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+
+        if(optOperand == getOperand())
+            return this;
+
+        return create(optOperand);
     }
 
 

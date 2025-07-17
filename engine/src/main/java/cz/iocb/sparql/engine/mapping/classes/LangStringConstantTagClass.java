@@ -132,7 +132,7 @@ public class LangStringConstantTagClass extends LiteralClass
     {
         if(check)
             return List.of(new ExpressionColumn(
-                    "sparql.rdfbox_get_langstring_value_of_lang(" + column + ", '" + lang + "'::varchar"));
+                    "sparql.rdfbox_get_langstring_value_of_lang(" + column + ", '" + lang + "'::varchar)"));
         else
             return List.of(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
     }

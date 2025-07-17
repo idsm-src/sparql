@@ -4,12 +4,10 @@ import static java.util.stream.Collectors.joining;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
@@ -39,28 +37,19 @@ public class SqlValues extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        UsedVariables optimizedVariables = variables.restrict(restrictions);
+
+        if(optimizedVariables.equals(variables))
             return this;
 
-        UsedVariables optimizedVariables = new UsedVariables();
         LinkedHashMap<Column, List<Column>> optimizedData = new LinkedHashMap<Column, List<Column>>();
 
-        for(UsedVariable variable : variables.getValues())
-        {
-            if(restrictions.contains(variable.getName()))
-            {
-                optimizedVariables.add(variable);
+        for(Column column : optimizedVariables.getNonConstantColumns())
+            optimizedData.put(column, data.get(column));
 
-                for(List<Column> mapping : variable.getMappings().values())
-                    for(Column column : mapping)
-                        if(column instanceof TableColumn)
-                            optimizedData.put(column, data.get(column));
-            }
-        }
-
-        return new SqlValues(optimizedVariables, optimizedData, size);
+        return create(optimizedVariables, optimizedData, size);
     }
 
 
@@ -92,11 +81,11 @@ public class SqlValues extends SqlIntercode
     {
         Conditions conditions = new Conditions(false);
 
-        for(int i = 0; i < size; i++) // iteruji přes jednotlivé řádky ...
+        for(int i = 0; i < size; i++)
         {
-            Condition condition = new Condition(); // podmínka pro daný řádek ...
+            Condition condition = new Condition();
 
-            for(UsedVariable variable : variables.getValues()) // iteruji přes (used) proměnné
+            for(UsedVariable variable : variables.getValues())
             {
                 UsedVariable outerVariable = outerVariables.get(variable.getName());
 

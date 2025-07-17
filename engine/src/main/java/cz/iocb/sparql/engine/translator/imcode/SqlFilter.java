@@ -1,12 +1,11 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -36,101 +35,103 @@ public class SqlFilter extends SqlIntercode
 
     public static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child)
     {
-        return filter(request, conditions, child, null, false, false);
+        return filter(request, conditions, child, null);
     }
 
 
     protected static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child,
-            Set<String> restrictions, boolean reduced, boolean evalServices)
+            Restrictions restrictions)
     {
-        /* special cases */
-
-        if(child == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(child instanceof SqlFilter filter)
-        {
-            ArrayList<SqlExpressionIntercode> merged = new ArrayList<SqlExpressionIntercode>();
-            merged.addAll(((SqlFilter) child).conditions);
-            merged.addAll(conditions);
-
-            return filter(request, merged,
-                    restrictions == null ? filter.child : filter.child.optimize(request, restrictions, reduced, false));
-        }
-
-        if(child instanceof SqlUnion union)
-            return SqlUnion
-                    .union(request, union.getChilds().stream()
-                            .map(p -> filter(request,
-                                    conditions.stream().map(c -> c.optimize(request, p.getVariables(), evalServices))
-                                            .toList(),
-                                    p, restrictions, reduced, evalServices))
-                            .toList())
-                    .optimize(request, restrictions, reduced, evalServices);
-
-        /* standard filter */
-
-        List<SqlExpressionIntercode> validExpressions = new LinkedList<SqlExpressionIntercode>();
-        boolean isFalse = false;
-
-        for(SqlExpressionIntercode expression : conditions)
-        {
-            if(expression == SqlNull.get() || expression == falseValue)
-                isFalse = true;
-            else if(expression instanceof SqlBinaryComparison binary && binary.isAlwaysFalseOrNull())
-                isFalse = true;
-            else if(expression != trueValue)
-                validExpressions.add(expression);
-        }
-
-        if(isFalse)
-            return SqlNoSolution.get();
-
-        if(validExpressions.isEmpty())
-            return child.optimize(request, restrictions, reduced, evalServices);
-
-
         UsedVariables variables = child.getVariables().restrict(restrictions);
 
-        return new SqlFilter(variables, child, validExpressions);
+        return new SqlFilter(variables, child, conditions);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
-            return this;
-
         SqlIntercode optChild = child;
         List<SqlExpressionIntercode> optCnds = conditions;
 
-        Set<String> cndVariables = optCnds.stream().flatMap(c -> c.getReferencedVariables().stream()).collect(toSet());
+        boolean childReduced = reduced && optCnds.stream().allMatch(r -> r.isDeterministic());
+
+        Restrictions childRestrictions = new Restrictions(restrictions);
+
+        for(SqlExpressionIntercode cnd : optCnds)
+            childRestrictions.add(cnd.getRequirements(Set.of(xsdBoolean)));
 
         while(true)
         {
-            HashSet<String> childRestrictions = new HashSet<String>(restrictions);
-            childRestrictions.addAll(cndVariables);
+            SqlIntercode newOptChild = optChild.optimize(request, childRestrictions, childReduced, evalServices);
 
-            SqlIntercode newOptChild = optChild.optimize(request, childRestrictions,
-                    reduced && optCnds.stream().allMatch(r -> r.isDeterministic()), evalServices);
+            List<SqlExpressionIntercode> newOptCnds = new LinkedList<SqlExpressionIntercode>();
 
-            List<SqlExpressionIntercode> newOptCnds = optCnds.stream()
-                    .map(c -> c.optimize(request, newOptChild.getVariables(), evalServices)).toList();
+            for(SqlExpressionIntercode cnd : optCnds)
+            {
+                SqlExpressionIntercode expression = cnd.optimize(request, newOptChild.getVariables(), evalServices);
 
-            Set<String> newCndVars = newOptCnds.stream().flatMap(c -> c.getReferencedVariables().stream())
-                    .collect(toSet());
+                if(expression == SqlNull.get() || expression == falseValue)
+                    return SqlNoSolution.get();
+                else if(expression instanceof SqlBinaryComparison binary && binary.isAlwaysFalseOrNull())
+                    return SqlNoSolution.get();
+                else if(expression != trueValue)
+                    newOptCnds.add(expression);
+            }
 
             optChild = newOptChild;
             optCnds = newOptCnds;
 
-            if(newCndVars.equals(cndVariables))
+            boolean newChildReduced = reduced && optCnds.stream().allMatch(r -> r.isDeterministic());
+            Restrictions newChildRestrictions = new Restrictions(restrictions);
+            newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(Set.of(xsdBoolean))));
+
+            if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;
 
-            cndVariables = newCndVars;
+            childRestrictions = newChildRestrictions;
+            childReduced = newChildReduced;
         }
 
-        return filter(request, optCnds, optChild, restrictions, reduced, evalServices);
+
+        if(optChild == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(optCnds.isEmpty())
+            return optChild.optimize(request, restrictions, reduced, evalServices);
+
+        if(optChild instanceof SqlFilter filter)
+        {
+            ArrayList<SqlExpressionIntercode> merged = new ArrayList<SqlExpressionIntercode>();
+            merged.addAll(filter.conditions);
+            merged.addAll(optCnds);
+
+            List<SqlExpressionIntercode> cnds = merged.stream()
+                    .map(c -> c.optimize(request, filter.child.getVariables(), evalServices)).toList();
+
+            return filter(request, cnds, filter.child).optimize(request, restrictions, reduced, evalServices);
+        }
+
+        if(optChild instanceof SqlUnion union)
+        {
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+            {
+                List<SqlExpressionIntercode> cnds = optCnds.stream()
+                        .map(c -> c.optimize(request, child.getVariables(), evalServices)).toList();
+
+                childs.add(filter(request, cnds, child, restrictions));
+            }
+
+            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+        }
+
+
+        if(optCnds.equals(conditions) && optChild == child && restrictions.isOptimized(variables))
+            return this;
+
+        return filter(request, optCnds, optChild, restrictions);
     }
 
 
@@ -164,5 +165,17 @@ public class SqlFilter extends SqlIntercode
     public boolean isDistinct(Request request, Collection<String> selected)
     {
         return child.isDistinct(request, selected);
+    }
+
+
+    public final SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
+    public final List<SqlExpressionIntercode> getConditions()
+    {
+        return conditions;
     }
 }

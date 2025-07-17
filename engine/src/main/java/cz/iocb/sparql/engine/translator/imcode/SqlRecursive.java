@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,7 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.Table;
@@ -61,69 +59,14 @@ public class SqlRecursive extends SqlIntercode
 
 
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, String beginName,
-            String joinName, String endName, String graphName, Set<String> restrictions)
+            String joinName, String endName, String graphName, Restrictions restrictions)
     {
-        if(init == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        while(next instanceof SqlUnion union)
-        {
-            UsedVariable endVar = createEndVar(request, endName, init, next);
-
-            List<SqlIntercode> childs = union.getChilds().stream()
-                    .filter(c -> (new UsedPairedVariable(endVar, c.getVariables().get(joinName))).isJoinable())
-                    .toList();
-
-            if(childs.size() == union.getChilds().size())
-                break;
-
-            next = SqlUnion.union(request, childs);
-        }
-
-        while(next instanceof SqlUnion union)
-        {
-            Set<ResourceClass> classes = new HashSet<>(init.getVariable(endName).getClasses());
-
-            while(true)
-            {
-                Set<ResourceClass> additional = new HashSet<>(classes);
-
-                for(SqlIntercode child : union.getChilds())
-                    if(child.getVariable(joinName).getClasses().stream()
-                            .anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass())))
-                        additional.addAll(child.getVariable(endName).getClasses());
-
-                if(additional.equals(classes))
-                    break;
-
-                classes.addAll(additional);
-            }
-
-            List<SqlIntercode> childs = union.getChilds().stream().filter(x -> x.getVariable(joinName).getClasses()
-                    .stream().anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass()))).toList();
-
-            if(childs.size() == union.getChilds().size())
-                break;
-
-            next = SqlUnion.union(request, childs);
-        }
-
-        if(next == SqlNoSolution.get())
-            return SqlDistinct.create(request, init,
-                    Stream.of(beginName, endName, graphName).filter(n -> n != null).collect(toSet()));
-
-        if(!(new UsedPairedVariable(init.getVariables().get(endName), next.getVariables().get(joinName))).isJoinable())
-            return SqlDistinct.create(request, init,
-                    Stream.of(beginName, endName, graphName).filter(n -> n != null).collect(toSet()));
-
-
-        /* standard recursion */
         Map<Column, Column> map = new HashMap<>();
         UsedVariables variables = new UsedVariables();
 
         for(UsedVariable var : init.getVariables().getValues())
         {
-            if(!var.getName().equals(endName))
+            if(var.getName().equals(beginName) || var.getName().equals(graphName))
             {
                 UsedVariable v = new UsedVariable(var.getName(), var.canBeNull());
 
@@ -146,7 +89,9 @@ public class SqlRecursive extends SqlIntercode
         }
 
         UsedVariable endVar = createEndVar(request, endName, init, next);
-        variables.add(endVar);
+
+        if(endVar != null)
+            variables.add(endVar);
 
 
         UsedVariables tmp = new UsedVariables(init.getVariables());
@@ -162,15 +107,12 @@ public class SqlRecursive extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
-            return this;
-
-        Set<String> childRestrictions = new HashSet<String>(restrictions);
+        Restrictions childRestrictions = new Restrictions(restrictions);
 
         childRestrictions.add(endVar.getName());
-        childRestrictions.add(joinName);
+        childRestrictions.add(joinName); //TODO: set appropriate resource classes
 
         if(graphName != null)
             childRestrictions.add(graphName);
@@ -178,16 +120,89 @@ public class SqlRecursive extends SqlIntercode
         if(beginName != null)
             childRestrictions.add(beginName);
 
+        String endName = endVar.getName();
+
         SqlIntercode initOpt = init.optimize(request, childRestrictions, reduced, evalServices);
         SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
+
+
+        if(initOpt == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
         if(beginName != null && initOpt instanceof SqlUnion union)
         {
             List<SqlIntercode> segs = SqlDistinct.expandUnionByResourceClasses(request, union, Set.of(beginName));
-            return SqlUnion.union(request, segs.stream().map(
-                    s -> create(request, s, nextOpt, beginName, joinName, endVar.getName(), graphName, restrictions))
-                    .toList());
+
+            if(segs.size() > 1)
+            {
+                List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : segs)
+                    childs.add(create(request, child, nextOpt, beginName, joinName, endVar.getName(), graphName,
+                            restrictions));
+
+                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+            }
         }
+
+        while(nextOpt instanceof SqlUnion union)
+        {
+            UsedVariable endVar = createEndVar(request, endName, initOpt, nextOpt);
+
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+                if((new UsedPairedVariable(endVar, child.getVariables().get(joinName))).isJoinable())
+                    childs.add(child);
+
+            if(childs.size() == union.getChilds().size())
+                break;
+
+            nextOpt = SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+        }
+
+
+        while(nextOpt instanceof SqlUnion union)
+        {
+            Set<ResourceClass> classes = new HashSet<>(initOpt.getVariable(endName).getClasses());
+
+            while(true)
+            {
+                Set<ResourceClass> additional = new HashSet<>(classes);
+
+                for(SqlIntercode child : union.getChilds())
+                    if(child.getVariable(joinName) != null && child.getVariable(joinName).getClasses().stream()
+                            .anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass())))
+                        additional.addAll(child.getVariable(endName).getClasses());
+
+                if(additional.equals(classes))
+                    break;
+
+                classes.addAll(additional);
+            }
+
+            List<SqlIntercode> childs = union.getChilds().stream()
+                    .filter(x -> x.getVariable(joinName) != null && x.getVariable(joinName).getClasses().stream()
+                            .anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass())))
+                    .toList();
+
+            if(childs.size() == union.getChilds().size())
+                break;
+
+            nextOpt = SqlUnion.union(request, childs);
+        }
+
+
+        if(nextOpt == SqlNoSolution.get())
+            return SqlDistinct.create(request, initOpt, initOpt.getVariables().getNames());
+
+        if(!(new UsedPairedVariable(initOpt.getVariables().get(endName), nextOpt.getVariables().get(joinName)))
+                .isJoinable())
+            return SqlDistinct.create(request, initOpt, initOpt.getVariables().getNames());
+
+
+        if(initOpt == init && nextOpt == next && restrictions.isOptimized(variables))
+            return this;
 
         return create(request, initOpt, nextOpt, beginName, joinName, endVar.getName(), graphName, restrictions);
     }
@@ -268,7 +283,7 @@ public class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = nextEndVariable.toResource(resClass);
+            List<Column> columns = nextEndVariable != null ? nextEndVariable.toResource(resClass) : null;
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -278,7 +293,10 @@ public class SqlRecursive extends SqlIntercode
                 appendComma(builder, hasUnionSelect);
                 hasUnionSelect = true;
 
-                builder.append(columns.get(j).fromTable(rightTable));
+                if(columns != null)
+                    builder.append(columns.get(j).fromTable(rightTable));
+                else
+                    builder.append("NULL");
             }
         }
 
@@ -322,34 +340,23 @@ public class SqlRecursive extends SqlIntercode
 
     private static UsedVariable createEndVar(Request request, String endName, SqlIntercode init, SqlIntercode next)
     {
+        UsedVariable initEndVar = init.getVariables().get(endName);
+        UsedVariable nextEndVar = next.getVariables().get(endName);
+
+        Set<ResourceClass> resClasses = new HashSet<ResourceClass>();
+
+        if(initEndVar != null)
+            resClasses.addAll(initEndVar.getClasses());
+
+        if(nextEndVar != null)
+            resClasses.addAll(nextEndVar.getClasses());
+
         UsedVariable endVar = new UsedVariable(endName, false);
 
+        for(ResourceClass resClass : cleanSpecificClasses(resClasses))
+            endVar.addMapping(resClass, resClass.createColumns(request.getColumnMap(), endName));
+
         //TODO: handle constant columns
-
-        Set<ResourceClass> initEndClasses = init.getVariables().get(endName).getClasses();
-        Set<ResourceClass> nextEndClasses = next.getVariables().get(endName).getClasses();
-
-        for(ResourceClass initClass : initEndClasses)
-        {
-            if(nextEndClasses.contains(initClass))
-                endVar.addMapping(initClass, initClass.createColumns(request.getColumnMap(), endName));
-            else if(nextEndClasses.contains(initClass.getGeneralClass()))
-                endVar.addMapping(initClass.getGeneralClass(),
-                        initClass.getGeneralClass().createColumns(request.getColumnMap(), endName));
-            else if(nextEndClasses.stream().noneMatch(r -> r.getGeneralClass() == initClass))
-                endVar.addMapping(initClass, initClass.createColumns(request.getColumnMap(), endName));
-        }
-
-        for(ResourceClass nextClass : nextEndClasses)
-        {
-            if(initEndClasses.contains(nextClass))
-                continue;
-            else if(initEndClasses.contains(nextClass.getGeneralClass()))
-                endVar.addMapping(nextClass.getGeneralClass(),
-                        nextClass.getGeneralClass().createColumns(request.getColumnMap(), endName));
-            else if(initEndClasses.stream().noneMatch(r -> r.getGeneralClass() == nextClass))
-                endVar.addMapping(nextClass, nextClass.createColumns(request.getColumnMap(), endName));
-        }
 
         return endVar;
     }

@@ -14,8 +14,10 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDur
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringType;
@@ -42,6 +44,7 @@ import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -122,8 +125,10 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                 if(argument == SqlNull.get())
                     return SqlNull.get();
 
+                Set<ResourceClass> rc = argument.getResourceClasses();
+
                 //NOTE: even if the argument cannot be null, the result can be null for an empty group
-                return new SqlBuiltinCall(function, distinct, arguments, argument.getResourceClasses(), true);
+                return new SqlBuiltinCall(function, distinct, arguments, rc, true);
             }
 
             case "group_concat":
@@ -714,7 +719,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
                     resultClasses.add(xsdInteger);
 
 
-                boolean canBeNull = resourceClasses.stream().anyMatch(r -> !isDateTime(r) && !isDate(r));
+                boolean canBeNull = operand.canBeNull()
+                        || resourceClasses.stream().anyMatch(r -> !isDateTime(r) && !isDate(r));
 
                 if(function.equals("timezone"))
                     canBeNull |= operand.getResourceClasses().stream().anyMatch(r -> r == xsdDateTime || r == xsdDate
@@ -773,12 +779,359 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        switch(function)
+        {
+            // aggregate functions
+            case "card":
+            {
+                Restrictions restrictions = new Restrictions();
+
+                for(SqlExpressionIntercode argument : arguments)
+                    restrictions.add(argument.getRequirements(null));
+
+                return restrictions;
+            }
+
+            case "count":
+            case "sum":
+            case "avg":
+            case "min":
+            case "max":
+            case "sample":
+            case "group_concat":
+            {
+                return arguments.get(0).getRequirements(null);
+            }
+
+
+            // functional forms
+            case "bound":
+            {
+                return arguments.get(0).getRequirements(null);
+            }
+
+            case "if":
+            {
+                Restrictions restrictions = new Restrictions();
+                restrictions.add(arguments.get(0).getRequirements(Set.of(xsdBoolean)));
+                restrictions.add(arguments.get(1).getRequirements(expected));
+                restrictions.add(arguments.get(2).getRequirements(expected));
+
+                return restrictions;
+            }
+
+            case "coalesce":
+            {
+                Restrictions restrictions = new Restrictions();
+
+                for(SqlExpressionIntercode argument : arguments)
+                    restrictions.add(argument.getRequirements(null));
+
+                return restrictions;
+            }
+
+            case "sameterm":
+            {
+                return new Restrictions(arguments.get(0).getRequirements(null), arguments.get(1).getRequirements(null));
+            }
+
+
+            // functions on RDF terms
+            case "isiri":
+            case "isuri":
+            case "isblank":
+            case "isliteral":
+            case "isnumeric":
+            {
+                return arguments.get(0).getRequirements(null);
+            }
+
+            case "str":
+            {
+                Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream()
+                        .filter(r -> isIri(r) || isLiteral(r)).collect(toSet());
+
+                return arguments.get(0).getRequirements(set);
+            }
+
+            case "lang":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString));
+            }
+
+            case "datatype":
+            {
+                Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream().filter(r -> isLiteral(r))
+                        .collect(toSet());
+
+                return arguments.get(0).getRequirements(set);
+            }
+
+            case "iri":
+            case "uri":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString, iri));
+            }
+
+            case "bnode":
+            {
+                if(arguments.size() == 0)
+                    return new Restrictions();
+                else
+                    return arguments.get(0).getRequirements(Set.of(xsdString));
+            }
+
+            case "strdt":
+            {
+                return new Restrictions(arguments.get(0).getRequirements(Set.of(xsdString)),
+                        arguments.get(1).getRequirements(Set.of(iri)));
+            }
+
+            case "strlang":
+            {
+                return new Restrictions(arguments.get(0).getRequirements(Set.of(xsdString)),
+                        arguments.get(1).getRequirements(Set.of(xsdString)));
+            }
+
+            case "uuid":
+            {
+                return new Restrictions();
+            }
+
+            case "struuid":
+            {
+                return new Restrictions();
+            }
+
+            // functions on strings
+            case "strlen":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString));
+            }
+
+            case "substr":
+            {
+                Restrictions restrictions = new Restrictions();
+
+                if(expected == null)
+                    restrictions.add(arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString)));
+                else
+                    restrictions.add(arguments.get(0)
+                            .getRequirements(expected.stream().filter(r -> isStringLiteral(r)).collect(toSet())));
+
+                restrictions.add(arguments.get(1).getRequirements(Set.of(xsdInteger, xsdLong, xsdInt, xsdShort)));
+
+                if(arguments.size() > 2)
+                    restrictions.add(arguments.get(2).getRequirements(Set.of(xsdInteger, xsdLong, xsdInt, xsdShort)));
+
+                return restrictions;
+            }
+
+            case "ucase":
+            case "lcase":
+            {
+                if(expected == null)
+                    return arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString));
+                else
+                    return arguments.get(0)
+                            .getRequirements(expected.stream().filter(r -> isStringLiteral(r)).collect(toSet()));
+            }
+
+            case "strstarts":
+            case "strends":
+            case "contains":
+            {
+                Set<ResourceClass> set0 = arguments.get(0).getResourceClasses().stream().filter(r -> isStringLiteral(r))
+                        .collect(toSet());
+
+                Set<ResourceClass> set1 = new HashSet<ResourceClass>(set0);
+                set1.add(xsdString);
+
+                return new Restrictions(arguments.get(0).getRequirements(set0), arguments.get(1).getRequirements(set1));
+            }
+
+            case "strbefore":
+            case "strafter":
+            {
+                Set<ResourceClass> set0 = expected == null ? Set.of(xsdString, rdfLangString) :
+                        expected.stream().filter(r -> isStringLiteral(r)).collect(toSet());
+
+                Set<ResourceClass> set1 = new HashSet<ResourceClass>(set0);
+                set1.add(xsdString);
+
+                return new Restrictions(arguments.get(0).getRequirements(set0), arguments.get(1).getRequirements(set1));
+            }
+
+            case "encode_for_uri":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString));
+            }
+
+            case "concat":
+            {
+                Restrictions restrictions = new Restrictions();
+
+                if(expected == null || expected.contains(xsdString))
+                {
+                    for(int i = 0; i < arguments.size(); i++)
+                        restrictions.add(arguments.get(i).getRequirements(Set.of(xsdString, rdfLangString)));
+                }
+                else if(expected.stream().anyMatch(r -> isLangString(r)))
+                {
+                    Set<ResourceClass> set = expected.stream().filter(r -> isLangString(r)).collect(toSet());
+
+                    for(int i = 0; i < arguments.size(); i++)
+                        restrictions.add(arguments.get(i).getRequirements(set));
+                }
+
+                return restrictions;
+            }
+
+            case "langmatches":
+            {
+                return new Restrictions(arguments.get(0).getRequirements(Set.of(xsdString)),
+                        arguments.get(1).getRequirements(Set.of(xsdString)));
+            }
+
+            case "regex":
+            case "replace":
+            {
+                Restrictions restrictions = new Restrictions();
+                restrictions.add(arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString)));
+
+                for(int i = 1; i < arguments.size(); i++)
+                    restrictions.add(arguments.get(i).getRequirements(Set.of(xsdString)));
+
+                return restrictions;
+            }
+
+
+            // functions on numerics
+            case "rand":
+            {
+                return new Restrictions();
+            }
+
+            case "abs":
+            case "round":
+            case "ceil":
+            case "floor":
+            {
+                Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+                if(expected == null || expected.contains(xsdDouble))
+                {
+                    set.add(xsdDouble);
+                    set.add(xsdFloat);
+                    set.add(xsdDecimal);
+                    set.add(xsdInteger);
+                    set.add(xsdShort);
+                    set.add(xsdInt);
+                    set.add(xsdLong);
+                }
+                else if(expected.contains(xsdFloat))
+                {
+                    set.add(xsdFloat);
+                    set.add(xsdDecimal);
+                    set.add(xsdInteger);
+                    set.add(xsdShort);
+                    set.add(xsdInt);
+                    set.add(xsdLong);
+                }
+                else if(expected.contains(xsdDecimal))
+                {
+                    set.add(xsdDecimal);
+                    set.add(xsdInteger);
+                    set.add(xsdShort);
+                    set.add(xsdInt);
+                    set.add(xsdLong);
+                }
+                else if(expected.contains(xsdInteger))
+                {
+                    set.add(xsdInteger);
+                    set.add(xsdShort);
+                    set.add(xsdInt);
+                    set.add(xsdLong);
+                }
+                else
+                {
+                    return new Restrictions();
+                }
+
+                return arguments.get(0).getRequirements(set);
+            }
+
+
+            // functions on dates and times:
+            case "now":
+            {
+                return new Restrictions();
+            }
+
+            case "year":
+            case "month":
+            case "day":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdDateTime, xsdDate));
+            }
+
+            case "timezone":
+            {
+                Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream()
+                        .filter(r -> (isDateTime(r) || isDate(r))
+                                && (!(r instanceof DateTimeConstantZoneClass z) || z.getZone() != Integer.MIN_VALUE)
+                                && (!(r instanceof DateConstantZoneClass z) || z.getZone() != Integer.MIN_VALUE))
+                        .collect(toSet());
+
+                return arguments.get(0).getRequirements(set);
+            }
+
+            case "tz":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdDateTime, xsdDate));
+            }
+
+            case "hours":
+            case "minutes":
+            case "seconds":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdDateTime, xsdDate));
+            }
+
+
+            // hash functions:
+            case "md5":
+            case "sha1":
+            case "sha256":
+            case "sha384":
+            case "sha512":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString));
+            }
+
+            case "_strhash":
+            {
+                return arguments.get(0).getRequirements(Set.of(xsdString, rdfLangString));
+            }
+        }
+
+        throw new IllegalArgumentException();// unexpected
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
             optimized.add(argument.optimize(request, variables, evalServices));
+
+
+        if(optimized.equals(arguments))
+            return this;
 
         return create(request, function, distinct, optimized);
     }
@@ -880,31 +1233,47 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                ResourceClass resClass = argument.getExpressionResourceClass();
+                if(argument == SqlNull.get())
+                {
+                    StringBuilder builder = new StringBuilder();
 
-                if(argument.getResourceClasses().stream().allMatch(r -> isNumericCompatibleWith(r, xsdInteger)))
-                    resClass = xsdInteger;
+                    builder.append("sparql.");
+                    builder.append(function);
+                    builder.append("_");
+                    builder.append("integer");
+                    builder.append("(NULL::integer)");
 
+                    return builder.toString();
 
-                StringBuilder builder = new StringBuilder();
-
-                builder.append("sparql.");
-                builder.append(function);
-                builder.append("_");
-                builder.append(resClass != null ? resClass.getName() : "rdfbox");
-                builder.append("(");
-
-                if(distinct)
-                    builder.append("DISTINCT ");
-
-                if(resClass != null)
-                    builder.append(translateAsUnboxedOperand(request, argument, resClass));
+                }
                 else
-                    builder.append(translateAsBoxedOperand(request, argument, argument.getResourceClasses()));
+                {
+                    ResourceClass resClass = argument.getExpressionResourceClass();
 
-                builder.append(")");
+                    if(argument.getResourceClasses().stream().allMatch(r -> isNumericCompatibleWith(r, xsdInteger)))
+                        resClass = xsdInteger;
 
-                return builder.toString();
+
+                    StringBuilder builder = new StringBuilder();
+
+                    builder.append("sparql.");
+                    builder.append(function);
+                    builder.append("_");
+                    builder.append(resClass != null ? resClass.getName() : "rdfbox");
+                    builder.append("(");
+
+                    if(distinct)
+                        builder.append("DISTINCT ");
+
+                    if(resClass != null)
+                        builder.append(translateAsUnboxedOperand(request, argument, resClass));
+                    else
+                        builder.append(translateAsBoxedOperand(request, argument, argument.getResourceClasses()));
+
+                    builder.append(")");
+
+                    return builder.toString();
+                }
             }
 
             case "min":
@@ -912,43 +1281,69 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                StringBuilder builder = new StringBuilder();
+                if(argument == SqlNull.get())
+                {
+                    StringBuilder builder = new StringBuilder();
 
-                if(isBoxed())
-                    builder.append("sparql.");
+                    builder.append(function);
 
-                builder.append(function);
+                    builder.append("(NULL::int4)");
 
-                if(isBoxed())
-                    builder.append("_rdfbox");
+                    return builder.toString();
 
-                builder.append("(");
+                }
+                else
+                {
+                    StringBuilder builder = new StringBuilder();
 
-                if(distinct)
-                    builder.append("DISTINCT ");
+                    if(isBoxed())
+                        builder.append("sparql.");
 
-                builder.append(argument.translate(request));
-                builder.append(")");
+                    builder.append(function);
 
-                return builder.toString();
+                    if(isBoxed())
+                        builder.append("_rdfbox");
+
+                    builder.append("(");
+
+                    if(distinct)
+                        builder.append("DISTINCT ");
+
+                    builder.append(argument.translate(request));
+                    builder.append(")");
+
+                    return builder.toString();
+                }
             }
 
             case "sample":
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                StringBuilder builder = new StringBuilder();
+                if(argument == SqlNull.get())
+                {
+                    StringBuilder builder = new StringBuilder();
 
-                builder.append("sparql.sample(");
+                    builder.append("sparql.sample(NULL::int4)");
 
-                //FIXME: is it needed?
-                if(distinct)
-                    builder.append("DISTINCT ");
+                    return builder.toString();
 
-                builder.append(argument.translate(request));
-                builder.append(")");
+                }
+                else
+                {
+                    StringBuilder builder = new StringBuilder();
 
-                return builder.toString();
+                    builder.append("sparql.sample(");
+
+                    //FIXME: is it needed?
+                    if(distinct)
+                        builder.append("DISTINCT ");
+
+                    builder.append(argument.translate(request));
+                    builder.append(")");
+
+                    return builder.toString();
+                }
             }
 
             case "group_concat":
@@ -2547,5 +2942,24 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         else if(function.equals("isnumeric"))
             return SqlExpressionIntercode::isNumeric;
         return null;
+    }
+
+
+    public boolean isAggregateFunction()
+    {
+        switch(function)
+        {
+            case "card":
+            case "count":
+            case "sum":
+            case "min":
+            case "max":
+            case "avg":
+            case "group_concat":
+            case "sample":
+                return true;
+        }
+
+        return false;
     }
 }

@@ -106,6 +106,7 @@ public class SqlUnion extends SqlIntercode
 
             UsedVariable variable = new UsedVariable(name, canBeNull);
 
+            loop:
             for(ResourceClass resourceClass : entry.getValue())
             {
                 List<Column> columns = resourceClass.createColumns(request.getColumnMap(), variable.getName());
@@ -125,6 +126,12 @@ public class SqlUnion extends SqlIntercode
                         }
                         else if(var.containsClass(resourceClass))
                         {
+                            if(var.getMapping(resourceClass) == null)
+                            {
+                                variable.addMapping(resourceClass, null);
+                                continue loop;
+                            }
+
                             cols.add(var.getMapping(resourceClass).get(i));
                         }
                         else
@@ -148,6 +155,12 @@ public class SqlUnion extends SqlIntercode
                                 {
                                     appendComma(builder, hasAlternative);
                                     hasAlternative = true;
+
+                                    if(var.getMapping(variant) == null)
+                                    {
+                                        variable.addMapping(resourceClass, null);
+                                        continue loop;
+                                    }
 
                                     builder.append(
                                             variant.toGeneralClass(var.getMapping(variant), var.canBeNull()).get(i));
@@ -199,13 +212,24 @@ public class SqlUnion extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        List<SqlIntercode> optChilds = childs.stream()
+                .map(c -> c.optimize(request, restrictions, reduced, evalServices))
+                .filter(i -> i != SqlNoSolution.get()).toList();
+
+
+        if(optChilds.isEmpty())
+            return SqlNoSolution.get();
+
+        if(optChilds.size() == 1)
+            return optChilds.get(0);
+
+
+        if(optChilds.equals(childs))
             return this;
 
-        return union(request,
-                childs.stream().map(c -> c.optimize(request, restrictions, reduced, evalServices)).toList());
+        return union(request, optChilds);
     }
 
 

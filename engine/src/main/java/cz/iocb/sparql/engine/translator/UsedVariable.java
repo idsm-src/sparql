@@ -168,9 +168,10 @@ public class UsedVariable
         Set<Column> result = new HashSet<Column>();
 
         for(List<Column> columns : mappings.values())
-            for(Column column : columns)
-                if(!(column instanceof ConstantColumn))
-                    result.add(column);
+            if(columns != null)
+                for(Column column : columns)
+                    if(!(column instanceof ConstantColumn))
+                        result.add(column);
 
         return result;
     }
@@ -191,9 +192,14 @@ public class UsedVariable
     public boolean isConstant()
     {
         for(List<Column> columns : mappings.values())
+        {
+            if(columns == null)
+                return false;
+
             for(Column column : columns)
                 if(!(column instanceof ConstantColumn))
                     return false;
+        }
 
         return true;
     }
@@ -220,5 +226,11 @@ public class UsedVariable
             return false;
 
         return true;
+    }
+
+
+    public boolean hasMapping()
+    {
+        return mappings.values().stream().anyMatch(c -> c != null);
     }
 }

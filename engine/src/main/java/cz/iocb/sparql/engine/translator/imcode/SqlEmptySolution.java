@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import java.util.Collection;
-import java.util.Set;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -25,7 +24,7 @@ public class SqlEmptySolution extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         return this;
     }

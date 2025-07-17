@@ -94,20 +94,6 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         this.graph = graph;
         SqlIntercode intercode = visitElement(predicate, subject, object);
 
-        Set<String> restrictions = new HashSet<String>();
-
-        if(graph instanceof VariableOrBlankNode var)
-            restrictions.add(var.getSqlName());
-
-        if(subject instanceof VariableOrBlankNode var)
-            restrictions.add(var.getSqlName());
-
-        if(predicate instanceof VariableOrBlankNode var)
-            restrictions.add(var.getSqlName());
-
-        if(object instanceof VariableOrBlankNode var)
-            restrictions.add(var.getSqlName());
-
         return intercode;
     }
 
@@ -186,14 +172,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         String joinName = joinNode.getSqlName();
         String graphName = graph instanceof VariableOrBlankNode v ? v.getSqlName() : null;
 
+
         // if it is more suitable, the reverse order is used
         if(!(object instanceof VariableOrBlankNode) && subject instanceof VariableOrBlankNode)
         {
-            SqlIntercode init = visitElement(repeatedPath.getChild(), subject, object);
-            SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinNode);
+            String endName = ((VariableOrBlankNode) subject).getSqlName();
 
-            return SqlRecursive.create(request, init, next, null, joinName,
-                    ((VariableOrBlankNode) subject).getSqlName(), graphName);
+            SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(object, subject) :
+                    visitElement(repeatedPath.getChild(), object, subject);
+
+            SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, subject);
+
+            return SqlRecursive.create(request, init, next, null, joinName, endName, graphName);
         }
 
 
@@ -207,21 +197,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endNode) :
                 visitElement(repeatedPath.getChild(), subject, endNode);
 
-        if(init == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
         SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
-
-        if(next == SqlNoSolution.get())
-            return SqlDistinct.create(request, init, distinct);
-
-        UsedVariable initBeginVar = init.getVariables().get(beginName);
-        UsedVariable nextEndVar = next.getVariables().get(endName);
-
-        if(cndNode instanceof VariableOrBlankNode && !(new UsedPairedVariable(initBeginVar, nextEndVar)).isJoinable()
-                || cndNode != null && nextEndVar.getClasses().stream().noneMatch(r -> request.match(r, cndNode)))
-            return SqlDistinct.create(request, visitElement(repeatedPath.getChild(), subject, object), distinct);
-
 
         SqlIntercode intercode = SqlRecursive.create(request, init, next, beginName, joinName, endName, graphName);
 

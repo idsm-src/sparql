@@ -8,11 +8,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
 public class SqlBinaryLogical extends SqlBinary
 {
+    private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean);
+
     private final Operator operator;
 
 
@@ -74,11 +77,23 @@ public class SqlBinaryLogical extends SqlBinary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return new Restrictions(getLeft().getRequirements(operandRequirements),
+                getRight().getRequirements(operandRequirements));
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode left = getLeft().optimize(request, variables, evalServices);
-        SqlExpressionIntercode right = getRight().optimize(request, variables, evalServices);
-        return create(operator, left, right);
+        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+
+        if(optLeft == getLeft() && optRight == getRight())
+            return this;
+
+        return create(operator, optLeft, optRight);
     }
 
 

@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlTableAccess;
 import cz.iocb.sparql.engine.translator.imcode.SqlValues;
@@ -35,6 +36,7 @@ public class StoredResultHandler extends ResultHandler
     private static int minTableSize = 1000; // has to be less than or equal to batchSize
 
     private final Request request;
+    private final Restrictions restrictions;
     private final List<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
 
     private Table table;
@@ -49,9 +51,10 @@ public class StoredResultHandler extends ResultHandler
     int batchCount;
 
 
-    public StoredResultHandler(Request request)
+    public StoredResultHandler(Request request, Restrictions restrictions)
     {
         this.request = request;
+        this.restrictions = restrictions;
         columns.put(new TableColumn("__"), "int");
     }
 
@@ -159,7 +162,7 @@ public class StoredResultHandler extends ResultHandler
                     values.put(entry.getKey(), entry.getValue().subList(0, rowCount));
             }
 
-            return SqlValues.create(vars, values, rowCount);
+            return SqlValues.create(vars, values, rowCount).optimize(request, restrictions, false, false);//FIXME
         }
 
 
@@ -186,7 +189,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        return SqlTableAccess.create(table, vars);
+        return SqlTableAccess.create(table, vars).optimize(request, restrictions, false, false);//FIXME;
     }
 
 

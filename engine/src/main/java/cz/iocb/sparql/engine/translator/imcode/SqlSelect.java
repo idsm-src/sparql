@@ -47,7 +47,7 @@ public class SqlSelect extends SqlIntercode
     protected SqlSelect(List<String> projections, SqlIntercode child, LinkedHashMap<String, Direction> orderBy,
             BigInteger offset, BigInteger limit, List<String> simpleOrderBy, boolean distinct)
     {
-        super(child.getVariables().restrict(projections), child.isDeterministic());
+        super(child.getVariables().restrict(new Restrictions(projections)), child.isDeterministic());
 
         this.child = child;
         this.projections = projections;
@@ -89,34 +89,8 @@ public class SqlSelect extends SqlIntercode
     public static SqlIntercode create(Request request, Set<String> variables, SqlIntercode child, boolean distinct,
             LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
-        if(child == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(limit != null && limit.compareTo(BigInteger.valueOf(0)) <= 0)
-            return SqlNoSolution.get();
-
-        if(child == SqlEmptySolution.get())
-        {
-            if(offset == null && limit == null)
-                return SqlEmptySolution.get();
-
-            if(offset != null && offset.compareTo(BigInteger.valueOf(0)) > 0)
-                return SqlNoSolution.get();
-        }
-
-        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
-
-        for(Entry<String, Direction> e : orderBy.entrySet())
-            if(child.getVariables().get(e.getKey()) != null)
-                stripedOrderBy.put(e.getKey(), e.getValue());
-
-        if(distinct && variables.containsAll(stripedOrderBy.keySet()))
-        {
-            child = SqlDistinct.create(request, child, variables);
-            distinct = false;
-        }
-
-        return new SqlSelect(child.getVariables().restrict(variables), child, distinct, stripedOrderBy, offset, limit);
+        return new SqlSelect(child.getVariables().restrict(new Restrictions(variables)), child, distinct, orderBy,
+                offset, limit);
     }
 
 
@@ -131,30 +105,7 @@ public class SqlSelect extends SqlIntercode
             boolean distinct, LinkedHashMap<String, Direction> orderBy, BigInteger offset, BigInteger limit,
             List<String> simpleOrderBy)
     {
-        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
-
-        for(Entry<String, Direction> e : orderBy.entrySet())
-            if(child.getVariables().get(e.getKey()) != null)
-                stripedOrderBy.put(e.getKey(), e.getValue());
-
-
-        List<String> stripedSimpleOrderBy = new ArrayList<String>();
-
-        for(String var : simpleOrderBy)
-            if(child.getVariables().get(var) != null && !stripedOrderBy.containsKey(var))
-                stripedSimpleOrderBy.add(var);
-
-        if(child.getVariables().restrict(stripedSimpleOrderBy).getNonConstantColumns().isEmpty())
-            stripedSimpleOrderBy = List.of();
-
-
-        if(distinct && projections.containsAll(stripedOrderBy.keySet()))
-        {
-            child = SqlDistinct.create(request, child, new HashSet<String>(projections));
-            distinct = false;
-        }
-
-        return new SqlSelect(projections, child, stripedOrderBy, offset, limit, stripedSimpleOrderBy, distinct);
+        return new SqlSelect(projections, child, orderBy, offset, limit, simpleOrderBy, distinct);
     }
 
 
@@ -226,40 +177,106 @@ public class SqlSelect extends SqlIntercode
     }
 
 
-    public SqlSelect optimize(Request request)
+    public SqlSelect optimize(Request request, boolean evalServices)
     {
         if(!isTopLevel())
             throw new UnsupportedOperationException();
 
-        HashSet<String> childRestrictions = new HashSet<String>(projections);
-        childRestrictions.addAll(orderBy.keySet());
-        childRestrictions.addAll(simpleOrderBy);
 
-        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, false, false).optimize(request,
-                childRestrictions, false, true);
-        return createTopLevel(request, projections, optimizedChild, distinct, orderBy, offset, limit, simpleOrderBy);
+        Restrictions childRestrictions = new Restrictions(projections);
+        childRestrictions.add(orderBy.keySet()); //TODO: not all resource classes are sortable
+        childRestrictions.add(simpleOrderBy); //TODO: not all resource classes are sortable
+
+        SqlIntercode optChild = child.optimize(request, childRestrictions, false, evalServices);
+
+
+        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
+
+        for(Entry<String, Direction> e : orderBy.entrySet())
+            if(optChild.getVariables().get(e.getKey()) != null)
+                stripedOrderBy.put(e.getKey(), e.getValue());
+
+
+        List<String> stripedSimpleOrderBy = new ArrayList<String>();
+
+        for(String var : simpleOrderBy)
+            if(optChild.getVariables().get(var) != null && !stripedOrderBy.containsKey(var))
+                stripedSimpleOrderBy.add(var);
+
+
+        if(optChild.getVariables().restrict(new Restrictions(stripedSimpleOrderBy)).getNonConstantColumns().isEmpty())
+            stripedSimpleOrderBy = List.of();
+
+
+        boolean optDistinct = distinct;
+
+        if(optDistinct && projections.containsAll(stripedOrderBy.keySet()))
+        {
+            optChild = SqlDistinct.create(request, optChild, new HashSet<String>(projections)).optimize(request,
+                    childRestrictions, true, evalServices);
+            optDistinct = false;
+        }
+
+
+        if(optChild == child && optDistinct == distinct && stripedOrderBy.equals(orderBy)
+                && stripedSimpleOrderBy.equals(simpleOrderBy))
+            return this;
+
+        return createTopLevel(request, projections, optChild, optDistinct, stripedOrderBy, offset, limit,
+                stripedSimpleOrderBy);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         if(isTopLevel())
             throw new UnsupportedOperationException();
 
-        if(restrictions == null)
+
+        Restrictions childRestrictions = new Restrictions(restrictions);
+        childRestrictions.add(orderBy.keySet()); // FIXME: not all resource classes are sortable
+        childRestrictions.add(simpleOrderBy); // FIXME: not all resource classes are sortable
+
+        SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+
+        LinkedHashMap<String, Direction> stripedOrderBy = new LinkedHashMap<String, Direction>();
+
+        for(Entry<String, Direction> e : orderBy.entrySet())
+            if(optChild.getVariables().get(e.getKey()) != null)
+                stripedOrderBy.put(e.getKey(), e.getValue());
+
+        boolean optDistinct = distinct;
+
+        if(optDistinct && variables.getNames().containsAll(stripedOrderBy.keySet()))
+        {
+            optChild = SqlDistinct.create(request, optChild, variables.getNames()).optimize(request, childRestrictions,
+                    reduced, evalServices);
+            optDistinct = false;
+        }
+
+
+        if(optChild == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(limit != null && limit.compareTo(BigInteger.valueOf(0)) <= 0)
+            return SqlNoSolution.get();
+
+        if(optChild == SqlEmptySolution.get() && offset == null && limit == null)
+            return SqlEmptySolution.get();
+
+        if(optChild == SqlEmptySolution.get() && offset != null && offset.compareTo(BigInteger.valueOf(0)) > 0)
+            return SqlNoSolution.get();
+
+        if(stripedOrderBy.isEmpty() && limit == null && (offset == null || offset.equals(BigInteger.ZERO)))
+            return optChild;
+
+
+        if(restrictions.isOptimized(variables) && optChild == child && optDistinct == distinct
+                && stripedOrderBy.equals(orderBy))
             return this;
 
-        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
-        childRestrictions.addAll(orderBy.keySet());
-        childRestrictions.addAll(simpleOrderBy);
-
-        SqlIntercode optimizedChild = child.optimize(request, childRestrictions, reduced, evalServices);
-
-        if(orderBy.isEmpty() && limit == null && (offset == null || offset.equals(BigInteger.ZERO)))
-            return optimizedChild;
-
-        return create(request, restrictions, optimizedChild, distinct, orderBy, offset, limit);
+        return create(request, restrictions.getNames(), optChild, optDistinct, stripedOrderBy, offset, limit);
     }
 
 
@@ -450,6 +467,10 @@ public class SqlSelect extends SqlIntercode
         {
             String varName = order.getKey();
             UsedVariable variable = child.getVariables().get(varName);
+
+            if(variable == null || !variable.hasMapping())
+                continue;
+
             Set<ResourceClass> classes = variable.getClasses();
 
 
@@ -776,6 +797,10 @@ public class SqlSelect extends SqlIntercode
                 }
             }
         }
+
+
+        if(!hasOrderCondition)
+            return "";
 
         return builder.toString();
     }

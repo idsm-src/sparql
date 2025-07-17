@@ -40,6 +40,7 @@ import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Pair;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -228,11 +229,37 @@ public class SqlBinaryComparison extends SqlBinary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
+        Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
+
+        for(Pair<ResourceClass, ResourceClass> p : comparable)
+        {
+            leftSet.add(p.getKey());
+            rightSet.add(p.getValue());
+        }
+
+        for(Pair<ResourceClass, ResourceClass> p : different)
+        {
+            leftSet.add(p.getKey());
+            rightSet.add(p.getValue());
+        }
+
+        return new Restrictions(getLeft().getRequirements(leftSet), getRight().getRequirements(rightSet));
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode left = getLeft().optimize(request, variables, evalServices);
-        SqlExpressionIntercode right = getRight().optimize(request, variables, evalServices);
-        return create(operator, left, right);
+        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+
+        if(optLeft == getLeft() && optRight == getRight())
+            return this;
+
+        return create(operator, optLeft, optRight);
     }
 
 

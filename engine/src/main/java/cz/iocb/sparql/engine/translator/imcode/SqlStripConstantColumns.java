@@ -72,9 +72,6 @@ public class SqlStripConstantColumns extends SqlIntercode
             variables.add(var);
         }
 
-        if(map.isEmpty())
-            return child;
-
         Map<TableColumn, ConstantColumn> remap = new HashMap<TableColumn, ConstantColumn>();
         map.forEach((k, v) -> remap.put(v, k));
 
@@ -83,12 +80,26 @@ public class SqlStripConstantColumns extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        SqlIntercode optChild = child.optimize(request, restrictions, reduced, evalServices);
+
+        boolean hasConstantColumn = false;
+
+        for(UsedVariable variable : optChild.getVariables().getValues())
+            for(Entry<ResourceClass, List<Column>> entry : variable.getMappings().entrySet())
+                for(Column column : entry.getValue())
+                    if(column instanceof ConstantColumn)
+                        hasConstantColumn = true;
+
+        if(!hasConstantColumn)
+            return optChild;
+
+
+        if(optChild == child)
             return this;
 
-        return strip(child.optimize(request, restrictions, reduced, evalServices));
+        return strip(optChild);
     }
 
 

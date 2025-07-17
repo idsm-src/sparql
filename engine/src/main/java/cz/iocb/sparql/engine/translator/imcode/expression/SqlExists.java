@@ -19,6 +19,7 @@ import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.translator.imcode.SqlUnion;
 
@@ -51,23 +52,6 @@ public class SqlExists extends SqlExpressionIntercode
         if(pattern == SqlEmptySolution.get())
             return negated ? falseValue : trueValue;
 
-
-        if(pattern instanceof SqlUnion union)
-        {
-            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
-
-            for(SqlIntercode child : union.getChilds())
-            {
-                ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(), variables);
-
-                if(pairs.stream().allMatch(p -> p.isJoinable()))
-                    unionList.add(child);
-            }
-
-            return new SqlExists(negated, SqlUnion.union(request, unionList), variables);
-        }
-
-
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(), variables);
 
         if(pairs.stream().anyMatch(p -> !p.isJoinable()))
@@ -78,9 +62,53 @@ public class SqlExists extends SqlExpressionIntercode
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return SqlIntercode.getJoinRestrictions(variables, pattern.getVariables(), new Restrictions());
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        return create(request, negated, pattern.optimize(request, variables.getNames(), true, evalServices), variables);
+        SqlIntercode optPattern = pattern;
+
+        Restrictions restrictions = SqlIntercode.getJoinRestrictions(optPattern.getVariables(), variables,
+                new Restrictions());
+
+        while(true)
+        {
+            optPattern = optPattern.optimize(request, restrictions, true, evalServices);
+
+            if(optPattern instanceof SqlUnion union)
+            {
+                List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : union.getChilds())
+                {
+                    ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(child.getVariables(), variables);
+
+                    if(pairs.stream().allMatch(p -> p.isJoinable()))
+                        unionList.add(child);
+                }
+
+                optPattern = SqlUnion.union(request, unionList).optimize(request, restrictions, true, evalServices);
+            }
+
+            Restrictions optRestrictions = SqlIntercode.getJoinRestrictions(optPattern.getVariables(), variables,
+                    new Restrictions());
+
+            if(optRestrictions.equals(restrictions))
+                break;
+
+            restrictions = optRestrictions;
+        }
+
+
+        if(optPattern == pattern && variables.equals(this.variables))
+            return this;
+
+        return create(request, negated, optPattern, variables);
     }
 
 

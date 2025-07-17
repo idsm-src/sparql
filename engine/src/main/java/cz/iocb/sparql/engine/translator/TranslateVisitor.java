@@ -91,7 +91,6 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
@@ -914,9 +913,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             SqlExpressionIntercode value = translator.visitElement(parameter.getValue());
 
-            if(value == SqlNull.get())
-                return SqlNoSolution.get();
-
             parameterNodes.put(parameterDefinition, (SqlNodeValue) value);
         }
 
@@ -1038,8 +1034,8 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<String> order,
-            boolean optimize) throws SQLException, ServiceException
+    public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<String> order)
+            throws SQLException, ServiceException
     {
         variableOccurrences = new HashMap<String, List<Range>>();
 
@@ -1076,10 +1072,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(offset != null || limit != null || !order.isEmpty())
                 imcode = imcode.addExternalLimits(offset, limit, order);
 
-            if(optimize)
-                imcode = imcode.optimize(request);
-
-            return imcode;
+            return imcode.optimize(request, false).optimize(request, true);
         }
         catch(ServiceRuntimeException e)
         {

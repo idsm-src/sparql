@@ -7,6 +7,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -36,8 +37,28 @@ public class SqlVariable extends SqlNodeValue
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        Restrictions restrictions = new Restrictions();
+
+        if(expected == null)
+            restrictions.add(variable.getName());
+        else
+            restrictions.add(variable.getName(), expected);
+
+        return restrictions;
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
+        if(variables.get(variable.getName()) == null)
+            return SqlNull.get();
+
+        if(variable.equals(variables.get(variable.getName())))
+            return this;
+
         return create(variable.getName(), variables);
     }
 

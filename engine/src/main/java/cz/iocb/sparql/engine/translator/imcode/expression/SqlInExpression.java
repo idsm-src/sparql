@@ -5,9 +5,12 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.fals
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -31,6 +34,12 @@ public class SqlInExpression extends SqlExpressionIntercode
                 return operand;
 
             return new OperandWrapper(operand);
+        }
+
+        @Override
+        public Restrictions getRequirements(Set<ResourceClass> expected)
+        {
+            return operand.getRequirements(expected);
         }
 
         @Override
@@ -101,14 +110,27 @@ public class SqlInExpression extends SqlExpressionIntercode
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return new Restrictions(expression.getRequirements(expected));
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
+
+        List<SqlExpressionIntercode> optRights = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode right : rights)
-            optimized.add(right.optimize(request, variables, evalServices));
+            optRights.add(right.optimize(request, variables, evalServices));
 
-        return create(negated, left.optimize(request, variables, evalServices), optimized);
+
+        if(optRights.equals(rights) && optLeft == left)
+            return this;
+
+        return create(negated, optLeft, optRights);
     }
 
 

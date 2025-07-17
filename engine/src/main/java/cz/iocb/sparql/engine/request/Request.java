@@ -247,7 +247,7 @@ public class Request implements AutoCloseable
             BigInteger newLimit = syntaxTree instanceof AskQuery || limit <= 0 ? null : BigInteger.valueOf(limit);
 
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
-            SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order, true);
+            SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
 
             String code = imcode.translate(this);
 

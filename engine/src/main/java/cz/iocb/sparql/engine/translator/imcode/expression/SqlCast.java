@@ -27,6 +27,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -69,9 +70,24 @@ public class SqlCast extends SqlUnary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        Set<ResourceClass> set = getOperand().getResourceClasses().stream()
+                .filter(r -> resultCastClass(r, resourceClass) != null).collect(toSet());
+
+        return getOperand().getRequirements(set);
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        return create(resourceClass, getOperand().optimize(request, variables, evalServices));
+        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+
+        if(optOperand == getOperand())
+            return this;
+
+        return create(resourceClass, optOperand);
     }
 
 

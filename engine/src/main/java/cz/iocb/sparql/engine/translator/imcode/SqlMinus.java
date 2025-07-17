@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.translator.imcode;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
@@ -35,48 +34,93 @@ public class SqlMinus extends SqlIntercode
 
     public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right)
     {
-        return minus(request, left, right, null, false);
+        return minus(request, left, right, null);
     }
 
 
     protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right,
-            Set<String> restrictions, boolean reduced)
+            Restrictions restrictions)
     {
-        boolean shareVariables = false;
-
-        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.getVariables(), right.getVariables()))
-        {
-            if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
-                shareVariables = true;
-
-            if(!pair.isJoinable())
-                return left.optimize(request, restrictions, reduced, false);
-        }
-
-        if(shareVariables == false)
-            return left.optimize(request, restrictions, reduced, false);
-
         return new SqlMinus(left.getVariables().restrict(restrictions), left, right);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        SqlIntercode optLeft = left;
+        SqlIntercode optRight = right;
+
+        boolean leftReduced = reduced & optRight.isDeterministic;
+        Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
+                restrictions);
+        Restrictions rightRestrictions = getJoinRestrictions(optRight.getVariables(), optLeft.getVariables(),
+                new Restrictions());
+
+        while(true)
+        {
+            optLeft = optLeft.optimize(request, leftRestrictions, leftReduced, evalServices);
+            optRight = optRight.optimize(request, rightRestrictions, true, evalServices);
+
+            if(optRight instanceof SqlUnion union)
+            {
+                List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : union.getChilds())
+                    if(isJoinable(optLeft, child))
+                        unionList.add(child);
+
+                if(!unionList.equals(union.getChilds()))
+                    optRight = SqlUnion.union(request, unionList).optimize(request, restrictions, true, evalServices);
+            }
+
+            boolean newLeftReduced = reduced & optRight.isDeterministic;
+            Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
+                    restrictions);
+            Restrictions newRightRestrictions = getJoinRestrictions(optRight.getVariables(), optLeft.getVariables(),
+                    new Restrictions());
+
+
+
+            if(newLeftReduced == leftReduced && newLeftRestrictions.equals(leftRestrictions)
+                    && newRightRestrictions.equals(rightRestrictions))
+                break;
+
+            leftRestrictions = newLeftRestrictions;
+            rightRestrictions = newRightRestrictions;
+            leftReduced = newLeftReduced;
+        }
+
+
+        boolean shareVariables = false;
+
+        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(optLeft.getVariables(), optRight.getVariables()))
+        {
+            if(pair.getLeftVariable() != null && pair.getRightVariable() != null)
+                shareVariables = true;
+
+            if(!pair.isJoinable())
+                return optLeft.optimize(request, restrictions, reduced, evalServices);
+        }
+
+        if(shareVariables == false)
+            return optLeft.optimize(request, restrictions, reduced, evalServices);
+
+        if(optLeft instanceof SqlUnion union)
+        {
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+                childs.add(minus(request, child, optRight, restrictions));
+
+            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+        }
+
+
+        if(restrictions.isOptimized(variables) && optLeft == left && optRight == right)
             return this;
 
-        reduced = reduced & right.isDeterministic;
-
-        HashSet<String> childRestrictions = new HashSet<String>();
-        childRestrictions.addAll(left.getVariables().getNames());
-        childRestrictions.retainAll(right.getVariables().getNames());
-        childRestrictions.addAll(restrictions);
-
-        SqlIntercode optimizedLeft = left.optimize(request, childRestrictions, reduced, evalServices);
-        SqlIntercode optimizedRight = right.optimize(request, childRestrictions, true, evalServices);
-
-        return minus(request, optimizedLeft, optimizedRight, restrictions, reduced);
+        return minus(request, optLeft, optRight, restrictions);
     }
 
 
@@ -172,6 +216,10 @@ public class SqlMinus extends SqlIntercode
 
         String domCondition = condition.stream().sorted().collect(joining(" OR "));
 
+        if(domCondition.isEmpty())
+            domCondition = "false";
+
+
         if(joinCondition == null)
             return domCondition;
         else
@@ -183,5 +231,17 @@ public class SqlMinus extends SqlIntercode
     public boolean isDistinct(Request request, Collection<String> selected)
     {
         return left.isDistinct(request, selected);
+    }
+
+
+    public final SqlIntercode getLeft()
+    {
+        return left;
+    }
+
+
+    public final SqlIntercode getRight()
+    {
+        return right;
     }
 }

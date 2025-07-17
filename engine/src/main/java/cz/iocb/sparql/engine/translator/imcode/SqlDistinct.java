@@ -45,47 +45,42 @@ public class SqlDistinct extends SqlIntercode
 
 
     protected static SqlIntercode create(Request request, SqlIntercode child, Set<String> distinctVariables,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
-        /* special cases */
-
-        if(child == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(child == SqlEmptySolution.get())
-            return SqlEmptySolution.get();
-
-        if(child.isDistinct(request, distinctVariables))
-            return child.optimize(request, restrictions, true, false);
-
-
-        /* standard distinct */
-
-        UsedVariables variables = new UsedVariables();
-
-        for(UsedVariable v : child.getVariables().getValues())
-            if(distinctVariables.contains(v.getName()) && (restrictions == null || restrictions.contains(v.getName())))
-                variables.add(v);
-
+        var variables = child.getVariables().restrict(new Restrictions(distinctVariables)).restrict(restrictions);
         return new SqlDistinct(variables, child, distinctVariables);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
-            return this;
-
-        HashSet<String> childRestriction = new HashSet<String>(restrictions);
-        childRestriction.addAll(distinctVariables);
-
-        SqlIntercode optChild = child.optimize(request, childRestriction, true, evalServices);
+        SqlIntercode optChild = child.optimize(request, new Restrictions(distinctVariables), true, evalServices);
 
 
-        if(optChild instanceof SqlTableAccess access && access.isDistinct(request, distinctVariables))
-            return optChild.optimize(request, restrictions, reduced, evalServices);
+        if(optChild == SqlNoSolution.get())
+            return SqlNoSolution.get();
 
+        if(optChild == SqlEmptySolution.get())
+            return SqlEmptySolution.get();
+
+        if(optChild.isDistinct(request, distinctVariables))
+            return optChild.optimize(request, restrictions, true, evalServices);
+
+        if(optChild instanceof SqlUnion union)
+        {
+            List<SqlIntercode> segs = expandUnionByResourceClasses(request, union, distinctVariables);
+
+            if(segs.size() > 1)
+            {
+                List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : segs)
+                    childs.add(create(request, child, distinctVariables, restrictions));
+
+                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+            }
+        }
 
         if(optChild instanceof SqlJoin join)
         {
@@ -111,16 +106,12 @@ public class SqlDistinct extends SqlIntercode
             }
 
             if(canBeEliminated)
-                return join.optimize(request, restrictions, reduced, evalServices);
+                return join.optimize(request, restrictions, true, evalServices);
         }
 
 
-        if(optChild instanceof SqlUnion union)
-        {
-            List<SqlIntercode> segs = expandUnionByResourceClasses(request, union, distinctVariables);
-            return SqlUnion.union(request,
-                    segs.stream().map(s -> create(request, s, distinctVariables, restrictions)).toList());
-        }
+        if(optChild == child && restrictions.isOptimized(variables))
+            return this;
 
         return create(request, optChild, distinctVariables, restrictions);
     }
@@ -130,8 +121,8 @@ public class SqlDistinct extends SqlIntercode
     public String translate(Request request)
     {
         SqlIntercode child = this.child;
-
-        UsedVariables vars = child.getVariables().restrict(distinctVariables);
+        Restrictions restrictions = new Restrictions(distinctVariables);
+        UsedVariables vars = child.getVariables().restrict(restrictions);
 
         Set<String> stringLiterals = new HashSet<String>();
 
@@ -162,7 +153,7 @@ public class SqlDistinct extends SqlIntercode
 
         builder.append(" GROUP BY ");
 
-        Set<Column> groupColumns = child.getVariables().restrict(distinctVariables).getNonConstantColumns();
+        Set<Column> groupColumns = child.getVariables().restrict(restrictions).getNonConstantColumns();
 
         Set<Column> hashColumns = new HashSet<Column>();
 
@@ -178,7 +169,7 @@ public class SqlDistinct extends SqlIntercode
         if(!groupColumns.isEmpty())
             builder.append(groupColumns.stream().map(Object::toString).collect(joining(", ")));
         else if(hashColumns.isEmpty())
-            builder.append("1"); // TODO: remove this possibility by an optimization
+            builder.append("1");
 
         return builder.toString();
     }

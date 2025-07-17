@@ -26,6 +26,181 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 public abstract class SqlIntercode extends SqlBaseClass
 {
+    public static class Restrictions
+    {
+        private static final Set<ResourceClass> all = new HashSet<ResourceClass>();
+
+        private final Map<String, Set<ResourceClass>> map = new HashMap<String, Set<ResourceClass>>();
+
+        public Restrictions()
+        {
+        }
+
+        public Restrictions(Restrictions restrictions)
+        {
+            map.putAll(restrictions.map);
+        }
+
+        public Restrictions(Collection<String> vars)
+        {
+            for(String var : vars)
+                map.put(var, all);
+        }
+
+        public Restrictions(Restrictions a, Restrictions b)
+        {
+            Set<String> vars = new HashSet<String>();
+            vars.addAll(a.getNames());
+            vars.addAll(b.getNames());
+
+            for(String v : vars)
+            {
+                Set<ResourceClass> sa = a.map.get(v);
+                Set<ResourceClass> sb = b.map.get(v);
+
+                if(sa == all || sb == all)
+                {
+                    map.put(v, all);
+                }
+                else if(sa == null)
+                {
+                    map.put(v, sb);
+                }
+                else if(sb == null)
+                {
+                    map.put(v, sa);
+                }
+                else
+                {
+                    Set<ResourceClass> sc = new HashSet<ResourceClass>();
+                    sc.addAll(sa);
+                    sc.addAll(sa);
+                    map.put(v, sc);
+                }
+            }
+        }
+
+        public void add(String var)
+        {
+            map.put(var, all);
+        }
+
+        public void add(Collection<String> vars)
+        {
+            for(String var : vars)
+                map.put(var, all);
+        }
+
+        public Set<String> getNames()
+        {
+            return map.keySet();
+        }
+
+        public boolean contains(String var, ResourceClass resClass)
+        {
+            if(!map.containsKey(var))
+                return false;
+
+            if(map.get(var) == all)
+                return true;
+
+            for(ResourceClass r : map.get(var))
+                if(resClass == r || resClass == r.getGeneralClass() || resClass.getGeneralClass() == r)
+                    return true;
+
+            return false;
+        }
+
+        public boolean canBeOptimized(UsedVariables vars)
+        {
+            UsedVariables opt = vars.restrict(this);
+
+            for(UsedVariable var : vars.getValues())
+            {
+                UsedVariable o = opt.get(var.getName());
+
+                if(o == null)
+                    return true;
+
+                if(!o.getMappings().equals(var.getMappings()))
+                    return true;
+            }
+
+            return false;
+        }
+
+
+        public void add(String var, Set<ResourceClass> set)
+        {
+            if(map.get(var) == all)
+                return;
+
+            if(map.containsKey(var))
+                map.get(var).addAll(set);
+            else
+                map.put(var, set);
+        }
+
+
+        public void set(String name, Set<ResourceClass> set)
+        {
+            map.put(name, set);
+        }
+
+        public boolean contains(String var, Set<ResourceClass> classes)
+        {
+            for(ResourceClass c : classes)
+                if(contains(var, c))
+                    return true;
+
+            return false;
+        }
+
+        public void add(Restrictions restrictions)
+        {
+            for(String v : restrictions.getNames())
+            {
+                Set<ResourceClass> sa = map.get(v);
+                Set<ResourceClass> sb = restrictions.map.get(v);
+
+                if(sb == all || sa == null)
+                {
+                    map.put(v, sb);
+                }
+                else if(sa != all && sb != null)
+                {
+                    Set<ResourceClass> sc = new HashSet<ResourceClass>();
+                    sc.addAll(sa);
+                    sc.addAll(sa);
+                    map.put(v, sb);
+                }
+            }
+        }
+
+        public boolean containsVar(String var)
+        {
+            return map.containsKey(var);
+        }
+
+        @Override
+        public boolean equals(Object other)
+        {
+            if(other == null)
+                return false;
+
+            if(other.getClass() != getClass())
+                return false;
+
+            return map.equals(((Restrictions) other).map);
+        }
+
+        public boolean isOptimized(UsedVariables variables)
+        {
+            return variables.restrict(this).equals(variables);
+        }
+    }
+
+
     protected final UsedVariables variables;
     protected final boolean isDeterministic;
 
@@ -37,7 +212,8 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    public abstract SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices);
+    public abstract SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced,
+            boolean evalServices);
 
 
     public abstract String translate(Request request);
@@ -97,7 +273,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     protected static UsedVariables getJoinUsedVariables(Request request, List<UsedVariables> allVars,
-            List<Table> tables, Set<String> restrictions, Map<Column, Column> map)
+            List<Table> tables, Restrictions restrictions, Map<Column, Column> map)
     {
         Map<Column, Column> columnMap = new HashMap<Column, Column>();
 
@@ -114,12 +290,12 @@ public abstract class SqlIntercode extends SqlBaseClass
                 Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(defs)), defs);
 
                 if(resClasses.isEmpty())
-                    return null;
+                    return new UsedVariables();
 
                 UsedVariable var = createUsedVariable(request, name, resClasses, vars, tables, columnMap, false);
 
                 if(var == null)
-                    return null;
+                    return new UsedVariables();
 
                 variables.add(var);
             }
@@ -159,14 +335,22 @@ public abstract class SqlIntercode extends SqlBaseClass
                     mappings.add(toTableColumns(tables.get(i), var.getMapping(resClass)));
                 }
 
-                if(IntStream.range(0, resClass.getColumnCount()).anyMatch(i -> mappings.stream().map(m -> m.get(i))
-                        .filter(c -> c instanceof ConstantColumn).distinct().count() > 1))
-                    return null;
+                if(mappings.stream().anyMatch(m -> m == null))
+                {
+                    assert mappings.stream().allMatch(m -> m == null);
+                    variable.addMapping(resClass, null);
+                }
+                else
+                {
+                    if(IntStream.range(0, resClass.getColumnCount()).anyMatch(i -> mappings.stream().map(m -> m.get(i))
+                            .filter(c -> c instanceof ConstantColumn).distinct().count() > 1))
+                        return null;
 
-                List<Column> columns = selectColumns(resClass, mappings);
+                    List<Column> columns = selectColumns(resClass, mappings);
 
-                variable.addMapping(resClass,
-                        getMappedColuns(resClass.createColumns(request.getColumnMap(), name), columns, columnMap));
+                    variable.addMapping(resClass,
+                            getMappedColuns(resClass.createColumns(request.getColumnMap(), name), columns, columnMap));
+                }
             }
         }
         else
@@ -252,14 +436,14 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    private static Set<ResourceClass> cleanSpecificClasses(Set<ResourceClass> classes)
+    protected static Set<ResourceClass> cleanSpecificClasses(Set<ResourceClass> classes)
     {
         return classes.stream().filter(r -> r == r.getGeneralClass() || !classes.contains(r.getGeneralClass()))
                 .collect(toSet());
     }
 
 
-    static Set<ResourceClass> cleanGeneralClasses(Set<ResourceClass> classes)
+    protected static Set<ResourceClass> cleanGeneralClasses(Set<ResourceClass> classes)
     {
         return classes.stream().filter(r -> classes.stream().noneMatch(x -> x != r && x.getGeneralClass() == r))
                 .collect(toSet());
@@ -272,14 +456,17 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    static List<Column> toTableColumns(Table table, List<Column> columns)
+    private static List<Column> toTableColumns(Table table, List<Column> columns)
     {
+        if(columns == null)
+            return null;
+
         return columns.stream().map(c -> c.fromTable(table)).toList();
     }
 
 
     protected static UsedVariables getJoinUsedVariables(Request request, UsedVariables left, UsedVariables right,
-            Table leftTable, Table rightTable, Set<String> restrictions, Map<Column, Column> map)
+            Table leftTable, Table rightTable, Restrictions restrictions, Map<Column, Column> map)
     {
         return getJoinUsedVariables(request, Arrays.asList(left, right), Arrays.asList(leftTable, rightTable),
                 restrictions, map);
@@ -411,7 +598,9 @@ public abstract class SqlIntercode extends SqlBaseClass
                     }
                 }
 
-                assert !condition.isEmpty();
+
+                if(condition.isEmpty())
+                    condition.add("false");
 
                 if(!condition.contains("true"))
                     join.add(condition.stream().sorted().collect(joining(" OR ", "(", ")")));
@@ -428,6 +617,9 @@ public abstract class SqlIntercode extends SqlBaseClass
     public static String generateJoinCondition(UsedVariable leftVariable, UsedVariable rightVariable, Table leftTable,
             Table rightTable)
     {
+        if(leftVariable == null || rightVariable == null)
+            return null;
+
         List<String> condition = new ArrayList<String>();
 
         if(leftVariable.canBeNull())
@@ -496,5 +688,123 @@ public abstract class SqlIntercode extends SqlBaseClass
     public boolean isDistinct(Request request, Collection<String> selected)
     {
         return false;
+    }
+
+
+    public static Restrictions getJoinRestrictions(UsedVariables variables, UsedVariables other,
+            Restrictions restrictions)
+    {
+        return getJoinRestrictions(variables, Set.of(other), restrictions);
+    }
+
+
+    protected static Restrictions getJoinRestrictions(UsedVariables variables, Collection<UsedVariables> others,
+            Restrictions restrictions)
+    {
+        Restrictions joinRestrictions = new Restrictions();
+
+        for(UsedVariable var : variables.getValues())
+        {
+            String name = var.getName();
+
+            Set<UsedVariable> vars = others.stream().map(v -> v.get(name)).filter(v -> v != null).collect(toSet());
+
+            if(!vars.isEmpty())
+            {
+                if(var.canBeNull())
+                {
+                    joinRestrictions.set(name, var.getMappings().keySet());
+                }
+                else
+                {
+                    Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+                    for(ResourceClass rc : var.getMappings().keySet())
+                        if(vars.stream().anyMatch(v -> v.containsClass(rc) || v.containsClass(rc.getGeneralClass())))
+                            set.add(rc);
+
+                    joinRestrictions.set(name, set);
+                }
+            }
+        }
+
+        return new Restrictions(joinRestrictions, restrictions);
+    }
+
+
+    protected static boolean isJoinable(List<SqlIntercode> childs)
+    {
+        List<UsedVariables> allVars = childs.stream().map(c -> c.getVariables()).toList();
+
+        for(String name : allVars.stream().flatMap(v -> v.getNames().stream()).collect(toSet()))
+        {
+            List<UsedVariable> vars = allVars.stream().map(v -> v.get(name)).filter(v -> v != null).toList();
+
+            if(vars.size() > 1 && vars.stream().anyMatch(v -> !v.canBeNull()))
+            {
+                vars = vars.stream().filter(v -> !v.canBeNull()).toList();
+                Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(vars)), vars);
+
+                if(resClasses.isEmpty())
+                    return false;
+
+                for(ResourceClass resClass : resClasses)
+                {
+                    Map<Integer, ConstantColumn> consts = new HashMap<Integer, ConstantColumn>();
+
+                    for(UsedVariable var : vars)
+                    {
+                        if(var.canBeNull() || !var.containsClass(resClass))
+                            continue;
+
+                        List<Column> cols = var.getMapping(resClass);
+
+                        for(int j = 0; j < resClass.getColumnCount(); j++)
+                            if(cols.get(j) instanceof ConstantColumn c && !consts.computeIfAbsent(j, k -> c).equals(c))
+                                return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+
+    protected static boolean isJoinable(SqlIntercode left, SqlIntercode right)
+    {
+        for(SqlIntercode l : getJoinList(left))
+        {
+            for(SqlIntercode r : getJoinList(right))
+            {
+                ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(l.getVariables(), r.getVariables());
+
+                if(pairs.stream().anyMatch(p -> !p.isJoinable()))
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    protected static List<SqlIntercode> getJoinList(SqlIntercode child)
+    {
+        if(child instanceof SqlJoin join)
+            return join.getChilds().stream().flatMap(c -> getJoinList(c).stream()).toList();
+
+        if(child instanceof SqlFilter filter)
+            return getJoinList(filter.getChild());
+
+        if(child instanceof SqlMinus minus)
+            return getJoinList(minus.getLeft());
+
+        if(child instanceof SqlLeftJoin join)
+            return getJoinList(join.getLeft());
+
+        if(child instanceof SqlDistinct distinct)
+            return getJoinList(distinct.getChild());
+
+        return List.of(child);
     }
 }

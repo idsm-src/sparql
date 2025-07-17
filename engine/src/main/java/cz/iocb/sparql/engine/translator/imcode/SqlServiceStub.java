@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
@@ -16,6 +17,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -81,21 +83,13 @@ public class SqlServiceStub extends SqlIntercode
     public static SqlIntercode create(Request request, VarOrIri name, GraphPattern pattern, SqlIntercode context,
             UserStrBlankNodeClass blankNodeClass, boolean silent)
     {
-        /* special cases */
-
-        if(context == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(name instanceof Variable && context.getVariables().get(((Variable) name).getSqlName()) == null)
-            return SqlNoSolution.get();
-
-        if(context instanceof SqlUnion union)
-            return SqlUnion.union(request, union.getChilds().stream()
-                    .map(p -> create(request, name, pattern, context, blankNodeClass, silent)).toList());
+        return create(request, name, pattern, context, blankNodeClass, silent, null);
+    }
 
 
-        /* standard service */
-
+    protected static SqlIntercode create(Request request, VarOrIri name, GraphPattern pattern, SqlIntercode context,
+            UserStrBlankNodeClass blankNodeClass, boolean silent, Restrictions restrictions)
+    {
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.add(unsupportedIri);
         resourceClasses.add(unsupportedLiteral);
@@ -105,7 +99,7 @@ public class SqlServiceStub extends SqlIntercode
         request.getConfiguration().getIriClasses().forEach(c -> resourceClasses.add(c));
         request.getConfiguration().getDataTypes().forEach(d -> resourceClasses.add(d.getGeneralLiteralClass()));
 
-        UsedVariables vars = new UsedVariables();
+        UsedVariables variables = new UsedVariables();
 
         for(UsedVariable v : context.getVariables().getValues())
         {
@@ -117,7 +111,7 @@ public class SqlServiceStub extends SqlIntercode
                 for(ResourceClass c : resourceClasses)
                     var.addMapping(c, c.createColumns(request.getColumnMap(), varName));
 
-                vars.add(var);
+                variables.add(var);
             }
         }
 
@@ -125,38 +119,62 @@ public class SqlServiceStub extends SqlIntercode
         {
             String varName = v.getSqlName();
 
-            if(!vars.getNames().contains(varName))
+            if(!variables.getNames().contains(varName))
             {
                 UsedVariable var = new UsedVariable(varName, true);
 
                 for(ResourceClass c : resourceClasses)
                     var.addMapping(c, c.createColumns(request.getColumnMap(), varName));
 
-                vars.add(var);
+                variables.add(var);
             }
         }
 
-        return new SqlServiceStub(vars, name, pattern, context, blankNodeClass, silent);
+        return new SqlServiceStub(variables.restrict(restrictions), name, pattern, context, blankNodeClass, silent);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         if(evalServices)
-            return eval(request);
+            return eval(request, restrictions);
 
 
-        if(restrictions == null)
-            return this;
-
-        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
+        Restrictions childRestrictions = new Restrictions(restrictions);
 
         for(Variable var : pattern.getVariablesInScope())
             childRestrictions.add(var.getSqlName());
 
-        return create(request, name, pattern, context.optimize(request, childRestrictions, reduced, evalServices),
-                blankNodeClass, silent);
+        SqlIntercode optContext = context.optimize(request, childRestrictions, reduced, evalServices);
+
+
+        if(optContext == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(name instanceof Variable nameVar)
+        {
+            UsedVariable var = optContext.getVariables().get(nameVar.getSqlName());
+
+            if(var == null || var.getCompatibleClasses(iri).isEmpty())
+                return SqlNoSolution.get();
+        }
+
+        if(optContext instanceof SqlUnion union)
+        {
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+                childs.add(create(request, name, pattern, child, blankNodeClass, silent));
+
+            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+        }
+
+
+        if(optContext == context && restrictions.isOptimized(variables))
+            return this;
+
+        return create(request, name, pattern, optContext, blankNodeClass, silent);
     }
 
 
@@ -167,7 +185,7 @@ public class SqlServiceStub extends SqlIntercode
     }
 
 
-    public SqlIntercode eval(Request request)
+    public SqlIntercode eval(Request request, Restrictions restrictions)
     {
         /* create variable lists */
 
@@ -201,7 +219,7 @@ public class SqlServiceStub extends SqlIntercode
             BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
             SqlSelect query = SqlSelect.createTopLevel(request, new ArrayList<String>(contextVariables), context, null,
                     limit);
-            String code = query.optimize(request).translate(request);
+            String code = query.optimize(request, true).translate(request);
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
                     request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
@@ -235,7 +253,7 @@ public class SqlServiceStub extends SqlIntercode
         ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
         String serviceCode = visitor.getResultCode(pattern);
 
-        try(ResultHandler results = new StoredResultHandler(request))
+        try(ResultHandler results = new StoredResultHandler(request, restrictions))
         {
             int call = 0;
 
@@ -350,7 +368,7 @@ public class SqlServiceStub extends SqlIntercode
                 }
 
 
-                /* receive result*/
+                /* receive result */
 
                 try
                 {

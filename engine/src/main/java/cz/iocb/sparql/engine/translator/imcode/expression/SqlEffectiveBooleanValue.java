@@ -22,11 +22,15 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
 public class SqlEffectiveBooleanValue extends SqlUnary
 {
+    private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean, xsdShort, xsdInt, xsdLong,
+            xsdInteger, xsdDecimal, xsdFloat, xsdDouble, xsdString);
+
     private static final List<IRI> ebvTypes = List.of(xsdBoolean.getTypeIri(), xsdShort.getTypeIri(),
             xsdInt.getTypeIri(), xsdLong.getTypeIri(), xsdInteger.getTypeIri(), xsdDecimal.getTypeIri(),
             xsdFloat.getTypeIri(), xsdDouble.getTypeIri(), xsdString.getTypeIri());
@@ -105,9 +109,21 @@ public class SqlEffectiveBooleanValue extends SqlUnary
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return getOperand().getRequirements(operandRequirements);
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        return create(getOperand().optimize(request, variables, evalServices));
+        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+
+        if(optOperand == getOperand())
+            return this;
+
+        return create(optOperand);
     }
 
 

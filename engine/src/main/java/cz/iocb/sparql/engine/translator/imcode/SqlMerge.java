@@ -1,12 +1,16 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
@@ -39,20 +43,8 @@ public class SqlMerge extends SqlIntercode
 
 
     protected static SqlIntercode create(Request request, String variable1, String variable2, SqlIntercode child,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
-        /* special cases */
-
-        if(child == SqlNoSolution.get())
-            return SqlNoSolution.get();
-
-        if(child instanceof SqlUnion union)
-            return SqlUnion.union(request, union.getChilds().stream()
-                    .map(c -> create(request, variable1, variable2, c, restrictions)).toList());
-
-
-        /* special merge */
-
         UsedVariables usedVars1 = new UsedVariables();
         UsedVariables usedVars2 = new UsedVariables();
 
@@ -67,32 +59,56 @@ public class SqlMerge extends SqlIntercode
         Map<Column, Column> map = new HashMap<Column, Column>();
         UsedVariables variables = getJoinUsedVariables(request, usedVars1, usedVars2, null, null, restrictions, map);
 
-        if(variables == null)
-            return SqlNoSolution.get();
-
         return new SqlMerge(variables, variable1, variable2, child, map);
     }
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        SqlIntercode optChild = child;
+
+        Restrictions childRestrictions = getRestrictions(optChild, variable1, variable2, restrictions);
+
+        while(true)
+        {
+            optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+
+            Restrictions newChildRestrictions = getRestrictions(optChild, variable1, variable2, restrictions);
+
+            if(newChildRestrictions.equals(childRestrictions))
+                break;
+
+            childRestrictions = newChildRestrictions;
+        }
+
+        if(optChild == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(!(new UsedPairedVariable(optChild.getVariable(variable1), optChild.getVariable(variable2))).isJoinable())
+            return SqlNoSolution.get();
+
+        if(optChild.getVariables().get(variable1) == null && !restrictions.containsVar(variable1))
+            return optChild.optimize(request, restrictions, reduced, evalServices);
+
+        if(optChild.getVariables().get(variable2) == null)
+            return optChild.optimize(request, restrictions, reduced, evalServices);
+
+        if(optChild instanceof SqlUnion union)
+        {
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+                childs.add(create(request, variable1, variable2, child, restrictions));
+
+            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+        }
+
+
+        if(restrictions.isOptimized(variables) && optChild == child)
             return this;
 
-        HashSet<String> contextRestrictions = new HashSet<String>(restrictions);
-        contextRestrictions.add(variable1);
-        contextRestrictions.add(variable2);
-
-        SqlIntercode optimizedContext = child.optimize(request, contextRestrictions, reduced, evalServices);
-
-        if(child.getVariables().get(variable1) == null && !restrictions.contains(variable1))
-            return child.optimize(request, restrictions, reduced, evalServices);
-
-        if(optimizedContext.getVariables().get(variable2) == null)
-            return child.optimize(request, restrictions, reduced, evalServices);
-
-        return create(request, variable1, variable2, optimizedContext, restrictions);
+        return create(request, variable1, variable2, optChild, restrictions);
     }
 
 
@@ -128,5 +144,48 @@ public class SqlMerge extends SqlIntercode
         }
 
         return builder.toString();
+    }
+
+
+    protected static Restrictions getRestrictions(SqlIntercode child, String variable1, String variable2,
+            Restrictions restrictions)
+    {
+        UsedVariable var1 = child.getVariable(variable1);
+        UsedVariable var2 = child.getVariable(variable2);
+
+        Restrictions result = new Restrictions(restrictions);
+        result.add(getJoinRestrictions(var1, var2));
+        result.add(getJoinRestrictions(var2, var1));
+
+        return result;
+    }
+
+
+    protected static Restrictions getJoinRestrictions(UsedVariable var, UsedVariable other)
+    {
+        Restrictions restrictions = new Restrictions();
+
+        if(var == null || other == null)
+            return restrictions;
+
+
+        String name = var.getName();
+
+        if(var.canBeNull())
+        {
+            restrictions.set(name, var.getMappings().keySet());
+        }
+        else
+        {
+            Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+            for(ResourceClass resClass : var.getMappings().keySet())
+                if(other.containsClass(resClass) || other.containsClass(resClass.getGeneralClass()))
+                    set.add(resClass);
+
+            restrictions.set(name, set);
+        }
+
+        return restrictions;
     }
 }

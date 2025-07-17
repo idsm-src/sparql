@@ -4,12 +4,15 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLi
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -49,6 +52,13 @@ public class SqlLiteral extends SqlNodeValue
 
 
     @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        return new Restrictions();
+    }
+
+
+    @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
         return this;
@@ -77,6 +87,9 @@ public class SqlLiteral extends SqlNodeValue
     @Override
     public List<Column> asResource(Request request, ResourceClass resourceClass)
     {
+        if(!resourceClass.match(request.getStatement(), literal))
+            return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
+
         return resourceClass.toColumns(request.getStatement(), literal);
     }
 }

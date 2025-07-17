@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -7,6 +9,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -29,14 +32,14 @@ public class SqlFunctionCall extends SqlExpressionIntercode
     }
 
 
-    public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguemnts)
+    public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
     {
-        boolean canBeNull = definition.canBeNull() || arguemnts.stream().anyMatch(a -> a.canBeNull());
-        boolean isDeterministic = definition.isDeterministic() && arguemnts.stream().allMatch(a -> a.isDeterministic());
+        boolean canBeNull = definition.canBeNull() || arguments.stream().anyMatch(a -> a.canBeNull());
+        boolean isDeterministic = definition.isDeterministic() && arguments.stream().allMatch(a -> a.isDeterministic());
 
-        for(int i = 0; i < arguemnts.size(); i++)
+        for(int i = 0; i < arguments.size(); i++)
         {
-            Set<ResourceClass> resClasses = arguemnts.get(i).getResourceClasses();
+            Set<ResourceClass> resClasses = arguments.get(i).getResourceClasses();
             ResourceClass refClass = definition.getArgumentClasses().get(i);
 
             if(refClass == FunctionDefinition.stringLiteral)
@@ -51,19 +54,40 @@ public class SqlFunctionCall extends SqlExpressionIntercode
             }
         }
 
-        return new SqlFunctionCall(definition, arguemnts, canBeNull, isDeterministic);
+        return new SqlFunctionCall(definition, arguments, canBeNull, isDeterministic);
+    }
+
+
+    @Override
+    public Restrictions getRequirements(Set<ResourceClass> expected)
+    {
+        Restrictions restrictions = new Restrictions();
+
+        for(int i = 0; i < arguments.size(); i++)
+        {
+            if(definition.getArgumentClasses().get(i) == FunctionDefinition.stringLiteral)
+                restrictions.add(arguments.get(i).getRequirements(Set.of(xsdString, rdfLangString)));
+            else
+                restrictions.add(arguments.get(i).getRequirements(Set.of(definition.getArgumentClasses().get(i))));
+        }
+
+        return restrictions;
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        List<SqlExpressionIntercode> optimized = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> optArguments = new LinkedList<SqlExpressionIntercode>();
 
         for(SqlExpressionIntercode argument : arguments)
-            optimized.add(argument.optimize(request, variables, evalServices));
+            optArguments.add(argument.optimize(request, variables, evalServices));
 
-        return create(definition, optimized);
+
+        if(optArguments.equals(arguments))
+            return this;
+
+        return create(definition, optArguments);
     }
 
 

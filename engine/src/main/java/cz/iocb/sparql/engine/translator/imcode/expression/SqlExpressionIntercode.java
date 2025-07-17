@@ -31,6 +31,7 @@ import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlBaseClass;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -53,6 +54,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         this.isBoxed = resourceClasses.size() > 0 ? isBoxed(resourceClasses) : false; //FIXME
         this.resourceClasses = resourceClasses;
     }
+
+
+    public abstract Restrictions getRequirements(Set<ResourceClass> expected);
 
 
     public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices);
@@ -354,6 +358,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     protected static String translateAsUnboxedOperand(Request request, SqlExpressionIntercode operand,
             ResourceClass resourceClass)
     {
+        //FIXME: can this happen?
+        if(operand == SqlNull.get())
+            return "NULL::" + resourceClass.getSqlTypes().get(0);
+
+
         StringBuilder builder = new StringBuilder();
 
         if(operand instanceof SqlVariable variable)

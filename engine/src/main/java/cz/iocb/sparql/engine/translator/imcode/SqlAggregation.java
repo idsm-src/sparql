@@ -50,42 +50,25 @@ public class SqlAggregation extends SqlIntercode
     }
 
 
-    public static SqlIntercode aggregate(Request request, HashSet<String> groupVariables,
-            LinkedHashMap<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
+    public static SqlIntercode aggregate(Request request, Set<String> groupVariables,
+            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
         return aggregate(request, groupVariables, aggregations, child, null);
     }
 
 
     protected static SqlIntercode aggregate(Request request, Set<String> groupVariables,
-            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, Set<String> restrictions)
+            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions)
     {
-        /* special cases */
-
-        //NOTE: special case - implicit group with eliminated aggregates
-        if(groupVariables.isEmpty() && aggregations.values().stream().noneMatch(r -> r instanceof SqlBuiltinCall))
-        {
-            SqlIntercode result = SqlEmptySolution.get();
-
-            for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
-                if(entry.getValue() != SqlNull.get())
-                    result = SqlBind.bind(request, entry.getKey(), entry.getValue(), result);
-
-            return result;
-        }
-
-
-        /* standard aggregates */
-
         UsedVariables variables = new UsedVariables();
 
         for(String variable : groupVariables)
-            if(child.getVariables().get(variable) != null && (restrictions == null || restrictions.contains(variable)))
+            if(child.getVariables().get(variable) != null)
                 variables.add(child.getVariables().get(variable));
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
         {
-            if(entry.getValue() != SqlNull.get() && (restrictions == null || restrictions.contains(entry.getKey())))
+            if(entry.getValue() != SqlNull.get())
             {
                 Set<ResourceClass> resClasses = entry.getValue().getResourceClasses();
 
@@ -111,10 +94,12 @@ public class SqlAggregation extends SqlIntercode
             }
         }
 
+        variables = variables.restrict(restrictions);
+
         boolean isDeterministic = child.isDeterministic();
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions == null || restrictions.contains(entry.getKey()))
+            if(restrictions == null || restrictions.contains(entry.getKey(), entry.getValue().getResourceClasses()))
                 isDeterministic &= entry.getValue().isDeterministic();
 
         return new SqlAggregation(variables, isDeterministic, groupVariables, aggregations, child);
@@ -122,55 +107,31 @@ public class SqlAggregation extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
-            return this;
+        SqlIntercode optChild = child;
+        Map<String, SqlExpressionIntercode> optAggregations = aggregations;
 
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
-        HashSet<String> childRestrictions = new HashSet<String>(groupVariables);
-
-        boolean childReduce = aggregations.values().stream()
+        boolean childReduce = optAggregations.values().stream()
                 .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
 
-        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
-            if(restrictions.contains(entry.getKey()))
-                childRestrictions.addAll(entry.getValue().getReferencedVariables());
+        Restrictions childRestrictions = getChildRestrictions(groupVariables, optAggregations, restrictions);
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduce, evalServices);
-        Map<String, SqlExpressionIntercode> optAggregations = optimizeAggregations(request, aggregations, optChild,
-                evalServices);
-
-
-        /* change count(var) on count(*) if possible  */
-        for(Map.Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
-            if(entry.getValue() instanceof SqlBuiltinCall call && call.getFunction().equals("count")
-                    && !call.isDistinct() && !call.getArguments().get(0).canBeNull())
-                optAggregations.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
-
-        /* change count(distinct var) on count(*) if possible  */
-        if(optChild instanceof SqlTableAccess tab && tab.getTable() != null)
-            for(Map.Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
-                if(entry.getValue() instanceof SqlBuiltinCall call && call.getFunction().equals("count")
-                        && call.isDistinct() && call.getArguments().get(0) instanceof SqlVariable var
-                        && schema.isKey(tab.getTable(), var.getUsedVariable().getNonConstantColumns()))
-                    optAggregations.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
-
-
-        boolean optChildReduce = optAggregations.values().stream()
-                .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
-
-        HashSet<String> newChildRestrictions = new HashSet<String>(groupVariables);
-
-        for(Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
-            if(restrictions.contains(entry.getKey()))
-                newChildRestrictions.addAll(entry.getValue().getReferencedVariables());
-
-        if(!newChildRestrictions.equals(childRestrictions))
+        while(true)
         {
-            optChild = child.optimize(request, newChildRestrictions, optChildReduce, evalServices);
+            optChild = optChild.optimize(request, childRestrictions, childReduce, evalServices);
             optAggregations = optimizeAggregations(request, optAggregations, optChild, evalServices);
+
+            boolean newChildReduce = optAggregations.values().stream()
+                    .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
+
+            Restrictions newChildRestrictions = getChildRestrictions(groupVariables, optAggregations, restrictions);
+
+            if(newChildReduce == childReduce && newChildRestrictions.equals(childRestrictions))
+                break;
+
+            childReduce = newChildReduce;
+            childRestrictions = newChildRestrictions;
         }
 
 
@@ -191,15 +152,15 @@ public class SqlAggregation extends SqlIntercode
 
             for(List<SqlIntercode> part : parts.values())
             {
-                SqlIntercode child = SqlUnion.union(request, part).optimize(request, childRestrictions, optChildReduce,
+                SqlIntercode child = SqlUnion.union(request, part);
+
+                Map<String, SqlExpressionIntercode> aggregations = optimizeAggregations(request, optAggregations, child,
                         evalServices);
-                Map<String, SqlExpressionIntercode> aggs = optimizeAggregations(request, optAggregations, child,
-                        evalServices);
-                result.add(aggregate(request, groupVariables, aggs, child, restrictions).optimize(request, restrictions,
-                        reduced, evalServices));
+
+                result.add(aggregate(request, groupVariables, aggregations, child));
             }
 
-            return SqlUnion.union(request, result);
+            return SqlUnion.union(request, result).optimize(request, restrictions, reduced, evalServices);
         }
 
 
@@ -270,19 +231,19 @@ public class SqlAggregation extends SqlIntercode
                     Map<String, SqlExpressionIntercode> subAggregations = Map.of("@card",
                             SqlBuiltinCall.create(request, "card", false, new ArrayList<SqlExpressionIntercode>()));
 
-                    SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code, Set.of("@card"));
+                    SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code);
 
                     SqlExpressionIntercode card = SqlVariable.create("@card", aggregate.getVariables());
                     SqlExpressionIntercode factor = SqlLiteral.create(request,
                             new Literal(count.toString(), xsdIntegerType));
                     SqlExpressionIntercode expression = SqlBinaryArithmetic.create(Operator.Multiply, factor, card);
 
-                    unionList.add(SqlBind.bind(request, "@bind", expression, aggregate, Set.of("@bind"), false));
+                    unionList.add(SqlBind.bind(request, "@bind", expression, aggregate));
                 }
                 else
                 {
                     var subAggregations = Map.of("@bind", SqlBuiltinCall.create(request, "card", false, List.of()));
-                    SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code, Set.of("@bind"));
+                    SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code);
                     unionList.add(aggregate);
                 }
             }
@@ -295,10 +256,12 @@ public class SqlAggregation extends SqlIntercode
             Map<String, SqlExpressionIntercode> outerAggregations = new LinkedHashMap<String, SqlExpressionIntercode>();
             outerAggregations.put(optAggregations.keySet().iterator().next(), expr);
 
-            return aggregate(request, groupVariables, outerAggregations, optUnion, restrictions);
+            return aggregate(request, groupVariables, outerAggregations, optUnion).optimize(request, restrictions,
+                    reduced, evalServices);
         }
 
 
+        /* change count(distinct v) to count(v) */
         if(optAggregations.size() == 1 && optAggregations.values().iterator().next() instanceof SqlBuiltinCall call
                 && call.getFunction().equals("count") && call.getArgument() instanceof SqlVariable var
                 && call.isDistinct())
@@ -307,20 +270,36 @@ public class SqlAggregation extends SqlIntercode
             distinctVars.add(var.getName());
 
             for(String v : groupVariables)
-                if(restrictions.contains(v) || !optChild.hasConstantVariable(v))
+                if(restrictions.containsVar(v) || !optChild.hasConstantVariable(v))
                     distinctVars.add(v);
 
-            SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars).optimize(request, distinctVars,
-                    true, evalServices);
+            SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars);
             List<SqlExpressionIntercode> args = List.of(SqlVariable.create(var.getName(), child.getVariables()));
 
             Map<String, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
                     SqlBuiltinCall.create(request, "count", false, args));
 
-            return aggregate(request, groupVariables, subAggregations, child, restrictions).optimize(request,
-                    restrictions, reduced, evalServices);
+            return aggregate(request, groupVariables, subAggregations, child).optimize(request, restrictions, reduced,
+                    evalServices);
         }
 
+
+        /* implicit group with eliminated aggregates */
+        if(groupVariables.isEmpty() && optAggregations.values().stream()
+                .noneMatch(r -> r instanceof SqlBuiltinCall c && c.isAggregateFunction()))
+        {
+            SqlIntercode result = SqlEmptySolution.get();
+
+            for(Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
+                if(entry.getValue() != SqlNull.get())
+                    result = SqlBind.bind(request, entry.getKey(), entry.getValue(), result);
+
+            return result.optimize(request, restrictions, reduced, evalServices);
+        }
+
+
+        if(optAggregations.equals(aggregations) && optChild == child && restrictions.isOptimized(variables))
+            return this;
 
         return aggregate(request, groupVariables, optAggregations, optChild, restrictions);
     }
@@ -329,10 +308,40 @@ public class SqlAggregation extends SqlIntercode
     private Map<String, SqlExpressionIntercode> optimizeAggregations(Request request,
             Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, boolean evalServices)
     {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
         LinkedHashMap<String, SqlExpressionIntercode> opt = new LinkedHashMap<String, SqlExpressionIntercode>();
         aggregations.forEach((k, v) -> opt.put(k, v.optimize(request, child.getVariables(), evalServices)));
 
+        /* change count(var) on count(*) if possible  */
+        for(Map.Entry<String, SqlExpressionIntercode> entry : opt.entrySet())
+            if(entry.getValue() instanceof SqlBuiltinCall call && call.getFunction().equals("count")
+                    && !call.isDistinct() && !call.getArguments().get(0).canBeNull())
+                opt.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
+
+
+        /* change count(distinct var) on count(*) if possible  */
+        if(child instanceof SqlTableAccess tab && tab.getTable() != null)
+            for(Map.Entry<String, SqlExpressionIntercode> entry : opt.entrySet())
+                if(entry.getValue() instanceof SqlBuiltinCall call && call.getFunction().equals("count")
+                        && call.isDistinct() && call.getArguments().get(0) instanceof SqlVariable var
+                        && schema.isKey(tab.getTable(), var.getUsedVariable().getNonConstantColumns()))
+                    opt.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
+
         return opt;
+    }
+
+
+    private static Restrictions getChildRestrictions(Set<String> groupVariables,
+            Map<String, SqlExpressionIntercode> aggregations, Restrictions restrictions)
+    {
+        Restrictions childRestrictions = new Restrictions(groupVariables);
+
+        for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
+            if(restrictions.contains(entry.getKey(), entry.getValue().getResourceClasses()))
+                childRestrictions.add(entry.getValue().getRequirements(null));
+
+        return childRestrictions;
     }
 
 
@@ -376,13 +385,13 @@ public class SqlAggregation extends SqlIntercode
                         builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
                     }
                 }
-                else
+                else if(variable.hasMapping())
                 {
                     appendComma(builder, hasSelect);
                     hasSelect = true;
 
                     Column column = new TableColumn(variableName + "##expression");
-                    builder.append(translateExpressionExpansion(column, variable));
+                    builder.append(translateExpressionExpansion(column, variable, expression.isBoxed()));
                 }
             }
 
@@ -446,6 +455,10 @@ public class SqlAggregation extends SqlIntercode
         else if(!groupVariables.isEmpty())
         {
             builder.append(" GROUP BY true::boolean");
+        }
+        else if(aggregations.values().stream().noneMatch(e -> e instanceof SqlBuiltinCall c && c.isAggregateFunction()))
+        {
+            builder.append(" GROUP BY ()");
         }
 
 

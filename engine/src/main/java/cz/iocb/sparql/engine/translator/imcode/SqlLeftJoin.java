@@ -1,15 +1,17 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -49,71 +51,23 @@ public class SqlLeftJoin extends SqlIntercode
     public static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions)
     {
-        return leftJoin(request, left, right, conditions, null, false);
+        return leftJoin(request, left, right, conditions, null);
     }
 
 
     protected static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions, Set<String> restrictions, boolean reduce)
+            List<SqlExpressionIntercode> conditions, Restrictions restrictions)
     {
-        /* special cases */
+        boolean hasConstantColumn = false;
 
-        if(left == SqlNoSolution.get())
-            return SqlNoSolution.get();
+        for(UsedVariable variable : right.getVariables().getValues())
+            for(Entry<ResourceClass, List<Column>> entry : variable.getMappings().entrySet())
+                for(Column column : entry.getValue())
+                    if(column instanceof ConstantColumn)
+                        hasConstantColumn = true;
 
-        if(right == SqlNoSolution.get() || right == SqlEmptySolution.get()
-                || !isJoinable(request, left, right, conditions))
-            return left.optimize(request, restrictions, reduce, false);
-
-        if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-            return SqlJoin.join(request, left, right).optimize(request, restrictions, reduce, false);
-
-        if(left instanceof SqlUnion union)
-        {
-            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
-
-            for(SqlIntercode child : union.getChilds())
-            {
-                List<SqlExpressionIntercode> conds = optimize(request, conditions, child.getVariables(),
-                        right.getVariables(), false);
-                unionList.add(leftJoin(request, child, right, conds, restrictions, reduce));
-            }
-
-            return SqlUnion.union(request, unionList).optimize(request, restrictions, reduce, false);
-        }
-
-        if(right instanceof SqlUnion union)
-        {
-            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
-
-            for(SqlIntercode child : union.getChilds())
-                if(isJoinable(request, left, child,
-                        optimize(request, conditions, left.getVariables(), child.getVariables(), false)))
-                    unionList.add(child);
-
-            right = SqlUnion.union(request, unionList);
-            conditions = optimize(request, conditions, left.getVariables(), right.getVariables(), false);
-
-            if(!(right instanceof SqlUnion))
-                return leftJoin(request, left, right, conditions, restrictions, reduce);
-            else if(isJoinConditionAlwaysTrue(left.variables, right.getVariables()) && conditions.isEmpty())
-                return SqlJoin.join(request, left, right).optimize(request, restrictions, reduce, false);
-        }
-
-        if(left instanceof SqlTableAccess l && right instanceof SqlTableAccess r && conditions.isEmpty())
-        {
-            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
-            SqlIntercode merge = SqlTableAccess.tryReduceLeftJoin(schema, l, r, restrictions);
-
-            if(merge != null)
-                return merge;
-        }
-
-
-        /* standard left join */
-
-        right = SqlStripConstantColumns.strip(right);
+        if(hasConstantColumn)
+            right = SqlStripConstantColumns.strip(right);
 
         Map<Column, Column> map = new HashMap<Column, Column>();
         UsedVariables variables = getJoinUsedVariables(request, left.getVariables(), setCanBeNull(right.getVariables()),
@@ -123,21 +77,13 @@ public class SqlLeftJoin extends SqlIntercode
     }
 
 
-    private static boolean isJoinable(Request request, SqlIntercode left, SqlIntercode right,
-            List<SqlExpressionIntercode> conditions)
+    private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
     {
         if(conditions.stream().anyMatch(f -> f == SqlNull.get() || f == falseValue
                 || (f instanceof SqlBinaryComparison && ((SqlBinaryComparison) f).isAlwaysFalseOrNull())))
             return false;
 
-        Set<String> restrictions = new HashSet<>();
-        restrictions.addAll(left.getVariables().getNames());
-        restrictions.addAll(right.getVariables().getNames());
-
-        if(SqlJoin.join(request, left, right).optimize(request, restrictions, false, false) == SqlNoSolution.get())
-            return false;
-
-        return true;
+        return isJoinable(left, right);
     }
 
 
@@ -183,27 +129,117 @@ public class SqlLeftJoin extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        SqlIntercode optLeft = left;
+        SqlIntercode optRight = right;
+        List<SqlExpressionIntercode> optConditions = conditions;
+        boolean optReduced = reduced & optConditions.stream().allMatch(r -> r.isDeterministic());
+
+
+        Restrictions cndRestrictions = new Restrictions(restrictions);
+
+        for(SqlExpressionIntercode condition : optConditions)
+            cndRestrictions.add(condition.getRequirements(Set.of(xsdBoolean)));
+
+        Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
+                cndRestrictions);
+        Restrictions rightRestrictions = getJoinRestrictions(optRight.getVariables(), optLeft.getVariables(),
+                cndRestrictions);
+
+
+        while(true)
+        {
+            optLeft = optLeft.optimize(request, leftRestrictions, optReduced, evalServices);
+            optRight = optRight.optimize(request, rightRestrictions, optReduced, evalServices);
+            optConditions = optimize(request, optConditions, optLeft.getVariables(), optRight.getVariables(),
+                    evalServices);
+
+            if(optRight instanceof SqlUnion union)
+            {
+                List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : union.getChilds())
+                    if(isJoinable(optLeft, child, optimize(request, optConditions, optLeft.getVariables(),
+                            child.getVariables(), evalServices)))
+                        unionList.add(child);
+
+                if(!unionList.equals(union.getChilds()))
+                {
+                    optRight = SqlUnion.union(request, unionList).optimize(request, restrictions, optReduced,
+                            evalServices);
+
+                    optConditions = optimize(request, optConditions, optLeft.getVariables(), optRight.getVariables(),
+                            evalServices);
+                }
+            }
+
+
+            boolean newOptReduced = optReduced & optConditions.stream().allMatch(r -> r.isDeterministic());
+
+            Restrictions newCndRestrictions = new Restrictions(restrictions);
+
+            for(SqlExpressionIntercode condition : optConditions)
+                newCndRestrictions.add(condition.getRequirements(Set.of(xsdBoolean)));
+
+            Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
+                    newCndRestrictions);
+            Restrictions newRightRestrictions = getJoinRestrictions(optRight.getVariables(), optLeft.getVariables(),
+                    newCndRestrictions);
+
+
+            if(newOptReduced == optReduced && newLeftRestrictions.equals(leftRestrictions)
+                    && newRightRestrictions.equals(rightRestrictions))
+                break;
+
+            optReduced = newOptReduced;
+            leftRestrictions = newLeftRestrictions;
+            rightRestrictions = newRightRestrictions;
+        }
+
+
+        if(optLeft == SqlNoSolution.get())
+            return SqlNoSolution.get();
+
+        if(optRight == SqlNoSolution.get() || optRight == SqlEmptySolution.get()
+                || !isJoinable(optLeft, optRight, optConditions))
+            return optLeft.optimize(request, restrictions, optReduced, evalServices);
+
+        //FIXME: valid only if it is ensured that optRight has at least one solution
+        //if(isJoinConditionAlwaysTrue(optLeft.variables, optRight.getVariables()) && optConditions.isEmpty())
+        //    return SqlJoin.join(request, optLeft, optRight).optimize(request, restrictions, optReduced, evalServices);
+
+        if(optLeft instanceof SqlUnion union)
+        {
+            List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+            {
+                List<SqlExpressionIntercode> cnds = optimize(request, optConditions, child.getVariables(),
+                        optRight.getVariables(), evalServices);
+
+                unionList.add(leftJoin(request, child, optRight, cnds, restrictions));
+            }
+
+            return SqlUnion.union(request, unionList).optimize(request, restrictions, optReduced, evalServices);
+        }
+
+        if(optLeft instanceof SqlTableAccess l && optRight instanceof SqlTableAccess r && optConditions.isEmpty())
+        {
+            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+
+            SqlIntercode merge = SqlTableAccess.tryReduceLeftJoin(schema, l, r, restrictions);
+
+            if(merge != null)
+                return merge;
+        }
+
+
+        if(optLeft == left && optRight == right && optConditions.equals(conditions)
+                && restrictions.isOptimized(variables))
             return this;
 
-        reduced = reduced & conditions.stream().allMatch(r -> r.isDeterministic());
-
-        HashSet<String> childRestrictions = new HashSet<String>();
-        childRestrictions.addAll(left.getVariables().getNames());
-        childRestrictions.retainAll(right.getVariables().getNames());
-        childRestrictions.addAll(restrictions);
-
-        for(SqlExpressionIntercode condition : conditions)
-            childRestrictions.addAll(condition.getReferencedVariables());
-
-        SqlIntercode optimizedLeft = left.optimize(request, childRestrictions, reduced, evalServices);
-        SqlIntercode optimizedRight = right.optimize(request, childRestrictions, reduced, evalServices);
-        List<SqlExpressionIntercode> optimizedConditions = optimize(request, conditions, optimizedLeft.getVariables(),
-                optimizedRight.getVariables(), evalServices);
-
-        return leftJoin(request, optimizedLeft, optimizedRight, optimizedConditions, restrictions, reduced);
+        return leftJoin(request, optLeft, optRight, optConditions, restrictions);
     }
 
 
@@ -247,8 +283,6 @@ public class SqlLeftJoin extends SqlIntercode
 
         String condition = generateJoinCondition(left.variables, right.getVariables(), leftTable, rightTable);
 
-        assert condition != null || !conditions.isEmpty();
-
         builder.append(" ON ");
 
         if(condition != null)
@@ -259,6 +293,27 @@ public class SqlLeftJoin extends SqlIntercode
 
         builder.append(conditions.stream().map(c -> c.translate(request)).collect(joining(" AND ")));
 
+        if(condition == null && conditions.isEmpty())
+            builder.append("true");
+
         return builder.toString();
+    }
+
+
+    public final SqlIntercode getLeft()
+    {
+        return left;
+    }
+
+
+    public final SqlIntercode getRight()
+    {
+        return right;
+    }
+
+
+    public final List<SqlExpressionIntercode> getConditions()
+    {
+        return conditions;
     }
 }

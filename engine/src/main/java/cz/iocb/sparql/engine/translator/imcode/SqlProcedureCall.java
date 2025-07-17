@@ -3,7 +3,6 @@ package cz.iocb.sparql.engine.translator.imcode;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +17,7 @@ import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ResultDefinition;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
@@ -51,10 +51,125 @@ public class SqlProcedureCall extends SqlIntercode
     }
 
 
+    public static SqlIntercode create(Request request, ProcedureDefinition procedure,
+            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child)
+    {
+        return create(request, procedure, parameters, results, child, null);
+    }
+
+
     protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
-            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Set<String> restrictions)
+            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Restrictions restrictions)
     {
+        UsedVariables callVariables = new UsedVariables();
+
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
+        {
+            ParameterDefinition definition = entry.getKey();
+            ResourceClass resClass = definition.getParameterClass();
+            SqlNodeValue node = entry.getValue();
+
+            if(node instanceof SqlVariable var)
+            {
+                String name = var.getName();
+                UsedVariable other = callVariables.get(var.getName());
+
+                if(other != null)
+                {
+                    Set<ResourceClass> otherClasses = other.getClasses();
+
+                    if(!otherClasses.contains(resClass) && !otherClasses.contains(resClass.getGeneralClass()))
+                    {
+                        if(otherClasses.stream().anyMatch(r -> resClass == r.getGeneralClass()))
+                        {
+                            Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+
+                            for(Entry<ResourceClass, List<Column>> e : other.getMappings().entrySet())
+                                if(e.getKey().getGeneralClass() != resClass)
+                                    mappings.put(e.getKey(), e.getValue());
+
+                            mappings.put(resClass, getColumns(child, name, resClass));
+
+                            callVariables.add(new UsedVariable(name, mappings, false));
+                        }
+                        else
+                        {
+                            Map<ResourceClass, List<Column>> mappings = new HashMap<>(other.getMappings());
+                            mappings.put(resClass, getColumns(child, name, resClass));
+
+                            callVariables.add(new UsedVariable(name, mappings, false));
+                        }
+                    }
+                }
+                else
+                {
+                    callVariables.add(new UsedVariable(name, resClass, getColumns(child, name, resClass), false));
+                }
+            }
+        }
+
+
+        for(Entry<ResultDefinition, String> entry : results.entrySet())
+        {
+            ResultDefinition definition = entry.getKey();
+            String node = entry.getValue();
+
+            Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+
+            for(Entry<ResourceClass, List<Column>> e : definition.getMappings().entrySet())
+                mappings.put(e.getKey(), getSqlResultColumns(e.getValue()));
+
+            callVariables.add(new UsedVariable(node, mappings, false));
+        }
+
+
+        Map<Column, Column> columnMap = new HashMap<Column, Column>();
+        UsedVariables variables = getJoinUsedVariables(request, callVariables, child.getVariables(), null, null, null,
+                columnMap).restrict(restrictions);
+
+        return new SqlProcedureCall(variables, procedure, parameters, results, child, columnMap);
+    }
+
+
+    @Override
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
+    {
+        LinkedHashMap<ResultDefinition, String> optResults = new LinkedHashMap<>();
+
+        for(Entry<ResultDefinition, String> result : results.entrySet())
+            if(restrictions.contains(result.getValue(), result.getKey().getMappings().keySet()))
+                optResults.put(result.getKey(), result.getValue());
+
+
+        Restrictions childRestrictions = new Restrictions(restrictions);
+
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
+            childRestrictions.add(entry.getValue().getRequirements(Set.of(entry.getKey().getParameterClass())));
+
+        //FIXME: is procedure deterministic?
+        SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+
+
+        if(optChild instanceof SqlUnion union)
+        {
+            List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+            for(SqlIntercode child : union.getChilds())
+                childs.add(create(request, procedure, parameters, optResults, child, restrictions));
+
+            return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
+        }
+
+        if(optChild != SqlEmptySolution.get() && parameters.values().stream()
+                .noneMatch(n -> n instanceof SqlVariable v && !v.getUsedVariable().isConstant()))
+        {
+            SqlIntercode call = create(request, procedure, parameters, optResults, SqlEmptySolution.get());
+            return SqlJoin.join(request, call, optChild).optimize(request, restrictions, reduced, evalServices);
+        }
+
+
         UsedVariables callVariables = new UsedVariables();
 
         for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
@@ -70,7 +185,6 @@ public class SqlProcedureCall extends SqlIntercode
 
                 if(variable != null)
                 {
-
                     ResourceClass other = variable.getResourceClass();
 
                     if(resClass != other && resClass.getGeneralClass() != other && resClass != other.getGeneralClass())
@@ -80,7 +194,7 @@ public class SqlProcedureCall extends SqlIntercode
                         resClass = other;
                 }
 
-                List<Column> columns = getColumns(child, name, resClass);
+                List<Column> columns = getColumns(optChild, name, resClass);
 
                 if(columns == null)
                     return SqlNoSolution.get();
@@ -95,14 +209,10 @@ public class SqlProcedureCall extends SqlIntercode
             }
         }
 
-
-        for(Entry<ResultDefinition, String> entry : results.entrySet())
+        for(Entry<ResultDefinition, String> entry : optResults.entrySet())
         {
             ResultDefinition definition = entry.getKey();
             String node = entry.getValue();
-
-            if(node == null)
-                return SqlNoSolution.get();
 
             Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
 
@@ -112,59 +222,19 @@ public class SqlProcedureCall extends SqlIntercode
             callVariables.add(new UsedVariable(node, mappings, false));
         }
 
-
-        SqlIntercode originalChild = null;
-
-        if(parameters.values().stream().noneMatch(n -> n instanceof SqlVariable) && child != SqlEmptySolution.get())
+        for(SqlIntercode r : getJoinList(optChild))
         {
-            originalChild = child;
-            child = SqlEmptySolution.get();
+            ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(callVariables, r.getVariables());
+
+            if(pairs.stream().anyMatch(p -> !p.isJoinable()))
+                return SqlNoSolution.get();
         }
 
 
-        Map<Column, Column> columnMap = new HashMap<Column, Column>();
-        UsedVariables variables = getJoinUsedVariables(request, callVariables, child.getVariables(), null, null, null,
-                columnMap).restrict(restrictions);
-
-        SqlProcedureCall call = new SqlProcedureCall(variables, procedure, parameters, results, child, columnMap);
-
-        if(originalChild == null)
-            return call;
-
-        return SqlJoin.join(request, call, originalChild);
-    }
-
-
-    public static SqlIntercode create(Request request, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
-            LinkedHashMap<ResultDefinition, String> results, SqlIntercode child)
-    {
-        return create(request, procedure, parameters, results, child, null);
-    }
-
-
-    @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
-    {
-        if(restrictions == null)
+        if(optResults.equals(results) && optChild == child && restrictions.isOptimized(variables))
             return this;
 
-        LinkedHashMap<ResultDefinition, String> restrictedResults = new LinkedHashMap<>();
-
-        for(Entry<ResultDefinition, String> result : results.entrySet())
-            if(restrictions.contains(result.getValue()))
-                restrictedResults.put(result.getKey(), result.getValue());
-
-
-        HashSet<String> childRestrictions = new HashSet<String>(restrictions);
-
-        for(SqlNodeValue paramater : parameters.values())
-            childRestrictions.addAll(paramater.getReferencedVariables());
-
-        //FIXME: is procedure deterministic?
-        SqlIntercode optimized = child.optimize(request, childRestrictions, reduced, evalServices);
-
-        return create(request, procedure, parameters, restrictedResults, optimized, restrictions);
+        return create(request, procedure, parameters, optResults, optChild, restrictions);
     }
 
 
@@ -222,7 +292,8 @@ public class SqlProcedureCall extends SqlIntercode
         builder.append(resultName);
         builder.append('"');
 
-        for(Column column : child.getVariables().restrict(this.getVariables().getNames()).getNonConstantColumns())
+        for(Column column : child.getVariables().restrict(new Restrictions(this.getVariables().getNames()))
+                .getNonConstantColumns())
         {
             builder.append(", ");
             builder.append(column);
@@ -242,12 +313,7 @@ public class SqlProcedureCall extends SqlIntercode
         UsedVariable variable = child.getVariables().get(name);
 
         if(variable == null)
-            return null;
-
-        Set<ResourceClass> classes = variable.getCompatibleClasses(resClass);
-
-        if(classes.isEmpty())
-            return null;
+            return resClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
 
         return variable.toResource(resClass);
     }

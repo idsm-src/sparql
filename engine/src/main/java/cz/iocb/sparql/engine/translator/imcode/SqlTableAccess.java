@@ -50,25 +50,19 @@ public class SqlTableAccess extends SqlIntercode
 
     public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal, boolean reduced)
     {
-        if(conditions.isFalse())
-            return SqlNoSolution.get();
-
         return new SqlTableAccess(table, conditions, internal, reduced);
     }
 
 
     public static SqlIntercode create(Table table, Conditions conditions, UsedVariables internal)
     {
-        if(conditions.isFalse())
-            return SqlNoSolution.get();
-
-        return new SqlTableAccess(table, conditions, internal, false);
+        return create(table, conditions, internal, false);
     }
 
 
     public static SqlIntercode create(Table table, UsedVariables internal)
     {
-        return new SqlTableAccess(table, new Conditions(true), internal, false);
+        return create(table, new Conditions(true), internal, false);
     }
 
 
@@ -133,6 +127,9 @@ public class SqlTableAccess extends SqlIntercode
     private static List<Column> selectColumns(Map<Column, Column> set, Map<Column, Column> expressions,
             List<Column> columns)
     {
+        if(columns == null)
+            return null;
+
         ArrayList<Column> optimized = new ArrayList<Column>(columns.size());
 
         for(Column column : columns)
@@ -498,18 +495,15 @@ public class SqlTableAccess extends SqlIntercode
     }
 
 
-    private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Set<String> restrictions)
+    private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Restrictions restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariables()));
 
-        if(conditions.isFalse())
-            return SqlNoSolution.get();
-
-        return new SqlTableAccess(left.table, conditions, left.internal.restrict(restrictions), left.reduced);
+        return create(left.table, conditions, left.internal.restrict(restrictions), left.reduced);
     }
 
 
-    static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Set<String> restrictions)
+    static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions)
     {
         Condition joinCondition = new Condition();
         UsedVariables variables = new UsedVariables();
@@ -519,8 +513,7 @@ public class SqlTableAccess extends SqlIntercode
             UsedVariable leftVar = pair.getLeftVariable();
             UsedVariable rightVar = pair.getRightVariable();
 
-            if(restrictions == null || restrictions.contains(pair.getName()))
-                variables.add(leftVar != null ? leftVar : rightVar);
+            variables.add(leftVar != null ? leftVar : rightVar);
 
             if(leftVar != null && rightVar != null && !leftVar.canBeNull() && !rightVar.canBeNull())
             {
@@ -534,6 +527,8 @@ public class SqlTableAccess extends SqlIntercode
             }
         }
 
+        variables = variables.restrict(restrictions);
+
         Conditions conditions = Conditions.and(left.conditions, right.conditions);
         conditions = Conditions.and(conditions, joinCondition);
 
@@ -545,7 +540,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, Set<ColumnPair> key,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
         Map<Column, Column> map = new HashMap<Column, Column>();
 
@@ -562,8 +557,7 @@ public class SqlTableAccess extends SqlIntercode
             UsedVariable childVar = pair.getLeftVariable();
             UsedVariable parentVar = pair.getRightVariable();
 
-            if(restrictions == null || restrictions.contains(pair.getName()))
-                variables.add(childVar != null ? childVar : remap(map, parentVar));
+            variables.add(childVar != null ? childVar : remap(map, parentVar));
 
             if(childVar != null && parentVar != null && !childVar.canBeNull() && !parentVar.canBeNull())
             {
@@ -577,6 +571,8 @@ public class SqlTableAccess extends SqlIntercode
             }
         }
 
+        variables = variables.restrict(restrictions);
+
         Conditions conditions = Conditions.and(child.conditions, remap(map, parent.conditions));
         conditions = Conditions.and(conditions, joinCondition);
 
@@ -588,7 +584,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     private static SqlTableAccess leftJoinByPrimaryKey(SqlTableAccess left, SqlTableAccess right,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
         Set<Column> extraNotNulls = new HashSet<Column>(right.conditions.getIsNotNull());
         extraNotNulls.removeAll(left.conditions.getIsNotNull());
@@ -602,38 +598,37 @@ public class SqlTableAccess extends SqlIntercode
             UsedVariable leftVar = pair.getLeftVariable();
             UsedVariable rightVar = pair.getRightVariable();
 
-            if(restrictions == null || restrictions.contains(pair.getName()))
+            if(leftVar != null)
             {
-                if(leftVar != null)
-                {
-                    variables.add(leftVar);
-                }
-                else if(variables.get(pair.getName()) == null)
-                {
-                    ResourceClass resClass = rightVar.getResourceClass();
-                    List<Column> columns = rightVar.getMapping(resClass);
+                variables.add(leftVar);
+            }
+            else if(variables.get(pair.getName()) == null)
+            {
+                ResourceClass resClass = rightVar.getResourceClass();
+                List<Column> columns = rightVar.getMapping(resClass);
 
-                    if(extraCondition != null)
+                if(extraCondition != null)
+                {
+                    List<Column> modified = new ArrayList<Column>(columns.size());
+
+                    for(Column col : columns)
                     {
-                        List<Column> modified = new ArrayList<Column>(columns.size());
-
-                        for(Column col : columns)
-                        {
-                            if(col == extraCondition)
-                                modified.add(col);
-                            else
-                                modified.add(new ExpressionColumn(
-                                        "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END"));
-                        }
-
-                        modified = columns;
+                        if(col == extraCondition)
+                            modified.add(col);
+                        else
+                            modified.add(new ExpressionColumn(
+                                    "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END"));
                     }
 
-                    boolean canBeNull = rightVar.canBeNull() || extraCondition != null;
-                    variables.add(new UsedVariable(pair.getName(), resClass, columns, canBeNull));
+                    modified = columns;
                 }
+
+                boolean canBeNull = rightVar.canBeNull() || extraCondition != null;
+                variables.add(new UsedVariable(pair.getName(), resClass, columns, canBeNull));
             }
         }
+
+        variables = variables.restrict(restrictions);
 
         return new SqlTableAccess(left.table, conditions, variables, left.reduced && right.reduced);
     }
@@ -688,7 +683,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     public static SqlIntercode tryReduceJoinWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right,
-            HashSet<String> mergeRestrictions)
+            Restrictions mergeRestrictions)
     {
         if(SqlTableAccess.canBeJoinedWithValues(schema, left, right))
             return joinWithValues(left, right, mergeRestrictions);
@@ -698,7 +693,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     public static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
         Set<ColumnPair> dropLeft = SqlTableAccess.canBeJoinedByForeignKey(schema, left, right);
 
@@ -720,7 +715,7 @@ public class SqlTableAccess extends SqlIntercode
 
 
     public static SqlIntercode tryReduceLeftJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
-            Set<String> restrictions)
+            Restrictions restrictions)
     {
         if(SqlTableAccess.canBeLeftJoinedByPrimaryKey(schema, left, right))
             return SqlTableAccess.leftJoinByPrimaryKey(left, right, restrictions);
@@ -773,6 +768,9 @@ public class SqlTableAccess extends SqlIntercode
 
     protected static List<Column> remap(Map<Column, Column> map, List<Column> columns)
     {
+        if(columns == null)
+            return null;
+
         List<Column> result = new ArrayList<Column>();
 
         for(Column column : columns)
@@ -841,12 +839,17 @@ public class SqlTableAccess extends SqlIntercode
 
 
     @Override
-    public SqlIntercode optimize(Request request, Set<String> restrictions, boolean reduced, boolean evalServices)
+    public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        if(restrictions == null)
+        if(conditions.isFalse())
+            return SqlNoSolution.get();
+
+        UsedVariables optimizedVariables = internal.restrict(restrictions);
+
+        if(optimizedVariables.equals(internal))
             return this;
 
-        return new SqlTableAccess(table, conditions, internal.restrict(restrictions), reduced);
+        return create(table, conditions, optimizedVariables, reduced);
     }
 
 
@@ -864,9 +867,12 @@ public class SqlTableAccess extends SqlIntercode
                 List<Column> vCols = var.getMapping(resClass);
                 List<Column> iCols = inner.getMapping(resClass);
 
-                for(int i = 0; i < iCols.size(); i++)
-                    if(iCols.get(i) instanceof ExpressionColumn)
-                        rev.put(vCols.get(i), iCols.get(i));
+                if(iCols != null)
+                {
+                    for(int i = 0; i < iCols.size(); i++)
+                        if(iCols.get(i) instanceof ExpressionColumn)
+                            rev.put(vCols.get(i), iCols.get(i));
+                }
             }
         }
 
@@ -875,7 +881,8 @@ public class SqlTableAccess extends SqlIntercode
 
         for(UsedVariable var : variables.getValues())
             for(List<Column> columns : var.getMappings().values())
-                canBeLimited &= columns.stream().allMatch(column -> column instanceof ConstantColumn);
+                canBeLimited &= columns == null
+                        || columns.stream().allMatch(column -> column instanceof ConstantColumn);
 
 
         StringBuilder builder = new StringBuilder();
