@@ -228,7 +228,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
         if(data.isEmpty())
-            data.put(new TableColumn("__"), new ArrayList<Column>(batchCount));
+            data.put(new TableColumn("__"), new ArrayList<Column>(Collections.nCopies(batchCount, null)));
 
         String insert = "insert into " + table
                 + data.keySet().stream().map(c -> c.toString()).collect(joining(", ", "(", ") values "))
