@@ -35,8 +35,6 @@ public class StoredResultHandler extends ResultHandler
     private static int batchSize = 1000;
     private static int minTableSize = 1000; // has to be less than or equal to batchSize
 
-    private final Request request;
-    private final Restrictions restrictions;
     private final List<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
 
     private Table table;
@@ -53,8 +51,8 @@ public class StoredResultHandler extends ResultHandler
 
     public StoredResultHandler(Request request, Restrictions restrictions)
     {
-        this.request = request;
-        this.restrictions = restrictions;
+        super(request, restrictions);
+
         columns.put(new TableColumn("__"), "int");
     }
 
@@ -64,6 +62,9 @@ public class StoredResultHandler extends ResultHandler
     {
         for(Entry<String, Node> entry : row.entrySet())
         {
+            if(!restrictions.containsVar(entry.getKey()))
+                continue;
+
             counts.merge(entry.getKey(), 1, Integer::sum);
 
             UsedVariable variable = variables.get(entry.getKey());
@@ -75,6 +76,10 @@ public class StoredResultHandler extends ResultHandler
             }
 
             ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
+
+            if(!restrictions.contains(entry.getKey(), resClass))
+                continue;
+
             List<Column> vals = getColumns(request, resClass, entry.getValue());
             List<Column> cols = variable.getMapping(resClass);
             List<String> types = resClass.getSqlTypes();

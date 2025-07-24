@@ -198,6 +198,13 @@ public abstract class SqlIntercode extends SqlBaseClass
         {
             return variables.restrict(this).equals(variables);
         }
+
+        public Set<ResourceClass> get(String key)
+        {
+            Set<ResourceClass> restriction = map.get(key);
+
+            return restriction == all ? null : restriction;
+        }
     }
 
 

@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
@@ -19,13 +20,35 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.request.IriCache;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
 public abstract class ResultHandler implements AutoCloseable
 {
-    final private IriCache iriCache = new IriCache(10000);
-    final private HashMap<String, List<UserIriClass>> typeIriClassesMap = new HashMap<String, List<UserIriClass>>();
+    protected final Request request;
+    protected final Restrictions restrictions;
+
+    private final IriCache iriCache = new IriCache(10000);
+    private final HashMap<String, List<UserIriClass>> typeIriClassesMap = new HashMap<String, List<UserIriClass>>();
+
+
+    protected ResultHandler(Request request, Restrictions restrictions)
+    {
+        this.request = request;
+        this.restrictions = restrictions;
+
+        for(String var : restrictions.getNames())
+        {
+            Set<ResourceClass> restriction = restrictions.get(var);
+
+            if(restriction == null || restriction.contains(unsupportedIri))
+                typeIriClassesMap.put(var, new LinkedList<UserIriClass>(request.getConfiguration().getIriClasses()));
+            else
+                typeIriClassesMap.put(var, new LinkedList<UserIriClass>(restriction.stream()
+                        .filter(c -> c instanceof UserIriClass).map(c -> (UserIriClass) c).toList()));
+        }
+    }
 
 
     protected final ResourceClass getResourceClass(Request request, Node value, String variable)
@@ -47,8 +70,7 @@ public abstract class ResultHandler implements AutoCloseable
         if(iriClass != null)
             return iriClass;
 
-        List<UserIriClass> iriClasses = typeIriClassesMap.computeIfAbsent(variable,
-                k -> new LinkedList<UserIriClass>(request.getConfiguration().getIriClasses()));
+        List<UserIriClass> iriClasses = typeIriClassesMap.get(variable);
 
         Iterator<UserIriClass> it = iriClasses.iterator();
 
