@@ -624,4 +624,11 @@ public class SqlConstruct extends SqlIntercode
 
         return conditions;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

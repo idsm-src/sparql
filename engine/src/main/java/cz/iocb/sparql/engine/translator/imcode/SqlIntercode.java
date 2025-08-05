@@ -226,6 +226,9 @@ public abstract class SqlIntercode extends SqlBaseClass
     public abstract String translate(Request request);
 
 
+    public abstract boolean hasServiceSubpattern();
+
+
     public final UsedVariables getVariables()
     {
         return variables;

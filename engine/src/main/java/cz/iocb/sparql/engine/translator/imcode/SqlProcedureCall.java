@@ -342,4 +342,11 @@ public class SqlProcedureCall extends SqlIntercode
 
         return result;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

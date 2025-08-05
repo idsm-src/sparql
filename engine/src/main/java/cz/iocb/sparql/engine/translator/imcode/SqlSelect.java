@@ -816,4 +816,11 @@ public class SqlSelect extends SqlIntercode
     {
         return description;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

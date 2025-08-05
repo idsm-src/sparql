@@ -341,4 +341,11 @@ public class SqlDistinct extends SqlIntercode
     {
         return selected.containsAll(distinctVariables);
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

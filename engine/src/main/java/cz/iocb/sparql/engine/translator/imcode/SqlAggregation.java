@@ -467,4 +467,11 @@ public class SqlAggregation extends SqlIntercode
 
         return builder.toString();
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

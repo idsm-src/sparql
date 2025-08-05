@@ -996,4 +996,11 @@ public class SqlTableAccess extends SqlIntercode
     {
         return internal.get(varName);
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return false;
+    }
 }

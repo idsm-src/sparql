@@ -140,4 +140,11 @@ public class SqlStripConstantColumns extends SqlIntercode
     {
         return child.isDistinct(request, selected);
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

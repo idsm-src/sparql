@@ -316,4 +316,11 @@ public class SqlLeftJoin extends SqlIntercode
     {
         return conditions;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+    }
 }

@@ -244,4 +244,11 @@ public class SqlMinus extends SqlIntercode
     {
         return right;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+    }
 }

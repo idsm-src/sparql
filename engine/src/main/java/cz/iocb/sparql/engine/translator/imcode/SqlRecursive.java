@@ -360,4 +360,11 @@ public class SqlRecursive extends SqlIntercode
 
         return endVar;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return init.hasServiceSubpattern() || next.hasServiceSubpattern();
+    }
 }

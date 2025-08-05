@@ -278,4 +278,11 @@ public class SqlUnion extends SqlIntercode
 
         return builder.toString();
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
+    }
 }

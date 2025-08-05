@@ -42,4 +42,11 @@ public class SqlEmptySolution extends SqlIntercode
     {
         return true;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return false;
+    }
 }

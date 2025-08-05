@@ -513,4 +513,11 @@ public class SqlServiceStub extends SqlIntercode
             throw new SQLRuntimeException(e);
         }
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return true;
+    }
 }

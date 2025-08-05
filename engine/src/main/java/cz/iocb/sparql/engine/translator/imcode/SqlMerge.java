@@ -188,4 +188,11 @@ public class SqlMerge extends SqlIntercode
 
         return restrictions;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

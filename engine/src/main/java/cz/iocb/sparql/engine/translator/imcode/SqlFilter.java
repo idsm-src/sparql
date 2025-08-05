@@ -178,4 +178,11 @@ public class SqlFilter extends SqlIntercode
     {
         return conditions;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return child.hasServiceSubpattern();
+    }
 }

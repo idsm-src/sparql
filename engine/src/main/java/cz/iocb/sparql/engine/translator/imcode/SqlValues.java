@@ -164,4 +164,11 @@ public class SqlValues extends SqlIntercode
     {
         return size;
     }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return false;
+    }
 }

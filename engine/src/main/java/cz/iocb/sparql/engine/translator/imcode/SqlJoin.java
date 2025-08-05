@@ -2,7 +2,9 @@ package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -65,26 +67,82 @@ public class SqlJoin extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
-        List<SqlIntercode> optChilds = childs;
+        List<SqlIntercode> list = optimize(request, childs, restrictions, reduced, evalServices);
+
+        Deque<List<SqlIntercode>> stack = new ArrayDeque<List<SqlIntercode>>();
+
+        stack.push(list);
+
+        List<SqlIntercode> servicesChilds = new ArrayList<SqlIntercode>();
+        List<SqlIntercode> optChilds = new ArrayList<SqlIntercode>();
+
+        while(!stack.isEmpty())
+        {
+            for(SqlIntercode c : stack.pop())
+            {
+                if(c instanceof SqlJoin join)
+                    stack.push(join.getChilds());
+                else if(c.hasServiceSubpattern())
+                    servicesChilds.add(c);
+                else
+                    optChilds.add(c);
+            }
+        }
+
+
+        Restrictions partRestrictions = new Restrictions(restrictions);
+
+        for(SqlIntercode s : servicesChilds)
+            for(UsedVariable v : s.getVariables().getValues())
+                partRestrictions.add(v.getName(), v.getClasses());
+
 
         if(optChilds.stream().anyMatch(c -> c instanceof SqlUnion || c instanceof SqlJoin))
-            return SqlUnion
-                    .union(request, expandJoin(optChilds).stream().map(l -> join(request, l, restrictions)).toList())
-                    .optimize(request, restrictions, reduced, evalServices);
+        {
+            SqlIntercode union = SqlUnion
+                    .union(request,
+                            expandJoin(optChilds).stream().map(l -> join(request, l, partRestrictions)).toList())
+                    .optimize(request, partRestrictions, reduced, evalServices);
+
+            if(servicesChilds.isEmpty())
+                return union;
+
+            List<SqlIntercode> join = new ArrayList<SqlIntercode>(servicesChilds);
+            join.add(union);
+
+            if(!isJoinable(join))
+                return SqlNoSolution.get();
+
+            return join(request, join, restrictions);
+        }
 
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         while(true)
         {
             List<SqlIntercode> newOptChilds = reduceDistinctUnion(
-                    reduceJoin(optimize(request, optChilds, restrictions, reduced, evalServices), restrictions, schema),
-                    restrictions, schema);
+                    reduceJoin(optimize(request, optChilds, partRestrictions, reduced, evalServices), partRestrictions,
+                            schema),
+                    partRestrictions, schema);
 
             if(optChilds.stream().anyMatch(c -> c instanceof SqlUnion || c instanceof SqlJoin))
-                return SqlUnion
+            {
+                SqlIntercode union = SqlUnion
                         .union(request,
-                                expandJoin(optChilds).stream().map(l -> join(request, l, restrictions)).toList())
-                        .optimize(request, restrictions, reduced, evalServices);
+                                expandJoin(optChilds).stream().map(l -> join(request, l, partRestrictions)).toList())
+                        .optimize(request, partRestrictions, reduced, evalServices);
+
+                if(servicesChilds.isEmpty())
+                    return union;
+
+                List<SqlIntercode> join = new ArrayList<SqlIntercode>(servicesChilds);
+                join.add(union);
+
+                if(!isJoinable(join))
+                    return SqlNoSolution.get();
+
+                return join(request, join, restrictions);
+            }
 
             if(newOptChilds.equals(optChilds))
                 break;
@@ -92,20 +150,23 @@ public class SqlJoin extends SqlIntercode
             optChilds = newOptChilds;
         }
 
-        if(optChilds.size() == 0)
+        List<SqlIntercode> fullChilds = new ArrayList<SqlIntercode>(servicesChilds);
+        fullChilds.addAll(optChilds);
+
+        if(fullChilds.size() == 0)
             return SqlEmptySolution.get();
 
-        if(optChilds.size() == 1)
-            return optChilds.get(0);
+        if(fullChilds.size() == 1)
+            return fullChilds.get(0);
 
-        if(!isJoinable(optChilds))
+        if(!isJoinable(fullChilds))
             return SqlNoSolution.get();
 
 
-        if(optChilds.equals(childs) && restrictions.isOptimized(variables))
+        if(fullChilds.equals(childs) && restrictions.isOptimized(variables))
             return this;
 
-        return join(request, optChilds, restrictions);
+        return join(request, fullChilds, restrictions);
     }
 
 
@@ -571,5 +632,12 @@ public class SqlJoin extends SqlIntercode
     public final List<SqlIntercode> getChilds()
     {
         return childs;
+    }
+
+
+    @Override
+    public boolean hasServiceSubpattern()
+    {
+        return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
     }
 }
