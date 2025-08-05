@@ -135,7 +135,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(resourceClass instanceof IriClass)
             return "iri";
 
-        return resourceClass.getName();
+        return resourceClass.getGeneralClass().getName();
     }
 
 
@@ -171,37 +171,93 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public static boolean isDateTime(ResourceClass resClass)
     {
-        return resClass == xsdDateTime || resClass instanceof DateTimeConstantZoneClass;
+        return resClass.getGeneralClass() == xsdDateTime;
     }
 
 
     public static boolean isDate(ResourceClass resClass)
     {
-        return resClass == xsdDate || resClass instanceof DateConstantZoneClass;
+        return resClass.getGeneralClass() == xsdDate;
     }
 
 
     public static boolean isLangString(ResourceClass resClass)
     {
-        return resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
+        return resClass.getGeneralClass() == rdfLangString;
     }
 
 
     public static boolean isStringLiteral(ResourceClass resClass)
     {
-        return resClass == xsdString || resClass == rdfLangString || resClass instanceof LangStringConstantTagClass;
+        ResourceClass genClass = resClass.getGeneralClass();
+
+        return genClass == xsdString || genClass == rdfLangString;
+    }
+
+
+    public static boolean isString(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdString;
+    }
+
+
+    public static boolean isDouble(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdDouble;
+    }
+
+
+    public static boolean isFloat(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdFloat;
+    }
+
+
+    public static boolean isDecimal(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdDecimal;
+    }
+
+
+    public static boolean isInteger(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdInteger;
+    }
+
+
+    public static boolean isLong(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdLong;
+    }
+
+
+    public static boolean isInt(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdInt;
+    }
+
+
+    public static boolean isShort(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdShort;
     }
 
 
     public static boolean isNumeric(ResourceClass resClass)
     {
-        return numericOrder.contains(resClass);
+        return numericOrder.contains(resClass.getGeneralClass());
     }
 
 
     public static boolean isFloatPoint(ResourceClass resClass)
     {
-        return resClass == xsdFloat || resClass == xsdDouble;
+        return resClass.getGeneralClass() == xsdFloat || resClass.getGeneralClass() == xsdDouble;
+    }
+
+
+    public static boolean isBoolean(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass() == xsdBoolean;
     }
 
 
@@ -213,13 +269,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(requestClass == null)
             return true;
 
-        return numericOrder.indexOf(resClass) <= numericOrder.indexOf(requestClass);
+        return numericOrder.indexOf(resClass.getGeneralClass()) <= numericOrder.indexOf(requestClass.getGeneralClass());
     }
 
 
     public static boolean isEffectiveBooleanClass(ResourceClass resClass)
     {
-        return isNumeric(resClass) || resClass == xsdBoolean || resClass == xsdString || resClass == unsupportedLiteral;
+        return isNumeric(resClass) || isBoolean(resClass) || isString(resClass) || resClass == unsupportedLiteral;
     }
 
 
@@ -368,13 +424,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(operand instanceof SqlVariable variable)
         {
             List<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
-                    .filter(r -> r == resourceClass
-                            || isNumeric(r) && isNumeric(resourceClass) && isNumericCompatibleWith(r, resourceClass)
-                            || isDateTime(r) && isDateTime(resourceClass) || isDate(r) && isDate(resourceClass)
-                            || isIri(r) && isIri(resourceClass) || isIntBlankNode(r) && isIntBlankNode(resourceClass)
-                            || isStrBlankNode(r) && isStrBlankNode(resourceClass))
+                    .filter(r -> r == resourceClass || r.getGeneralClass() == resourceClass
+                            || r == resourceClass.getGeneralClass()
+                            || isNumeric(r) && isNumeric(resourceClass) && isNumericCompatibleWith(r, resourceClass))
                     .toList();
-
 
             boolean hasAlternative = false;
 
@@ -405,12 +458,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 }
                 else
                 {
+                    List<Column> columns = variable.asResource(request, compatibleClass);
+                    String code = compatibleClass.getGeneralClass().toExpression(columns).toString();
+
                     builder.append("sparql.cast_as_");
                     builder.append(resourceClass.getName());
                     builder.append("_from_");
-                    builder.append(compatibleClass.getName());
+                    builder.append(compatibleClass.getGeneralClass().getName());
                     builder.append("(");
-                    builder.append(compatibleClass.toExpression(cols));
+                    builder.append(code);
                     builder.append(")");
                 }
             }
@@ -454,7 +510,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 builder.append("_from_");
                 builder.append(expressionClass.getName());
                 builder.append("(");
-                builder.append(operand.translate(request));
+                builder.append(expressionClass.toGeneralExpression(operand.translate(request)));
                 builder.append(")");
             }
         }
@@ -498,20 +554,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
 
         return builder.toString();
-    }
-
-
-    protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand,
-            ResourceClass resourceClass)
-    {
-        if(operand instanceof SqlVariable variable)
-            return variable.getExpressionValue(resourceClass).toString();
-        else if(!operand.isBoxed())
-            return operand.translate(request);
-        else if(resourceClass == xsdString)
-            return "sparql.rdfbox_get_string(" + operand.translate(request) + ")";
-        else
-            return "sparql.rdfbox_get_langstring_value(" + operand.translate(request) + ")";
     }
 
 

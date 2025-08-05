@@ -132,7 +132,7 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     {
         SqlExpressionIntercode operand = getOperand();
 
-        if(operand instanceof SqlVariable variable)
+        if(operand instanceof SqlNodeValue variable)
         {
             Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
                     .filter(r -> isEffectiveBooleanClass(r)).collect(toSet());
@@ -144,34 +144,26 @@ public class SqlEffectiveBooleanValue extends SqlUnary
             if(compatibleClasses.size() > 1)
                 builder.append("coalesce(");
 
-            for(ResourceClass resourceClass : variable.getResourceClasses())
+            for(ResourceClass resourceClass : compatibleClasses)
             {
-                if(!compatibleClasses.contains(resourceClass))
-                    continue;
-
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                Column column = variable.getExpressionValue(resourceClass);
+                List<Column> columns = variable.asResource(request, resourceClass.getGeneralClass());
+                Column column = resourceClass.getGeneralClass().toExpression(columns);
 
-                if(resourceClass == xsdString)
-                {
+                String sqlType = resourceClass.getGeneralClass().getSqlTypes().get(0);
+
+                if(isString(resourceClass))
                     builder.append("(octet_length(" + column + ") != 0)");
-                }
-                if(resourceClass == xsdFloat || resourceClass == xsdDouble)
-                {
-                    String sqlType = resourceClass.getSqlTypes().get(0);
+                if(isFloat(resourceClass) || isDouble(resourceClass))
                     builder.append("(" + column + " not in ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))");
-                }
-                else if(resourceClass != xsdBoolean)
-                {
-                    String sqlType = resourceClass.getSqlTypes().get(0);
+                else if(isNumeric(resourceClass))
                     builder.append("(" + column + " != '0'::" + sqlType + ")");
-                }
-                else
-                {
+                else if(isBoolean(resourceClass))
                     builder.append(column);
-                }
+                else
+                    throw new IllegalArgumentException();
             }
 
             if(compatibleClasses.size() > 1)
@@ -183,23 +175,35 @@ public class SqlEffectiveBooleanValue extends SqlUnary
         {
             return "sparql.ebv_rdfbox(" + operand.translate(request) + ")";
         }
-        else if(operand.getResourceClasses().contains(xsdString))
+        else if(operand.getResourceClasses().stream().allMatch(r -> isString(r)))
         {
-            return "(octet_length(" + operand.translate(request) + ") != 0)";
+            String code = operand.getExpressionResourceClass().toGeneralExpression(operand.translate(request));
+
+            return "(octet_length(" + code + ") != 0)";
         }
-        else if(operand.getResourceClasses().contains(xsdFloat) || operand.getResourceClasses().contains(xsdDouble))
+        else if(operand.getResourceClasses().stream().allMatch(r -> isFloat(r) || isDouble(r)))
         {
-            String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
-            return "(" + operand.translate(request) + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
+            ResourceClass resClass = operand.getExpressionResourceClass();
+            String sqlType = resClass.getGeneralClass().getSqlTypes().get(0);
+            String code = resClass.toGeneralExpression(operand.translate(request));
+
+            return "(" + code + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
         }
-        else if(!operand.getResourceClasses().contains(xsdBoolean))
+        else if(operand.getResourceClasses().stream().allMatch(r -> isNumeric(r)))
         {
-            String sqlType = operand.getExpressionResourceClass().getSqlTypes().get(0);
-            return "(" + operand.translate(request) + " != '0'::" + sqlType + ")";
+            ResourceClass resClass = operand.getExpressionResourceClass();
+            String sqlType = resClass.getGeneralClass().getSqlTypes().get(0);
+            String code = resClass.toGeneralExpression(operand.translate(request));
+
+            return "(" + code + " != '0'::" + sqlType + ")";
+        }
+        else if(operand.getResourceClasses().stream().allMatch(r -> isBoolean(r)))
+        {
+            return operand.getExpressionResourceClass().toGeneralExpression(operand.translate(request));
         }
         else
         {
-            return operand.translate(request);
+            throw new IllegalArgumentException();
         }
     }
 }

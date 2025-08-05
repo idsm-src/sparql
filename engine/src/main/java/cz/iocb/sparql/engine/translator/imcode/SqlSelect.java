@@ -1,14 +1,14 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDate;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDateTime;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isIri;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isString;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
@@ -605,9 +605,10 @@ public class SqlSelect extends SqlIntercode
                     hasVariants = true;
 
                     if(decimals.size() > 0 && decimals.size() != numerics.size())
-                        builder.append("sparql.rdfbox_create_from_").append(numeric.getName()).append("(");
+                        builder.append("sparql.rdfbox_create_from_").append(numeric.getGeneralClass().getName())
+                                .append("(");
 
-                    builder.append(variable.getMapping(numeric).get(0));
+                    builder.append(numeric.toGeneralClass(variable.getMapping(numeric), true).get(0));
 
                     if(decimals.size() > 0 && decimals.size() != numerics.size())
                         builder.append(")");
@@ -622,12 +623,28 @@ public class SqlSelect extends SqlIntercode
 
 
             // order xsd:booleans
-            if(variable.containsClass(xsdBoolean))
+            Set<ResourceClass> bools = classes.stream().filter(r -> isBoolean(r)).collect(toSet());
+
+            if(bools.size() > 0)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(variable.getMapping(xsdBoolean).get(0));
+                if(bools.size() > 1)
+                    builder.append("coalesce(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass bool : bools)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(bool.toGeneralClass(variable.getMapping(bool), true).get(0));
+                }
+
+                if(bools.size() > 1)
+                    builder.append(")");
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -635,12 +652,28 @@ public class SqlSelect extends SqlIntercode
 
 
             // order xsd:strings
-            if(variable.containsClass(xsdString))
+            Set<ResourceClass> strings = classes.stream().filter(r -> isString(r)).collect(toSet());
+
+            if(strings.size() > 0)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(variable.getMapping(xsdString).get(0));
+                if(strings.size() > 1)
+                    builder.append("coalesce(");
+
+                boolean hasVariants = false;
+
+                for(ResourceClass string : strings)
+                {
+                    appendComma(builder, hasVariants);
+                    hasVariants = true;
+
+                    builder.append(string.toGeneralClass(variable.getMapping(string), true).get(0));
+                }
+
+                if(strings.size() > 1)
+                    builder.append(")");
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");

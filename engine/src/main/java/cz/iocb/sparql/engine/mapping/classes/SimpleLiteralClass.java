@@ -13,6 +13,12 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 public class SimpleLiteralClass extends LiteralClass
 {
+    protected SimpleLiteralClass(String name, ResultTag resultTag, String sqlType, IRI sparqlTypeIri)
+    {
+        super(name, List.of(sqlType), List.of(resultTag), sparqlTypeIri);
+    }
+
+
     protected SimpleLiteralClass(ResultTag resultTag, String sqlType, IRI sparqlTypeIri)
     {
         super(resultTag.getTag(), List.of(sqlType), List.of(resultTag), sparqlTypeIri);

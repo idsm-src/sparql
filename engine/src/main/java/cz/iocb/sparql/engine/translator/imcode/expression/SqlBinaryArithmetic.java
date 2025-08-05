@@ -72,14 +72,16 @@ public class SqlBinaryArithmetic extends SqlBinary
     private static ResourceClass determineResultClass(Operator operator, ResourceClass leftClass,
             ResourceClass rightClass)
     {
-        if(leftClass == xsdDouble || rightClass == xsdDouble)
+        if(isDouble(leftClass) || isDouble(rightClass))
             return xsdDouble;
-        else if(leftClass == xsdFloat || rightClass == xsdFloat)
+        else if(isFloat(leftClass) || isFloat(rightClass))
             return xsdFloat;
-        else if(leftClass == xsdDecimal || rightClass == xsdDecimal || operator == Operator.Divide)
+        else if(isDecimal(leftClass) || isDecimal(rightClass) || operator == Operator.Divide)
             return xsdDecimal;
-        else
+        else if(isInteger(leftClass) || isInteger(rightClass))
             return xsdInteger;
+
+        throw new IllegalArgumentException();
     }
 
 

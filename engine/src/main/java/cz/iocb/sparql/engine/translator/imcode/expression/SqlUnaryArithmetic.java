@@ -47,8 +47,12 @@ public class SqlUnaryArithmetic extends SqlUnary
 
     private static ResourceClass determineResultClass(ResourceClass operandClass)
     {
-        if(operandClass == xsdDouble || operandClass == xsdFloat || operandClass == xsdDecimal)
-            return operandClass;
+        if(isDouble(operandClass))
+            return xsdDouble;
+        else if(isFloat(operandClass))
+            return xsdFloat;
+        else if(isDecimal(operandClass))
+            return xsdDecimal;
         else
             return xsdInteger;
     }

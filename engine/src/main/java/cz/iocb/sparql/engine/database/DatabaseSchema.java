@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
 
@@ -77,10 +78,10 @@ public class DatabaseSchema
     }
 
 
-    private final HashMap<Table, List<Column>> nullableColumns = new HashMap<Table, List<Column>>();
-    private final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
-    private final HashMap<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<Set<ColumnPair>>>();
-    private final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
+    protected final HashMap<Table, List<Column>> nullableColumns = new HashMap<Table, List<Column>>();
+    protected final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
+    protected final HashMap<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<Set<ColumnPair>>>();
+    protected final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
 
 
     public DatabaseSchema(DataSource connectionPool) throws SQLException
@@ -174,6 +175,22 @@ public class DatabaseSchema
                 }
             }
         }
+    }
+
+
+    public DatabaseSchema(DatabaseSchema other)
+    {
+        for(Entry<Table, List<Column>> e : other.nullableColumns.entrySet())
+            nullableColumns.put(e.getKey(), new ArrayList<Column>(e.getValue()));
+
+        for(Entry<Table, List<List<Column>>> e : other.primaryKeys.entrySet())
+            primaryKeys.put(e.getKey(), new ArrayList<List<Column>>(e.getValue()));
+
+        for(Entry<TablePair, List<Set<ColumnPair>>> e : other.foreignKeys.entrySet())
+            foreignKeys.put(e.getKey(), new ArrayList<Set<ColumnPair>>(e.getValue()));
+
+        for(Entry<TablePair, List<List<ColumnPair>>> e : other.unjoinableColumns.entrySet())
+            unjoinableColumns.put(e.getKey(), new ArrayList<List<ColumnPair>>(e.getValue()));
     }
 
 

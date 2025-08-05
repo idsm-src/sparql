@@ -106,8 +106,7 @@ public class SqlBinaryComparison extends SqlBinary
                     different.add(new Pair<>(leftClass, rightClass));
                 }
                 else if(leftClass == xsdBoolean && rightClass == xsdBoolean
-                        || leftClass == xsdString && rightClass == xsdString
-                        || isNumeric(leftClass) && isNumeric(rightClass)
+                        || isString(leftClass) && isString(rightClass) || isNumeric(leftClass) && isNumeric(rightClass)
                         || isDateTime(leftClass) && isDateTime(rightClass) || isDate(leftClass) && isDate(rightClass))
                 {
                     isAlwaysNull = false;
@@ -413,22 +412,29 @@ public class SqlBinaryComparison extends SqlBinary
                     builder.append(")");
                 }
             }
-            else if(leftClass == xsdBoolean || leftClass == xsdString || leftClass == xsdDayTimeDuration
+            else if(leftClass == xsdBoolean || isString(leftClass) || leftClass == xsdDayTimeDuration
                     || isNumeric(leftClass))
             {
-                String left = leftCols.get(0).toString();
-                String right = rightCols.get(0).toString();
+                ResourceClass leftGenClass = leftClass.getGeneralClass();
+                ResourceClass rightGenClass = rightClass.getGeneralClass();
+
+                List<Column> leftColumns = leftNode.asResource(request, leftGenClass);
+                String left = leftGenClass.toExpression(leftColumns).toString();
+
+                List<Column> rightColumns = rightNode.asResource(request, rightGenClass);
+                String right = rightGenClass.toExpression(rightColumns).toString();
 
                 ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
 
-                if(leftClass != cmpClass)
-                    left = "sparql.cast_as_" + cmpClass.getName() + "_from_" + leftClass.getName() + "(" + left + ")";
+                if(leftGenClass != cmpClass.getGeneralClass())
+                    left = "sparql.cast_as_" + cmpClass.getGeneralClass().getName() + "_from_" + leftGenClass.getName()
+                            + "(" + left + ")";
 
-                if(rightClass != cmpClass)
-                    right = "sparql.cast_as_" + cmpClass.getName() + "_from_" + rightClass.getName() + "(" + right
-                            + ")";
+                if(rightGenClass != cmpClass.getGeneralClass())
+                    right = "sparql.cast_as_" + cmpClass.getGeneralClass().getName() + "_from_"
+                            + rightGenClass.getName() + "(" + right + ")";
 
-                if(cmpClass != xsdFloat && cmpClass != xsdDouble)
+                if(!isFloat(cmpClass) && !isDouble(cmpClass))
                 {
                     builder.append("(" + left + " " + operator.getText() + " " + right + ")");
                 }
@@ -657,6 +663,9 @@ public class SqlBinaryComparison extends SqlBinary
         if(leftClass == rightClass)
             return leftClass;
 
+        if(isString(leftClass) && isString(rightClass))
+            return xsdString;
+
         if(isDateTime(leftClass) && isDateTime(rightClass))
             return xsdDateTime;
 
@@ -682,19 +691,19 @@ public class SqlBinaryComparison extends SqlBinary
 
         if(isNumeric(leftClass) && isNumeric(rightClass))
         {
-            if(leftClass == xsdDouble || rightClass == xsdDouble)
+            if(isDouble(leftClass) || isDouble(rightClass))
                 return xsdDouble;
-            else if(leftClass == xsdFloat || rightClass == xsdFloat)
+            else if(isFloat(leftClass) || isFloat(rightClass))
                 return xsdFloat;
-            else if(leftClass == xsdDecimal || rightClass == xsdDecimal)
+            else if(isDecimal(leftClass) || isDecimal(rightClass))
                 return xsdDecimal;
-            else if(leftClass == xsdInteger || rightClass == xsdInteger)
+            else if(isInteger(leftClass) || isInteger(rightClass))
                 return xsdInteger;
-            else if(leftClass == xsdLong || rightClass == xsdLong)
+            else if(isLong(leftClass) || isLong(rightClass))
                 return xsdLong;
-            else if(leftClass == xsdInt || rightClass == xsdInt)
+            else if(isInt(leftClass) || isInt(rightClass))
                 return xsdInt;
-            else if(leftClass == xsdShort || rightClass == xsdShort)
+            else if(isShort(leftClass) || isShort(rightClass))
                 return xsdShort;
         }
 

@@ -47,15 +47,8 @@ public class SqlCast extends SqlUnary
 
     public static SqlExpressionIntercode create(ResourceClass resourceClass, SqlExpressionIntercode operand)
     {
-        if(operand.getResourceClasses().size() == 1 && operand.getResourceClasses().contains(resourceClass))
+        if(operand.getResourceClasses().stream().allMatch(r -> r.getGeneralClass() == resourceClass))
             return operand;
-
-        if(resourceClass == xsdDateTime && operand.getResourceClasses().stream().allMatch(r -> isDateTime(r)))
-            return operand;
-
-        if(resourceClass == xsdDate && operand.getResourceClasses().stream().allMatch(r -> isDate(r)))
-            return operand;
-
 
         Set<ResourceClass> resultClasses = operand.getResourceClasses().stream()
                 .map(r -> resultCastClass(r, resourceClass)).filter(r -> r != null).collect(toSet());
@@ -94,7 +87,7 @@ public class SqlCast extends SqlUnary
     @Override
     public String translate(Request request)
     {
-        if(!(getOperand() instanceof SqlVariable))
+        if(!(getOperand() instanceof SqlNodeValue))
         {
             ResourceClass operandClass = getOperand().getExpressionResourceClass();
             StringBuilder builder = new StringBuilder();
@@ -165,6 +158,12 @@ public class SqlCast extends SqlUnary
             if(resClass == castClass)
             {
                 builder.append(variable.getExpressionValue(resClass));
+            }
+            else if(resClass.getGeneralClass() == castClass)
+            {
+                List<Column> columns = variable.asResource(request, resClass);//
+
+                builder.append(castClass.toExpression(resClass.toGeneralClass(columns, true)));
             }
 
             /* special casts from datetime */
@@ -298,9 +297,9 @@ public class SqlCast extends SqlUnary
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_");
-                builder.append(resClass.getName());
+                builder.append(resClass.getGeneralClass().getName());
                 builder.append("(");
-                builder.append(variable.getExpressionValue(resClass));
+                builder.append(resClass.getGeneralClass().toExpression(variable.asResource(request, resClass)));
                 builder.append(")");
             }
             else
@@ -324,13 +323,13 @@ public class SqlCast extends SqlUnary
         if(isIri(from) && to == xsdString)
             return xsdString;
 
-        if(!(from instanceof LiteralClass) && !isDateTime(from) && !isDate(from))
+        if(!(from instanceof LiteralClass))
             return null;
 
         if(from == to)
             return to;
 
-        if(from == xsdString || to == xsdString)
+        if(isString(from) || to == xsdString)
             return to;
 
         if(from == xsdDayTimeDuration || to == xsdDayTimeDuration)
