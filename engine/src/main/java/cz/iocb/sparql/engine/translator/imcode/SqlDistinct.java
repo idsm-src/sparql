@@ -69,6 +69,12 @@ public class SqlDistinct extends SqlIntercode
 
         if(optChild instanceof SqlUnion union)
         {
+            DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+            optChild = reduceDistinctUnion(request, union, schema);
+        }
+
+        if(optChild instanceof SqlUnion union)
+        {
             List<SqlIntercode> segs = expandUnionByResourceClasses(request, union, distinctVariables);
 
             if(segs.size() > 1)
@@ -79,12 +85,6 @@ public class SqlDistinct extends SqlIntercode
                     childs.add(create(request, child, distinctVariables, restrictions));
 
                 return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
-            }
-            else if(segs.size() == 1)
-            {
-                //FIXME: find better condition
-                if(!(segs.get(0) instanceof SqlUnion u) || !compareChilds(u.getChilds(), union.getChilds()))
-                    optChild = segs.get(0);
             }
         }
 
@@ -120,19 +120,6 @@ public class SqlDistinct extends SqlIntercode
             return this;
 
         return create(request, optChild, distinctVariables, restrictions);
-    }
-
-
-    private static boolean compareChilds(List<SqlIntercode> list1, List<SqlIntercode> list2)
-    {
-        if(list1.size() != list2.size())
-            return false;
-
-        //FIXME: use better approach
-        HashSet<SqlIntercode> copy1 = new HashSet<SqlIntercode>(list1);
-        HashSet<SqlIntercode> copy2 = new HashSet<SqlIntercode>(list2);
-
-        return copy1.equals(copy2);
     }
 
 
@@ -183,7 +170,6 @@ public class SqlDistinct extends SqlIntercode
 
         if(!hashColumns.isEmpty() && !groupColumns.isEmpty())
             builder.append(", ");
-
 
         if(!groupColumns.isEmpty())
             builder.append(groupColumns.stream().map(Object::toString).collect(joining(", ")));
@@ -255,13 +241,11 @@ public class SqlDistinct extends SqlIntercode
             sorts.add(new Pair<List<Set<ResourceClass>>, List<SqlIntercode>>(newKey, newValue));
         }
 
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
         List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 
         for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
         {
-            SqlIntercode item = SqlUnion.union(request, reduceDistinctUnion(s.getValue(), schema));
+            SqlIntercode item = SqlUnion.union(request, s.getValue());
 
             if(item instanceof SqlUnion subUnion)
                 list.addAll(expandUnionByConstantColumns(request, subUnion, distinctVariables));
@@ -276,8 +260,6 @@ public class SqlDistinct extends SqlIntercode
     private static List<SqlIntercode> expandUnionByConstantColumns(Request request, SqlUnion union,
             Set<String> distinctVariables)
     {
-        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
-
         Map<SqlIntercode, List<Column>> values = new HashMap<SqlIntercode, List<Column>>();
 
         for(SqlIntercode child : union.getChilds())
@@ -313,15 +295,15 @@ public class SqlDistinct extends SqlIntercode
         List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 
         for(List<SqlIntercode> l : rev.values())
-            list.add(SqlUnion.union(request, reduceDistinctUnion(l, schema)));
+            list.add(SqlUnion.union(request, l));
 
         return list;
     }
 
 
-    private static List<SqlIntercode> reduceDistinctUnion(List<SqlIntercode> childs, DatabaseSchema schema)
+    private static SqlIntercode reduceDistinctUnion(Request request, SqlUnion union, DatabaseSchema schema)
     {
-        ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
+        ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(union.getChilds());
 
         for(int i = 0; i < optChilds.size(); i++)
         {
@@ -345,7 +327,10 @@ public class SqlDistinct extends SqlIntercode
             }
         }
 
-        return optChilds;
+        if(optChilds.size() == union.getChilds().size())
+            return union;
+
+        return SqlUnion.union(request, optChilds);
     }
 
 

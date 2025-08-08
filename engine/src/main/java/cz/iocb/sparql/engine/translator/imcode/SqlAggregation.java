@@ -134,35 +134,25 @@ public class SqlAggregation extends SqlIntercode
             childRestrictions = newChildRestrictions;
         }
 
-
-        /* expand union if its child are grouped by constants  */
-        if(optChild instanceof SqlUnion union && !optChild.hasConstantVariables(groupVariables)
-                && union.getChilds().stream().allMatch(c -> c.hasConstantVariables(groupVariables)))
+        /* expand union if its child are grouped by disjoint values */
+        if(optChild instanceof SqlUnion union && !optChild.hasConstantVariables(groupVariables))
         {
-            Map<List<Map<ResourceClass, List<Column>>>, List<SqlIntercode>> parts = new HashMap<>();
+            List<SqlIntercode> segs = SqlDistinct.expandUnionByResourceClasses(request, union, groupVariables);
 
-            for(SqlIntercode child : union.getChilds())
+            if(segs.size() > 1)
             {
-                List<Map<ResourceClass, List<Column>>> key = groupVariables.stream()
-                        .map(v -> child.getVariable(v) == null ? null : child.getMappings(v)).toList();
-                parts.computeIfAbsent(key, (k) -> new ArrayList<SqlIntercode>()).add(child);
+                List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
+
+                for(SqlIntercode child : segs)
+                {
+                    Map<String, SqlExpressionIntercode> aggregations = optimizeAggregations(request, optAggregations,
+                            child, evalServices);
+                    childs.add(aggregate(request, groupVariables, aggregations, child));
+                }
+
+                return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
             }
-
-            List<SqlIntercode> result = new ArrayList<SqlIntercode>();
-
-            for(List<SqlIntercode> part : parts.values())
-            {
-                SqlIntercode child = SqlUnion.union(request, part);
-
-                Map<String, SqlExpressionIntercode> aggregations = optimizeAggregations(request, optAggregations, child,
-                        evalServices);
-
-                result.add(aggregate(request, groupVariables, aggregations, child));
-            }
-
-            return SqlUnion.union(request, result).optimize(request, restrictions, reduced, evalServices);
         }
-
 
         /* expand count(*) to not compute same union branches twice */
         if(optChild instanceof SqlUnion union && optChild.hasConstantVariables(groupVariables)
