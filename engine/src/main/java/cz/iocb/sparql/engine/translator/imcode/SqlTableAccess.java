@@ -202,13 +202,16 @@ public class SqlTableAccess extends SqlIntercode
             if(tableVariable == null)
                 return false;
 
+            //TODO: support resource class generalization
+            if(tableVariable.getMapping(variable.getResourceClass()) == null)
+                return false;
+
             if(tableVariable.canBeNull() /*&& right.getSize() > 1*/)
                 return false;
         }
 
         return true;
     }
-
 
 
     static Set<Column> getJoinColumns(SqlTableAccess left, SqlTableAccess right)

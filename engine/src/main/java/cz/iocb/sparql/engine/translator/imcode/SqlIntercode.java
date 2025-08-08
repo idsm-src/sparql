@@ -411,15 +411,23 @@ public abstract class SqlIntercode extends SqlBaseClass
         for(int i = 0; i < output.size(); i++)
         {
             Column access = input.get(i);
-            Column column = map.get(access);
 
-            if(column == null)
+            if(access instanceof ConstantColumn)
             {
-                column = output.get(i);
-                map.put(access, column);
+                mapping.add(access);
             }
+            else
+            {
+                Column column = map.get(access);
 
-            mapping.add(column);
+                if(column == null)
+                {
+                    column = output.get(i);
+                    map.put(access, column);
+                }
+
+                mapping.add(column);
+            }
         }
 
         return mapping;

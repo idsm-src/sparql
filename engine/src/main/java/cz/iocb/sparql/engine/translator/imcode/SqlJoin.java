@@ -20,6 +20,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable.PairedClass;
@@ -200,7 +201,7 @@ public class SqlJoin extends SqlIntercode
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
 
-        HashMap<String, UsedVariable> constants = new HashMap<String, UsedVariable>();
+        HashMap<String, List<UsedVariable>> constants = new HashMap<String, List<UsedVariable>>();
 
         for(SqlIntercode child : childs)
         {
@@ -208,10 +209,24 @@ public class SqlJoin extends SqlIntercode
             {
                 if(v.isConstant())
                 {
-                    UsedVariable old = constants.put(v.getName(), v);
+                    ResourceClass resClass = v.getResourceClass();
 
-                    if(old != null && !old.equals(v))
-                        return List.of(SqlNoSolution.get());
+                    List<UsedVariable> list = constants.computeIfAbsent(v.getName(),
+                            r -> new ArrayList<UsedVariable>());
+
+                    for(UsedVariable old : list)
+                    {
+                        ResourceClass oldResClass = old.getResourceClass();
+
+                        if(resClass == oldResClass && !old.equals(v))
+                            return List.of(SqlNoSolution.get());
+
+                        //TODO: support resource class generalization
+                        if(oldResClass.getGeneralClass() != resClass.getGeneralClass())
+                            return List.of(SqlNoSolution.get());
+                    }
+
+                    list.add(v);
                 }
             }
         }
@@ -227,14 +242,20 @@ public class SqlJoin extends SqlIntercode
                     Condition cnd = new Condition();
                     HashMap<String, UsedVariable> skip = new HashMap<String, UsedVariable>();
 
-                    for(Entry<String, UsedVariable> e : constants.entrySet())
+                    for(Entry<String, List<UsedVariable>> e : constants.entrySet())
                     {
                         UsedVariable v = access.getInternalVariable(e.getKey());
 
-                        if(v != null && !v.isConstant() && v.getMapping(e.getValue().getResourceClass()) != null)
+                        if(v == null || v.isConstant())
+                            continue;
+
+                        for(UsedVariable o : e.getValue())
                         {
-                            cnd.addAreEqual(e.getValue().getMapping(), v.getMapping(e.getValue().getResourceClass()));
-                            skip.put(e.getKey(), e.getValue());
+                            if(v.getMapping(o.getResourceClass()) != null)
+                            {
+                                cnd.addAreEqual(o.getMapping(), v.getMapping(o.getResourceClass()));
+                                skip.put(e.getKey(), o);
+                            }
                         }
                     }
 
@@ -535,7 +556,8 @@ public class SqlJoin extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> columnMap.get(c) + " AS " + c).collect(joining(", ")));
+            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
+                    .collect(joining(", ")));
         else
             builder.append("1");
 
@@ -606,7 +628,8 @@ public class SqlJoin extends SqlIntercode
                     merged.addAll(e);
                     merged.addAll(r);
 
-                    subresult.add(merged);
+                    if(isJoinable(merged))
+                        subresult.add(merged);
                 }
             }
 

@@ -89,18 +89,12 @@ public class SqlValues extends SqlIntercode
             {
                 UsedVariable outerVariable = outerVariables.get(variable.getName());
 
-                if(outerVariable == null)
-                    continue; // should not happen, if the SqlValues instance is correctly optimized
-
                 //TODO: support multiple resource class ...
                 assert variable.getMappings().size() == 1;
 
                 for(Entry<ResourceClass, List<Column>> mapping : variable.getMappings().entrySet())
                 {
                     List<Column> outerCollumns = outerVariable.getMapping(mapping.getKey());
-
-                    if(outerCollumns == null)
-                        continue; // should not happen, if the SqlValues instance is correctly optimized
 
                     for(int j = 0; j < outerCollumns.size(); j++)
                     {

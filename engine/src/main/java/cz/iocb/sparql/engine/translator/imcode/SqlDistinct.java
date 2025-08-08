@@ -80,6 +80,12 @@ public class SqlDistinct extends SqlIntercode
 
                 return SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
             }
+            else if(segs.size() == 1)
+            {
+                //FIXME: find better condition
+                if(!(segs.get(0) instanceof SqlUnion u) || !compareChilds(u.getChilds(), union.getChilds()))
+                    optChild = segs.get(0);
+            }
         }
 
         if(optChild instanceof SqlJoin join)
@@ -114,6 +120,19 @@ public class SqlDistinct extends SqlIntercode
             return this;
 
         return create(request, optChild, distinctVariables, restrictions);
+    }
+
+
+    private static boolean compareChilds(List<SqlIntercode> list1, List<SqlIntercode> list2)
+    {
+        if(list1.size() != list2.size())
+            return false;
+
+        //FIXME: use better approach
+        HashSet<SqlIntercode> copy1 = new HashSet<SqlIntercode>(list1);
+        HashSet<SqlIntercode> copy2 = new HashSet<SqlIntercode>(list2);
+
+        return copy1.equals(copy2);
     }
 
 

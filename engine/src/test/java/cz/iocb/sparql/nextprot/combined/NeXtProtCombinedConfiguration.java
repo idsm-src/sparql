@@ -14,7 +14,8 @@ public class NeXtProtCombinedConfiguration extends SparqlDatabaseConfiguration
     static final String schema = "nextprot_indirect";
 
 
-    public NeXtProtCombinedConfiguration(String service, DataSource connectionPool, DatabaseSchema schema) throws SQLException
+    public NeXtProtCombinedConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
+            throws SQLException
     {
         super(service, connectionPool, schema);
 

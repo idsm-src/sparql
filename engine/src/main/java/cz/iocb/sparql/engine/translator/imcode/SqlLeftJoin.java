@@ -267,7 +267,8 @@ public class SqlLeftJoin extends SqlIntercode
         builder.append("SELECT ");
 
         if(!columns.isEmpty())
-            builder.append(columns.stream().map(c -> columnMap.get(c) + " AS " + c).collect(joining(", ")));
+            builder.append(columns.stream().map(c -> (columnMap.get(c) != null ? columnMap.get(c) + " AS " : "") + c)
+                    .collect(joining(", ")));
         else
             builder.append("1");
 
