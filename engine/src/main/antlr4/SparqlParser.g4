@@ -476,7 +476,6 @@ nil
 /* ANTLR V4 branded expressions */
 expression
     : primaryExpression                                     # baseExpression
-    //| op=('*'|'/') expression                               # unaryMultiplicativeExpression
     | op=('+'|'-') expression                               # unaryAdditiveExpression
     | '!' expression                                        # unaryNegationExpression
     | expression op=('*'|'/') expression                    # multiplicativeExpression
@@ -484,8 +483,8 @@ expression
     | expression unaryLiteralExpression                     # unarySignedLiteralExpression   
     | expression NOT? IN '(' expressionList? ')'            # relationalSetExpression
     | expression op=('='|'!='|'<'|'>'|'<='|'>=') expression # relationalExpression
-    | expression ('&&' expression)                          # conditionalAndExpression
-    | expression ('||' expression)                          # conditionalOrExpression
+    | expression '&&' expression                            # conditionalAndExpression
+    | expression '||' expression                            # conditionalOrExpression
     ;
 
 unaryLiteralExpression
