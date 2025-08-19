@@ -349,4 +349,36 @@ public class SqlProcedureCall extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("call ");
+        builder.append(procedure.getProcedureName());
+
+        for(Entry<ResultDefinition, String> e : results.entrySet())
+        {
+            indentInfo(builder, indent, true);
+
+            if(e.getKey().getResultName() != null)
+                builder.append(e.getKey().getResultName()).append(" ");
+            else
+                builder.append("#result");
+
+            builder.append(" to ");
+            builder.append(e.getValue());
+        }
+
+        for(Entry<ParameterDefinition, SqlNodeValue> e : parameters.entrySet())
+        {
+            indentInfo(builder, indent, true);
+            builder.append(e.getKey().getParamName());
+            builder.append(" as ");
+            e.getValue().generateExplanation(builder, null);
+        }
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

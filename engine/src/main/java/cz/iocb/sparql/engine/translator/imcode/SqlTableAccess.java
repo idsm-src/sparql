@@ -1006,4 +1006,99 @@ public class SqlTableAccess extends SqlIntercode
     {
         return false;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("access");
+
+        if(table != null)
+        {
+            builder.append(" ");
+            builder.append(table.getSchema());
+            builder.append(".");
+            builder.append(table.getName());
+        }
+
+        if(!conditions.isTrue())
+        {
+            builder.append(" where ");
+
+            boolean hasWhere = false;
+
+            for(Condition condition : conditions.getConditions())
+            {
+                if(hasWhere)
+                    builder.append(" or ");
+
+                hasWhere = true;
+
+                if(conditions.getConditions().size() > 1)
+                    builder.append("(");
+
+                boolean hasCondition = false;
+
+                for(ColumnComparison pair : condition.getAreEqual())
+                {
+                    if(hasCondition)
+                        builder.append(" and ");
+
+                    hasCondition = true;
+                    builder.append(pair.getLeft().getName());
+                    builder.append(" = ");
+                    builder.append(pair.getRight().getName());
+                }
+
+                for(ColumnComparison pair : condition.getAreNotEqual())
+                {
+                    if(hasCondition)
+                        builder.append(" and ");
+
+                    hasCondition = true;
+                    builder.append(pair.getLeft().getName());
+                    builder.append(" <> ");
+                    builder.append(pair.getRight().getName());
+                }
+
+                for(Column column : condition.getIsNotNull())
+                {
+                    if(hasCondition)
+                        builder.append(" and ");
+
+                    hasCondition = true;
+                    builder.append(column.getName());
+                    builder.append(" is not null");
+                }
+
+                for(Column column : condition.getIsNull())
+                {
+                    if(hasCondition)
+                        builder.append(" and ");
+
+                    hasCondition = true;
+                    builder.append(column.getName());
+                    builder.append(" is null");
+                }
+
+                if(conditions.getConditions().size() > 1)
+                    builder.append(")");
+            }
+        }
+
+
+        for(UsedVariable var : internal.getValues())
+        {
+            indentInfo(builder, indent, false);
+            builder.append(var.getName());
+            builder.append(" as");
+
+            for(Entry<ResourceClass, List<Column>> e : var.getMappings().entrySet())
+            {
+                builder.append(" ");
+                builder.append(e.getKey().getName());
+                builder.append(e.getValue().stream().map(c -> c.toString()).collect(joining(",", "(", ")")));
+            }
+        }
+    }
 }

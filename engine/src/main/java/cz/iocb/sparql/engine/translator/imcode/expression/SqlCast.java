@@ -25,6 +25,7 @@ import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
+import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
@@ -414,5 +415,21 @@ public class SqlCast extends SqlUnary
             return false;
 
         return true;
+    }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        IRI type = ((LiteralClass) resourceClass).getTypeIri();
+
+        if(type.getValue().startsWith("http://www.w3.org/2001/XMLSchema#"))
+            builder.append("xsd:").append(type.getValue().substring(33));
+        else
+            builder.append(type);
+
+        builder.append("(");
+        getOperand().generateExplanation(builder, indent, 10);
+        builder.append(")");
     }
 }

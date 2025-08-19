@@ -96,4 +96,11 @@ public class SqlVariable extends SqlNodeValue
     {
         return variable;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append(variable.getName());
+    }
 }

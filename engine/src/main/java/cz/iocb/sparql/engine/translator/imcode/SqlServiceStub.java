@@ -520,4 +520,25 @@ public class SqlServiceStub extends SqlIntercode
     {
         return true;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("service");
+
+        ServiceTranslateVisitor visitor = new ServiceTranslateVisitor();
+        String serviceCode = visitor.getResultCode(pattern);
+
+        String[] lines = serviceCode.split("\n");
+
+        for(String line : lines)
+        {
+            indentInfo(builder, indent, true);
+            builder.append(line);
+        }
+
+        indentChild(builder, indent, true);
+        context.generateExplanation(builder, getIndent(indent, true));
+    }
 }

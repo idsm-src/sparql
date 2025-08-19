@@ -229,6 +229,17 @@ public abstract class SqlIntercode extends SqlBaseClass
     public abstract boolean hasServiceSubpattern();
 
 
+    public abstract void generateExplanation(StringBuilder builder, String indent);
+
+
+    public String getExplanation()
+    {
+        StringBuilder builder = new StringBuilder();
+        generateExplanation(builder, "\n");
+        return builder.toString();
+    }
+
+
     public final UsedVariables getVariables()
     {
         return variables;

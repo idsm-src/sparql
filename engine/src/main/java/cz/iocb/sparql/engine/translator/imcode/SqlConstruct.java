@@ -631,4 +631,61 @@ public class SqlConstruct extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("construct subject predicate object");
+
+        for(Template template : templates)
+        {
+            indentInfo(builder, indent, true);
+
+            for(ConstructColumn column : ConstructColumn.values())
+            {
+                if(column != ConstructColumn.SUBJECT)
+                    builder.append(" ");
+
+                switch(template.get(column))
+                {
+                    case Literal literal ->
+                    {
+                        builder.append("'");
+                        builder.append(literal.getStringValue().replaceAll("\n", "\\\\n").replaceAll("\r", "\\\\r"));
+                        builder.append("'");
+
+                        if(literal.getLanguageTag() != null)
+                        {
+                            builder.append('@');
+                            builder.append(literal.getLanguageTag());
+                        }
+
+                        else if(literal.getTypeIri() != null && !literal.isSimple())
+                        {
+                            builder.append("^^");
+
+                            IRI type = literal.getTypeIri();
+
+                            if(type.getValue().startsWith("http://www.w3.org/2001/XMLSchema#"))
+                                builder.append("xsd:").append(type.getValue().substring(33));
+                            else
+                                builder.append(type);
+                        }
+                    }
+
+                    case IRI iri -> builder.append(iri);
+
+                    case BlankNode bnode -> builder.append("_:" + bnode.getName());
+
+                    case Variable variable -> builder.append(variable.getSqlName());
+
+                    default -> throw new IllegalArgumentException();
+                }
+            }
+        }
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

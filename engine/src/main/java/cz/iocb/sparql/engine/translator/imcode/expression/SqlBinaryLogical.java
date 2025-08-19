@@ -103,4 +103,23 @@ public class SqlBinaryLogical extends SqlBinary
         return "(" + getLeft().translate(request) + " " + operator.getName() + " " + getRight().translate(request)
                 + ")";
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        int myPriortity = operator == Operator.Or ? 9 : 8;
+
+        if(myPriortity > priority)
+            builder.append("(");
+
+        getLeft().generateExplanation(builder, indent, myPriortity);
+        builder.append(" ");
+        builder.append(operator.getText());
+        builder.append(" ");
+        getRight().generateExplanation(builder, indent, myPriortity);
+
+        if(myPriortity > priority)
+            builder.append(")");
+    }
 }

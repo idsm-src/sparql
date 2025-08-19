@@ -74,4 +74,11 @@ public class SqlIri extends SqlNodeValue
     {
         return iriClass;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append(iri);
+    }
 }

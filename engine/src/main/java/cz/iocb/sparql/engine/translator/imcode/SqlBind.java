@@ -288,4 +288,19 @@ public class SqlBind extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("bind");
+
+        indentInfo(builder, indent, true);
+        expression.generateExplanation(builder, getIndent(indent, false) + "  ");
+        builder.append(" as ");
+        builder.append(variableName);
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

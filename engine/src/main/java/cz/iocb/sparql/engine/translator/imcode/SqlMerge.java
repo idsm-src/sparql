@@ -195,4 +195,17 @@ public class SqlMerge extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("merge ");
+        builder.append(variable1);
+        builder.append(" and ");
+        builder.append(variable2);
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

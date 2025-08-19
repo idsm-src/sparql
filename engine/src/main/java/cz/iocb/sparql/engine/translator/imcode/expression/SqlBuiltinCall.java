@@ -2990,4 +2990,25 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
 
         return false;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append(function);
+        builder.append("(");
+
+        if(distinct)
+            builder.append("distinct ");
+
+        for(int i = 0; i < arguments.size(); i++)
+        {
+            if(i > 0)
+                builder.append(", ");
+
+            arguments.get(i).generateExplanation(builder, indent, 10);
+        }
+
+        builder.append(")");
+    }
 }

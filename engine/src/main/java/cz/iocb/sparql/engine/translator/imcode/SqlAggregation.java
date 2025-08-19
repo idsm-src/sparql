@@ -464,4 +464,25 @@ public class SqlAggregation extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("aggregate");
+
+        for(Entry<String, SqlExpressionIntercode> e : aggregations.entrySet())
+        {
+            indentInfo(builder, indent, true);
+            e.getValue().generateExplanation(builder, getIndent(indent, false) + "  ");
+            builder.append(" as ");
+            builder.append(e.getKey());
+        }
+
+        if(!groupVariables.isEmpty())
+            builder.append(groupVariables.stream().collect(joining(" ", " over ", "")));
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

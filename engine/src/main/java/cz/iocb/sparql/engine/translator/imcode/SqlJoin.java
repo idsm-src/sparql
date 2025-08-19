@@ -663,4 +663,17 @@ public class SqlJoin extends SqlIntercode
     {
         return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("join");
+
+        for(int i = 0; i < childs.size(); i++)
+        {
+            indentChild(builder, indent, i == childs.size() - 1);
+            childs.get(i).generateExplanation(builder, getIndent(indent, i == childs.size() - 1));
+        }
+    }
 }

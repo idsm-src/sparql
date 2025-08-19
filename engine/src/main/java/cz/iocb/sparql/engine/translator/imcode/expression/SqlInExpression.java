@@ -53,6 +53,12 @@ public class SqlInExpression extends SqlExpressionIntercode
         {
             return "\"expr\"";
         }
+
+        @Override
+        public void generateExplanation(StringBuilder builder, String indent, int priority)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
 
@@ -148,5 +154,27 @@ public class SqlInExpression extends SqlExpressionIntercode
         builder.append(left.translate(request));
         builder.append(")) AS \"tab\"(\"expr\"))");
         return builder.toString();
+    }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        left.generateExplanation(builder, indent, 7);
+
+        if(negated)
+            builder.append(" not");
+
+        builder.append(" in (");
+
+        for(int i = 0; i < rights.size(); i++)
+        {
+            if(i > 0)
+                builder.append(", ");
+
+            rights.get(i).generateExplanation(builder, indent, 10);
+        }
+
+        builder.append(")");
     }
 }

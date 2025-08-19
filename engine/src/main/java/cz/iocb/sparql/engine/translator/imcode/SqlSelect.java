@@ -856,4 +856,41 @@ public class SqlSelect extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("select");
+
+        if(distinct)
+            builder.append(" distinct");
+
+        if(projections != null)
+            builder.append(projections.stream().collect(joining(" ", " ", "")));
+        else if(!variables.getNames().isEmpty())
+            builder.append(variables.getNames().stream().collect(joining(" ", " ", "")));
+
+        if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())
+        {
+            builder.append(" order by");
+
+            if(!orderBy.isEmpty())
+                builder.append(orderBy.entrySet().stream()
+                        .map(e -> (e.getValue() == Direction.Descending ? "desc" : "asc") + "(" + e.getKey() + ")")
+                        .collect(joining(" ", " ", "")));
+
+            if(!simpleOrderBy.isEmpty())
+                builder.append(simpleOrderBy.stream().map(e -> e).collect(joining(" ", " ", "")));
+        }
+
+        if(offset != null)
+            builder.append(" offset ").append(offset);
+
+        if(limit != null)
+            builder.append(" limit ").append(limit);
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

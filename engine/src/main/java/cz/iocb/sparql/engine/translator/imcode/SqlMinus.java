@@ -251,4 +251,17 @@ public class SqlMinus extends SqlIntercode
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("minus");
+
+        indentChild(builder, indent, false);
+        left.generateExplanation(builder, getIndent(indent, false));
+
+        indentChild(builder, indent, true);
+        right.generateExplanation(builder, getIndent(indent, true));
+    }
 }

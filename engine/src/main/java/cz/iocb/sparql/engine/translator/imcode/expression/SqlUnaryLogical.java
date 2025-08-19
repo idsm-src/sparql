@@ -60,4 +60,12 @@ public class SqlUnaryLogical extends SqlUnary
     {
         return "(not " + getOperand().translate(request) + ")";
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append("not ");
+        getOperand().generateExplanation(builder, indent, 3);
+    }
 }

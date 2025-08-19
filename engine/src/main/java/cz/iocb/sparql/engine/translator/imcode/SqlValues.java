@@ -165,4 +165,14 @@ public class SqlValues extends SqlIntercode
     {
         return false;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("inline data");
+
+        if(!variables.getNames().isEmpty())
+            builder.append(variables.getNames().stream().collect(joining(" ", " ", "")));
+    }
 }

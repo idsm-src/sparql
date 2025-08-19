@@ -166,4 +166,23 @@ public class SqlExists extends SqlExpressionIntercode
 
         return builder.toString();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        String existsIndent = indent + "  ";
+
+        builder.append("(").append(existsIndent);
+
+        if(negated)
+            builder.append("not ");
+
+        builder.append("exists");
+
+        indentChild(builder, existsIndent, true);
+        pattern.generateExplanation(builder, getIndent(existsIndent, true));
+
+        builder.append(existsIndent).append(")");
+    }
 }

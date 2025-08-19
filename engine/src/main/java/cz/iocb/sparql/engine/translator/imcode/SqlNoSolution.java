@@ -49,4 +49,11 @@ public class SqlNoSolution extends SqlIntercode
     {
         return false;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("no solution");
+    }
 }

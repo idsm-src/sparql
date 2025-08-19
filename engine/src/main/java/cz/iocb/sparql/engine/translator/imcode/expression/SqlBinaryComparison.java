@@ -737,4 +737,23 @@ public class SqlBinaryComparison extends SqlBinary
     {
         return operator == Operator.NotEquals && isAlwaysDifferentIfNotNull;
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        int myPriortity = 6;
+
+        if(myPriortity > priority)
+            builder.append("(");
+
+        getLeft().generateExplanation(builder, indent, myPriortity);
+        builder.append(" ");
+        builder.append(operator.getText());
+        builder.append(" ");
+        getRight().generateExplanation(builder, indent, myPriortity);
+
+        if(myPriortity > priority)
+            builder.append(")");
+    }
 }

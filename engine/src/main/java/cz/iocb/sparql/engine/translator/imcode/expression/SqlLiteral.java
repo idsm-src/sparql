@@ -9,6 +9,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
@@ -91,5 +92,32 @@ public class SqlLiteral extends SqlNodeValue
             return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
 
         return resourceClass.toColumns(request.getStatement(), literal);
+    }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append("'");
+        builder.append(literal.getStringValue().replaceAll("\n", "\\\\n").replaceAll("\r", "\\\\r"));
+        builder.append("'");
+
+        if(literal.getLanguageTag() != null)
+        {
+            builder.append('@');
+            builder.append(literal.getLanguageTag());
+        }
+
+        else if(literal.getTypeIri() != null && !literal.isSimple())
+        {
+            builder.append("^^");
+
+            IRI type = literal.getTypeIri();
+
+            if(type.getValue().startsWith("http://www.w3.org/2001/XMLSchema#"))
+                builder.append("xsd:").append(type.getValue().substring(33));
+            else
+                builder.append(type);
+        }
     }
 }

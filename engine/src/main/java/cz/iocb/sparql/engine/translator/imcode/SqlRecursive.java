@@ -367,4 +367,17 @@ public class SqlRecursive extends SqlIntercode
     {
         return init.hasServiceSubpattern() || next.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("recurse");
+
+        indentChild(builder, indent, false);
+        init.generateExplanation(builder, getIndent(indent, false));
+
+        indentChild(builder, indent, true);
+        next.generateExplanation(builder, getIndent(indent, true));
+    }
 }

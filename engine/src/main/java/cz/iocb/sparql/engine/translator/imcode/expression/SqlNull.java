@@ -45,4 +45,11 @@ public class SqlNull extends SqlExpressionIntercode
     {
         return "NULL";
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append("null");
+    }
 }

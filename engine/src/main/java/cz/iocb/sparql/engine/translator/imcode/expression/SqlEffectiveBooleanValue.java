@@ -206,4 +206,13 @@ public class SqlEffectiveBooleanValue extends SqlUnary
             throw new IllegalArgumentException();
         }
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append("evb(");
+        getOperand().generateExplanation(builder, indent, 10);
+        builder.append(")");
+    }
 }

@@ -352,4 +352,15 @@ public class SqlDistinct extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("distinct");
+        builder.append(distinctVariables.stream().collect(joining(" ", " ", "")));
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

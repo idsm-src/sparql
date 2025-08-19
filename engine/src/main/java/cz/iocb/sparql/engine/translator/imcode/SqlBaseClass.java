@@ -21,4 +21,24 @@ public class SqlBaseClass
         if(condition)
             builder.append(" OR ");
     }
+
+
+    protected static void indentChild(StringBuilder builder, String indent, boolean last)
+    {
+        builder.append(indent);
+        builder.append(last ? " └─ " : " ├─ ");
+    }
+
+
+    protected static void indentInfo(StringBuilder builder, String indent, boolean child)
+    {
+        builder.append(indent);
+        builder.append(child ? " │  " : "  ");
+    }
+
+
+    protected static String getIndent(String indent, boolean last)
+    {
+        return indent + (last ? "    " : " │  ");
+    }
 }

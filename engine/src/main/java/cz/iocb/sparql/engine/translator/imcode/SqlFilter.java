@@ -185,4 +185,20 @@ public class SqlFilter extends SqlIntercode
     {
         return child.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("filter");
+
+        for(SqlExpressionIntercode cnd : conditions)
+        {
+            indentInfo(builder, indent, true);
+            cnd.generateExplanation(builder, getIndent(indent, false));
+        }
+
+        indentChild(builder, indent, true);
+        child.generateExplanation(builder, getIndent(indent, true));
+    }
 }

@@ -132,4 +132,12 @@ public class SqlUnaryArithmetic extends SqlUnary
             return "(- " + code + ")";
         }
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent, int priority)
+    {
+        builder.append(isMinus ? "- " : "+ ");
+        getOperand().generateExplanation(builder, indent, 3);
+    }
 }

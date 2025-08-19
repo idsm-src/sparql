@@ -324,4 +324,23 @@ public class SqlLeftJoin extends SqlIntercode
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
     }
+
+
+    @Override
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        builder.append("left join");
+
+        for(SqlExpressionIntercode cnd : conditions)
+        {
+            indentInfo(builder, indent, true);
+            cnd.generateExplanation(builder, indent);
+        }
+
+        indentChild(builder, indent, false);
+        left.generateExplanation(builder, getIndent(indent, false));
+
+        indentChild(builder, indent, true);
+        right.generateExplanation(builder, getIndent(indent, true));
+    }
 }

@@ -65,6 +65,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     public abstract String translate(Request request);
 
 
+    protected abstract void generateExplanation(StringBuilder builder, String indent, int priority);
+
+
+    public void generateExplanation(StringBuilder builder, String indent)
+    {
+        generateExplanation(builder, indent, 10);
+    }
+
+
     public boolean canBeNull()
     {
         return canBeNull;
