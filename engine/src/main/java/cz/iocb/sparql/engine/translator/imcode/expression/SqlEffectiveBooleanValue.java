@@ -111,16 +111,16 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     @Override
     public Restrictions getRequirements(Set<ResourceClass> expected)
     {
-        return getOperand().getRequirements(operandRequirements);
+        return operand.getRequirements(operandRequirements);
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
 
-        if(optOperand == getOperand())
+        if(optOperand == operand)
             return this;
 
         return create(optOperand);
@@ -130,8 +130,6 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     @Override
     public String translate(Request request)
     {
-        SqlExpressionIntercode operand = getOperand();
-
         if(operand instanceof SqlNodeValue variable)
         {
             Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
@@ -212,7 +210,7 @@ public class SqlEffectiveBooleanValue extends SqlUnary
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append("evb(");
-        getOperand().generateExplanation(builder, indent, 10);
+        operand.generateExplanation(builder, indent, 10);
         builder.append(")");
     }
 }

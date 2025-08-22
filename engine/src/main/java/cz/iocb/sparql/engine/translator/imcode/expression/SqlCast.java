@@ -66,19 +66,19 @@ public class SqlCast extends SqlUnary
     @Override
     public Restrictions getRequirements(Set<ResourceClass> expected)
     {
-        Set<ResourceClass> set = getOperand().getResourceClasses().stream()
+        Set<ResourceClass> set = operand.getResourceClasses().stream()
                 .filter(r -> resultCastClass(r, resourceClass) != null).collect(toSet());
 
-        return getOperand().getRequirements(set);
+        return operand.getRequirements(set);
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
 
-        if(optOperand == getOperand())
+        if(optOperand == operand)
             return this;
 
         return create(resourceClass, optOperand);
@@ -88,9 +88,9 @@ public class SqlCast extends SqlUnary
     @Override
     public String translate(Request request)
     {
-        if(!(getOperand() instanceof SqlNodeValue))
+        if(!(operand instanceof SqlNodeValue))
         {
-            ResourceClass operandClass = getOperand().getExpressionResourceClass();
+            ResourceClass operandClass = operand.getExpressionResourceClass();
             StringBuilder builder = new StringBuilder();
 
             if(operandClass instanceof DateTimeConstantZoneClass constantZoneClass)
@@ -98,7 +98,7 @@ public class SqlCast extends SqlUnary
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_datetime(");
-                builder.append(getOperand().translate(request));
+                builder.append(operand.translate(request));
                 builder.append(", '");
                 builder.append(constantZoneClass.getZone());
                 builder.append("'::int4)");
@@ -108,18 +108,18 @@ public class SqlCast extends SqlUnary
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_date(");
-                builder.append(getOperand().translate(request));
+                builder.append(operand.translate(request));
                 builder.append(", '");
                 builder.append(constantZoneClass.getZone());
                 builder.append("'::int4)");
             }
             else if(operandClass instanceof IriClass)
             {
-                builder.append(getOperand().translate(request));
+                builder.append(operand.translate(request));
             }
             else if(operandClass instanceof UserLiteralClass)
             {
-                builder.append(getOperand().translate(request));
+                builder.append(operand.translate(request));
                 builder.append("::varchar");
             }
             else
@@ -127,9 +127,9 @@ public class SqlCast extends SqlUnary
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_");
-                builder.append(getOperand().getResourceName());
+                builder.append(operand.getResourceName());
                 builder.append("(");
-                builder.append(getOperand().translate(request));
+                builder.append(operand.translate(request));
                 builder.append(")");
             }
 
@@ -138,7 +138,7 @@ public class SqlCast extends SqlUnary
 
 
 
-        SqlVariable variable = (SqlVariable) getOperand();
+        SqlVariable variable = (SqlVariable) operand;
         ResourceClass castClass = getExpressionResourceClass();
         StringBuilder builder = new StringBuilder();
 
@@ -429,7 +429,7 @@ public class SqlCast extends SqlUnary
             builder.append(type);
 
         builder.append("(");
-        getOperand().generateExplanation(builder, indent, 10);
+        operand.generateExplanation(builder, indent, 10);
         builder.append(")");
     }
 }

@@ -245,17 +245,17 @@ public class SqlBinaryComparison extends SqlBinary
             rightSet.add(p.getValue());
         }
 
-        return new Restrictions(getLeft().getRequirements(leftSet), getRight().getRequirements(rightSet));
+        return new Restrictions(left.getRequirements(leftSet), right.getRequirements(rightSet));
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
-        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
+        SqlExpressionIntercode optRight = right.optimize(request, variables, evalServices);
 
-        if(optLeft == getLeft() && optRight == getRight())
+        if(optLeft == left && optRight == right)
             return this;
 
         return create(operator, optLeft, optRight);
@@ -265,34 +265,34 @@ public class SqlBinaryComparison extends SqlBinary
     @Override
     public String translate(Request request)
     {
-        if(getLeft() instanceof SqlNodeValue && getRight() instanceof SqlNodeValue)
+        if(left instanceof SqlNodeValue && right instanceof SqlNodeValue)
             return translateAsNodeComparison(request);
 
 
         StringBuilder builder = new StringBuilder();
 
-        if(different.size() == getLeft().getResourceClasses().size() * getRight().getResourceClasses().size())
+        if(different.size() == left.getResourceClasses().size() * right.getResourceClasses().size())
         {
             assert comparable.size() == 0;
             assert operator == Operator.Equals || operator == Operator.NotEquals;
 
             builder.append("NULLIF(");
 
-            if(getLeft().canBeNull())
-                builder.append(translateAsNullCheck(request, getLeft(), operator == Operator.NotEquals));
+            if(left.canBeNull())
+                builder.append(translateAsNullCheck(request, left, operator == Operator.NotEquals));
 
-            if(getLeft().canBeNull() && getRight().canBeNull())
+            if(left.canBeNull() && right.canBeNull())
                 builder.append(operator == Operator.Equals ? " OR " : " AND ");
 
-            if(getRight().canBeNull())
-                builder.append(translateAsNullCheck(request, getRight(), operator == Operator.NotEquals));
+            if(right.canBeNull())
+                builder.append(translateAsNullCheck(request, right, operator == Operator.NotEquals));
 
             builder.append(operator == Operator.Equals ? ", true)" : ", false)");
         }
         //TODO: také podporovat, když je to integer vs integer+decimal
         else if(different.size() == 0 && SqlExpressionIntercode.getExpressionResourceClass(
                 comparable.stream().map(r -> determineComparisonClass(r.getKey(), r.getValue()))
-                        .collect(toSet())) != null/*!(getLeft().isBoxed() || getRight().isBoxed())*/)
+                        .collect(toSet())) != null/*!(left.isBoxed() || right.isBoxed())*/)
         {
             Set<ResourceClass> cmpClasses = comparable.stream()
                     .map(r -> determineComparisonClass(r.getKey(), r.getValue())).collect(toSet());
@@ -303,43 +303,34 @@ public class SqlBinaryComparison extends SqlBinary
             {
                 //TODO: add special treatment
 
-                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
-
                 builder.append("(");
-                builder.append(left);
+                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
                 builder.append(" ");
                 builder.append(userClass.getOperatorCode(operator));
                 builder.append(" ");
-                builder.append(right);
+                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
                 builder.append(")");
             }
             else if(cmpClass == xsdDateTime || cmpClass == xsdDate || isFloatPoint(cmpClass))
             {
                 //TODO: add special cases to compare xsdDate as simple date
 
-                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
-
                 builder.append("(");
-                builder.append(left);
+                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
                 builder.append(" operator(sparql.");
                 builder.append(operator.getText());
                 builder.append(") ");
-                builder.append(right);
+                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
                 builder.append(")");
             }
             else
             {
-                String left = translateAsUnboxedOperand(request, getLeft(), cmpClass);
-                String right = translateAsUnboxedOperand(request, getRight(), cmpClass);
-
                 builder.append("(");
-                builder.append(left);
+                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
                 builder.append(" ");
                 builder.append(operator.getText());
                 builder.append(" ");
-                builder.append(right);
+                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
                 builder.append(")");
             }
         }
@@ -354,11 +345,11 @@ public class SqlBinaryComparison extends SqlBinary
             rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
 
             builder.append("(");
-            builder.append(translateAsBoxedOperand(request, getLeft(), leftSet));
+            builder.append(translateAsBoxedOperand(request, left, leftSet));
             builder.append(" operator(sparql.");
             builder.append(operator.getText());
             builder.append(") ");
-            builder.append(translateAsBoxedOperand(request, getRight(), rightSet));
+            builder.append(translateAsBoxedOperand(request, right, rightSet));
             builder.append(")");
         }
 
@@ -368,8 +359,8 @@ public class SqlBinaryComparison extends SqlBinary
 
     public String translateAsNodeComparison(Request request)
     {
-        SqlNodeValue leftNode = (SqlNodeValue) getLeft();
-        SqlNodeValue rightNode = (SqlNodeValue) getRight();
+        SqlNodeValue leftNode = (SqlNodeValue) left;
+        SqlNodeValue rightNode = (SqlNodeValue) right;
 
         StringBuilder builder = new StringBuilder();
         boolean hasAlternative = false;
@@ -617,7 +608,7 @@ public class SqlBinaryComparison extends SqlBinary
 
             builder.append("NULLIF(");
 
-            if(getLeft().canBeNull() || leftNode.getResourceClasses().size() > 1)
+            if(left.canBeNull() || leftNode.getResourceClasses().size() > 1)
             {
                 for(int i = 0; i < leftClass.getColumnCount(); i++)
                 {
@@ -632,7 +623,7 @@ public class SqlBinaryComparison extends SqlBinary
                 }
             }
 
-            if(getRight().canBeNull() || rightNode.getResourceClasses().size() > 1)
+            if(right.canBeNull() || rightNode.getResourceClasses().size() > 1)
             {
                 for(int i = 0; i < rightClass.getColumnCount(); i++)
                 {
@@ -747,11 +738,11 @@ public class SqlBinaryComparison extends SqlBinary
         if(myPriortity > priority)
             builder.append("(");
 
-        getLeft().generateExplanation(builder, indent, myPriortity);
+        left.generateExplanation(builder, indent, myPriortity);
         builder.append(" ");
         builder.append(operator.getText());
         builder.append(" ");
-        getRight().generateExplanation(builder, indent, myPriortity);
+        right.generateExplanation(builder, indent, myPriortity);
 
         if(myPriortity > priority)
             builder.append(")");

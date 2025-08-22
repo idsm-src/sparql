@@ -129,17 +129,17 @@ public class SqlBinaryArithmetic extends SqlBinary
             return new Restrictions();
         }
 
-        return new Restrictions(getLeft().getRequirements(set), getRight().getRequirements(set));
+        return new Restrictions(left.getRequirements(set), right.getRequirements(set));
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
-        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
+        SqlExpressionIntercode optRight = right.optimize(request, variables, evalServices);
 
-        if(optLeft == getLeft() && optRight == getRight())
+        if(optLeft == left && optRight == right)
             return this;
 
         return create(operator, optLeft, optRight);
@@ -153,17 +153,15 @@ public class SqlBinaryArithmetic extends SqlBinary
 
         if(expressionResourceClass == null)
         {
-            String leftCode = translateAsBoxedOperand(request, getLeft(),
-                    getLeft().getResourceClasses(r -> isNumeric(r)));
-            String rightCode = translateAsBoxedOperand(request, getRight(),
-                    getRight().getResourceClasses(r -> isNumeric(r)));
+            String leftCode = translateAsBoxedOperand(request, left, left.getResourceClasses(r -> isNumeric(r)));
+            String rightCode = translateAsBoxedOperand(request, right, right.getResourceClasses(r -> isNumeric(r)));
 
             return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
         }
         else
         {
-            String leftCode = translateAsUnboxedOperand(request, getLeft(), getExpressionResourceClass());
-            String rightCode = translateAsUnboxedOperand(request, getRight(), getExpressionResourceClass());
+            String leftCode = translateAsUnboxedOperand(request, left, getExpressionResourceClass());
+            String rightCode = translateAsUnboxedOperand(request, right, getExpressionResourceClass());
 
             return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
         }
@@ -178,11 +176,11 @@ public class SqlBinaryArithmetic extends SqlBinary
         if(myPriortity > priority)
             builder.append("(");
 
-        getLeft().generateExplanation(builder, indent, myPriortity);
+        left.generateExplanation(builder, indent, myPriortity);
         builder.append(" ");
         builder.append(operator.getText());
         builder.append(" ");
-        getRight().generateExplanation(builder, indent, myPriortity);
+        right.generateExplanation(builder, indent, myPriortity);
 
         if(myPriortity > priority)
             builder.append(")");

@@ -79,18 +79,17 @@ public class SqlBinaryLogical extends SqlBinary
     @Override
     public Restrictions getRequirements(Set<ResourceClass> expected)
     {
-        return new Restrictions(getLeft().getRequirements(operandRequirements),
-                getRight().getRequirements(operandRequirements));
+        return new Restrictions(left.getRequirements(operandRequirements), right.getRequirements(operandRequirements));
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = getLeft().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
         SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
 
-        if(optLeft == getLeft() && optRight == getRight())
+        if(optLeft == left && optRight == getRight())
             return this;
 
         return create(operator, optLeft, optRight);
@@ -100,8 +99,7 @@ public class SqlBinaryLogical extends SqlBinary
     @Override
     public String translate(Request request)
     {
-        return "(" + getLeft().translate(request) + " " + operator.getName() + " " + getRight().translate(request)
-                + ")";
+        return "(" + left.translate(request) + " " + operator.getName() + " " + getRight().translate(request) + ")";
     }
 
 
@@ -113,7 +111,7 @@ public class SqlBinaryLogical extends SqlBinary
         if(myPriortity > priority)
             builder.append("(");
 
-        getLeft().generateExplanation(builder, indent, myPriortity);
+        left.generateExplanation(builder, indent, myPriortity);
         builder.append(" ");
         builder.append(operator.getText());
         builder.append(" ");

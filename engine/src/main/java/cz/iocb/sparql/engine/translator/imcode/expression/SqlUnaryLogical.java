@@ -39,16 +39,16 @@ public class SqlUnaryLogical extends SqlUnary
     @Override
     public Restrictions getRequirements(Set<ResourceClass> expected)
     {
-        return getOperand().getRequirements(Set.of(xsdBoolean));
+        return operand.getRequirements(Set.of(xsdBoolean));
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
 
-        if(optOperand == getOperand())
+        if(optOperand == operand)
             return this;
 
         return create(optOperand);
@@ -58,7 +58,7 @@ public class SqlUnaryLogical extends SqlUnary
     @Override
     public String translate(Request request)
     {
-        return "(not " + getOperand().translate(request) + ")";
+        return "(not " + operand.translate(request) + ")";
     }
 
 
@@ -66,6 +66,6 @@ public class SqlUnaryLogical extends SqlUnary
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append("not ");
-        getOperand().generateExplanation(builder, indent, 3);
+        operand.generateExplanation(builder, indent, 3);
     }
 }

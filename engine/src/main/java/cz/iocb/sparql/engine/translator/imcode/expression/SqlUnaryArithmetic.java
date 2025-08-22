@@ -97,16 +97,16 @@ public class SqlUnaryArithmetic extends SqlUnary
             return new Restrictions();
         }
 
-        return getOperand().getRequirements(set);
+        return operand.getRequirements(set);
     }
 
 
     @Override
     public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = getOperand().optimize(request, variables, evalServices);
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
 
-        if(optOperand == getOperand())
+        if(optOperand == operand)
             return this;
 
         return create(isMinus, optOperand);
@@ -120,14 +120,13 @@ public class SqlUnaryArithmetic extends SqlUnary
 
         if(expressionResourceClass == null)
         {
-            String code = translateAsBoxedOperand(request, getOperand(),
-                    getOperand().getResourceClasses(r -> isNumeric(r)));
+            String code = translateAsBoxedOperand(request, operand, operand.getResourceClasses(r -> isNumeric(r)));
 
             return "(operator(sparql.-) " + code + ")";
         }
         else
         {
-            String code = translateAsUnboxedOperand(request, getOperand(), getExpressionResourceClass());
+            String code = translateAsUnboxedOperand(request, operand, getExpressionResourceClass());
 
             return "(- " + code + ")";
         }
@@ -138,6 +137,6 @@ public class SqlUnaryArithmetic extends SqlUnary
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append(isMinus ? "- " : "+ ");
-        getOperand().generateExplanation(builder, indent, 3);
+        operand.generateExplanation(builder, indent, 3);
     }
 }

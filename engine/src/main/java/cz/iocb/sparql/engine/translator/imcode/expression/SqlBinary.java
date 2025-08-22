@@ -7,8 +7,8 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 public abstract class SqlBinary extends SqlExpressionIntercode
 {
-    private final SqlExpressionIntercode left;
-    private final SqlExpressionIntercode right;
+    protected final SqlExpressionIntercode left;
+    protected final SqlExpressionIntercode right;
 
 
     protected SqlBinary(SqlExpressionIntercode left, SqlExpressionIntercode right, Set<ResourceClass> resourceClasses,

@@ -7,7 +7,7 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 public abstract class SqlUnary extends SqlExpressionIntercode
 {
-    private final SqlExpressionIntercode operand;
+    protected final SqlExpressionIntercode operand;
 
 
     protected SqlUnary(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
