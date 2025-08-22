@@ -274,7 +274,7 @@ public class DatabaseSchema
         return switch(column)
         {
             case ConstantColumn col -> false;
-            case ExpressionColumn col -> true;
+            case ExpressionColumn col -> col.canBeNull();
             default -> nullableColumns.getOrDefault(table, List.of()).contains(column);
         };
     }

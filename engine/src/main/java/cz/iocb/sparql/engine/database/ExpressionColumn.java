@@ -4,10 +4,20 @@ package cz.iocb.sparql.engine.database;
 
 public class ExpressionColumn extends Column
 {
-    public ExpressionColumn(String value)
+    private final boolean canBeNull;
+
+
+    public ExpressionColumn(String value, boolean canBeNull)
     {
         //TODO: check whether the parameter is a valid SQL expression
         super(value);
+        this.canBeNull = canBeNull;
+    }
+
+
+    public ExpressionColumn(String value)
+    {
+        this(value, true);
     }
 
 
@@ -25,5 +35,11 @@ public class ExpressionColumn extends Column
             return this;
 
         throw new UnsupportedOperationException();
+    }
+
+
+    public boolean canBeNull()
+    {
+        return canBeNull;
     }
 }
