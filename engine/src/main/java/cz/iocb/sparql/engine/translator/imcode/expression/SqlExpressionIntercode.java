@@ -16,6 +16,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import cz.iocb.sparql.engine.database.Column;
@@ -66,6 +67,10 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     protected abstract void generateExplanation(StringBuilder builder, String indent, int priority);
+
+
+    @Override
+    protected abstract int getHashCode();
 
 
     public void generateExplanation(StringBuilder builder, String indent)
@@ -601,5 +606,30 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         {
             return "sparql.rdfbox_get_string_literal(" + operand.translate(request) + ")";
         }
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlExpressionIntercode imcode))
+            return false;
+
+        if(hashCode() != imcode.hashCode())
+            return false;
+
+        if(!Objects.equals(isDeterministic, imcode.isDeterministic))
+            return false;
+
+        if(!Objects.equals(canBeNull, imcode.canBeNull))
+            return false;
+
+        if(!Objects.equals(resourceClasses, imcode.resourceClasses))
+            return false;
+
+        return true;
     }
 }

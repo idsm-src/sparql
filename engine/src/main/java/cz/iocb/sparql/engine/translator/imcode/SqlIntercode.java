@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
@@ -835,5 +836,27 @@ public abstract class SqlIntercode extends SqlBaseClass
             return getJoinList(distinct.getChild());
 
         return List.of(child);
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlIntercode imcode))
+            return false;
+
+        if(hashCode() != imcode.hashCode())
+            return false;
+
+        if(!Objects.equals(isDeterministic, imcode.isDeterministic))
+            return false;
+
+        if(!Objects.equals(variables, imcode.variables))
+            return false;
+
+        return true;
     }
 }

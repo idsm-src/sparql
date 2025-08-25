@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -14,7 +15,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlIri extends SqlNodeValue
+public final class SqlIri extends SqlNodeValue
 {
     private final IRI iri;
     private final IriClass iriClass;
@@ -80,5 +81,34 @@ public class SqlIri extends SqlNodeValue
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append(iri);
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlIri imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(iri, imcode.iri))
+            return false;
+
+        if(iriClass != imcode.iriClass)
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(iri);
     }
 }

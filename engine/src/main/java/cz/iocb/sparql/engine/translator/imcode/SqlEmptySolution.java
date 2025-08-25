@@ -6,7 +6,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlEmptySolution extends SqlIntercode
+public final class SqlEmptySolution extends SqlIntercode
 {
     static private final SqlEmptySolution singleton = new SqlEmptySolution();
 
@@ -55,5 +55,19 @@ public class SqlEmptySolution extends SqlIntercode
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("empty solution");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        return object == singleton;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return System.identityHashCode(singleton);
     }
 }

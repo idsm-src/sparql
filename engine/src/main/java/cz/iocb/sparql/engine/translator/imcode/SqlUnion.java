@@ -8,18 +8,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlUnion extends SqlIntercode
+public final class SqlUnion extends SqlIntercode
 {
     private final List<SqlIntercode> childs;
     private final List<Map<Column, Column>> columnMappings;
@@ -297,5 +299,31 @@ public class SqlUnion extends SqlIntercode
             indentChild(builder, indent, i == childs.size() - 1);
             childs.get(i).generateExplanation(builder, getIndent(indent, i == childs.size() - 1));
         }
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlUnion imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(new Multiset<>(childs), new Multiset<>(imcode.childs)))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(new Multiset<>(childs));
     }
 }

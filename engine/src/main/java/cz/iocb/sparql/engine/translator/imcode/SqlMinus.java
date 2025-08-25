@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Table;
@@ -14,7 +15,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlMinus extends SqlIntercode
+public final class SqlMinus extends SqlIntercode
 {
     private static final Table leftTable = new Table("tab0");
     private static final Table rightTable = new Table("tab1");
@@ -263,5 +264,34 @@ public class SqlMinus extends SqlIntercode
 
         indentChild(builder, indent, true);
         right.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlMinus imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(left, imcode.left))
+            return false;
+
+        if(!Objects.equals(right, imcode.right))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(left, right);
     }
 }

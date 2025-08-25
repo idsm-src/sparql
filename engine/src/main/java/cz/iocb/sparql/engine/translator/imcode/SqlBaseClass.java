@@ -1,7 +1,14 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
-public class SqlBaseClass
+public abstract class SqlBaseClass
 {
+    private boolean hasHashCode = false;
+    private int hashCode;
+
+
+    protected abstract int getHashCode();
+
+
     protected static void appendComma(StringBuilder builder, boolean condition)
     {
         if(condition)
@@ -40,5 +47,18 @@ public class SqlBaseClass
     protected static String getIndent(String indent, boolean last)
     {
         return indent + (last ? "    " : " │  ");
+    }
+
+
+    @Override
+    public int hashCode()
+    {
+        if(!hasHashCode)
+        {
+            hashCode = getHashCode();
+            hasHashCode = true;
+        }
+
+        return hashCode;
     }
 }

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
@@ -12,14 +13,14 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlBinaryLogical extends SqlBinary
+public final class SqlBinaryLogical extends SqlBinary
 {
     private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean);
 
     private final Operator operator;
 
 
-    public SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+    protected SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(left, right, resourceClasses, canBeNull);
@@ -119,5 +120,34 @@ public class SqlBinaryLogical extends SqlBinary
 
         if(myPriortity > priority)
             builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlBinaryLogical imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(operator, imcode.operator))
+            return false;
+
+        if(!left.equals(imcode.left) || !right.equals(imcode.right))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(operator, left, right);
     }
 }

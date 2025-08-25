@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -13,13 +14,13 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlFunctionCall extends SqlExpressionIntercode
+public final class SqlFunctionCall extends SqlExpressionIntercode
 {
     private final FunctionDefinition definition;
     private final List<SqlExpressionIntercode> arguments;
 
 
-    SqlFunctionCall(FunctionDefinition definition, List<SqlExpressionIntercode> arguments, boolean canBeNull,
+    protected SqlFunctionCall(FunctionDefinition definition, List<SqlExpressionIntercode> arguments, boolean canBeNull,
             boolean isDeterministic)
     {
         super(asSet(definition.getResultClass()), canBeNull, isDeterministic);
@@ -131,5 +132,34 @@ public class SqlFunctionCall extends SqlExpressionIntercode
         }
 
         builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlFunctionCall imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(definition, imcode.definition))
+            return false;
+
+        if(!Objects.equals(arguments, imcode.arguments))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(definition, arguments);
     }
 }

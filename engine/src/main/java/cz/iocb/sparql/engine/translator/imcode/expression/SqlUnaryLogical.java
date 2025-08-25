@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -11,7 +12,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlUnaryLogical extends SqlUnary
+public final class SqlUnaryLogical extends SqlUnary
 {
     protected SqlUnaryLogical(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
@@ -67,5 +68,31 @@ public class SqlUnaryLogical extends SqlUnary
     {
         builder.append("not ");
         operand.generateExplanation(builder, indent, 3);
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlUnaryLogical imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(operand, imcode.operand))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(operand);
     }
 }

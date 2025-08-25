@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -25,7 +26,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 
-public class SqlBind extends SqlIntercode
+public final class SqlBind extends SqlIntercode
 {
     private static final Column expressionColumn = new TableColumn("#expression");
 
@@ -302,5 +303,37 @@ public class SqlBind extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlBind imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(variableName, imcode.variableName))
+            return false;
+
+        if(!Objects.equals(expression, imcode.expression))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(variableName, expression, child);
     }
 }

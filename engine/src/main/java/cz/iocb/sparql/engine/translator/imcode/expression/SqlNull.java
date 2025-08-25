@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlNull extends SqlExpressionIntercode
+public final class SqlNull extends SqlExpressionIntercode
 {
     static private final SqlNull singleton = new SqlNull();
 
@@ -51,5 +51,19 @@ public class SqlNull extends SqlExpressionIntercode
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append("null");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        return object == singleton;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return System.identityHashCode(singleton);
     }
 }

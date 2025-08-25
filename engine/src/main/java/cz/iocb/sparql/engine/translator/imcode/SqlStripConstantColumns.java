@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -17,7 +18,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlStripConstantColumns extends SqlIntercode
+public final class SqlStripConstantColumns extends SqlIntercode
 {
     private final SqlIntercode child;
     private final Map<TableColumn, ConstantColumn> map;
@@ -156,5 +157,31 @@ public class SqlStripConstantColumns extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlStripConstantColumns imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(child);
     }
 }

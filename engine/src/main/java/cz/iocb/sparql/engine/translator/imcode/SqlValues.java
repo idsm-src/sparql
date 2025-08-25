@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -15,7 +16,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlValues extends SqlIntercode
+public final class SqlValues extends SqlIntercode
 {
     private final LinkedHashMap<Column, List<Column>> data;
     private final int size;
@@ -174,5 +175,34 @@ public class SqlValues extends SqlIntercode
 
         if(!variables.getNames().isEmpty())
             builder.append(variables.getNames().stream().collect(joining(" ", " ", "")));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlValues imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(size, imcode.size))
+            return false;
+
+        if(!Objects.equals(data, imcode.data))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(size, data);
     }
 }

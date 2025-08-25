@@ -8,6 +8,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
@@ -21,7 +22,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlRecursive extends SqlIntercode
+public final class SqlRecursive extends SqlIntercode
 {
     private static final Table leftTable = new Table("tab0");
     private static final Table rightTable = new Table("tab1");
@@ -379,5 +380,46 @@ public class SqlRecursive extends SqlIntercode
 
         indentChild(builder, indent, true);
         next.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlRecursive imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(graphName, imcode.graphName))
+            return false;
+
+        if(!Objects.equals(beginName, imcode.beginName))
+            return false;
+
+        if(!Objects.equals(joinName, imcode.joinName))
+            return false;
+
+        if(!Objects.equals(endVar.getName(), imcode.endVar.getName()))
+            return false;
+
+        if(!Objects.equals(init, imcode.init))
+            return false;
+
+        if(!Objects.equals(next, imcode.next))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(graphName, beginName, joinName, endVar, init, next);
     }
 }

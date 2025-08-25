@@ -6,7 +6,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlNoSolution extends SqlIntercode
+public final class SqlNoSolution extends SqlIntercode
 {
     static private final SqlNoSolution singleton = new SqlNoSolution();
 
@@ -55,5 +55,19 @@ public class SqlNoSolution extends SqlIntercode
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("no solution");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        return object == singleton;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return System.identityHashCode(singleton);
     }
 }

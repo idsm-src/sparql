@@ -10,6 +10,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
@@ -19,12 +20,12 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlBinaryArithmetic extends SqlBinary
+public final class SqlBinaryArithmetic extends SqlBinary
 {
     private final Operator operator;
 
 
-    public SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+    protected SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(left, right, resourceClasses, canBeNull);
@@ -184,5 +185,34 @@ public class SqlBinaryArithmetic extends SqlBinary
 
         if(myPriortity > priority)
             builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlBinaryArithmetic imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(operator, imcode.operator))
+            return false;
+
+        if(!left.equals(imcode.left) || !right.equals(imcode.right))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(operator, left, right);
     }
 }

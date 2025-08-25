@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
@@ -33,12 +34,13 @@ import cz.iocb.sparql.engine.parser.model.expression.Literal;
 import cz.iocb.sparql.engine.parser.model.triple.BlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlConstruct extends SqlIntercode
+public final class SqlConstruct extends SqlIntercode
 {
     public static enum ConstructColumn
     {
@@ -687,5 +689,37 @@ public class SqlConstruct extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlConstruct imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(bnOffset, imcode.bnOffset))
+            return false;
+
+        if(!Objects.equals(new Multiset<>(templates), new Multiset<>(imcode.templates)))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(bnOffset, new Multiset<>(templates), child);
     }
 }

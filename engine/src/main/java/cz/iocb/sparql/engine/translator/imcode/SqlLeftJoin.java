@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -24,7 +25,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 
 
 
-public class SqlLeftJoin extends SqlIntercode
+public final class SqlLeftJoin extends SqlIntercode
 {
     private static final Table leftTable = new Table("tab0");
     private static final Table rightTable = new Table("tab1");
@@ -342,5 +343,37 @@ public class SqlLeftJoin extends SqlIntercode
 
         indentChild(builder, indent, true);
         right.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlLeftJoin imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(conditions, imcode.conditions))
+            return false;
+
+        if(!Objects.equals(left, imcode.left))
+            return false;
+
+        if(!Objects.equals(right, imcode.right))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(conditions, left, right);
     }
 }

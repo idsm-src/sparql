@@ -5,18 +5,20 @@ import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.fals
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlInExpression extends SqlExpressionIntercode
+public final class SqlInExpression extends SqlExpressionIntercode
 {
-    static private class OperandWrapper extends SqlExpressionIntercode
+    static private final class OperandWrapper extends SqlExpressionIntercode
     {
         private SqlExpressionIntercode operand;
 
@@ -59,6 +61,30 @@ public class SqlInExpression extends SqlExpressionIntercode
         {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean equals(Object object)
+        {
+            if(this == object)
+                return true;
+
+            if(!(object instanceof OperandWrapper imcode))
+                return false;
+
+            if(!super.equals(imcode))
+                return false;
+
+            if(!Objects.equals(operand, imcode.operand))
+                return false;
+
+            return true;
+        }
+
+        @Override
+        protected int getHashCode()
+        {
+            return Objects.hash(operand);
+        }
     }
 
 
@@ -68,7 +94,7 @@ public class SqlInExpression extends SqlExpressionIntercode
     private SqlExpressionIntercode expression;
 
 
-    public SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
+    protected SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
             SqlExpressionIntercode expression)
     {
         super(asSet(xsdBoolean), expression.canBeNull(),
@@ -176,5 +202,37 @@ public class SqlInExpression extends SqlExpressionIntercode
         }
 
         builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlInExpression imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(negated, imcode.negated))
+            return false;
+
+        if(!Objects.equals(left, imcode.left))
+            return false;
+
+        if(!Objects.equals(new Multiset<>(rights), new Multiset<>(imcode.rights)))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(negated, left, new Multiset<>(rights));
     }
 }

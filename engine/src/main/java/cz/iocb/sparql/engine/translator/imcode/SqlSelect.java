@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
@@ -32,7 +33,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlSelect extends SqlIntercode
+public final class SqlSelect extends SqlIntercode
 {
     private final SqlIntercode child;
     private final List<String> projections;
@@ -892,5 +893,49 @@ public class SqlSelect extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlSelect imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(projections, imcode.projections))
+            return false;
+
+        if(!Objects.equals(orderBy, imcode.orderBy))
+            return false;
+
+        if(!Objects.equals(simpleOrderBy, imcode.simpleOrderBy))
+            return false;
+
+        if(!Objects.equals(offset, imcode.offset))
+            return false;
+
+        if(!Objects.equals(limit, imcode.limit))
+            return false;
+
+        if(!Objects.equals(distinct, imcode.distinct))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(projections, orderBy, simpleOrderBy, offset, limit, distinct, child);
     }
 }

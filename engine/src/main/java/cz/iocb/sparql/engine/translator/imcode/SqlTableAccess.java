@@ -29,7 +29,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlTableAccess extends SqlIntercode
+public final class SqlTableAccess extends SqlIntercode
 {
     private final Table table;
     private final Conditions conditions;
@@ -1100,5 +1100,40 @@ public class SqlTableAccess extends SqlIntercode
                 builder.append(e.getValue().stream().map(c -> c.toString()).collect(joining(",", "(", ")")));
             }
         }
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlTableAccess imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(reduced, imcode.reduced))
+            return false;
+
+        if(!Objects.equals(table, imcode.table))
+            return false;
+
+        if(!Objects.equals(internal, imcode.internal))
+            return false;
+
+        if(!Objects.equals(conditions, imcode.conditions))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(reduced, table, internal, conditions);
     }
 }

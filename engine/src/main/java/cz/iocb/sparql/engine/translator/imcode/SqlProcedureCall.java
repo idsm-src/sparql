@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -26,7 +27,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 //TODO: add support for binding parameter and result variables
-public class SqlProcedureCall extends SqlIntercode
+public final class SqlProcedureCall extends SqlIntercode
 {
     private static final String resultName = "@res";
 
@@ -380,5 +381,40 @@ public class SqlProcedureCall extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlProcedureCall imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(procedure, imcode.procedure))
+            return false;
+
+        if(!Objects.equals(parameters, imcode.parameters))
+            return false;
+
+        if(!Objects.equals(results, imcode.results))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(procedure, parameters, results, child);
     }
 }

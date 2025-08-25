@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -11,7 +12,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlVariable extends SqlNodeValue
+public final class SqlVariable extends SqlNodeValue
 {
     private final UsedVariable variable;
 
@@ -102,5 +103,31 @@ public class SqlVariable extends SqlNodeValue
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
         builder.append(variable.getName());
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlVariable imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(variable, imcode.variable))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(variable);
     }
 }

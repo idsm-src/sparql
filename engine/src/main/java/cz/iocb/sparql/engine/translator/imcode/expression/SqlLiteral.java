@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLi
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -17,7 +18,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlLiteral extends SqlNodeValue
+public final class SqlLiteral extends SqlNodeValue
 {
     public static final Literal trueLiteral = new Literal("true", xsdBooleanType);
     public static final Literal falseLiteral = new Literal("false", xsdBooleanType);
@@ -119,5 +120,34 @@ public class SqlLiteral extends SqlNodeValue
             else
                 builder.append(type);
         }
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlLiteral imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(literal, imcode.literal))
+            return false;
+
+        if(literalClass != imcode.literalClass)
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(literal);
     }
 }

@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -25,7 +26,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlUnion;
 
 
 
-public class SqlExists extends SqlExpressionIntercode
+public final class SqlExists extends SqlExpressionIntercode
 {
     private final boolean negated;
     private final SqlIntercode pattern;
@@ -184,5 +185,37 @@ public class SqlExists extends SqlExpressionIntercode
         pattern.generateExplanation(builder, getIndent(existsIndent, true));
 
         builder.append(existsIndent).append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlExists imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(negated, imcode.negated))
+            return false;
+
+        if(!Objects.equals(pattern, imcode.pattern))
+            return false;
+
+        //if(!Objects.equals(variables, imcode.variables))
+        //    return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(negated, pattern);
     }
 }

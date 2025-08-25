@@ -16,6 +16,7 @@ import static java.util.stream.Collectors.toSet;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -26,7 +27,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlEffectiveBooleanValue extends SqlUnary
+public final class SqlEffectiveBooleanValue extends SqlUnary
 {
     private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean, xsdShort, xsdInt, xsdLong,
             xsdInteger, xsdDecimal, xsdFloat, xsdDouble, xsdString);
@@ -212,5 +213,31 @@ public class SqlEffectiveBooleanValue extends SqlUnary
         builder.append("evb(");
         operand.generateExplanation(builder, indent, 10);
         builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlEffectiveBooleanValue imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(operand, imcode.operand))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(operand);
     }
 }

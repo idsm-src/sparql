@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -54,7 +55,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlServiceStub extends SqlIntercode
+public final class SqlServiceStub extends SqlIntercode
 {
     private static final int serviceRedirectLimit = 3;
     private static final int serviceContextLimit = 1000;
@@ -540,5 +541,43 @@ public class SqlServiceStub extends SqlIntercode
 
         indentChild(builder, indent, true);
         context.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlServiceStub imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(silent, imcode.silent))
+            return false;
+
+        if(!Objects.equals(name, imcode.name))
+            return false;
+
+        if(!Objects.equals(blankNodeClass, imcode.blankNodeClass))
+            return false;
+
+        if(!Objects.equals(pattern, imcode.pattern))
+            return false;
+
+        if(!Objects.equals(context, imcode.context))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(silent, name, blankNodeClass, pattern, context);
     }
 }

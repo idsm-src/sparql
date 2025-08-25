@@ -32,7 +32,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 
-public class SqlAggregation extends SqlIntercode
+public final class SqlAggregation extends SqlIntercode
 {
     private final SqlIntercode child;
     private final Set<String> groupVariables;
@@ -160,60 +160,16 @@ public class SqlAggregation extends SqlIntercode
                 && optAggregations.values().stream().allMatch(e -> e instanceof SqlBuiltinCall call
                         && call.getFunction().equals("card") && !call.isDistinct()))
         {
-            record CodeWrapper(SqlIntercode item, String code)
-            {
-                @Override
-                public int hashCode()
-                {
-                    return item instanceof SqlTableAccess tab ? Objects.hashCode(tab.getTable()) : item.hashCode();
-                }
-
-                @Override
-                public boolean equals(Object other)
-                {
-                    if(other instanceof CodeWrapper o && item instanceof SqlTableAccess l
-                            && o.item instanceof SqlTableAccess r && Objects.equals(l.getTable(), r.getTable())
-                            && l.getConditions().equals(r.getConditions()) && l.getReduced() == r.getReduced())
-                        return true;
-
-
-                    if(other instanceof CodeWrapper o && item instanceof SqlDistinct pl
-                            && o.item instanceof SqlDistinct pr && pl.getChild() instanceof SqlTableAccess l
-                            && pr.getChild() instanceof SqlTableAccess r && Objects.equals(l.getTable(), r.getTable())
-                            && l.getConditions().equals(r.getConditions()) /*&& l.getReduced() == r.getReduced()*/)
-                    {
-                        Set<Column> sl = new HashSet<Column>();
-                        Set<Column> sr = new HashSet<Column>();
-
-                        for(String v : pl.getVariables().getNames())
-                            sl.addAll(l.getInternalVariable(v).getNonConstantColumns());
-
-                        for(String v : pr.getVariables().getNames())
-                            sr.addAll(r.getInternalVariable(v).getNonConstantColumns());
-
-                        if(sl.equals(sr))
-                            return true;
-                    }
-
-                    //FIXME: use a better approach to decide whether the two codes are equivalent
-                    if(other instanceof CodeWrapper o && o.code.equals(code))
-                        return true;
-
-                    return false;
-                }
-            }
-
-
-            Map<CodeWrapper, Integer> counts = new HashMap<CodeWrapper, Integer>();
+            Map<SqlIntercode, Integer> counts = new HashMap<SqlIntercode, Integer>();
 
             for(SqlIntercode child : union.getChilds())
-                counts.merge(new CodeWrapper(child, child.translate(request)), 1, Integer::sum);
+                counts.merge(child, 1, Integer::sum);
 
             List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
 
-            for(Entry<CodeWrapper, Integer> entry : counts.entrySet())
+            for(Entry<SqlIntercode, Integer> entry : counts.entrySet())
             {
-                SqlIntercode code = entry.getKey().item;
+                SqlIntercode code = entry.getKey();
                 Integer count = entry.getValue();
 
                 if(count > 1)
@@ -484,5 +440,37 @@ public class SqlAggregation extends SqlIntercode
 
         indentChild(builder, indent, true);
         child.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlAggregation imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(aggregations, imcode.aggregations))
+            return false;
+
+        if(!Objects.equals(groupVariables, imcode.groupVariables))
+            return false;
+
+        if(!Objects.equals(child, imcode.child))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(aggregations, groupVariables, child);
     }
 }

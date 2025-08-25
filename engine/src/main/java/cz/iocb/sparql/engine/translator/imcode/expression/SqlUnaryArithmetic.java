@@ -8,6 +8,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -16,7 +17,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlUnaryArithmetic extends SqlUnary
+public final class SqlUnaryArithmetic extends SqlUnary
 {
     private final boolean isMinus;
 
@@ -138,5 +139,34 @@ public class SqlUnaryArithmetic extends SqlUnary
     {
         builder.append(isMinus ? "- " : "+ ");
         operand.generateExplanation(builder, indent, 3);
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlUnaryArithmetic imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(isMinus, imcode.isMinus))
+            return false;
+
+        if(!Objects.equals(operand, imcode.operand))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(isMinus, operand);
     }
 }

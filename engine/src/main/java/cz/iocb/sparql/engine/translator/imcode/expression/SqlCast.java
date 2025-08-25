@@ -17,6 +17,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.toSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
@@ -33,7 +34,7 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 //TODO: add support for casting to user literals
-public class SqlCast extends SqlUnary
+public final class SqlCast extends SqlUnary
 {
     private final ResourceClass resourceClass;
 
@@ -431,5 +432,34 @@ public class SqlCast extends SqlUnary
         builder.append("(");
         operand.generateExplanation(builder, indent, 10);
         builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlCast imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(resourceClass != imcode.resourceClass)
+            return false;
+
+        if(!Objects.equals(operand, imcode.operand))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(resourceClass, operand);
     }
 }

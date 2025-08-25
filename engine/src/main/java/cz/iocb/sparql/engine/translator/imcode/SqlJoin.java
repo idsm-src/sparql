@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.sparql.engine.translator.UsedVariable;
@@ -29,7 +30,7 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 
 
-public class SqlJoin extends SqlIntercode
+public final class SqlJoin extends SqlIntercode
 {
     private final List<Table> tables;
     private final List<SqlIntercode> childs;
@@ -675,5 +676,31 @@ public class SqlJoin extends SqlIntercode
             indentChild(builder, indent, i == childs.size() - 1);
             childs.get(i).generateExplanation(builder, getIndent(indent, i == childs.size() - 1));
         }
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlJoin imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(new Multiset<>(childs), new Multiset<>(imcode.childs)))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(new Multiset<>(childs));
     }
 }

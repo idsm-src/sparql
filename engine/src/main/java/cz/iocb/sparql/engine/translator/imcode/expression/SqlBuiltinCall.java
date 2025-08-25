@@ -28,6 +28,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import cz.iocb.sparql.engine.database.Column;
@@ -48,14 +49,14 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlBuiltinCall extends SqlExpressionIntercode
+public final class SqlBuiltinCall extends SqlExpressionIntercode
 {
     private final String function;
     private final boolean distinct;
     private final List<SqlExpressionIntercode> arguments;
 
 
-    SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
+    protected SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
             Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         super(resourceClasses, canBeNull,
@@ -69,8 +70,8 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
-    SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments, Set<ResourceClass> resourceClasses,
-            boolean canBeNull)
+    protected SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments,
+            Set<ResourceClass> resourceClasses, boolean canBeNull)
     {
         this(function, false, arguments, resourceClasses, canBeNull);
     }
@@ -3010,5 +3011,34 @@ public class SqlBuiltinCall extends SqlExpressionIntercode
         }
 
         builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlBuiltinCall imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(distinct, imcode.distinct) || !Objects.equals(function, imcode.function))
+            return false;
+
+        if(!Objects.equals(arguments, imcode.arguments))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(distinct, function, arguments);
     }
 }

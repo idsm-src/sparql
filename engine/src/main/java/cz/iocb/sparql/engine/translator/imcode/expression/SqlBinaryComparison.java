@@ -23,6 +23,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
@@ -44,16 +45,18 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public class SqlBinaryComparison extends SqlBinary
+public final class SqlBinaryComparison extends SqlBinary
 {
+    private static final int SECS_PER_DAY = 24 * 60 * 60;
+
     private final Operator operator;
+
     private final boolean isAlwaysDifferentIfNotNull;
     private final List<Pair<ResourceClass, ResourceClass>> comparable;
     private final List<Pair<ResourceClass, ResourceClass>> different;
-    private static final int SECS_PER_DAY = 24 * 60 * 60;
 
 
-    public SqlBinaryComparison(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+    protected SqlBinaryComparison(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             boolean canBeNull, boolean isAlwaysDifferentIfNotNull, List<Pair<ResourceClass, ResourceClass>> comparable,
             List<Pair<ResourceClass, ResourceClass>> different)
     {
@@ -746,5 +749,34 @@ public class SqlBinaryComparison extends SqlBinary
 
         if(myPriortity > priority)
             builder.append(")");
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(!(object instanceof SqlBinaryComparison imcode))
+            return false;
+
+        if(!super.equals(imcode))
+            return false;
+
+        if(!Objects.equals(operator, imcode.operator))
+            return false;
+
+        if(!left.equals(imcode.left) || !right.equals(imcode.right))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    protected int getHashCode()
+    {
+        return Objects.hash(operator, left, right);
     }
 }
