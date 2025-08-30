@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.xml.parsers.ParserConfigurationException;
@@ -57,6 +58,12 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 
 public final class SqlServiceStub extends SqlIntercode
 {
+    private static class SharedState
+    {
+        public Map<SqlIntercode, SqlIntercode> results = new HashMap<SqlIntercode, SqlIntercode>();
+    }
+
+
     private static final int serviceRedirectLimit = 3;
     private static final int serviceContextLimit = 1000;
     private static final int serviceResultLimit = 10000000;
@@ -66,10 +73,11 @@ public final class SqlServiceStub extends SqlIntercode
     private final GraphPattern pattern;
     private final boolean silent;
     private final UserStrBlankNodeClass blankNodeClass;
+    private final SharedState state;
 
 
     protected SqlServiceStub(UsedVariables variables, VarOrIri name, GraphPattern pattern, SqlIntercode context,
-            UserStrBlankNodeClass blankNodeClass, boolean silent)
+            UserStrBlankNodeClass blankNodeClass, boolean silent, SharedState state)
     {
         super(variables, false);
 
@@ -78,18 +86,19 @@ public final class SqlServiceStub extends SqlIntercode
         this.pattern = pattern;
         this.silent = silent;
         this.blankNodeClass = blankNodeClass;
+        this.state = state;
     }
 
 
     public static SqlIntercode create(Request request, VarOrIri name, GraphPattern pattern, SqlIntercode context,
             UserStrBlankNodeClass blankNodeClass, boolean silent)
     {
-        return create(request, name, pattern, context, blankNodeClass, silent, null);
+        return create(request, name, pattern, context, blankNodeClass, silent, null, new SharedState());
     }
 
 
     protected static SqlIntercode create(Request request, VarOrIri name, GraphPattern pattern, SqlIntercode context,
-            UserStrBlankNodeClass blankNodeClass, boolean silent, Restrictions restrictions)
+            UserStrBlankNodeClass blankNodeClass, boolean silent, Restrictions restrictions, SharedState state)
     {
         Set<ResourceClass> resourceClasses = new HashSet<ResourceClass>();
         resourceClasses.add(unsupportedIri);
@@ -131,7 +140,8 @@ public final class SqlServiceStub extends SqlIntercode
             }
         }
 
-        return new SqlServiceStub(variables.restrict(restrictions), name, pattern, context, blankNodeClass, silent);
+        return new SqlServiceStub(variables.restrict(restrictions), name, pattern, context, blankNodeClass, silent,
+                state);
     }
 
 
@@ -142,12 +152,12 @@ public final class SqlServiceStub extends SqlIntercode
             return eval(request, restrictions);
 
 
-        Restrictions childRestrictions = new Restrictions(restrictions);
+        Restrictions contextRestrictions = new Restrictions(restrictions);
 
         for(Variable var : pattern.getVariablesInScope())
-            childRestrictions.add(var.getSqlName());
+            contextRestrictions.add(var.getSqlName());
 
-        SqlIntercode optContext = context.optimize(request, childRestrictions, reduced, evalServices);
+        SqlIntercode optContext = context.optimize(request, contextRestrictions, reduced, evalServices);
 
 
         if(optContext == SqlNoSolution.get())
@@ -166,7 +176,7 @@ public final class SqlServiceStub extends SqlIntercode
             List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : union.getChilds())
-                childs.add(create(request, name, pattern, child, blankNodeClass, silent));
+                childs.add(create(request, name, pattern, child, blankNodeClass, silent, restrictions, state));
 
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
         }
@@ -175,7 +185,7 @@ public final class SqlServiceStub extends SqlIntercode
         if(optContext == context && restrictions.isOptimized(variables))
             return this;
 
-        return create(request, name, pattern, optContext, blankNodeClass, silent);
+        return create(request, name, pattern, optContext, blankNodeClass, silent, restrictions, state);
     }
 
 
@@ -188,6 +198,13 @@ public final class SqlServiceStub extends SqlIntercode
 
     public SqlIntercode eval(Request request, Restrictions restrictions)
     {
+        if(state.results.containsKey(context))
+        {
+            System.err.println("use result from state");
+            return state.results.get(context);
+        }
+
+
         /* create variable lists */
 
         Set<String> contextVariables = context.getVariables().getNames();
@@ -503,7 +520,12 @@ public final class SqlServiceStub extends SqlIntercode
                 }
             }
 
-            return results.get();
+            SqlIntercode result = results.get();
+
+            if(context.isDeterministic())
+                state.results.put(context, result);
+
+            return result;
         }
         catch(ServiceException e)
         {
