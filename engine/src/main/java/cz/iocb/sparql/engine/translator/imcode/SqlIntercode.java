@@ -750,7 +750,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                     Set<ResourceClass> set = new HashSet<ResourceClass>();
 
                     for(ResourceClass rc : var.getMappings().keySet())
-                        if(vars.stream().anyMatch(v -> v.containsClass(rc) || v.containsClass(rc.getGeneralClass())))
+                        if(vars.stream().anyMatch(v -> v.getClasses().stream()
+                                .anyMatch(c -> c == rc || c.getGeneralClass() == rc || c == rc.getGeneralClass())))
                             set.add(rc);
 
                     joinRestrictions.set(name, set);
