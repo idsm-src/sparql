@@ -28,31 +28,31 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
-      <version>5.13.3</version>
+      <version>5.13.4</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
-      <version>5.13.3</version>
+      <version>5.13.4</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-core</artifactId>
-      <version>5.4.0</version>
+      <version>5.5.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-arq</artifactId>
-      <version>5.4.0</version>
+      <version>5.5.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-jdbc</artifactId>
-      <version>9.0.107</version>
+      <version>9.0.108</version>
       <scope>test</scope>
     </dependency>
     <dependency>
