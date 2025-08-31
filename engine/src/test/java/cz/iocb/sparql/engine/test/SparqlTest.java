@@ -1,6 +1,14 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.error.MessageCategory.ERROR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import java.io.BufferedReader;
 import java.io.File;
@@ -18,8 +26,10 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -104,6 +114,7 @@ public class SparqlTest
     static PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image).withSharedMemorySize(1L << 30);
 
     private static final UserStrBlankNodeClass bnodeClass = new UserStrBlankNodeClass();
+    private static final Map<LiteralClass, LiteralClass> literalClassMap = new HashMap<LiteralClass, LiteralClass>();
 
     private static DataSource connectionPool = null;
     private static DatabaseSchema schema = null;
@@ -155,6 +166,17 @@ public class SparqlTest
                 model.add(m);
             }
         }
+
+
+        literalClassMap.put(xsdString, new SubsetLiteralClass(xsdString));
+        literalClassMap.put(xsdDouble, new SubsetLiteralClass(xsdDouble));
+        literalClassMap.put(xsdFloat, new SubsetLiteralClass(xsdFloat));
+        literalClassMap.put(xsdDecimal, new SubsetLiteralClass(xsdDecimal));
+        literalClassMap.put(xsdInteger, new SubsetLiteralClass(xsdInteger));
+        literalClassMap.put(xsdLong, new SubsetLiteralClass(xsdLong));
+        literalClassMap.put(xsdInt, new SubsetLiteralClass(xsdInt));
+        literalClassMap.put(xsdShort, new SubsetLiteralClass(xsdShort));
+        literalClassMap.put(xsdBoolean, new SubsetLiteralClass(xsdBoolean));
     }
 
 
@@ -229,35 +251,36 @@ public class SparqlTest
 
         Engine engine = new Engine(config);
 
-        List<List<RdfNode>> result = new ArrayList<List<RdfNode>>();
+        try(Request request = engine.getRequest())
+        {
+            List<List<RdfNode>> result = getResult(request.execute(query));
+
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
+        }
+    }
+
+
+    @DisplayName("Query Evaluation Tests (with subset literals)")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("getQueryEvaluationTests")
+    void doQueryEvaluationTestsWithLiteralMap(String name, String query, List<Quad> quads, List<List<RdfNode>> expected)
+            throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
+    {
+        SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
+
+        for(Quad quad : quads)
+            config.addQuadMapping((ConstantIriMapping) getMapping(quad.graph, config), getMapping(quad.subject, config),
+                    (ConstantIriMapping) getMapping(quad.predicate, config),
+                    getMapping(quad.object, config, literalClassMap));
+
+        Engine engine = new Engine(config);
 
         try(Request request = engine.getRequest())
         {
-            Result it = request.execute(query);
+            List<List<RdfNode>> result = getResult(request.execute(query));
 
-            if(it.getHeads().isEmpty())
-            {
-                while(it.next())
-                {
-                    result.add(new ArrayList<RdfNode>());
-                }
-            }
-            else
-            {
-                while(it.next())
-                {
-                    RdfNode[] row = it.getRow();
-
-                    for(int i = 0; i < row.length; i++)
-                        if(row[i] instanceof BNode)
-                            row[i] = new BNode("");
-
-                    result.add(Arrays.asList(row));
-                }
-            }
+            MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
         }
-
-        MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
     }
 
 
@@ -535,6 +558,13 @@ public class SparqlTest
 
     private static NodeMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
     {
+        return getMapping(node, config, Map.of());
+    }
+
+
+    private static NodeMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
+            Map<LiteralClass, LiteralClass> map)
+    {
         if(node == null)
         {
             return null;
@@ -558,7 +588,7 @@ public class SparqlTest
                                 config.getDataType(new IRI(node.asLiteral().getDatatypeURI())),
                                 new IRI(node.asLiteral().getDatatypeURI())));
 
-            return new ConstantLiteralMapping(literalClass, literal);
+            return new ConstantLiteralMapping(map.getOrDefault(literalClass, literalClass), literal);
         }
         else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
         {
@@ -752,5 +782,34 @@ public class SparqlTest
         saxParser.parse((new URI(result.asResource().getURI())).toURL().openStream(), handler);
 
         return results;
+    }
+
+
+    private List<List<RdfNode>> getResult(Result it) throws SQLException
+    {
+        List<List<RdfNode>> result = new ArrayList<List<RdfNode>>();
+
+        if(it.getHeads().isEmpty())
+        {
+            while(it.next())
+            {
+                result.add(new ArrayList<RdfNode>());
+            }
+        }
+        else
+        {
+            while(it.next())
+            {
+                RdfNode[] row = it.getRow();
+
+                for(int i = 0; i < row.length; i++)
+                    if(row[i] instanceof BNode)
+                        row[i] = new BNode("");
+
+                result.add(Arrays.asList(row));
+            }
+        }
+
+        return result;
     }
 }
