@@ -849,7 +849,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         UsedVariables optimizedVariables = internal.restrict(restrictions);
 
-        if(optimizedVariables.equals(internal))
+        if(this.reduced == reduced && optimizedVariables.equals(internal))
             return this;
 
         return create(table, conditions, optimizedVariables, reduced);
