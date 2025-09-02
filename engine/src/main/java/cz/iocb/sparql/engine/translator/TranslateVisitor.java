@@ -1072,7 +1072,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(offset != null || limit != null || !order.isEmpty())
                 imcode = imcode.addExternalLimits(offset, limit, order);
 
-            return imcode.optimize(request, false).optimize(request, true);
+            return imcode;
         }
         catch(ServiceRuntimeException e)
         {

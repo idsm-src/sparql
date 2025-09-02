@@ -249,6 +249,12 @@ public class Request implements AutoCloseable
             TranslateVisitor translateVisitor = new TranslateVisitor(this);
             SqlSelect imcode = translateVisitor.translate(syntaxTree, newOffset, newLimit, order);
 
+            // optimize
+            imcode = imcode.optimize(this, false);
+
+            // evaluate service calls
+            imcode = imcode.optimize(this, true);
+
             String code = imcode.translate(this);
 
             if(sqlSizeLimit > 0 && code.length() > sqlSizeLimit)

@@ -235,9 +235,10 @@ public final class SqlServiceStub extends SqlIntercode
             /* evaluate context pattern */
 
             BigInteger limit = BigInteger.valueOf(serviceContextLimit + 1);
-            SqlSelect query = SqlSelect.createTopLevel(request, new ArrayList<String>(contextVariables), context, null,
-                    limit);
-            String code = query.optimize(request, true).translate(request);
+            ArrayList<String> vars = new ArrayList<String>(contextVariables);
+            SqlSelect query = SqlSelect.createTopLevel(request, vars, context, null, limit).optimize(request, true);
+
+            String code = query.translate(request);
 
             try(Result result = new Result(ResultType.SELECT, query.getResultDescription(),
                     request.getStatement().executeQuery(code), request.getBegin(), request.getTimeout()))
