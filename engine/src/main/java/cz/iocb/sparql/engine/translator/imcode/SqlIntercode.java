@@ -173,7 +173,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     Set<ResourceClass> sc = new HashSet<ResourceClass>();
                     sc.addAll(sa);
                     sc.addAll(sa);
-                    map.put(v, sb);
+                    map.put(v, sc);
                 }
             }
         }
