@@ -64,6 +64,8 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    private static final String userAgent;
+
     private static final int serviceRedirectLimit = 3;
     private static final int serviceContextLimit = 1000;
     private static final int serviceResultLimit = 10000000;
@@ -74,6 +76,18 @@ public final class SqlServiceStub extends SqlIntercode
     private final boolean silent;
     private final UserStrBlankNodeClass blankNodeClass;
     private final SharedState state;
+
+
+    static
+    {
+        String version = SqlServiceStub.class.getPackage().getImplementationVersion();
+
+        if(version == null)
+            version = "devel";
+
+        userAgent = "IDSM SPARQL engine/" + version
+                + " (https://github.com/idsm-src/sparql; jakub.galgonek@uochb.cas.cz)";
+    }
 
 
     protected SqlServiceStub(UsedVariables variables, VarOrIri name, GraphPattern pattern, SqlIntercode context,
@@ -361,6 +375,7 @@ public final class SqlServiceStub extends SqlIntercode
                         connection.setRequestMethod("POST");
                         connection.setRequestProperty("content-type",
                                 "application/x-www-form-urlencoded; charset=UTF-8");
+                        connection.setRequestProperty("user-agent", userAgent);
                         connection.setRequestProperty("accept", "application/sparql-results+xml");
                         connection.setDoOutput(true);
 
