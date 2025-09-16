@@ -151,6 +151,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
         //FIXME: is procedure deterministic?
         SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+        LinkedHashMap<ParameterDefinition, SqlNodeValue> optParameters = optimize(request, parameters, optChild);
 
 
         if(optChild instanceof SqlUnion union)
@@ -158,22 +159,18 @@ public final class SqlProcedureCall extends SqlIntercode
             List<SqlIntercode> childs = new ArrayList<SqlIntercode>();
 
             for(SqlIntercode child : union.getChilds())
-                childs.add(create(request, procedure, parameters, optResults, child, restrictions));
+            {
+                LinkedHashMap<ParameterDefinition, SqlNodeValue> childParams = optimize(request, optParameters, child);
+                childs.add(create(request, procedure, childParams, optResults, child, restrictions));
+            }
 
             return SqlUnion.union(request, childs).optimize(request, restrictions, reduced, evalServices);
-        }
-
-        if(optChild != SqlEmptySolution.get() && parameters.values().stream()
-                .noneMatch(n -> n instanceof SqlVariable v && !v.getUsedVariable().isConstant()))
-        {
-            SqlIntercode call = create(request, procedure, parameters, optResults, SqlEmptySolution.get());
-            return SqlJoin.join(request, call, optChild).optimize(request, restrictions, reduced, evalServices);
         }
 
 
         UsedVariables callVariables = new UsedVariables();
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlNodeValue> entry : optParameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
             ResourceClass resClass = definition.getParameterClass();
@@ -232,10 +229,23 @@ public final class SqlProcedureCall extends SqlIntercode
         }
 
 
-        if(optResults.equals(results) && optChild == child && restrictions.isOptimized(variables))
+        if(optResults.equals(results) && optParameters.equals(parameters) && optChild == child
+                && restrictions.isOptimized(variables))
             return this;
 
-        return create(request, procedure, parameters, optResults, optChild, restrictions);
+        return create(request, procedure, optParameters, optResults, optChild, restrictions);
+    }
+
+
+    protected static LinkedHashMap<ParameterDefinition, SqlNodeValue> optimize(Request request,
+            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters, SqlIntercode context)
+    {
+        LinkedHashMap<ParameterDefinition, SqlNodeValue> result = new LinkedHashMap<ParameterDefinition, SqlNodeValue>();
+
+        for(Entry<ParameterDefinition, SqlNodeValue> e : parameters.entrySet())
+            result.put(e.getKey(), (SqlNodeValue) e.getValue().optimize(request, context.getVariables(), false));
+
+        return result;
     }
 
 
