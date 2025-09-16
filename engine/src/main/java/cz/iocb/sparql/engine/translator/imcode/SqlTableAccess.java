@@ -1095,9 +1095,12 @@ public final class SqlTableAccess extends SqlIntercode
 
             for(Entry<ResourceClass, List<Column>> e : var.getMappings().entrySet())
             {
-                builder.append(" ");
-                builder.append(e.getKey().getName());
-                builder.append(e.getValue().stream().map(c -> c.toString()).collect(joining(",", "(", ")")));
+                if(e.getValue() != null)
+                {
+                    builder.append(" ");
+                    builder.append(e.getKey().getName());
+                    builder.append(e.getValue().stream().map(c -> c.toString()).collect(joining(",", "(", ")")));
+                }
             }
         }
     }

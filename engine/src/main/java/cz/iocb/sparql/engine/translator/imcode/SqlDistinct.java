@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -261,7 +262,7 @@ public final class SqlDistinct extends SqlIntercode
     private static List<SqlIntercode> expandUnionByConstantColumns(Request request, SqlUnion union,
             Set<String> distinctVariables)
     {
-        Map<SqlIntercode, List<Column>> values = new HashMap<SqlIntercode, List<Column>>();
+        Map<SqlIntercode, List<Column>> values = new IdentityHashMap<SqlIntercode, List<Column>>();
 
         for(SqlIntercode child : union.getChilds())
             values.put(child, new ArrayList<Column>());

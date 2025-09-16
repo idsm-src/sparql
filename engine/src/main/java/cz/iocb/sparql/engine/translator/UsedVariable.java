@@ -229,6 +229,13 @@ public class UsedVariable
     }
 
 
+    @Override
+    public int hashCode()
+    {
+        return name.hashCode() + Boolean.hashCode(canBeNull) + mappings.hashCode();
+    }
+
+
     public boolean hasMapping()
     {
         return mappings.values().stream().anyMatch(c -> c != null);

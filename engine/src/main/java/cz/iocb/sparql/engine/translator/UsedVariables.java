@@ -129,4 +129,11 @@ public class UsedVariables
 
         return true;
     }
+
+
+    @Override
+    public int hashCode()
+    {
+        return usedVariables.hashCode();
+    }
 }
