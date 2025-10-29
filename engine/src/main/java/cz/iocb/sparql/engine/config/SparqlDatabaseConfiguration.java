@@ -498,7 +498,7 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    public void addServiceDescription()
+    public void addBasicServiceDescription()
     {
         //FIXME: Code depends on prefix definitions.
 
@@ -540,16 +540,44 @@ public class SparqlDatabaseConfiguration
             addQuadMapping(graph, function, createIriMapping("rdf:type"), createIriMapping("sd:Function"));
         }
 
-        for(ProcedureDefinition def : procedures.get(serviceIri).values())
+
+        Set<String> propertyIris = new HashSet<String>();
+
+        for(ProcedureDefinition def : getProcedures(getServiceIri()).values())
         {
-            ConstantIriMapping procedure = createIriMapping(new IRI(def.getProcedureName()));
+            propertyIris.add(def.getProcedureName());
+
+            for(ParameterDefinition parameter : def.getParameters())
+                propertyIris.add(parameter.getParamName());
+
+            if(!def.isSimple())
+                for(ResultDefinition result : def.getResults())
+                    propertyIris.add(result.getResultName());
+        }
+
+        for(String iri : propertyIris)
+        {
+            ConstantIriMapping procedure = createIriMapping(new IRI(iri));
             addQuadMapping(graph, endpoint, createIriMapping("sd:propertyFeature"), procedure);
             addQuadMapping(graph, procedure, createIriMapping("rdf:type"), createIriMapping("sd:Feature"));
         }
+    }
+
+
+    public void addDatasetServiceDescription()
+    {
+        //FIXME: Code depends on prefix definitions.
+
+        ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
+        ConstantIriMapping endpoint = createIriMapping(serviceIri);
 
         //FIXME: use blank node
-        ConstantIriMapping defaultDataset = createIriMapping("<" + serviceIri.getValue() + "#DefaultDataset>");
+        ConstantIriMapping defaultDataset = createIriMapping("<" + serviceIri.getValue() + "#default-dataset>");
+        ConstantIriMapping availableGraphs = createIriMapping("<" + serviceIri.getValue() + "#available-graphs>");
         ConstantIriMapping defaultGraph = createIriMapping("<" + serviceIri.getValue() + "#DefaultGraph>");
+
+        addQuadMapping(graph, endpoint, createIriMapping("sd:availableGraphs"), availableGraphs);
+        addQuadMapping(graph, availableGraphs, createIriMapping("rdf:type"), createIriMapping("sd:GraphCollection"));
 
         addQuadMapping(graph, endpoint, createIriMapping("sd:defaultDataset"), defaultDataset);
         addQuadMapping(graph, defaultDataset, createIriMapping("rdf:type"), createIriMapping("sd:Dataset"));
