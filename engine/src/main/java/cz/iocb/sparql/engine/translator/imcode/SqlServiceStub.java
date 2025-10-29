@@ -163,7 +163,7 @@ public final class SqlServiceStub extends SqlIntercode
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
         if(evalServices)
-            return eval(request, restrictions);
+            return eval(request, context, restrictions);
 
 
         Restrictions contextRestrictions = new Restrictions(restrictions);
@@ -210,7 +210,7 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
-    public SqlIntercode eval(Request request, Restrictions restrictions)
+    public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
     {
         if(state.results.containsKey(context))
         {
@@ -579,6 +579,18 @@ public final class SqlServiceStub extends SqlIntercode
 
         indentChild(builder, indent, true);
         context.generateExplanation(builder, getIndent(indent, true));
+    }
+
+
+    public GraphPattern getPattern()
+    {
+        return pattern;
+    }
+
+
+    public SqlIntercode getContext()
+    {
+        return context;
     }
 
 

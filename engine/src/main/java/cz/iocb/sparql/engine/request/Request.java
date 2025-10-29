@@ -106,6 +106,7 @@ public class Request implements AutoCloseable
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
     private final SparqlDatabaseConfiguration config;
+    private final boolean serviceReorder;
 
     private final IriCache iriCache = new IriCache(10000);
     private final Map<IRI, Set<IriClass>> missmatches = new HashMap<IRI, Set<IriClass>>();
@@ -120,9 +121,16 @@ public class Request implements AutoCloseable
     private boolean canceled;
 
 
-    public Request(SparqlDatabaseConfiguration config)
+    public Request(SparqlDatabaseConfiguration config, boolean serviceReorder)
     {
         this.config = config;
+        this.serviceReorder = serviceReorder;
+    }
+
+
+    public Request(SparqlDatabaseConfiguration config)
+    {
+        this(config, false);
     }
 
 
@@ -616,5 +624,11 @@ public class Request implements AutoCloseable
             return iri.getValue();
 
         return iriClass.getPrefix(columns);
+    }
+
+
+    public boolean isServiceReorderEnabled()
+    {
+        return serviceReorder;
     }
 }

@@ -1029,8 +1029,18 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return result;
         }
 
-        return SqlServiceStub.create(request, name, service.getPattern(), context,
-                new UserStrBlankNodeClass(--serviceId), service.isSilent());
+        if(request.isServiceReorderEnabled())
+        {
+            SqlIntercode call = SqlServiceStub.create(request, name, service.getPattern(), SqlEmptySolution.get(),
+                    new UserStrBlankNodeClass(--serviceId), service.isSilent());
+
+            return SqlJoin.join(request, call, context);
+        }
+        else
+        {
+            return SqlServiceStub.create(request, name, service.getPattern(), context,
+                    new UserStrBlankNodeClass(--serviceId), service.isSilent());
+        }
     }
 
 

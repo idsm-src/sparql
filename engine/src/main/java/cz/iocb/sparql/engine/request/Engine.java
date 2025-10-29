@@ -15,9 +15,15 @@ public class Engine
     }
 
 
+    public Request getRequest(boolean serviceReorder)
+    {
+        return new Request(config, serviceReorder);
+    }
+
+
     public Request getRequest()
     {
-        return new Request(config);
+        return new Request(config, false);
     }
 
 

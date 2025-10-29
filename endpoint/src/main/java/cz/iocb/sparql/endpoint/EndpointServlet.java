@@ -329,6 +329,10 @@ public class EndpointServlet extends HttpServlet
 
             // IOCB SPARQL protocol extension
             String warnings = req.getParameter("warnings");
+            boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
+
+            String reorder = req.getParameter("service-reorder");
+            boolean serviceReorder = reorder != null ? Boolean.parseBoolean(reorder) : false;
 
 
             int limit = -1;
@@ -346,9 +350,7 @@ public class EndpointServlet extends HttpServlet
             }
 
 
-            boolean includeWarnings = warnings != null ? Boolean.parseBoolean(warnings) : false;
-
-            try(Request request = engine.getRequest())
+            try(Request request = engine.getRequest(serviceReorder))
             {
                 PreparedQuery preparedQuery = request.prepareQuery(query, dataSets);
                 OutputType format = detectOutputType(req, preparedQuery.getResultType());
