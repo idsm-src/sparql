@@ -769,11 +769,11 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         for(String name : allVars.stream().flatMap(v -> v.getNames().stream()).collect(toSet()))
         {
-            List<UsedVariable> vars = allVars.stream().map(v -> v.get(name)).filter(v -> v != null).toList();
+            List<UsedVariable> vars = allVars.stream().map(v -> v.get(name)).filter(v -> v != null && !v.canBeNull())
+                    .toList();
 
-            if(vars.size() > 1 && vars.stream().anyMatch(v -> !v.canBeNull()))
+            if(vars.size() > 1)
             {
-                vars = vars.stream().filter(v -> !v.canBeNull()).toList();
                 Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(vars)), vars);
 
                 if(resClasses.isEmpty())
