@@ -112,14 +112,14 @@ public final class SqlLeftJoin extends SqlIntercode
 
             for(ResourceClass resClass : var.getClasses())
             {
-                List<Column> mapping = new ArrayList<Column>();
+                List<Column> cols = var.getMapping(resClass);
 
-                if(joinVariables != null)
-                    var.getMapping(resClass).forEach(c -> mapping.add(map.get(c)));
+                if(cols == null)
+                    variable.addMapping(resClass, null);
+                else if(joinVariables != null)
+                    variable.addMapping(resClass, cols.stream().map(c -> map.get(c)).toList());
                 else
-                    var.getMapping(resClass).forEach(c -> mapping.add(c.fromTable(leftTable)));
-
-                variable.addMapping(resClass, mapping);
+                    variable.addMapping(resClass, cols.stream().map(c -> c.fromTable(leftTable)).toList());
             }
 
             variables.add(variable);
