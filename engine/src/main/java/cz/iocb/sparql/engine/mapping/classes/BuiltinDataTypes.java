@@ -121,7 +121,7 @@ public class BuiltinDataTypes
     private static final String datePattern = dateWithoutZonePattern + timezonePattern;
 
 
-    @SuppressWarnings("serial") private static final Map<Long, String> eraSign = new HashMap<Long, String>()
+    private static final Map<Long, String> eraSign = new HashMap<Long, String>()
     {
         {
             put(0L, "-");

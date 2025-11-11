@@ -26,7 +26,6 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 public class DateTimeClass extends LiteralClass
 {
-    @SuppressWarnings("serial")
     private static final Map<Long, String> era = new HashMap<Long, String>()
     {
         {
