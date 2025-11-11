@@ -121,32 +121,34 @@ public final class SqlJoin extends SqlIntercode
 
         List<SqlIntercode> optChilds = deterministic;
 
-
-        if(optChilds.stream().anyMatch(c -> c instanceof SqlUnion || c instanceof SqlJoin))
-            optChilds = List.of(SqlUnion
-                    .union(request, expandJoin(optChilds).stream().map(l -> join(request, l, newRestrictions)).toList())
-                    .optimize(request, newRestrictions, reduced, evalServices));
-
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         while(true)
         {
-            List<SqlIntercode> newOptChilds = reduceDistinctUnion(
+            List<SqlIntercode> newChilds = reduceDistinctUnion(
                     reduceJoin(optimize(request, optChilds, newRestrictions, reduced, evalServices), newRestrictions,
                             schema),
                     newRestrictions, schema);
 
-            if(optChilds.stream().anyMatch(c -> c instanceof SqlUnion || c instanceof SqlJoin))
-                optChilds = List.of(SqlUnion
+            if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
+                optChilds = newChilds;
+
+            if(newChilds.size() > 1 && newChilds.stream().anyMatch(c -> c instanceof SqlUnion || c instanceof SqlJoin))
+            {
+                newChilds = List.of(SqlUnion
                         .union(request,
-                                expandJoin(optChilds).stream().map(l -> join(request, l, newRestrictions)).toList())
+                                expandJoin(newChilds).stream().map(l -> join(request, l, newRestrictions)).toList())
                         .optimize(request, newRestrictions, reduced, evalServices));
 
+                if(newChilds.size() == 1 && newChilds.get(0) instanceof SqlJoin join)
+                    newChilds = join.getChilds();
 
-            if(Objects.equals(new Multiset<>(newOptChilds), new Multiset<>(optChilds)))
+                if(!Objects.equals(new Multiset<>(newChilds), new Multiset<>(optChilds)))
+                    optChilds = newChilds;
+            }
+
+            if(optChilds != newChilds)
                 break;
-
-            optChilds = newOptChilds;
         }
 
 

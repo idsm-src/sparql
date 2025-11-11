@@ -63,9 +63,10 @@ public final class SqlLeftJoin extends SqlIntercode
 
         for(UsedVariable variable : right.getVariables().getValues())
             for(Entry<ResourceClass, List<Column>> entry : variable.getMappings().entrySet())
-                for(Column column : entry.getValue())
-                    if(column instanceof ConstantColumn)
-                        hasConstantColumn = true;
+                if(entry.getValue() != null)
+                    for(Column column : entry.getValue())
+                        if(column instanceof ConstantColumn)
+                            hasConstantColumn = true;
 
         if(hasConstantColumn)
             right = SqlStripConstantColumns.strip(right);
@@ -167,7 +168,7 @@ public final class SqlLeftJoin extends SqlIntercode
 
                 if(!unionList.equals(union.getChilds()))
                 {
-                    optRight = SqlUnion.union(request, unionList).optimize(request, restrictions, optReduced,
+                    optRight = SqlUnion.union(request, unionList).optimize(request, rightRestrictions, optReduced,
                             evalServices);
 
                     optConditions = optimize(request, optConditions, optLeft.getVariables(), optRight.getVariables(),
