@@ -222,9 +222,6 @@ public class MapUserIriClass extends SimpleUserIriClass
     @Override
     protected Column generateInverseFunction(Column parameter, boolean check)
     {
-        if(prefix == null && suffix == null && !check)
-            return parameter;
-
         StringBuilder builder = new StringBuilder();
 
         if(check)
