@@ -45,29 +45,36 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
             for(Entry<ResourceClass, List<Column>> entry : variable.getMappings().entrySet())
             {
-                List<Column> mapping = new ArrayList<Column>(entry.getValue().size());
-
-                for(Column column : entry.getValue())
+                if(entry.getValue() == null)
                 {
-                    if(column instanceof ConstantColumn constColumn)
-                    {
-                        TableColumn col = map.get(column);
-
-                        if(col == null)
-                        {
-                            col = new TableColumn("#const" + map.size());
-                            map.put(constColumn, col);
-                        }
-
-                        mapping.add(col);
-                    }
-                    else
-                    {
-                        mapping.add(column);
-                    }
+                    var.addMapping(entry.getKey(), null);
                 }
+                else
+                {
+                    List<Column> mapping = new ArrayList<Column>(entry.getValue().size());
 
-                var.addMapping(entry.getKey(), mapping);
+                    for(Column column : entry.getValue())
+                    {
+                        if(column instanceof ConstantColumn constColumn)
+                        {
+                            TableColumn col = map.get(column);
+
+                            if(col == null)
+                            {
+                                col = new TableColumn("#const" + map.size());
+                                map.put(constColumn, col);
+                            }
+
+                            mapping.add(col);
+                        }
+                        else
+                        {
+                            mapping.add(column);
+                        }
+                    }
+
+                    var.addMapping(entry.getKey(), mapping);
+                }
             }
 
             variables.add(var);
@@ -89,9 +96,10 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
         for(UsedVariable variable : optChild.getVariables().getValues())
             for(Entry<ResourceClass, List<Column>> entry : variable.getMappings().entrySet())
-                for(Column column : entry.getValue())
-                    if(column instanceof ConstantColumn)
-                        hasConstantColumn = true;
+                if(entry.getValue() != null)
+                    for(Column column : entry.getValue())
+                        if(column instanceof ConstantColumn)
+                            hasConstantColumn = true;
 
         if(!hasConstantColumn)
             return optChild;
