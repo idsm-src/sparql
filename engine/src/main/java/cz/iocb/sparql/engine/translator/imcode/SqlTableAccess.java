@@ -188,6 +188,9 @@ public final class SqlTableAccess extends SqlIntercode
 
     private static boolean canBeJoinedWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
     {
+        if(!right.hasUniqueData())
+            return false;
+
         for(UsedVariable variable : right.getVariables().getValues())
         {
             if(variable.canBeNull())

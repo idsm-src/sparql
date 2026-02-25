@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -152,6 +154,21 @@ public final class SqlValues extends SqlIntercode
         builder.append(")");
 
         return builder.toString();
+    }
+
+
+    public boolean hasUniqueData()
+    {
+        List<List<Column>> transposition = new ArrayList<List<Column>>(size);
+
+        for(int i = 0; i < size; i++)
+            transposition.add(new ArrayList<Column>(data.size()));
+
+        for(List<Column> columns : data.values())
+            for(int i = 0; i < size; i++)
+                transposition.get(i).add(columns.get(i));
+
+        return new HashSet<List<Column>>(transposition).size() == size;
     }
 
 
