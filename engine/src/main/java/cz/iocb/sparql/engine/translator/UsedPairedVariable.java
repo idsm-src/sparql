@@ -142,6 +142,14 @@ public class UsedPairedVariable
                     List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightVariable.getMapping(pairedClass.getLeftClass());
 
+                    /* NOTE: Consider the situation "(X join Y) left join Z". In both X and Z, the variable V may have
+                     * resource class R. In Y, however, the variable V cannot have resource class R, and is therefore
+                     * eliminated from both X and Z. During optimization, however, isJoinable may be called with
+                     * parameters X and Z.
+                     */
+                    if(leftCols == null || rightCols == null)
+                        continue;
+
                     if(!isJoinable(leftCols, rightCols))
                         continue;
                 }
