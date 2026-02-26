@@ -133,6 +133,11 @@ public final class SqlLeftJoin extends SqlIntercode
     @Override
     public SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced, boolean evalServices)
     {
+        SqlIntercode right = this.right;
+
+        if(right instanceof SqlStripConstantColumns strip)
+            right = strip.getChild();
+
         SqlIntercode optLeft = left;
         SqlIntercode optRight = right;
         List<SqlExpressionIntercode> optConditions = conditions;

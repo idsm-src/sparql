@@ -168,6 +168,12 @@ public final class SqlStripConstantColumns extends SqlIntercode
     }
 
 
+    public final SqlIntercode getChild()
+    {
+        return child;
+    }
+
+
     @Override
     public boolean equals(Object object)
     {
