@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator;
 
+import static java.util.Collections.nCopies;
 import static java.util.stream.Collectors.joining;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -44,6 +46,7 @@ public class StoredResultHandler extends ResultHandler
     private final Map<String, Integer> counts = new HashMap<String, Integer>();
     private final Map<Column, Column> constants = new HashMap<Column, Column>();
 
+    Map<String, List<ResourceClass>> resourceClasses = new HashMap<String, List<ResourceClass>>();
     private final LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
     int rowCount;
     int batchCount;
@@ -80,6 +83,9 @@ public class StoredResultHandler extends ResultHandler
             if(!restrictions.contains(entry.getKey(), resClass))
                 continue;
 
+            resourceClasses.computeIfAbsent(entry.getKey(), k -> new ArrayList<>(nCopies(batchSize, null)))
+                    .set(batchCount, resClass);
+
             List<Column> vals = getColumns(request, resClass, entry.getValue());
             List<Column> cols = variable.getMapping(resClass);
             List<String> types = resClass.getSqlTypes();
@@ -103,17 +109,8 @@ public class StoredResultHandler extends ResultHandler
             }
 
             for(int i = 0; i < vals.size(); i++)
-            {
-                List<Column> v = data.get(cols.get(i));
-
-                if(v == null)
-                {
-                    v = new ArrayList<>(Collections.nCopies(batchSize, (Column) null));
-                    data.put(cols.get(i), v);
-                }
-
-                v.set(batchCount, vals.get(i));
-            }
+                data.computeIfAbsent(cols.get(i), k -> new ArrayList<>(nCopies(batchSize, null))).set(batchCount,
+                        vals.get(i));
 
             if(rowCount == 0)
             {
@@ -157,17 +154,35 @@ public class StoredResultHandler extends ResultHandler
 
         if(rowCount < minTableSize)
         {
+            Map<Column, String> sqlTypes = new HashMap<>();
+
+            for(UsedVariable v : vars.getValues())
+                for(Entry<ResourceClass, List<Column>> e : v.getMappings().entrySet())
+                    for(int i = 0; i < e.getKey().getColumnCount(); i++)
+                        sqlTypes.put(e.getValue().get(i), e.getKey().getSqlTypes().get(i));
+
+
+            Map<String, List<ResourceClass>> types = new HashMap<String, List<ResourceClass>>();
+
+            for(Entry<String, List<ResourceClass>> entry : resourceClasses.entrySet())
+                types.put(entry.getKey(), entry.getValue().subList(0, rowCount));
+
+
             Set<Column> columns = vars.getNonConstantColumns();
 
             LinkedHashMap<Column, List<Column>> values = new LinkedHashMap<Column, List<Column>>();
 
             for(Entry<Column, List<Column>> entry : data.entrySet())
             {
+                String type = sqlTypes.get(entry.getKey());
+
                 if(columns.contains(entry.getKey()))
-                    values.put(entry.getKey(), entry.getValue().subList(0, rowCount));
+                    values.put(entry.getKey(), entry.getValue().stream().limit(rowCount)
+                            .map(c -> c != null ? c : new ConstantColumn(null, type)).toList());
             }
 
-            return SqlValues.create(vars, values, rowCount).optimize(request, restrictions, false, false);//FIXME
+
+            return SqlValues.create(vars, types, values, rowCount).optimize(request, restrictions, false, false);
         }
 
 
@@ -243,6 +258,7 @@ public class StoredResultHandler extends ResultHandler
         request.getStatement().execute(insert);
 
         data.clear();
+        resourceClasses.clear();
         batchCount = 0;
     }
 }

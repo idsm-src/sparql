@@ -790,6 +790,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             return SqlNoSolution.get();
 
 
+        Map<String, List<ResourceClass>> resourceClasses = new HashMap<String, List<ResourceClass>>();
         LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
         Map<List<Column>, Column> revData = new HashMap<List<Column>, Column>();
         UsedVariables variables = new UsedVariables();
@@ -802,7 +803,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             LinkedHashSet<ResourceClass> resClasses = new LinkedHashSet<ResourceClass>();
             boolean canBeNull = false;
 
-            Map<Node, ResourceClass> nodeTypes = new HashMap<Node, ResourceClass>();
+            List<ResourceClass> nodeResourceClasses = new ArrayList<ResourceClass>();
 
             for(List<Node> line : lines)
             {
@@ -812,11 +813,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     ResourceClass resClass = request.getResourceClass(node);
 
+                    nodeResourceClasses.add(resClass);
                     resClasses.add(resClass);
-                    nodeTypes.put(node, resClass);
                 }
                 else
                 {
+                    nodeResourceClasses.add(null);
                     canBeNull = true;
                 }
             }
@@ -824,6 +826,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             if(resClasses.size() == 0)
                 continue;
 
+            resourceClasses.put(variableNames.get(i), nodeResourceClasses);
 
             UsedVariable variable = new UsedVariable(variableNames.get(i), canBeNull);
 
@@ -834,13 +837,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 for(int j = 0; j < resClass.getColumnCount(); j++)
                     classColumns.add(new ArrayList<Column>(lines.size()));
 
-                for(List<Node> line : lines)
+                for(int k = 0; k < lines.size(); k++)
                 {
-                    Node node = line.get(i);
-
-                    if(node != null && resClass == nodeTypes.get(node))
+                    if(resClass == nodeResourceClasses.get(k))
                     {
-                        List<Column> cols = request.getColumns(resClass, node);
+                        List<Column> cols = request.getColumns(resClass, lines.get(k).get(i));
 
                         for(int j = 0; j < resClass.getColumnCount(); j++)
                             classColumns.get(j).add(cols.get(j));
@@ -885,7 +886,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             variables.add(variable);
         }
 
-        return SqlValues.create(variables, data, lines.size());
+        return SqlValues.create(variables, resourceClasses, data, lines.size());
     }
 
 

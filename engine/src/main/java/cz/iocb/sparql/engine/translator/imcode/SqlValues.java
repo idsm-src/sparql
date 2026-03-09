@@ -1,12 +1,15 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import java.util.ArrayList;
+import static java.util.stream.Collectors.toMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
@@ -21,21 +24,25 @@ import cz.iocb.sparql.engine.translator.UsedVariables;
 public final class SqlValues extends SqlIntercode
 {
     private final LinkedHashMap<Column, List<Column>> data;
+    private final Map<String, List<ResourceClass>> resourceClasses;
     private final int size;
 
 
-    protected SqlValues(UsedVariables usedVariables, LinkedHashMap<Column, List<Column>> data, int size)
+    protected SqlValues(UsedVariables usedVariables, Map<String, List<ResourceClass>> resourceClasses,
+            LinkedHashMap<Column, List<Column>> data, int size)
     {
         super(usedVariables, true);
 
         this.data = data;
+        this.resourceClasses = resourceClasses;
         this.size = size;
     }
 
 
-    public static SqlIntercode create(UsedVariables usedVariables, LinkedHashMap<Column, List<Column>> data, int size)
+    public static SqlIntercode create(UsedVariables usedVariables, Map<String, List<ResourceClass>> resourceClasses,
+            LinkedHashMap<Column, List<Column>> data, int size)
     {
-        return new SqlValues(usedVariables, data, size);
+        return new SqlValues(usedVariables, resourceClasses, data, size);
     }
 
 
@@ -52,7 +59,7 @@ public final class SqlValues extends SqlIntercode
         for(Column column : optimizedVariables.getNonConstantColumns())
             optimizedData.put(column, data.get(column));
 
-        return create(optimizedVariables, optimizedData, size);
+        return create(optimizedVariables, resourceClasses, optimizedData, size);
     }
 
 
@@ -157,21 +164,6 @@ public final class SqlValues extends SqlIntercode
     }
 
 
-    public boolean hasUniqueData()
-    {
-        List<List<Column>> transposition = new ArrayList<List<Column>>(size);
-
-        for(int i = 0; i < size; i++)
-            transposition.add(new ArrayList<Column>(data.size()));
-
-        for(List<Column> columns : data.values())
-            for(int i = 0; i < size; i++)
-                transposition.get(i).add(columns.get(i));
-
-        return new HashSet<List<Column>>(transposition).size() == size;
-    }
-
-
     public int getSize()
     {
         return size;
@@ -221,5 +213,125 @@ public final class SqlValues extends SqlIntercode
     protected int getHashCode()
     {
         return Objects.hash(size, data);
+    }
+
+
+    public SqlIntercode getSlice(int j)
+    {
+        UsedVariables subvars = new UsedVariables();
+
+        for(UsedVariable var : variables.getValues())
+        {
+            ResourceClass resClass = resourceClasses.get(var.getName()).get(j);
+
+            if(resClass != null)
+            {
+                List<Column> cols = var.getMapping(resClass);
+
+                if(cols == null)
+                {
+                    subvars.add(new UsedVariable(var.getName(), resClass, null, false));
+                }
+                else
+                {
+                    List<Column> constCols = cols.stream()
+                            .map(c -> c instanceof ConstantColumn ? c : data.get(c).get(j)).toList();
+                    subvars.add(new UsedVariable(var.getName(), resClass, constCols, false));
+                }
+            }
+        }
+
+        return SqlTableAccess.create(null, subvars);
+    }
+
+    static <T> List<T> filterByMask(List<T> list, boolean[] mask)
+    {
+        List<T> out = new java.util.ArrayList<>(list.size());
+
+        for(int i = 0; i < list.size(); i++)
+            if(mask[i])
+                out.add(list.get(i));
+
+        return out;
+    }
+
+
+    public SqlIntercode strip(boolean[] mask)
+    {
+        int newSize = 0;
+
+        for(int i = 0; i < mask.length; i++)
+            if(mask[i])
+                newSize++;
+
+        if(newSize == 0)
+            return SqlNoSolution.get();
+
+        if(newSize == 1)
+        {
+            //TODO: return SqlTableAccess
+            /*
+            for(int i = 0; i < mask.length; i++)
+                if(mask[i])
+                    return getSlice(i);
+            */
+        }
+
+
+        Map<String, List<ResourceClass>> filteredResourceClasses = resourceClasses.entrySet().stream()
+                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, b) -> a, HashMap::new));
+
+        LinkedHashMap<Column, List<Column>> filteredData = data.entrySet().stream()
+                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, b) -> a, LinkedHashMap::new));
+
+        UsedVariables newVars = new UsedVariables();
+
+        for(UsedVariable var : variables.getValues())
+        {
+            Set<ResourceClass> classes = new HashSet<ResourceClass>();
+            boolean canBeNull = false;
+
+            for(int i = 0; i < size; i++)
+            {
+                if(mask[i])
+                {
+                    ResourceClass resClass = resourceClasses.get(var.getName()).get(i);
+
+                    if(resClass != null)
+                        classes.add(resClass);
+                    else
+                        canBeNull = true;
+                }
+            }
+
+            if(!classes.isEmpty())
+            {
+                UsedVariable newVar = new UsedVariable(var.getName(), canBeNull);
+
+                for(ResourceClass rc : classes)
+                {
+                    List<Column> cols = var.getMapping(rc);
+
+                    if(cols != null)
+                        cols = cols.stream()
+                                .map(c -> c instanceof ConstantColumn ? c :
+                                        filteredData.get(c).stream().distinct().limit(2).count() == 1 ?
+                                                filteredData.get(c).get(0) : c)
+                                .toList();
+
+                    newVar.addMapping(rc, cols);
+                }
+
+                newVars.add(newVar);
+            }
+        }
+
+        Set<Column> nonConstCols = newVars.getNonConstantColumns();
+
+        LinkedHashMap<Column, List<Column>> refilteredData = filteredData.entrySet().stream()
+                .filter(e -> nonConstCols.contains(e.getKey()))
+                .collect(toMap(Entry::getKey, Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+
+        return create(newVars, filteredResourceClasses, refilteredData, newSize);
     }
 }

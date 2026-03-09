@@ -425,6 +425,31 @@ public final class SqlJoin extends SqlIntercode
 
         for(int i = 0; i < optChilds.size(); i++)
         {
+            if(optChilds.get(i) instanceof SqlValues values)
+            {
+                if(values.getSize() > 1)
+                {
+                    ArrayList<SqlIntercode> copyChilds = new ArrayList<SqlIntercode>(optChilds);
+
+                    boolean[] mask = new boolean[values.getSize()];
+
+                    for(int j = 0; j < values.getSize(); j++)
+                    {
+                        SqlIntercode line = values.getSlice(j);
+                        copyChilds.set(i, line);
+
+                        mask[j] = isJoinable(copyChilds);
+                    }
+
+
+                    optChilds.set(i, values.strip(mask));
+                }
+            }
+        }
+
+
+        for(int i = 0; i < optChilds.size(); i++)
+        {
             if(optChilds.get(i) instanceof SqlValues left)
             {
                 for(int j = 0; j < optChilds.size(); j++)
