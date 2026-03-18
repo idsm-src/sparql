@@ -159,7 +159,7 @@ public final class SqlRecursive extends SqlIntercode
             if(childs.size() == union.getChilds().size())
                 break;
 
-            nextOpt = SqlUnion.union(request, childs).optimize(request, restrictions, true, evalServices);
+            nextOpt = SqlUnion.union(request, childs).optimize(request, childRestrictions, true, evalServices);
         }
 
 

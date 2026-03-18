@@ -179,9 +179,9 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             String endName = ((VariableOrBlankNode) subject).getSqlName();
 
             SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(object, subject) :
-                    visitElement(repeatedPath.getChild(), object, subject);
+                    visitElement(repeatedPath.getChild(), subject, object);
 
-            SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, subject);
+            SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinNode);
 
             return SqlRecursive.create(request, init, next, null, joinName, endName, graphName);
         }
