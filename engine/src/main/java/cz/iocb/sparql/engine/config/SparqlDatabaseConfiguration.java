@@ -548,7 +548,8 @@ public class SparqlDatabaseConfiguration
             propertyIris.add(def.getProcedureName());
 
             for(ParameterDefinition parameter : def.getParameters())
-                propertyIris.add(parameter.getParamName());
+                if(!parameter.getParamName().startsWith("#"))
+                    propertyIris.add(parameter.getParamName());
 
             if(!def.isSimple())
                 for(ResultDefinition result : def.getResults())
