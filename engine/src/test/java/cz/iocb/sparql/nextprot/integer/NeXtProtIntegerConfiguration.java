@@ -61,7 +61,7 @@ public class NeXtProtIntegerConfiguration extends SparqlDatabaseConfiguration
     {
         addIriClass(new StringUserIriClass("uniprot", "http://purl.uniprot.org/uniprot/"));
         addIriClass(new StringUserIriClass("uniprotpage", "http://www.uniprot.org/uniprot/"));
-        addIriClass(new IntegerUserIriClass("chebi", "integer", "http://purl.obolibrary.org/obo/CHEBI_"));
+        addIriClass(new IntegerUserIriClass("chebi", "int4", "http://purl.obolibrary.org/obo/CHEBI_"));
         addIriClass(new StringUserIriClass("drugbank",
                 "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB"));
 

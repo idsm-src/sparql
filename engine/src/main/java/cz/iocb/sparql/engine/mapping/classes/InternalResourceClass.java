@@ -4,6 +4,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 
@@ -13,8 +14,14 @@ public class InternalResourceClass extends ResourceClass
 {
     public InternalResourceClass(int size)
     {
-        super("internal", new ArrayList<String>(Collections.nCopies(size, "any")),
-                new ArrayList<ResultTag>(Collections.nCopies(size, ResultTag.NULL)));
+        super("internal", new ArrayList<String>(Collections.nCopies(size, "any")));
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of();
     }
 
 
@@ -80,12 +87,6 @@ public class InternalResourceClass extends ResourceClass
         throw new IllegalArgumentException();
     }
 
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        throw new UnsupportedOperationException();
-    }
 
     @Override
     public String fromGeneralExpression(String code)

@@ -8,9 +8,9 @@ import cz.iocb.sparql.engine.parser.model.IRI;
 
 public abstract class UserIriClass extends IriClass
 {
-    protected UserIriClass(String name, List<String> sqlTypes, List<ResultTag> resultTags)
+    protected UserIriClass(String name, List<String> sqlTypes)
     {
-        super(name, sqlTypes, resultTags);
+        super(name, sqlTypes);
     }
 
 

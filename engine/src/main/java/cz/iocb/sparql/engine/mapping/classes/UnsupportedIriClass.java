@@ -15,7 +15,7 @@ public class UnsupportedIriClass extends IriClass
 {
     UnsupportedIriClass()
     {
-        super("unsupported", List.of("varchar"), List.of(ResultTag.IRI));
+        super("unsupported", List.of("varchar"));
     }
 
 
@@ -68,13 +68,6 @@ public class UnsupportedIriClass extends IriClass
     public Column toBoxedExpression(List<Column> columns)
     {
         return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + columns.get(0) + ")");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return columns;
     }
 
 

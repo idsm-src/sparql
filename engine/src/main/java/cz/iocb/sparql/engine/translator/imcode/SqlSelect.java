@@ -28,9 +28,10 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.ResultTag;
+import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.parser.model.OrderCondition.Direction;
+import cz.iocb.sparql.engine.request.ColumnMap;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
@@ -46,7 +47,7 @@ public final class SqlSelect extends SqlIntercode
     private final BigInteger offset;
     private final BigInteger limit;
     private final boolean distinct;
-    private final Map<String, List<List<ResultTag>>> description;
+    private final Map<String, List<ResultResourceClass>> description;
 
 
     protected SqlSelect(List<String> projections, SqlIntercode child, LinkedHashMap<String, Direction> orderBy,
@@ -67,10 +68,11 @@ public final class SqlSelect extends SqlIntercode
         {
             UsedVariable var = variables.get(varName);
 
-            if(var == null || var.getClasses().isEmpty())
-                description.put(varName, List.of(List.of(ResultTag.NULL)));
+            if(var == null)
+                description.put(varName, List.of());
             else
-                description.put(varName, var.getClasses().stream().map(c -> c.getResultTags()).distinct().toList());
+                description.put(varName, var.getClasses().stream().flatMap(c -> c.getResultResourceClasses().stream())
+                        .distinct().toList());
         }
     }
 
@@ -367,80 +369,41 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
-    private static String translateSelectVariables(Map<String, List<List<ResultTag>>> description,
+    private static String translateSelectVariables(Map<String, List<ResultResourceClass>> description,
             UsedVariables variables)
     {
+        ColumnMap columnMap = new ColumnMap();
+
         StringBuilder builder = new StringBuilder();
         boolean hasSelect = false;
 
-        for(Entry<String, List<List<ResultTag>>> entry : description.entrySet())
+        for(Entry<String, List<ResultResourceClass>> entry : description.entrySet())
         {
             String variableName = entry.getKey();
-            List<List<ResultTag>> tagss = entry.getValue();
+            UsedVariable variable = variables.get(variableName);
 
-            if(tagss.isEmpty())
-            {
-                appendComma(builder, hasSelect);
-                hasSelect = true;
+            if(variable == null)
+                variable = new UsedVariable(variableName, true);
 
-                builder.append("NULL AS \"");
-                builder.append(variableName.replaceFirst("^@", ""));
-                builder.append('#');
-                builder.append(ResultTag.NULL.getTag());
-                builder.append('"');
-            }
-            else
+            for(ResultResourceClass resClass : entry.getValue())
             {
-                for(List<ResultTag> tags : tagss)
+                List<Column> colNames = ((ResourceClass) resClass).createColumns(columnMap, variableName);
+                List<Column> cols = variable.deriveMapping((ResourceClass) resClass);
+
+                for(int i = 0; i < cols.size(); i++)
                 {
-                    UsedVariable variable = variables.get(variableName);
+                    appendComma(builder, hasSelect);
+                    hasSelect = true;
 
-                    List<ResourceClass> resClasses = variable == null ? List.of() :
-                            variable.getClasses().stream().filter(c -> tags.equals(c.getResultTags())).toList();
-
-                    for(int part = 0; part < tags.size(); part++)
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        if(resClasses.size() == 0)
-                        {
-                            builder.append("NULL::" + tags.get(part).getSqlType());
-                        }
-                        else
-                        {
-                            if(resClasses.size() > 1)
-                                builder.append("coalesce(");
-
-                            for(int i = 0; i < resClasses.size(); i++)
-                            {
-                                appendComma(builder, i > 0);
-
-                                ResourceClass resClass = resClasses.get(i);
-                                builder.append(resClass.toResult(variable.getMapping(resClass)).get(part));
-                            }
-
-                            if(resClasses.size() > 1)
-                                builder.append(")");
-                        }
-
-                        builder.append(" AS \"");
-
-                        builder.append(variableName.replaceFirst("^@", ""));
-                        builder.append('#');
-                        builder.append(tags.get(part).getTag());
-                        builder.append('"');
-                    }
+                    builder.append(cols.get(i));
+                    builder.append(" AS ");
+                    builder.append(colNames.get(i));
                 }
             }
         }
 
         if(!hasSelect)
-        {
-            builder.append("1 AS \"*#");
-            builder.append(ResultTag.NULL.getTag());
-            builder.append('"');
-        }
+            builder.append("1");
 
         return builder.toString();
     }
@@ -849,7 +812,7 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
-    public Map<String, List<List<ResultTag>>> getResultDescription()
+    public Map<String, List<ResultResourceClass>> getResultDescription()
     {
         return description;
     }

@@ -8,7 +8,7 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class CommonStrBlankNodeClass extends StrBlankNodeClass
+public class CommonStrBlankNodeClass extends StrBlankNodeClass implements ResultResourceClass
 {
     CommonStrBlankNodeClass()
     {
@@ -73,14 +73,6 @@ public class CommonStrBlankNodeClass extends StrBlankNodeClass
     {
         return new ExpressionColumn(
                 "sparql.rdfbox_create_from_sblanknode(" + columns.get(0) + ", " + columns.get(1) + ")");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return List
-                .of(new ExpressionColumn("sparql.sblanknode_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 
 

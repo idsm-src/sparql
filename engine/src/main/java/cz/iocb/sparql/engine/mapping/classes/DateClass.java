@@ -2,10 +2,10 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateIri;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATE;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -14,11 +14,11 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class DateClass extends LiteralClass
+public final class DateClass extends LiteralClass implements ResultResourceClass
 {
     DateClass()
     {
-        super("date", List.of("date", "int4"), List.of(DATE), xsdDateIri);
+        super("date", List.of("date", "int4"), xsdDateIri);
     }
 
 
@@ -26,6 +26,13 @@ public class DateClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return xsdDate;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -97,14 +104,6 @@ public class DateClass extends LiteralClass
     public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((Literal) node).getValue().toString(), "sparql.zoneddate");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        // xsdDate is returned as zoneddate because there are many discrepancies in date interpretations
-        return List.of(new ExpressionColumn("sparql.zoneddate_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 
 

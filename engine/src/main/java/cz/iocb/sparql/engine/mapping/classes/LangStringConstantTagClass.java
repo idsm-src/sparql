@@ -2,12 +2,11 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANG;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANGSTRING;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -16,7 +15,7 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class LangStringConstantTagClass extends LiteralClass
+public final class LangStringConstantTagClass extends LiteralClass implements ResultResourceClass
 {
     private static final Hashtable<String, LangStringConstantTagClass> instances = new Hashtable<String, LangStringConstantTagClass>();
 
@@ -25,7 +24,7 @@ public class LangStringConstantTagClass extends LiteralClass
 
     private LangStringConstantTagClass(String lang)
     {
-        super("lang-" + lang, List.of("varchar"), List.of(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang-" + lang, List.of("varchar"), rdfLangStringIri);
         this.lang = lang;
     }
 
@@ -34,6 +33,13 @@ public class LangStringConstantTagClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return rdfLangString;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -151,15 +157,6 @@ public class LangStringConstantTagClass extends LiteralClass
     public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((String) ((Literal) node).getValue()), "varchar");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + lang + "'::varchar END";
-
-        return List.of(columns.get(0), new ExpressionColumn(code));
     }
 
 

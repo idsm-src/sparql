@@ -24,18 +24,18 @@ public class Chromosome
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("isoform", "integer", new Table(schema, "isoform_bases"),
+        config.addIriClass(new MapUserIriClass("isoform", "int4", new Table(schema, "isoform_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/isoform/", 0));
-        config.addIriClass(new MapUserIriClass("annotation", "integer", new Table(schema, "annotation_bases"),
+        config.addIriClass(new MapUserIriClass("annotation", "int4", new Table(schema, "annotation_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/annotation/", 0));
-        config.addIriClass(new MapUserIriClass("evidence", "integer", new Table(schema, "evidence_bases"),
+        config.addIriClass(new MapUserIriClass("evidence", "int4", new Table(schema, "evidence_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/evidence/", 0));
-        config.addIriClass(new MapUserIriClass("entry", "integer", new Table(schema, "entry_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/entry/", 0));
-        config.addIriClass(new MapUserIriClass("proteoform", "integer", new Table(schema, "proteoform_bases"),
+        config.addIriClass(new MapUserIriClass("entry", "int4", new Table(schema, "entry_bases"), new TableColumn("id"),
+                new TableColumn("iri"), "http://nextprot.org/rdf/entry/", 0));
+        config.addIriClass(new MapUserIriClass("proteoform", "int4", new Table(schema, "proteoform_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
-        config.addIriClass(new MapUserIriClass("gene", "integer", new Table(schema, "gene_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
+        config.addIriClass(new MapUserIriClass("gene", "int4", new Table(schema, "gene_bases"), new TableColumn("id"),
+                new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
     }
 
 

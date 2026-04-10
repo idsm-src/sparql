@@ -14,7 +14,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
 {
     public SimpleUserIriClass(String name, String sqlType)
     {
-        super(name, List.of(sqlType), List.of(ResultTag.IRI));
+        super(name, List.of(sqlType));
     }
 
 
@@ -57,13 +57,6 @@ public abstract class SimpleUserIriClass extends UserIriClass
     public Column toBoxedExpression(List<Column> columns)
     {
         return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + generateFunction(columns.get(0)) + ")");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return List.of(generateFunction(columns.get(0)));
     }
 
 

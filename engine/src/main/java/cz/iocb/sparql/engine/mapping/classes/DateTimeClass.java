@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATETIME;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -16,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -24,7 +24,7 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class DateTimeClass extends LiteralClass
+public final class DateTimeClass extends LiteralClass implements ResultResourceClass
 {
     private static final Map<Long, String> era = new HashMap<Long, String>()
     {
@@ -61,7 +61,7 @@ public class DateTimeClass extends LiteralClass
 
     DateTimeClass()
     {
-        super("datetime", List.of("timestamptz", "int4"), List.of(DATETIME), xsdDateTimeIri);
+        super("datetime", List.of("timestamptz", "int4"), xsdDateTimeIri);
     }
 
 
@@ -69,6 +69,13 @@ public class DateTimeClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return xsdDateTime;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -141,15 +148,6 @@ public class DateTimeClass extends LiteralClass
     public Column toExpression(Statement statement, Node node)
     {
         return new ConstantColumn(((Literal) node).getValue().toString(), "sparql.zoneddatetime");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        // xsdDateTime is returned as zoneddatetime because there are many discrepancies in timestamp interpretations
-        return List.of(
-                new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", " + columns.get(1) + ")"));
     }
 
 

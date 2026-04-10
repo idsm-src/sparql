@@ -56,7 +56,7 @@ public class StoredResultHandler extends ResultHandler
     {
         super(request, restrictions);
 
-        columns.put(new TableColumn("__"), "int");
+        columns.put(new TableColumn("__"), "int4");
     }
 
 

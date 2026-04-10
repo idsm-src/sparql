@@ -1,10 +1,10 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LITERAL;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.TYPE;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -24,7 +24,7 @@ public class UserLiteralClass extends LiteralClass
 
     private UserLiteralClass(int id, String sqlType, String equalOp, String notEqualOp, IRI type)
     {
-        super("usertype" + id, List.of(sqlType), List.of(LITERAL, TYPE), type);
+        super("usertype" + id, List.of(sqlType), type);
         this.equalOperator = equalOp;
         this.notEqualOperator = notEqualOp;
     }
@@ -55,6 +55,13 @@ public class UserLiteralClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return this;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(unsupportedLiteral);
     }
 
 
@@ -123,16 +130,6 @@ public class UserLiteralClass extends LiteralClass
         Object value = ((Literal) node).getValue();
 
         return new ConstantColumn(value.toString(), sqlTypes.get(0));
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        String type = getTypeIri().getValue().replace("'", "''");
-        String code = "CASE WHEN " + columns.get(0) + " IS NOT NULL THEN '" + type + "'::varchar END";
-
-        return List.of(new ExpressionColumn(columns.get(0) + "::varchar"), new ExpressionColumn(code));
     }
 
 

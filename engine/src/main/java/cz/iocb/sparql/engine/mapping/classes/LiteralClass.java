@@ -16,9 +16,9 @@ public abstract class LiteralClass extends ResourceClass
     protected final IRI typeIri;
 
 
-    protected LiteralClass(String name, List<String> sqlTypes, List<ResultTag> resultTags, IRI typeIri)
+    protected LiteralClass(String name, List<String> sqlTypes, IRI typeIri)
     {
-        super(name, sqlTypes, resultTags);
+        super(name, sqlTypes);
         this.typeIri = typeIri;
     }
 

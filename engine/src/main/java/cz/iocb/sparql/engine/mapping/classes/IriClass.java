@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -12,9 +13,9 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 public abstract class IriClass extends ResourceClass
 {
-    protected IriClass(String name, List<String> sqlTypes, List<ResultTag> resultTags)
+    protected IriClass(String name, List<String> sqlTypes)
     {
-        super(name, sqlTypes, resultTags);
+        super(name, sqlTypes);
     }
 
 
@@ -22,6 +23,13 @@ public abstract class IriClass extends ResourceClass
     public ResourceClass getGeneralClass()
     {
         return iri;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(iri);
     }
 
 

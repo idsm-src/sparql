@@ -38,7 +38,7 @@ public class GeneralUserIriClass extends UserIriClass
     public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,
             SqlCheck sqlCheck)
     {
-        super(name, sqlTypes, List.of(ResultTag.IRI));
+        super(name, sqlTypes);
 
         this.sqlCheck = sqlCheck;
         this.function = new Function(schema, function);
@@ -258,28 +258,6 @@ public class GeneralUserIriClass extends UserIriClass
         builder.append(")");
 
         return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(function);
-        builder.append("(");
-
-        for(int i = 0; i < getColumnCount(); i++)
-        {
-            if(i > 0)
-                builder.append(", ");
-
-            builder.append(columns.get(i));
-        }
-
-        builder.append(")");
-
-        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 

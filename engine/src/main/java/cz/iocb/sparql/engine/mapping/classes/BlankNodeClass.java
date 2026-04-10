@@ -10,9 +10,9 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 public abstract class BlankNodeClass extends ResourceClass
 {
-    protected BlankNodeClass(String name, List<String> sqlTypes, List<ResultTag> resultTags)
+    protected BlankNodeClass(String name, List<String> sqlTypes)
     {
-        super(name, sqlTypes, resultTags);
+        super(name, sqlTypes);
     }
 
 

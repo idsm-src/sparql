@@ -2,11 +2,10 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANG;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LANGSTRING;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -15,11 +14,11 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class LangStringClass extends LiteralClass
+public final class LangStringClass extends LiteralClass implements ResultResourceClass
 {
     LangStringClass()
     {
-        super("lang", List.of("varchar", "varchar"), List.of(LANGSTRING, LANG), rdfLangStringIri);
+        super("lang", List.of("varchar", "varchar"), rdfLangStringIri);
     }
 
 
@@ -27,6 +26,13 @@ public class LangStringClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return rdfLangString;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -100,13 +106,6 @@ public class LangStringClass extends LiteralClass
         return new ExpressionColumn(
                 "sparql.rdfbox_create_from_langstring('" + ((String) literal.getValue()).replaceAll("'", "''")
                         + "'::varchar, '" + literal.getLanguageTag() + "'::varchar)");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return columns;
     }
 
 

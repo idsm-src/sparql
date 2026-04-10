@@ -3,14 +3,13 @@ package cz.iocb.sparql.engine.mapping.extension;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.ResultTag;
 import cz.iocb.sparql.engine.mapping.classes.SimpleLiteralClass;
 
 
 
 public class FunctionDefinition
 {
-    public static final ResourceClass stringLiteral = new SimpleLiteralClass(ResultTag.NULL, "string", null)
+    public static final ResourceClass stringLiteral = new SimpleLiteralClass(null, "varchar", null)
     {
     };
 

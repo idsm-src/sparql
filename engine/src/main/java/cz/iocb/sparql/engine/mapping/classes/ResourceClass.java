@@ -16,14 +16,12 @@ public abstract class ResourceClass
 {
     protected final String name;
     protected final List<String> sqlTypes;
-    protected final List<ResultTag> resultTags;
 
 
-    protected ResourceClass(String name, List<String> sqlTypes, List<ResultTag> resultTags)
+    protected ResourceClass(String name, List<String> sqlTypes)
     {
         this.name = name;
         this.sqlTypes = sqlTypes;
-        this.resultTags = resultTags;
     }
 
 
@@ -36,6 +34,9 @@ public abstract class ResourceClass
     public abstract ResourceClass getGeneralClass();
 
 
+    public abstract Set<ResultResourceClass> getResultResourceClasses();
+
+
     public final int getColumnCount()
     {
         return sqlTypes.size();
@@ -45,18 +46,6 @@ public abstract class ResourceClass
     public final List<String> getSqlTypes()
     {
         return sqlTypes;
-    }
-
-
-    public final List<ResultTag> getResultTags()
-    {
-        return resultTags;
-    }
-
-
-    public final int getTagCount()
-    {
-        return resultTags.size();
     }
 
 
@@ -94,9 +83,6 @@ public abstract class ResourceClass
 
 
     public abstract Column toExpression(Statement statement, Node node);
-
-
-    public abstract List<Column> toResult(List<Column> columns);
 
 
     public abstract String fromGeneralExpression(String code);
@@ -148,9 +134,6 @@ public abstract class ResourceClass
             return false;
 
         if(!sqlTypes.equals(other.sqlTypes))
-            return false;
-
-        if(!resultTags.equals(other.resultTags))
             return false;
 
         return true;

@@ -51,10 +51,10 @@ public class ConstantColumn extends Column
         return switch(type)
         {
             case "boolean" -> "bool";
-            case "int" -> "integer";
-            case "int2" -> "smallint";
-            case "int4" -> "integer";
-            case "int8" -> "bigint";
+            case "smallint" -> "int2";
+            case "int" -> "int4";
+            case "integer" -> "int4";
+            case "bigint" -> "int8";
             case "decimal" -> "numeric";
             case "real" -> "float4";
             case "double precision" -> "float8";

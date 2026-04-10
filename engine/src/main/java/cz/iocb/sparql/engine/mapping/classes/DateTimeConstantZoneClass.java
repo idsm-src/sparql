@@ -2,11 +2,11 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeIri;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.DATETIME;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -15,7 +15,7 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class DateTimeConstantZoneClass extends LiteralClass
+public final class DateTimeConstantZoneClass extends LiteralClass implements ResultResourceClass
 {
     private static final Hashtable<Integer, DateTimeConstantZoneClass> instances = new Hashtable<Integer, DateTimeConstantZoneClass>();
 
@@ -24,7 +24,7 @@ public class DateTimeConstantZoneClass extends LiteralClass
 
     private DateTimeConstantZoneClass(int zone)
     {
-        super("datetime$" + zone, List.of("timestamptz"), List.of(DATETIME), xsdDateTimeIri);
+        super("datetime$" + zone, List.of("timestamptz"), xsdDateTimeIri);
         this.zone = zone;
     }
 
@@ -33,6 +33,13 @@ public class DateTimeConstantZoneClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return xsdDateTime;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -147,14 +154,6 @@ public class DateTimeConstantZoneClass extends LiteralClass
     {
         return new ExpressionColumn(
                 "sparql.zoneddatetime_get_value('" + ((Literal) node).getValue() + "'::sparql.zoneddatetime)");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return List
-                .of(new ExpressionColumn("sparql.zoneddatetime_create(" + columns.get(0) + ", '" + zone + "'::int4)"));
     }
 
 

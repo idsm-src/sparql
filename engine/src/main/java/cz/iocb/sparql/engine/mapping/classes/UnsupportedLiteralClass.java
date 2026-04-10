@@ -1,10 +1,9 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.LITERAL;
-import static cz.iocb.sparql.engine.mapping.classes.ResultTag.TYPE;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -13,11 +12,11 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class UnsupportedLiteralClass extends LiteralClass
+public final class UnsupportedLiteralClass extends LiteralClass implements ResultResourceClass
 {
     UnsupportedLiteralClass()
     {
-        super("literal", List.of("varchar", "varchar"), List.of(LITERAL, TYPE), null);
+        super("literal", List.of("varchar", "varchar"), null);
     }
 
 
@@ -25,6 +24,13 @@ public class UnsupportedLiteralClass extends LiteralClass
     public ResourceClass getGeneralClass()
     {
         return this;
+    }
+
+
+    @Override
+    public Set<ResultResourceClass> getResultResourceClasses()
+    {
+        return Set.of(this);
     }
 
 
@@ -95,13 +101,6 @@ public class UnsupportedLiteralClass extends LiteralClass
 
         return new ExpressionColumn("sparql.rdfbox_create_from_typedliteral('" + value + "', '"
                 + ((Literal) node).getTypeIri().getValue() + "')");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return columns;
     }
 
 

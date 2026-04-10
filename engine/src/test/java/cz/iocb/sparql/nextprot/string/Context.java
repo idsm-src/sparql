@@ -13,7 +13,7 @@ public class Context
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("context", "integer", "http://nextprot.org/rdf/context/"));
+        config.addIriClass(new IntegerUserIriClass("context", "int4", "http://nextprot.org/rdf/context/"));
     }
 
 

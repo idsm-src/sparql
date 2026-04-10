@@ -15,7 +15,7 @@ public class Terminology
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("terminology", "integer", new Table(schema, "terminology_bases"),
+        config.addIriClass(new MapUserIriClass("terminology", "int4", new Table(schema, "terminology_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/terminology/", 0));
     }
 

@@ -15,7 +15,7 @@ public class Publication
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("publication", "integer", "http://nextprot.org/rdf/publication/"));
+        config.addIriClass(new IntegerUserIriClass("publication", "int4", "http://nextprot.org/rdf/publication/"));
     }
 
 

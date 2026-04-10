@@ -38,11 +38,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
             builder.append("(" + pattern + ")");
         else if(length > 0)
             builder.append(String.format("[0-9]{%d}", length));
-        else if(sqlType.equals("smallint"))
+        else if(sqlType.equals("int2"))
             builder.append(generateMaxNumberPattern("32767", -length));
-        else if(sqlType.equals("integer"))
+        else if(sqlType.equals("int4"))
             builder.append(generateMaxNumberPattern("2147483647", -length));
-        else if(sqlType.equals("bigint"))
+        else if(sqlType.equals("int8"))
             builder.append(generateMaxNumberPattern("9223372036854775807", -length));
         else
             throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);

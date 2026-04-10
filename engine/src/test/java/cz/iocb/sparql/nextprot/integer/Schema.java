@@ -20,11 +20,11 @@ public class Schema
 {
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("source", "integer", new Table(schema, "source_bases"),
+        config.addIriClass(new MapUserIriClass("source", "int4", new Table(schema, "source_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/source/", 0));
-        config.addIriClass(new MapUserIriClass("database", "integer", new Table(schema, "database_bases"),
+        config.addIriClass(new MapUserIriClass("database", "int4", new Table(schema, "database_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/db/", 0));
-        config.addIriClass(new MapUserIriClass("schema", "integer", new Table(schema, "schema_bases"),
+        config.addIriClass(new MapUserIriClass("schema", "int4", new Table(schema, "schema_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf#", 0));
     }
 

@@ -120,14 +120,6 @@ public class UserIntBlankNodeClass extends IntBlankNodeClass
 
 
     @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return List
-                .of(new ExpressionColumn("sparql.iblanknode_create(" + columns.get(0) + ", '" + segment + "'::int4)"));
-    }
-
-
-    @Override
     public String fromGeneralExpression(String code)
     {
         return "sparql.iblanknode_get_value_of_segment(" + code + ", '" + segment + "'::int4)";

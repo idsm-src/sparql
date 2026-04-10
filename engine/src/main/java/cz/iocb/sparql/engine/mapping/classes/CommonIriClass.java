@@ -11,11 +11,11 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class CommonIriClass extends IriClass
+public class CommonIriClass extends IriClass implements ResultResourceClass
 {
     CommonIriClass()
     {
-        super("iri", List.of("varchar"), List.of(ResultTag.IRI));
+        super("iri", List.of("varchar"));
     }
 
 
@@ -65,13 +65,6 @@ public class CommonIriClass extends IriClass
     public Column toBoxedExpression(List<Column> columns)
     {
         return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + columns.get(0) + ")");
-    }
-
-
-    @Override
-    public List<Column> toResult(List<Column> columns)
-    {
-        return columns;
     }
 
 
