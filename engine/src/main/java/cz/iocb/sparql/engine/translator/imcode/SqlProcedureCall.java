@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.translator.imcode;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ public final class SqlProcedureCall extends SqlIntercode
             LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Restrictions restrictions)
     {
-        UsedVariables callVariables = new UsedVariables();
+        Map<String, Set<ResourceClass>> resClasses = new HashMap<String, Set<ResourceClass>>();
 
         for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
         {
@@ -73,44 +74,22 @@ public final class SqlProcedureCall extends SqlIntercode
             SqlNodeValue node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-            {
-                String name = var.getName();
-                UsedVariable other = callVariables.get(var.getName());
-
-                if(other != null)
-                {
-                    Set<ResourceClass> otherClasses = other.getClasses();
-
-                    if(!otherClasses.contains(resClass) && !otherClasses.contains(resClass.getGeneralClass()))
-                    {
-                        if(otherClasses.stream().anyMatch(r -> resClass == r.getGeneralClass()))
-                        {
-                            Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
-
-                            for(Entry<ResourceClass, List<Column>> e : other.getMappings().entrySet())
-                                if(e.getKey().getGeneralClass() != resClass)
-                                    mappings.put(e.getKey(), e.getValue());
-
-                            mappings.put(resClass, getColumns(child, name, resClass));
-
-                            callVariables.add(new UsedVariable(name, mappings, false));
-                        }
-                        else
-                        {
-                            Map<ResourceClass, List<Column>> mappings = new HashMap<>(other.getMappings());
-                            mappings.put(resClass, getColumns(child, name, resClass));
-
-                            callVariables.add(new UsedVariable(name, mappings, false));
-                        }
-                    }
-                }
-                else
-                {
-                    callVariables.add(new UsedVariable(name, resClass, getColumns(child, name, resClass), false));
-                }
-            }
+                resClasses.computeIfAbsent(var.getName(), k -> new HashSet<ResourceClass>()).add(resClass);
         }
 
+
+        UsedVariables callVariables = new UsedVariables();
+
+        for(Entry<String, Set<ResourceClass>> e : resClasses.entrySet())
+        {
+            ResourceClass interClass = ResourceClass.getIntersectionClass(e.getValue());
+            String name = e.getKey();
+
+            if(interClass == null)
+                continue;
+
+            callVariables.add(new UsedVariable(name, interClass, getColumns(child, name, interClass), false));
+        }
 
         for(Entry<ResultDefinition, String> entry : results.entrySet())
         {
@@ -168,7 +147,7 @@ public final class SqlProcedureCall extends SqlIntercode
         }
 
 
-        UsedVariables callVariables = new UsedVariables();
+        Map<String, Set<ResourceClass>> resClasses = new HashMap<String, Set<ResourceClass>>();
 
         for(Entry<ParameterDefinition, SqlNodeValue> entry : optParameters.entrySet())
         {
@@ -177,35 +156,25 @@ public final class SqlProcedureCall extends SqlIntercode
             SqlNodeValue node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-            {
-                String name = var.getName();
-                UsedVariable variable = callVariables.get(var.getName());
-
-                if(variable != null)
-                {
-                    ResourceClass other = variable.getResourceClass();
-
-                    if(resClass != other && resClass.getGeneralClass() != other && resClass != other.getGeneralClass())
-                        return SqlNoSolution.get();
-
-                    if(resClass == other.getGeneralClass())
-                        resClass = other;
-                }
-
-                List<Column> columns = getColumns(optChild, name, resClass);
-
-                if(columns == null)
-                    return SqlNoSolution.get();
-
-                callVariables.add(new UsedVariable(name, resClass, columns, false));
-            }
-            else if(node == null
-                    || resClass != node.getResourceClass() && resClass.getGeneralClass() != node.getResourceClass()
-                            && resClass != node.getResourceClass().getGeneralClass())
-            {
+                resClasses.computeIfAbsent(var.getName(), k -> new HashSet<ResourceClass>()).add(resClass);
+            else if(node == null || ResourceClass.areDisjunct(resClass, node.getResourceClass()))
                 return SqlNoSolution.get();
-            }
         }
+
+
+        UsedVariables callVariables = new UsedVariables();
+
+        for(Entry<String, Set<ResourceClass>> e : resClasses.entrySet())
+        {
+            ResourceClass interClass = ResourceClass.getIntersectionClass(e.getValue());
+            String name = e.getKey();
+
+            if(interClass == null)
+                return SqlNoSolution.get();
+
+            callVariables.add(new UsedVariable(name, interClass, getColumns(optChild, name, interClass), false));
+        }
+
 
         for(Entry<ResultDefinition, String> entry : optResults.entrySet())
         {
@@ -326,7 +295,7 @@ public final class SqlProcedureCall extends SqlIntercode
         if(variable == null)
             return resClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
 
-        return variable.toResource(resClass);
+        return variable.deriveMapping(resClass);
     }
 
 

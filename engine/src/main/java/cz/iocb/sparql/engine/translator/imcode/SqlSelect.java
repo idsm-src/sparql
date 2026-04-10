@@ -1,7 +1,11 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.getExpressionBaseClass;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.getResourceName;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDate;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDateTime;
@@ -606,10 +610,9 @@ public final class SqlSelect extends SqlIntercode
                     hasVariants = true;
 
                     if(decimals.size() > 0 && decimals.size() != numerics.size())
-                        builder.append("sparql.rdfbox_create_from_").append(numeric.getGeneralClass().getName())
-                                .append("(");
+                        builder.append("sparql.rdfbox_create_from_").append(getResourceName(numeric)).append("(");
 
-                    builder.append(numeric.toGeneralClass(variable.getMapping(numeric), true).get(0));
+                    builder.append(variable.deriveMapping(getExpressionBaseClass(numeric)).get(0));
 
                     if(decimals.size() > 0 && decimals.size() != numerics.size())
                         builder.append(")");
@@ -641,7 +644,7 @@ public final class SqlSelect extends SqlIntercode
                     appendComma(builder, hasVariants);
                     hasVariants = true;
 
-                    builder.append(bool.toGeneralClass(variable.getMapping(bool), true).get(0));
+                    builder.append(bool.toGeneralClass(xsdBoolean, variable.getMapping(bool), true).get(0));
                 }
 
                 if(bools.size() > 1)
@@ -670,7 +673,7 @@ public final class SqlSelect extends SqlIntercode
                     appendComma(builder, hasVariants);
                     hasVariants = true;
 
-                    builder.append(string.toGeneralClass(variable.getMapping(string), true).get(0));
+                    builder.append(string.toGeneralClass(xsdString, variable.getMapping(string), true).get(0));
                 }
 
                 if(strings.size() > 1)

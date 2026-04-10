@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -79,6 +78,8 @@ public final class SqlBind extends SqlIntercode
         {
             Set<ResourceClass> resClasses = expression.getResourceClasses();
 
+            //FIXME:
+            /*
             for(ResourceClass resClass : resClasses)
             {
                 if(!resClass.canBeDerivatedFromGeneral())
@@ -92,6 +93,7 @@ public final class SqlBind extends SqlIntercode
                     }
                 }
             }
+            */
 
             UsedVariable bindVar = new UsedVariable(varName, expression.canBeNull());
             resClasses.stream().forEach(r -> bindVar.addMapping(r, r.createColumns(request.getColumnMap(), varName)));
@@ -252,8 +254,12 @@ public final class SqlBind extends SqlIntercode
 
             if(isBoxed)
             {
+                //FIXME
+                boolean check = true;
+                /*
                 ResourceClass generalClass = resClass.getGeneralClass();
                 boolean check = resClasses.stream().filter(r -> r.getGeneralClass() == generalClass).count() > 1;
+                */
                 columns = resClass.fromBoxedExpression(column, check);
             }
             else

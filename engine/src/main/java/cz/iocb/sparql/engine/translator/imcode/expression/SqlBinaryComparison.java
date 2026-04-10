@@ -396,8 +396,8 @@ public final class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    List<Column> lcols = leftNode.asResource(request, leftClass.getGeneralClass());
-                    List<Column> rcols = rightNode.asResource(request, rightClass.getGeneralClass());
+                    List<Column> lcols = leftNode.asResource(request, getExpressionBaseClass(leftClass));
+                    List<Column> rcols = rightNode.asResource(request, getExpressionBaseClass(rightClass));
 
                     builder.append("(");
                     builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
@@ -409,8 +409,8 @@ public final class SqlBinaryComparison extends SqlBinary
             else if(leftClass == xsdBoolean || isString(leftClass) || leftClass == xsdDayTimeDuration
                     || isNumeric(leftClass))
             {
-                ResourceClass leftGenClass = leftClass.getGeneralClass();
-                ResourceClass rightGenClass = rightClass.getGeneralClass();
+                ResourceClass leftGenClass = getExpressionBaseClass(leftClass);
+                ResourceClass rightGenClass = getExpressionBaseClass(rightClass);
 
                 List<Column> leftColumns = leftNode.asResource(request, leftGenClass);
                 String left = leftGenClass.toExpression(leftColumns).toString();
@@ -418,15 +418,15 @@ public final class SqlBinaryComparison extends SqlBinary
                 List<Column> rightColumns = rightNode.asResource(request, rightGenClass);
                 String right = rightGenClass.toExpression(rightColumns).toString();
 
-                ResourceClass cmpClass = determineComparisonClass(leftClass, rightClass);
+                ResourceClass cmpClass = determineComparisonClass(leftGenClass, rightGenClass);
 
-                if(leftGenClass != cmpClass.getGeneralClass())
-                    left = "sparql.cast_as_" + cmpClass.getGeneralClass().getName() + "_from_" + leftGenClass.getName()
-                            + "(" + left + ")";
+                if(leftGenClass != cmpClass)
+                    left = "sparql.cast_as_" + cmpClass.getName() + "_from_" + leftGenClass.getName() + "(" + left
+                            + ")";
 
-                if(rightGenClass != cmpClass.getGeneralClass())
-                    right = "sparql.cast_as_" + cmpClass.getGeneralClass().getName() + "_from_"
-                            + rightGenClass.getName() + "(" + right + ")";
+                if(rightGenClass != cmpClass)
+                    right = "sparql.cast_as_" + cmpClass.getName() + "_from_" + rightGenClass.getName() + "(" + right
+                            + ")";
 
                 if(!isFloat(cmpClass) && !isDouble(cmpClass))
                 {
@@ -511,8 +511,8 @@ public final class SqlBinaryComparison extends SqlBinary
                 }
                 else
                 {
-                    List<Column> lcols = leftNode.asResource(request, leftClass.getGeneralClass());
-                    List<Column> rcols = rightNode.asResource(request, rightClass.getGeneralClass());
+                    List<Column> lcols = leftNode.asResource(request, getExpressionBaseClass(leftClass));
+                    List<Column> rcols = rightNode.asResource(request, getExpressionBaseClass(rightClass));
 
                     builder.append("(");
                     builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));

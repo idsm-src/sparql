@@ -1,9 +1,10 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -169,23 +170,13 @@ public final class SqlMerge extends SqlIntercode
         if(var == null || other == null)
             return restrictions;
 
-
         String name = var.getName();
+        Set<ResourceClass> classes = var.getClasses();
 
         if(var.canBeNull())
-        {
-            restrictions.set(name, var.getMappings().keySet());
-        }
+            restrictions.set(name, var.getClasses());
         else
-        {
-            Set<ResourceClass> set = new HashSet<ResourceClass>();
-
-            for(ResourceClass resClass : var.getMappings().keySet())
-                if(other.containsClass(resClass) || other.containsClass(resClass.getGeneralClass()))
-                    set.add(resClass);
-
-            restrictions.set(name, set);
-        }
+            restrictions.set(name, classes.stream().filter(c -> !areDisjunct(c, other.getClasses())).collect(toSet()));
 
         return restrictions;
     }

@@ -149,7 +149,16 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(resourceClass instanceof IriClass)
             return "iri";
 
-        return resourceClass.getGeneralClass().getName();
+        return getExpressionBaseClass(resourceClass).getName();
+    }
+
+
+    public static String getResourceName(ResourceClass resourceClass)
+    {
+        if(resourceClass == null)
+            return "rdfbox";
+
+        return getExpressionBaseClass(resourceClass).getName();
     }
 
 
@@ -185,93 +194,91 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public static boolean isDateTime(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdDateTime;
+        return !ResourceClass.areDisjunct(resClass, xsdDateTime);
     }
 
 
     public static boolean isDate(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdDate;
+        return !ResourceClass.areDisjunct(resClass, xsdDate);
     }
 
 
     public static boolean isLangString(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == rdfLangString;
+        return !ResourceClass.areDisjunct(resClass, rdfLangString);
     }
 
 
     public static boolean isStringLiteral(ResourceClass resClass)
     {
-        ResourceClass genClass = resClass.getGeneralClass();
-
-        return genClass == xsdString || genClass == rdfLangString;
+        return !ResourceClass.areDisjunct(resClass, xsdString) || !ResourceClass.areDisjunct(resClass, rdfLangString);
     }
 
 
     public static boolean isString(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdString;
+        return !ResourceClass.areDisjunct(resClass, xsdString);
     }
 
 
     public static boolean isDouble(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdDouble;
+        return !ResourceClass.areDisjunct(resClass, xsdDouble);
     }
 
 
     public static boolean isFloat(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdFloat;
+        return !ResourceClass.areDisjunct(resClass, xsdFloat);
     }
 
 
     public static boolean isDecimal(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdDecimal;
+        return !ResourceClass.areDisjunct(resClass, xsdDecimal);
     }
 
 
     public static boolean isInteger(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdInteger;
+        return !ResourceClass.areDisjunct(resClass, xsdInteger);
     }
 
 
     public static boolean isLong(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdLong;
+        return !ResourceClass.areDisjunct(resClass, xsdLong);
     }
 
 
     public static boolean isInt(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdInt;
+        return !ResourceClass.areDisjunct(resClass, xsdInt);
     }
 
 
     public static boolean isShort(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdShort;
+        return !ResourceClass.areDisjunct(resClass, xsdShort);
     }
 
 
     public static boolean isNumeric(ResourceClass resClass)
     {
-        return numericOrder.contains(resClass.getGeneralClass());
+        return numericOrder.contains(getExpressionBaseClass(resClass));
     }
 
 
     public static boolean isFloatPoint(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdFloat || resClass.getGeneralClass() == xsdDouble;
+        return !ResourceClass.areDisjunct(resClass, xsdFloat) || !ResourceClass.areDisjunct(resClass, xsdDouble);
     }
 
 
     public static boolean isBoolean(ResourceClass resClass)
     {
-        return resClass.getGeneralClass() == xsdBoolean;
+        return !ResourceClass.areDisjunct(resClass, xsdBoolean);
     }
 
 
@@ -283,7 +290,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(requestClass == null)
             return true;
 
-        return numericOrder.indexOf(resClass.getGeneralClass()) <= numericOrder.indexOf(requestClass.getGeneralClass());
+        return numericOrder.indexOf(getExpressionBaseClass(resClass)) <= numericOrder
+                .indexOf(getExpressionBaseClass(requestClass));
     }
 
 
@@ -462,12 +470,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
                 else if(compatibleClass.getGeneralClass() == resourceClass)
                 {
                     boolean nullCheck = operand.canBeNull() || operand.getResourceClasses().size() > 1;
-                    List<Column> c = compatibleClass.toGeneralClass(cols, nullCheck);
+                    List<Column> c = compatibleClass.toGeneralClass(resourceClass, cols, nullCheck);
                     builder.append(resourceClass.toExpression(c));
                 }
                 else if(compatibleClass == resourceClass.getGeneralClass())
                 {
-                    List<Column> c = resourceClass.fromGeneralClass(cols);
+                    List<Column> c = resourceClass.fromGeneralClass(resourceClass, cols);
                     builder.append(resourceClass.toExpression(c));
                 }
                 else
@@ -568,6 +576,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         }
 
         return builder.toString();
+    }
+
+
+    public static ResourceClass getExpressionBaseClass(ResourceClass resClass)
+    {
+        return resClass.getGeneralClass();
     }
 
 

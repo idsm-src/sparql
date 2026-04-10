@@ -148,10 +148,12 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
                 appendComma(builder, hasAlternative);
                 hasAlternative = true;
 
-                List<Column> columns = variable.asResource(request, resourceClass.getGeneralClass());
-                Column column = resourceClass.getGeneralClass().toExpression(columns);
+                ResourceClass baseClass = getExpressionBaseClass(resourceClass);
 
-                String sqlType = resourceClass.getGeneralClass().getSqlTypes().get(0);
+                List<Column> columns = variable.asResource(request, baseClass);
+                Column column = baseClass.toExpression(columns);
+
+                String sqlType = baseClass.getSqlTypes().get(0);
 
                 if(isString(resourceClass))
                     builder.append("(octet_length(" + column + ") != 0)");
@@ -183,7 +185,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         else if(operand.getResourceClasses().stream().allMatch(r -> isFloat(r) || isDouble(r)))
         {
             ResourceClass resClass = operand.getExpressionResourceClass();
-            String sqlType = resClass.getGeneralClass().getSqlTypes().get(0);
+            String sqlType = getExpressionBaseClass(resClass).getSqlTypes().get(0);
             String code = resClass.toGeneralExpression(operand.translate(request));
 
             return "(" + code + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
@@ -191,7 +193,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         else if(operand.getResourceClasses().stream().allMatch(r -> isNumeric(r)))
         {
             ResourceClass resClass = operand.getExpressionResourceClass();
-            String sqlType = resClass.getGeneralClass().getSqlTypes().get(0);
+            String sqlType = getExpressionBaseClass(resClass).getSqlTypes().get(0);
             String code = resClass.toGeneralExpression(operand.translate(request));
 
             return "(" + code + " != '0'::" + sqlType + ")";

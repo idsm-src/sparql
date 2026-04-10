@@ -83,7 +83,7 @@ public final class SqlVariable extends SqlNodeValue
     @Override
     public List<Column> asResource(Request request, ResourceClass resourceClass)
     {
-        return variable.toResource(resourceClass);
+        return variable.deriveMapping(resourceClass);
     }
 
 

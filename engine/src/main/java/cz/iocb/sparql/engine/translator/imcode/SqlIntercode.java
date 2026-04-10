@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getDisjunctClasses;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -12,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -106,7 +109,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 return true;
 
             for(ResourceClass r : map.get(var))
-                if(resClass == r || resClass == r.getGeneralClass() || resClass.getGeneralClass() == r)
+                if(!ResourceClass.areDisjunct(r, resClass))
                     return true;
 
             return false;
@@ -294,6 +297,26 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    private static Set<ResourceClass> joinResourceClasses(List<UsedVariable> defs)
+    {
+        List<Set<ResourceClass>> result = List.of(Set.of());
+
+        for(UsedVariable def : defs)
+        {
+            List<Set<ResourceClass>> nextResult = new ArrayList<Set<ResourceClass>>();
+
+            for(ResourceClass resClass : def.getClasses())
+                for(Set<ResourceClass> set : result)
+                    if(set.stream().allMatch(c -> !ResourceClass.areDisjunct(c, resClass)))
+                        nextResult.add(Stream.concat(set.stream(), Stream.of(resClass)).collect(toSet()));
+
+            result = nextResult;
+        }
+
+        return getDisjunctClasses(result.stream().map(s -> getIntersectionClass(s)).collect(toSet()));
+    }
+
+
     protected static UsedVariables getJoinUsedVariables(Request request, List<UsedVariables> allVars,
             List<Table> tables, Restrictions restrictions, Map<Column, Column> map)
     {
@@ -309,7 +332,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(defs.stream().anyMatch(v -> !v.canBeNull()))
             {
                 defs = defs.stream().filter(v -> !v.canBeNull()).toList();
-                Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(defs)), defs);
+                Set<ResourceClass> resClasses = joinResourceClasses(defs);
 
                 if(resClasses.isEmpty())
                     return new UsedVariables();
@@ -323,7 +346,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
             else
             {
-                Set<ResourceClass> resClasses = cleanSpecificClasses(collectClasses(defs));
+                Set<ResourceClass> resClasses = ResourceClass.getDisjunctClasses(collectClasses(defs));
                 UsedVariable var = createUsedVariable(request, name, resClasses, vars, tables, columnMap, true);
 
                 variables.add(var);
@@ -392,7 +415,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     for(ResourceClass specClass : var.getCompatibleClasses(resClass))
                     {
                         List<Column> columns = toTableColumns(table, var.getMapping(specClass));
-                        variants.add(resClass == specClass ? columns : specClass.toGeneralClass(columns, true));
+                        variants.add(specClass.toGeneralClass(resClass, columns, true));
                     }
                 }
 
@@ -458,28 +481,6 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
-    private static Set<ResourceClass> selectSharedClasses(Set<ResourceClass> classes, List<UsedVariable> variables)
-    {
-        return classes.stream().filter(
-                c -> variables.stream().allMatch(v -> v.containsClass(c) || v.containsClass(c.getGeneralClass())))
-                .collect(toSet());
-    }
-
-
-    protected static Set<ResourceClass> cleanSpecificClasses(Set<ResourceClass> classes)
-    {
-        return classes.stream().filter(r -> r == r.getGeneralClass() || !classes.contains(r.getGeneralClass()))
-                .collect(toSet());
-    }
-
-
-    protected static Set<ResourceClass> cleanGeneralClasses(Set<ResourceClass> classes)
-    {
-        return classes.stream().filter(r -> classes.stream().noneMatch(x -> x != r && x.getGeneralClass() == r))
-                .collect(toSet());
-    }
-
-
     private static Set<ResourceClass> collectClasses(List<UsedVariable> variables)
     {
         return variables.stream().flatMap(v -> v.getClasses().stream()).collect(toSet());
@@ -510,32 +511,29 @@ public abstract class SqlIntercode extends SqlBaseClass
             UsedVariable leftVariable = pair.getLeftVariable();
             UsedVariable rightVariable = pair.getRightVariable();
 
-            if(leftVariable != null && rightVariable != null)
+            if(leftVariable.canBeNull())
+                return false;
+
+            if(rightVariable.canBeNull())
+                return false;
+
+            for(PairedClass pairedClass : pair.getClasses())
             {
-                if(leftVariable.canBeNull())
+                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
                     return false;
 
-                if(rightVariable.canBeNull())
-                    return false;
+                ResourceClass resClass = pairedClass.getLeftClass();
+                List<Column> leftCols = leftVariable.getMapping(resClass);
+                List<Column> rightCols = rightVariable.getMapping(resClass);
 
-                for(PairedClass pairedClass : pair.getClasses())
+                for(int i = 0; i < resClass.getColumnCount(); i++)
                 {
-                    if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                    Column leftCol = leftCols.get(i);
+                    Column rightCol = rightCols.get(i);
+
+                    if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn)
+                            || !leftCol.equals(rightCol))
                         return false;
-
-                    ResourceClass resClass = pairedClass.getLeftClass();
-                    List<Column> leftCols = leftVariable.getMapping(resClass);
-                    List<Column> rightCols = rightVariable.getMapping(resClass);
-
-                    for(int i = 0; i < resClass.getColumnCount(); i++)
-                    {
-                        Column leftCol = leftCols.get(i);
-                        Column rightCol = rightCols.get(i);
-
-                        if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn)
-                                || !leftCol.equals(rightCol))
-                            return false;
-                    }
                 }
             }
         }
@@ -570,71 +568,57 @@ public abstract class SqlIntercode extends SqlBaseClass
             UsedVariable leftVariable = pair.getLeftVariable();
             UsedVariable rightVariable = pair.getRightVariable();
 
-            if(leftVariable != null && rightVariable != null)
+            List<String> condition = new ArrayList<String>();
+
+            if(leftVariable.canBeNull())
+                condition.add(leftVariable.getNonConstantColumns().stream()
+                        .map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
+
+            if(rightVariable.canBeNull())
+                condition.add(rightVariable.getNonConstantColumns().stream()
+                        .map(c -> c.fromTable(rightTable) + " IS NULL").sorted().collect(joining(" AND ")));
+
+            for(PairedClass pairedClass : pair.getClasses())
             {
-                List<String> condition = new ArrayList<String>();
+                ResourceClass leftClass = pairedClass.getLeftClass();
+                ResourceClass rightClass = pairedClass.getRightClass();
 
-                if(leftVariable.canBeNull())
-                    condition.add(leftVariable.getNonConstantColumns().stream()
-                            .map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
+                if(leftClass == null || rightClass == null)
+                    continue;
 
-                if(rightVariable.canBeNull())
-                    condition.add(rightVariable.getNonConstantColumns().stream()
-                            .map(c -> c.fromTable(rightTable) + " IS NULL").sorted().collect(joining(" AND ")));
+                ResourceClass unionClass = ResourceClass.getUnionClass(leftClass, rightClass);
 
-                for(PairedClass pairedClass : pair.getClasses())
+                List<Column> leftCols = toTableColumns(leftTable, leftVariable.getMapping(leftClass));
+                List<Column> rightCols = toTableColumns(rightTable, rightVariable.getMapping(rightClass));
+
+                List<Column> genLeftCols = leftClass.toGeneralClass(unionClass, leftCols, false);
+                List<Column> genRightCols = rightClass.toGeneralClass(unionClass, rightCols, false);
+
+                Set<String> compare = new HashSet<String>();
+
+                for(int i = 0; i < unionClass.getColumnCount(); i++)
                 {
-                    if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
-                    {
-                        List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass()).stream()
-                                .map(c -> c.fromTable(leftTable)).toList();
-                        List<Column> rightCols = rightVariable.getMapping(pairedClass.getRightClass()).stream()
-                                .map(c -> c.fromTable(rightTable)).toList();
+                    Column leftCol = genLeftCols.get(i);
+                    Column rightCol = genRightCols.get(i);
 
-                        Set<String> compare = new HashSet<String>();
-
-                        if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                        {
-                            ResourceClass resClass = pairedClass.getLeftClass();
-
-                            for(int i = 0; i < resClass.getColumnCount(); i++)
-                            {
-                                Column leftCol = leftCols.get(i);
-                                Column rightCol = rightCols.get(i);
-
-                                if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
-                                    compare.add(leftCol + " = " + rightCol);
-                                else if(!leftCol.equals(rightCol))
-                                    compare.add("false");
-                            }
-                        }
-                        else
-                        {
-                            ResourceClass leftClass = pairedClass.getLeftClass();
-                            ResourceClass rightClass = pairedClass.getRightClass();
-
-                            List<Column> genLeftCols = leftClass.toGeneralClass(leftCols, false);
-                            List<Column> genRightCols = rightClass.toGeneralClass(rightCols, false);
-
-                            for(int i = 0; i < leftClass.getGeneralClass().getColumnCount(); i++)
-                                compare.add(genLeftCols.get(i) + " = " + genRightCols.get(i));
-                        }
-
-                        if(compare.isEmpty())
-                            condition.add("true");
-
-                        if(!compare.contains("false"))
-                            condition.add(compare.stream().sorted().collect(joining(" AND ")));
-                    }
+                    if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
+                        compare.add(leftCol + " = " + rightCol);
+                    else if(!leftCol.equals(rightCol))
+                        compare.add("false");
                 }
 
+                if(compare.isEmpty())
+                    condition.add("true");
 
-                if(condition.isEmpty())
-                    condition.add("false");
-
-                if(!condition.contains("true"))
-                    join.add(condition.stream().sorted().collect(joining(" OR ", "(", ")")));
+                if(!compare.contains("false"))
+                    condition.add(compare.stream().sorted().collect(joining(" AND ")));
             }
+
+            if(condition.isEmpty())
+                condition.add("false");
+
+            if(!condition.contains("true"))
+                join.add(condition.stream().sorted().collect(joining(" OR ", "(", ")")));
         }
 
         if(join.isEmpty())
@@ -662,48 +646,38 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         for(PairedClass pairedClass : (new UsedPairedVariable(leftVariable, rightVariable)).getClasses())
         {
-            if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
+            ResourceClass leftClass = pairedClass.getLeftClass();
+            ResourceClass rightClass = pairedClass.getRightClass();
+
+            if(leftClass == null || rightClass == null)
+                continue;
+
+            ResourceClass unionClass = ResourceClass.getUnionClass(leftClass, rightClass);
+
+            List<Column> leftCols = toTableColumns(leftTable, leftVariable.getMapping(leftClass));
+            List<Column> rightCols = toTableColumns(rightTable, rightVariable.getMapping(rightClass));
+
+            List<Column> genLeftCols = leftClass.toGeneralClass(unionClass, leftCols, false);
+            List<Column> genRightCols = rightClass.toGeneralClass(unionClass, rightCols, false);
+
+            Set<String> compare = new HashSet<String>();
+
+            for(int i = 0; i < unionClass.getColumnCount(); i++)
             {
-                List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass()).stream()
-                        .map(c -> c.fromTable(leftTable)).toList();
-                List<Column> rightCols = rightVariable.getMapping(pairedClass.getRightClass()).stream()
-                        .map(c -> c.fromTable(rightTable)).toList();
+                Column leftCol = genLeftCols.get(i);
+                Column rightCol = genRightCols.get(i);
 
-                Set<String> compare = new HashSet<String>();
-
-                if(pairedClass.getLeftClass() == pairedClass.getRightClass())
-                {
-                    ResourceClass resClass = pairedClass.getLeftClass();
-
-                    for(int i = 0; i < resClass.getColumnCount(); i++)
-                    {
-                        Column leftCol = leftCols.get(i);
-                        Column rightCol = rightCols.get(i);
-
-                        if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
-                            compare.add(leftCol + " = " + rightCol);
-                        else if(!leftCol.equals(rightCol))
-                            compare.add("false");
-                    }
-                }
-                else
-                {
-                    ResourceClass leftClass = pairedClass.getLeftClass();
-                    ResourceClass rightClass = pairedClass.getRightClass();
-
-                    List<Column> genLeftCols = leftClass.toGeneralClass(leftCols, false);
-                    List<Column> genRightCols = rightClass.toGeneralClass(rightCols, false);
-
-                    for(int i = 0; i < leftClass.getGeneralClass().getColumnCount(); i++)
-                        compare.add(genLeftCols.get(i) + " = " + genRightCols.get(i));
-                }
-
-                if(compare.isEmpty())
-                    condition.add("true");
-
-                if(!compare.contains("false"))
-                    condition.add(compare.stream().sorted().collect(joining(" AND ")));
+                if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
+                    compare.add(leftCol + " = " + rightCol);
+                else if(!leftCol.equals(rightCol))
+                    compare.add("false");
             }
+
+            if(compare.isEmpty())
+                condition.add("true");
+
+            if(!compare.contains("false"))
+                condition.add(compare.stream().sorted().collect(joining(" AND ")));
         }
 
         assert !condition.isEmpty();
@@ -750,8 +724,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     Set<ResourceClass> set = new HashSet<ResourceClass>();
 
                     for(ResourceClass rc : var.getMappings().keySet())
-                        if(vars.stream().anyMatch(v -> v.getClasses().stream()
-                                .anyMatch(c -> c == rc || c.getGeneralClass() == rc || c == rc.getGeneralClass())))
+                        if(vars.stream().anyMatch(v -> !ResourceClass.areDisjunct(rc, v.getClasses())))
                             set.add(rc);
 
                     joinRestrictions.set(name, set);
@@ -774,7 +747,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             if(vars.size() > 1)
             {
-                Set<ResourceClass> resClasses = selectSharedClasses(cleanGeneralClasses(collectClasses(vars)), vars);
+                Set<ResourceClass> resClasses = joinResourceClasses(vars);
 
                 if(resClasses.isEmpty())
                     return false;

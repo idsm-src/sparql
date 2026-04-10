@@ -22,7 +22,6 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
-import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Estimator;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -338,38 +337,14 @@ public final class SqlJoin extends SqlIntercode
             return List.of(SqlNoSolution.get());
 
 
-        ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
-
-
         HashMap<String, List<UsedVariable>> constants = new HashMap<String, List<UsedVariable>>();
 
         for(SqlIntercode child : childs)
-        {
             for(UsedVariable v : child.getVariables().getValues())
-            {
-                if(v.isConstant())
-                {
-                    ResourceClass resClass = v.getResourceClass();
+                if(v.isConstant()) // children are joinable, so constants should be consistent
+                    constants.computeIfAbsent(v.getName(), r -> new ArrayList<UsedVariable>()).add(v);
 
-                    List<UsedVariable> list = constants.computeIfAbsent(v.getName(),
-                            r -> new ArrayList<UsedVariable>());
-
-                    for(UsedVariable old : list)
-                    {
-                        ResourceClass oldResClass = old.getResourceClass();
-
-                        if(resClass == oldResClass && !old.equals(v))
-                            return List.of(SqlNoSolution.get());
-
-                        //TODO: support resource class generalization
-                        if(oldResClass.getGeneralClass() != resClass.getGeneralClass())
-                            return List.of(SqlNoSolution.get());
-                    }
-
-                    list.add(v);
-                }
-            }
-        }
+        ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
         if(!constants.isEmpty())
         {
@@ -493,9 +468,6 @@ public final class SqlJoin extends SqlIntercode
                         {
                             UsedVariable leftVar = pair.getLeftVariable();
                             UsedVariable rightVar = pair.getRightVariable();
-
-                            if(leftVar == null || rightVar == null)
-                                continue;
 
                             //NOTE: currently, only simple join is taken into the account
 
@@ -649,9 +621,6 @@ public final class SqlJoin extends SqlIntercode
         {
             UsedVariable distinctVar = pair.getLeftVariable();
             UsedVariable candidateVar = pair.getRightVariable();
-
-            if(distinctVar == null || candidateVar == null)
-                continue;
 
             //NOTE: currently, only simple join is taken into the account
 

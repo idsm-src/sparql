@@ -50,7 +50,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             }
             else
             {
-                if(resClasses.stream().allMatch(r -> r.getGeneralClass() != refClass.getGeneralClass()))
+                if(ResourceClass.areDisjunct(refClass, resClasses))
                     return SqlNull.get();
             }
         }

@@ -1277,14 +1277,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append("sparql.");
                     builder.append(function);
                     builder.append("_");
-                    builder.append(resClass != null ? resClass.getGeneralClass().getName() : "rdfbox");
+                    builder.append(getResourceName(resClass));
                     builder.append("(");
 
                     if(distinct)
                         builder.append("DISTINCT ");
 
                     if(resClass != null)
-                        builder.append(translateAsUnboxedOperand(request, argument, resClass.getGeneralClass()));
+                        builder.append(translateAsUnboxedOperand(request, argument, getExpressionBaseClass(resClass)));
                     else
                         builder.append(translateAsBoxedOperand(request, argument, argument.getResourceClasses()));
 
@@ -1498,6 +1498,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 StringBuilder builder = new StringBuilder();
 
+                /*
                 if(left instanceof SqlNodeValue leftNode && right instanceof SqlNodeValue rightNode)
                 {
                     boolean incomparable = false;
@@ -1528,7 +1529,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 leftCols = leftNode.asResource(request, leftClass);
                                 rightCols = rightNode.asResource(request, rightClass);
                             }
-                            else if(leftClass.getGeneralClass() == rightClass)
+                            else if(leftClass.isSubclassOf(rightClass))
                             {
                                 rightCols = rightNode.asResource(request, rightClass);
 
@@ -1539,9 +1540,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 else
                                     leftCols = leftClass.toGeneralClass(leftNode.asResource(request, leftClass), false);
                             }
-                            else if(leftClass == rightClass.getGeneralClass())
+                            else if(rightClass.isSubclassOf(leftClass))
                             {
-
                                 leftCols = leftNode.asResource(request, leftClass);
 
                                 if(right instanceof SqlIri iri)
@@ -1551,6 +1551,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 else
                                     rightCols = rightClass.toGeneralClass(rightNode.asResource(request, rightClass),
                                             false);
+                            }
+                            else if(!ResourceClass.areDisjunct(leftClass, rightClass))
+                            {
+                                //FIXME:
                             }
                             else
                             {
@@ -1602,6 +1606,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                 }
                 else
+                */
                 {
                     if(intersectResourceClasses(left.getResourceClasses(), right.getResourceClasses()).isEmpty())
                     {
@@ -1762,7 +1767,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode operand = arguments.get(0);
                 StringBuilder builder = new StringBuilder();
 
-                if(!(operand instanceof SqlVariable variable))
+                //if(!(operand instanceof SqlVariable variable))
                 {
                     ResourceClass operandClass = operand.getExpressionResourceClass();
 
@@ -1810,6 +1815,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(")");
                     }
                 }
+                /*
                 else
                 {
                     Set<ResourceClass> convertible = variable.getResourceClasses().stream()
@@ -1883,10 +1889,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         else
                         {
                             List<Column> columns = variable.asResource(request, resClass);
-                            String code = resClass.getGeneralClass().toExpression(columns).toString();
+                            String code = getExpressionBaseClass(resClass).toExpression(columns).toString();
 
                             builder.append("sparql.cast_as_string_from_");
-                            builder.append(resClass.getGeneralClass().getName());
+                            builder.append(getResourceName(resClass));
                             builder.append("(");
                             builder.append(code);
                             builder.append(")");
@@ -1896,6 +1902,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     if(convertible.size() > 1)
                         builder.append(")");
                 }
+                */
 
                 return builder.toString();
             }
@@ -2061,13 +2068,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 SqlExpressionIntercode operand = arguments.get(0);
                 SqlExpressionIntercode base = arguments.get(1);
 
-                if(!(operand instanceof SqlVariable variable))
+                //if(!(operand instanceof SqlVariable variable))
                 {
                     if(operand.isBoxed())
                         return "sparql.iri_rdfbox(" + base.translate(request) + ", " + operand.translate(request) + ")";
                     else
                         return "sparql.iri_string(" + base.translate(request) + ", " + operand.translate(request) + ")";
                 }
+                /*
                 else
                 {
                     Set<ResourceClass> applicable = variable.getResourceClasses().stream()
@@ -2106,6 +2114,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     return builder.toString();
                 }
+                */
             }
 
             case "bnode":
@@ -2140,6 +2149,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode operand = arguments.get(0);
 
+                /*
                 if(operand instanceof SqlNodeValue variable)
                 {
                     Set<ResourceClass> applicable = operand.getResourceClasses().stream()
@@ -2170,6 +2180,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return builder.toString();
                 }
                 else
+                */
                 {
                     if(operand.isBoxed())
                         return "sparql.strlen_rdfbox(" + operand.translate(request) + ")";
@@ -2473,6 +2484,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode operand = arguments.get(0);
 
+                /*
                 if(operand instanceof SqlNodeValue variable)
                 {
                     Set<ResourceClass> applicable = operand.getResourceClasses().stream()
@@ -2501,6 +2513,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return builder.toString();
                 }
                 else
+                */
                 {
                     if(operand.isBoxed())
                         return "sparql.encode_for_uri_rdfbox(" + operand.translate(request) + ")";
@@ -2706,7 +2719,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else
                     {
                         ResourceClass resClass = getExpressionResourceClass();
-                        String code = translateAsUnboxedOperand(request, operand, resClass.getGeneralClass());
+                        String code = translateAsUnboxedOperand(request, operand, getExpressionBaseClass(resClass));
 
                         if(!function.equals("abs") && resClass == xsdInteger)
                             return code;
@@ -2734,11 +2747,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         ResourceClass effectiveClass = determineNumericResultClass(resClass);
 
                         List<Column> columns = variable.asResource(request, resClass);
-                        String code = resClass.getGeneralClass().toExpression(columns).toString();
+                        String code = getExpressionBaseClass(resClass).toExpression(columns).toString();
 
-                        if(resClass.getGeneralClass() != effectiveClass)
-                            code = "sparql.cast_as_integer_from_" + resClass.getGeneralClass().getName() + "(" + code
-                                    + ")";
+                        if(getExpressionBaseClass(resClass) != effectiveClass)
+                            code = "sparql.cast_as_integer_from_" + getResourceName(resClass) + "(" + code + ")";
 
                         if(function.equals("abs") || effectiveClass != xsdInteger)
                             code = function + "(" + code + ")";

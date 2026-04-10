@@ -1,8 +1,6 @@
 package cz.iocb.sparql.engine.database;
 
-
-
-public abstract class Column
+public abstract class Column implements Comparable<Column>
 {
     protected final String value;
 
@@ -41,5 +39,25 @@ public abstract class Column
         Column other = (Column) object;
 
         return value.equals(other.value);
+    }
+
+
+    private static int order(Column column)
+    {
+        return switch(column)
+        {
+            case ConstantColumn c -> 0;
+            case TableColumn c -> 1;
+            case ExpressionColumn c -> 2;
+            default -> Integer.MAX_VALUE;
+        };
+    }
+
+
+    @Override
+    public int compareTo(Column o)
+    {
+        int typeCompare = Integer.compare(order(this), order(o));
+        return typeCompare != 0 ? typeCompare : toString().compareTo(o.toString());
     }
 }

@@ -1,8 +1,9 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,7 +13,6 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -56,9 +56,6 @@ public final class SqlUnion extends SqlIntercode
 
         for(String varName : varNames)
         {
-            Set<ResourceClass> set = new HashSet<ResourceClass>();
-            classes.put(varName, set);
-
             Set<ResourceClass> resources = new HashSet<ResourceClass>();
 
             for(SqlIntercode branche : branches)
@@ -69,13 +66,7 @@ public final class SqlUnion extends SqlIntercode
                     resources.addAll(var.getClasses());
             }
 
-            for(ResourceClass res : resources)
-            {
-                if(resources.contains(res.getGeneralClass()))
-                    set.add(res.getGeneralClass());
-                else
-                    set.add(res);
-            }
+            classes.put(varName, ResourceClass.getDisjunctClasses(resources));
         }
 
 
@@ -91,7 +82,6 @@ public final class SqlUnion extends SqlIntercode
 
 
         Map<List<Column>, Column> unionColumns = new HashMap<List<Column>, Column>();
-
         List<Map<Column, Column>> columnMappings = new ArrayList<Map<Column, Column>>(childs.size());
 
         for(int i = 0; i < childs.size(); i++)
@@ -102,98 +92,67 @@ public final class SqlUnion extends SqlIntercode
         for(Entry<String, Set<ResourceClass>> entry : classes.entrySet())
         {
             String name = entry.getKey();
+            List<UsedVariable> vars = childs.stream().map(c -> c.getVariable(name)).toList();
 
-            boolean canBeNull = childs.stream()
-                    .anyMatch(i -> i.getVariables().get(name) == null || i.getVariables().get(name).canBeNull());
-
+            boolean canBeNull = vars.stream().anyMatch(v -> v == null || v.canBeNull());
             UsedVariable variable = new UsedVariable(name, canBeNull);
 
-            loop:
             for(ResourceClass resourceClass : entry.getValue())
             {
+                if(vars.stream().filter(Objects::nonNull).flatMap(v -> v.getMappings().entrySet().stream())
+                        .anyMatch(r -> isNull(r.getValue()) && !areDisjunct(r.getKey(), resourceClass)))
+                {
+                    variable.addMapping(resourceClass, null);
+                    continue;
+                }
+
+
+                List<List<Column>> cols = new ArrayList<List<Column>>(resourceClass.getColumnCount());
+
+                for(int i = 0; i < resourceClass.getColumnCount(); i++)
+                    cols.add(new ArrayList<Column>(childs.size()));
+
+
+                for(UsedVariable var : vars)
+                {
+                    if(var == null)
+                    {
+                        for(int i = 0; i < resourceClass.getColumnCount(); i++)
+                            cols.get(i).add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
+                    }
+                    else
+                    {
+                        List<Column> c = var.deriveMapping(resourceClass);
+
+                        for(int i = 0; i < resourceClass.getColumnCount(); i++)
+                            cols.get(i).add(c.get(i));
+                    }
+                }
+
+
                 List<Column> columns = resourceClass.createColumns(request.getColumnMap(), variable.getName());
                 List<Column> mapping = new ArrayList<Column>(resourceClass.getColumnCount());
 
                 for(int i = 0; i < resourceClass.getColumnCount(); i++)
                 {
-                    List<Column> cols = new ArrayList<Column>(childs.size());
+                    List<Column> c = cols.get(i);
 
-                    for(SqlIntercode child : childs)
+                    if(c.get(0) instanceof ConstantColumn c0 && c.stream().allMatch(d -> d.equals(c0)))
                     {
-                        UsedVariable var = child.getVariables().get(name);
-
-                        if(var == null)
-                        {
-                            cols.add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
-                        }
-                        else if(var.containsClass(resourceClass))
-                        {
-                            if(var.getMapping(resourceClass) == null)
-                            {
-                                variable.addMapping(resourceClass, null);
-                                continue loop;
-                            }
-
-                            cols.add(var.getMapping(resourceClass).get(i));
-                        }
-                        else
-                        {
-                            Set<ResourceClass> variants = var.getCompatibleClasses(resourceClass);
-
-                            if(variants.isEmpty())
-                            {
-                                cols.add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
-                            }
-                            else
-                            {
-                                StringBuilder builder = new StringBuilder();
-
-                                if(variants.size() > 1)
-                                    builder.append("coalesce(");
-
-                                boolean hasAlternative = false;
-
-                                for(ResourceClass variant : variants)
-                                {
-                                    appendComma(builder, hasAlternative);
-                                    hasAlternative = true;
-
-                                    if(var.getMapping(variant) == null)
-                                    {
-                                        variable.addMapping(resourceClass, null);
-                                        continue loop;
-                                    }
-
-                                    builder.append(
-                                            variant.toGeneralClass(var.getMapping(variant), var.canBeNull()).get(i));
-                                }
-
-                                if(variants.size() > 1)
-                                    builder.append(")");
-
-                                cols.add(new ExpressionColumn(builder.toString()));
-                            }
-                        }
+                        mapping.add(c.get(0));
                     }
-
-
-                    if(cols.get(0) instanceof ConstantColumn && Collections.frequency(cols, cols.get(0)) == cols.size())
+                    else if(unionColumns.containsKey(c))
                     {
-                        mapping.add(cols.get(0));
-                    }
-                    else if(unionColumns.containsKey(cols))
-                    {
-                        Column col = unionColumns.get(cols);
-                        mapping.add(col);
+                        mapping.add(unionColumns.get(c));
                     }
                     else
                     {
                         Column col = columns.get(i);
-                        unionColumns.put(cols, col);
+                        unionColumns.put(c, col);
                         mapping.add(col);
 
                         for(int j = 0; j < childs.size(); j++)
-                            columnMappings.get(j).put(col, cols.get(j));
+                            columnMappings.get(j).put(col, c.get(j));
                     }
                 }
 

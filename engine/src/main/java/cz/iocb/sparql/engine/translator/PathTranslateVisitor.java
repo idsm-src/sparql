@@ -555,8 +555,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
                 else
                 {
-                    //NOTE: CommonIriClass cannot be used in mappings
-                    assert other.getResourceClass().getGeneralClass() != resourceClass.getGeneralClass();
+                    //FIXME: common (general) classes cannot be used in mappings
+                    assert ResourceClass.areDisjunct(other.getResourceClass(), resourceClass);
                     return SqlNoSolution.get();
                 }
             }

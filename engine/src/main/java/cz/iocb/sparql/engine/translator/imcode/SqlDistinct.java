@@ -202,8 +202,10 @@ public final class SqlDistinct extends SqlIntercode
                     classes.add(null);
 
                 if(var != null)
-                    for(ResourceClass r : var.getClasses())
-                        classes.add(unionVar.getClasses().contains(r.getGeneralClass()) ? r.getGeneralClass() : r);
+                    for(ResourceClass varResourceClass : var.getClasses())
+                        for(ResourceClass unionResourceClass : unionVar.getClasses())
+                            if(!ResourceClass.areDisjunct(varResourceClass, unionResourceClass))
+                                classes.add(unionResourceClass);
 
                 newKey.add(classes);
             }

@@ -1,8 +1,9 @@
 package cz.iocb.sparql.engine.translator;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -58,37 +59,27 @@ public class UsedPairedVariable
         }
         else
         {
+            Set<ResourceClass> leftOthers = new HashSet<ResourceClass>(leftVariable.getClasses());
+            Set<ResourceClass> rightOthers = new HashSet<ResourceClass>(rightVariable.getClasses());
+
             for(ResourceClass leftClass : leftVariable.getClasses())
             {
-                if(rightVariable.getClasses().contains(leftClass))
+                for(ResourceClass rightClass : rightVariable.getClasses())
                 {
-                    addClasses(leftClass, leftClass);
-                }
-                else if(rightVariable.getClasses().contains(leftClass.getGeneralClass()))
-                {
-                    addClasses(leftClass, leftClass.getGeneralClass());
-                }
-                else if(rightVariable.getClasses().stream().noneMatch(r -> r.getGeneralClass() == leftClass))
-                {
-                    addClasses(leftClass, null);
+                    if(!ResourceClass.areDisjunct(leftClass, rightClass))
+                    {
+                        addClasses(leftClass, rightClass);
+                        leftOthers.remove(leftClass);
+                        rightOthers.remove(rightClass);
+                    }
                 }
             }
 
-            for(ResourceClass rightClass : rightVariable.getClasses())
-            {
-                if(leftVariable.getClasses().contains(rightClass))
-                {
+            for(ResourceClass leftClass : leftOthers)
+                addClasses(leftClass, null);
 
-                }
-                else if(leftVariable.getClasses().contains(rightClass.getGeneralClass()))
-                {
-                    addClasses(rightClass.getGeneralClass(), rightClass);
-                }
-                else if(leftVariable.getClasses().stream().noneMatch(r -> r.getGeneralClass() == rightClass))
-                {
-                    addClasses(null, rightClass);
-                }
-            }
+            for(ResourceClass rightClass : rightOthers)
+                addClasses(null, rightClass);
         }
     }
 
@@ -107,14 +98,8 @@ public class UsedPairedVariable
 
     public static ArrayList<UsedPairedVariable> getPairs(UsedVariables left, UsedVariables right)
     {
-        LinkedHashSet<String> varNames = new LinkedHashSet<String>();
-
-        for(UsedVariable variable : left.getValues())
-            varNames.add(variable.getName());
-
-        for(UsedVariable variable : right.getValues())
-            varNames.add(variable.getName());
-
+        HashSet<String> varNames = new HashSet<String>(left.getNames());
+        varNames.retainAll(right.getNames());
 
         ArrayList<UsedPairedVariable> pairs = new ArrayList<UsedPairedVariable>(varNames.size());
 

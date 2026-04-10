@@ -182,37 +182,34 @@ public final class SqlMinus extends SqlIntercode
             UsedVariable leftVariable = pair.getLeftVariable();
             UsedVariable rightVariable = pair.getRightVariable();
 
-            if(leftVariable != null && rightVariable != null)
+            StringBuilder builder = new StringBuilder();
+
+            if(leftVariable.canBeNull())
             {
-                StringBuilder builder = new StringBuilder();
+                Set<Column> columns = leftVariable.getNonConstantColumns();
+                assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
 
-                if(leftVariable.canBeNull())
-                {
-                    Set<Column> columns = leftVariable.getNonConstantColumns();
-                    assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
-
-                    builder.append("(");
-                    builder.append(columns.stream().map(c -> c.fromTable(leftTable) + " IS NOT NULL").sorted()
-                            .collect(joining(" OR ")));
-                    builder.append(")");
-                }
-
-                if(leftVariable.canBeNull() && rightVariable.canBeNull())
-                    builder.append(" AND ");
-
-                if(rightVariable.canBeNull())
-                {
-                    Set<Column> columns = rightVariable.getNonConstantColumns();
-                    assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
-
-                    builder.append("(");
-                    builder.append(columns.stream().map(c -> c.fromTable(rightTable) + " IS NOT NULL").sorted()
-                            .collect(joining(" OR ")));
-                    builder.append(")");
-                }
-
-                condition.add(builder.toString());
+                builder.append("(");
+                builder.append(columns.stream().map(c -> c.fromTable(leftTable) + " IS NOT NULL").sorted()
+                        .collect(joining(" OR ")));
+                builder.append(")");
             }
+
+            if(leftVariable.canBeNull() && rightVariable.canBeNull())
+                builder.append(" AND ");
+
+            if(rightVariable.canBeNull())
+            {
+                Set<Column> columns = rightVariable.getNonConstantColumns();
+                assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
+
+                builder.append("(");
+                builder.append(columns.stream().map(c -> c.fromTable(rightTable) + " IS NOT NULL").sorted()
+                        .collect(joining(" OR ")));
+                builder.append(")");
+            }
+
+            condition.add(builder.toString());
         }
 
         String domCondition = condition.stream().sorted().collect(joining(" OR "));

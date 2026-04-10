@@ -82,24 +82,10 @@ public abstract class QuadMapping
         if(!node1.equals(node2))
             return true;
 
-        if(map1 instanceof ConstantMapping && map2 instanceof ConstantMapping)
-            return map1.equals(map2);
+        if(map1 instanceof ConstantMapping cmap1 && map2 instanceof ConstantMapping cmap2)
+            return cmap1.getValue().equals(cmap2.getValue());
 
-        ResourceClass rc1 = map1.getResourceClass(request);
-        ResourceClass rc2 = map2.getResourceClass(request);
-
-        //NOTE: CommonIriClass cannot be used in mappings
-
-        if(rc1 == rc2)
-            return true;
-
-        if(map1 instanceof ConstantMapping && rc1.getGeneralClass() == rc2)
-            return true;
-
-        if(map2 instanceof ConstantMapping && rc2.getGeneralClass() == rc1)
-            return true;
-
-        return false;
+        return !ResourceClass.areDisjunct(map1.getResourceClass(request), map2.getResourceClass(request));
     }
 
 

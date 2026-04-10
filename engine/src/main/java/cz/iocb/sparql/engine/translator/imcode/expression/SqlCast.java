@@ -49,7 +49,7 @@ public final class SqlCast extends SqlUnary
 
     public static SqlExpressionIntercode create(ResourceClass resourceClass, SqlExpressionIntercode operand)
     {
-        if(operand.getResourceClasses().stream().allMatch(r -> r.getGeneralClass() == resourceClass))
+        if(operand.getResourceClasses().stream().allMatch(r -> r.isSubclassOf(resourceClass))) //FIXME:
             return operand;
 
         Set<ResourceClass> resultClasses = operand.getResourceClasses().stream()
@@ -161,11 +161,11 @@ public final class SqlCast extends SqlUnary
             {
                 builder.append(variable.getExpressionValue(resClass));
             }
-            else if(resClass.getGeneralClass() == castClass)
+            else if(!ResourceClass.areDisjunct(resClass, castClass))
             {
-                List<Column> columns = variable.asResource(request, resClass);//
+                List<Column> columns = variable.asResource(request, resClass);
 
-                builder.append(castClass.toExpression(resClass.toGeneralClass(columns, true)));
+                builder.append(castClass.toExpression(resClass.toGeneralClass(castClass, columns, true)));
             }
 
             /* special casts from datetime */
@@ -299,9 +299,9 @@ public final class SqlCast extends SqlUnary
                 builder.append("sparql.cast_as_");
                 builder.append(getResourceName());
                 builder.append("_from_");
-                builder.append(resClass.getGeneralClass().getName());
+                builder.append(getResourceName(resClass));
                 builder.append("(");
-                builder.append(resClass.getGeneralClass().toExpression(variable.asResource(request, resClass)));
+                builder.append(getExpressionBaseClass(resClass).toExpression(variable.asResource(request, resClass)));
                 builder.append(")");
             }
             else

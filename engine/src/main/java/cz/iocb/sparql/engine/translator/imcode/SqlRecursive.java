@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -171,10 +172,9 @@ public final class SqlRecursive extends SqlIntercode
             {
                 Set<ResourceClass> additional = new HashSet<>(classes);
 
-                for(SqlIntercode child : union.getChilds())
-                    if(child.getVariable(joinName) != null && child.getVariable(joinName).getClasses().stream()
-                            .anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass())))
-                        additional.addAll(child.getVariable(endName).getClasses());
+                for(SqlIntercode c : union.getChilds())
+                    if(c.getVariable(joinName) != null && !areDisjunct(classes, c.getVariable(joinName).getClasses()))
+                        additional.addAll(c.getVariable(endName).getClasses());
 
                 if(additional.equals(classes))
                     break;
@@ -182,9 +182,8 @@ public final class SqlRecursive extends SqlIntercode
                 classes.addAll(additional);
             }
 
-            List<SqlIntercode> childs = union.getChilds().stream()
-                    .filter(x -> x.getVariable(joinName) != null && x.getVariable(joinName).getClasses().stream()
-                            .anyMatch(c -> classes.contains(c) || classes.contains(c.getGeneralClass())))
+            List<SqlIntercode> childs = union.getChilds().stream().filter(
+                    c -> c.getVariable(joinName) != null && !areDisjunct(classes, c.getVariable(joinName).getClasses()))
                     .toList();
 
             if(childs.size() == union.getChilds().size())
@@ -251,7 +250,7 @@ public final class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = initEndVariable.toResource(resClass);
+            List<Column> columns = initEndVariable.deriveMapping(resClass);
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -284,7 +283,7 @@ public final class SqlRecursive extends SqlIntercode
 
         for(ResourceClass resClass : endVarClasses)
         {
-            List<Column> columns = nextEndVariable != null ? nextEndVariable.toResource(resClass) : null;
+            List<Column> columns = nextEndVariable != null ? nextEndVariable.deriveMapping(resClass) : null;
 
             for(int j = 0; j < resClass.getColumnCount(); j++)
             {
@@ -354,7 +353,7 @@ public final class SqlRecursive extends SqlIntercode
 
         UsedVariable endVar = new UsedVariable(endName, false);
 
-        for(ResourceClass resClass : cleanSpecificClasses(resClasses))
+        for(ResourceClass resClass : ResourceClass.getDisjunctClasses(resClasses))
             endVar.addMapping(resClass, resClass.createColumns(request.getColumnMap(), endName));
 
         //TODO: handle constant columns

@@ -2,10 +2,12 @@ package cz.iocb.sparql.engine.translator;
 
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -90,6 +92,64 @@ public class UsedVariable
     }
 
 
+    public List<Column> deriveMapping(ResourceClass targetClass)
+    {
+        if(mappings.containsKey(targetClass))
+            return mappings.get(targetClass);
+
+        List<List<Column>> variants = new ArrayList<List<Column>>();
+        boolean canBeNull = canBeNull() || mappings.size() > 1;
+
+        for(Entry<ResourceClass, List<Column>> map : mappings.entrySet())
+        {
+            if(!ResourceClass.areDisjunct(targetClass, map.getKey()))
+            {
+                ResourceClass sourceClass = map.getKey();
+
+                if(map.getValue() == null)
+                    return null;
+
+                ResourceClass targetEffectiveClass = targetClass.getEffectiveClass();
+                ResourceClass effectiveSourceClass = sourceClass.getEffectiveClass();
+
+                if(effectiveSourceClass.isSubclassOf(targetEffectiveClass))
+                    variants.add(sourceClass.toGeneralClass(targetClass, map.getValue(), canBeNull));
+                else if(targetEffectiveClass.isSubclassOf(effectiveSourceClass))
+                    variants.add(targetClass.fromGeneralClass(sourceClass, map.getValue()));
+                else
+                    throw new UnsupportedOperationException();
+            }
+        }
+
+        if(variants.isEmpty())
+            return targetClass.getSqlTypes().stream().map(s -> (Column) new ConstantColumn(null, s)).toList();
+
+        if(variants.size() == 1)
+            return variants.get(0);
+
+        List<Column> columns = new ArrayList<Column>();
+
+        for(int i = 0; i < targetClass.getColumnCount(); i++)
+        {
+            List<Column> set = new ArrayList<Column>();
+
+            for(List<Column> variant : variants)
+                if(!set.contains(variant.get(i)))
+                    set.add(variant.get(i));
+
+            Collections.sort(set);
+
+            if(set.size() == 1)
+                columns.add(variants.get(0).get(i));
+            else
+                columns.add(new ExpressionColumn(
+                        set.stream().map(Object::toString).collect(joining(",", "coalesce(", ")"))));
+        }
+
+        return columns;
+    }
+
+
     public final Set<ResourceClass> getClasses()
     {
         return mappings.keySet();
@@ -116,48 +176,8 @@ public class UsedVariable
         HashSet<ResourceClass> result = new HashSet<ResourceClass>();
 
         for(ResourceClass r : mappings.keySet())
-            if(r == resClass || r.getGeneralClass() == resClass || r == resClass.getGeneralClass())
+            if(!ResourceClass.areDisjunct(r, resClass))
                 result.add(r);
-
-        return result;
-    }
-
-
-    public List<Column> toResource(ResourceClass resourceClass)
-    {
-        List<Column> result = new ArrayList<Column>(resourceClass.getColumnCount());
-
-        Set<ResourceClass> resClasses = getCompatibleClasses(resourceClass);
-
-        List<List<Column>> columns = new ArrayList<List<Column>>(resClasses.size());
-
-        for(ResourceClass resClass : resClasses)
-        {
-            if(resClass == resourceClass)
-                columns.add(getMapping(resClass));
-            else if(resClass.getGeneralClass() == resourceClass)
-                columns.add(resClass.toGeneralClass(getMapping(resClass), canBeNull() || resClasses.size() > 0));
-            else if(resClass == resourceClass.getGeneralClass())
-                columns.add(resourceClass.fromGeneralClass(getMapping(resClass)));
-        }
-
-        if(columns.size() == 0)
-            return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
-
-        if(columns.size() == 1)
-            return columns.get(0);
-
-        for(int part = 0; part < resourceClass.getColumnCount(); part++)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            int i = part;
-            builder.append("coalesce(");
-            builder.append(columns.stream().map(c -> c.get(i).toString()).collect(joining(", ")));
-            builder.append(")");
-
-            result.add(new ExpressionColumn(builder.toString()));
-        }
 
         return result;
     }

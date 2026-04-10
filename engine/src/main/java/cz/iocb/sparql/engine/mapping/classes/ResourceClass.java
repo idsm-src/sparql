@@ -2,7 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
@@ -152,5 +154,105 @@ public abstract class ResourceClass
             return false;
 
         return true;
+    }
+
+
+    public static boolean areDisjunct(ResourceClass class1, ResourceClass class2)
+    {
+        return class1 != class2 && class1.getGeneralClass() != class2 && class1 != class2.getGeneralClass();
+    }
+
+
+    public static boolean areDisjunct(ResourceClass resClass, Set<ResourceClass> resClasses)
+    {
+        return resClasses.stream().allMatch(c -> areDisjunct(resClass, c));
+    }
+
+
+    public static boolean areDisjunct(Set<ResourceClass> classes1, Set<ResourceClass> classes2)
+    {
+        return classes1.stream().allMatch(c1 -> ResourceClass.areDisjunct(c1, classes2));
+    }
+
+
+    public static Set<ResourceClass> getDisjunctClasses(Set<ResourceClass> resClasses)
+    {
+        Set<ResourceClass> result = new HashSet<ResourceClass>();
+
+        for(ResourceClass resClass : resClasses)
+        {
+            if(resClasses.contains(resClass.getGeneralClass()))
+                result.add(resClass.getGeneralClass());
+            else
+                result.add(resClass);
+        }
+
+        return result;
+    }
+
+
+    public static ResourceClass getIntersectionClass(Set<ResourceClass> resClasses)
+    {
+        ResourceClass result = null;
+
+        for(ResourceClass resClass : resClasses)
+        {
+            if(result == null || result == resClass.getGeneralClass())
+                result = resClass;
+            else if(result != resClass && result.getGeneralClass() != resClass)
+                return null;
+        }
+
+        return result;
+    }
+
+
+    public static ResourceClass getUnionClass(ResourceClass classes1, ResourceClass classes2)
+    {
+        if(classes1 == classes2)
+            return classes1;
+        else if(classes1.getGeneralClass() == classes2.getGeneralClass())
+            return classes1.getGeneralClass();
+        else
+            return null;
+    }
+
+
+    public List<Column> fromGeneralClass(ResourceClass sourceClass, List<Column> columns, boolean hasToBeChecked)
+    {
+        if(this == sourceClass)
+            return columns;
+
+        return this.fromGeneralClass(columns);
+    }
+
+
+    public ResourceClass getEffectiveClass()
+    {
+        return this;
+    }
+
+
+    public boolean isSubclassOf(ResourceClass resClass)
+    {
+        return this == resClass || this.getGeneralClass() == resClass;
+    }
+
+
+    public List<Column> toGeneralClass(ResourceClass sourceClass, List<Column> columns, boolean canBeNull)
+    {
+        if(this == sourceClass)
+            return columns;
+
+        return this.toGeneralClass(columns, canBeNull);
+    }
+
+
+    public List<Column> fromGeneralClass(ResourceClass sourceClass, List<Column> columns)
+    {
+        if(this == sourceClass)
+            return columns;
+
+        return this.fromGeneralClass(columns);
     }
 }

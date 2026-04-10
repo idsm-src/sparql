@@ -231,9 +231,6 @@ public final class SqlTableAccess extends SqlIntercode
             UsedVariable leftVar = pair.getLeftVariable();
             UsedVariable rightVar = pair.getRightVariable();
 
-            if(leftVar == null || rightVar == null)
-                continue;
-
             //NOTE: currently, only simple join is taken into the account
 
             if(pair.getClasses().size() > 1)
@@ -293,9 +290,6 @@ public final class SqlTableAccess extends SqlIntercode
         {
             UsedVariable parentVar = pair.getLeftVariable();
             UsedVariable childVar = pair.getRightVariable();
-
-            if(parentVar == null || childVar == null)
-                continue;
 
             //NOTE: currently, only simple join is taken into the account
 
@@ -367,26 +361,13 @@ public final class SqlTableAccess extends SqlIntercode
             return false;
 
         // the sets of variables (and their resource classes) have to be the same
-        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
-        {
-            UsedVariable leftVar = pair.getLeftVariable();
-            UsedVariable rightVar = pair.getRightVariable();
 
-            if(leftVar == null || rightVar == null)
-                return false;
+        if(!left.internal.getNames().equals(right.internal.getNames()))
+            return false;
 
-            for(PairedClass pairedClass : pair.getClasses())
-            {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
-                    return false;
-
-                List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
-                List<Column> rightCols = rightVar.getMapping(pairedClass.getRightClass());
-
-                if(!leftCols.equals(rightCols))
-                    return false;
-            }
-        }
+        if(left.internal.getNames().stream()
+                .anyMatch(n -> !left.internal.get(n).getMappings().equals(right.internal.get(n).getMappings())))
+            return false;
 
         return true;
     }
@@ -403,6 +384,14 @@ public final class SqlTableAccess extends SqlIntercode
             return null;
 
         // the sets of variables (and their resource classes) have to be the same
+
+        if(!parent.internal.getNames().equals(child.internal.getNames()))
+            return null;
+
+        if(parent.internal.getNames().stream().anyMatch(n -> !parent.internal.get(n).getMappings().keySet()
+                .equals(child.internal.get(n).getMappings().keySet())))
+            return null;
+
         Set<ColumnPair> columns = new HashSet<ColumnPair>();
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(parent.internal, child.internal))
@@ -410,14 +399,8 @@ public final class SqlTableAccess extends SqlIntercode
             UsedVariable parentVar = pair.getLeftVariable();
             UsedVariable childVar = pair.getRightVariable();
 
-            if(parentVar == null || childVar == null)
-                return null;
-
             for(PairedClass pairedClass : pair.getClasses())
             {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
-                    return null;
-
                 List<Column> parentCols = parentVar.getMapping(pairedClass.getLeftClass());
                 List<Column> childCols = childVar.getMapping(pairedClass.getRightClass());
 
@@ -479,7 +462,7 @@ public final class SqlTableAccess extends SqlIntercode
             UsedVariable leftVar = pair.getLeftVariable();
             UsedVariable rightVar = pair.getRightVariable();
 
-            if(leftVar != null && rightVar != null && !leftVar.canBeNull() && !rightVar.canBeNull())
+            if(!leftVar.canBeNull() && !rightVar.canBeNull())
             {
                 for(PairedClass pairedClass : pair.getClasses())
                 {
@@ -512,16 +495,18 @@ public final class SqlTableAccess extends SqlIntercode
     static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions)
     {
         Condition joinCondition = new Condition();
-        UsedVariables variables = new UsedVariables();
+        UsedVariables variables = new UsedVariables(left.internal);
+
+        for(String var : right.internal.getNames())
+            if(left.internal.get(var) == null)
+                variables.add(right.internal.get(var));
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
         {
             UsedVariable leftVar = pair.getLeftVariable();
             UsedVariable rightVar = pair.getRightVariable();
 
-            variables.add(leftVar != null ? leftVar : rightVar);
-
-            if(leftVar != null && rightVar != null && !leftVar.canBeNull() && !rightVar.canBeNull())
+            if(!leftVar.canBeNull() && !rightVar.canBeNull())
             {
                 for(PairedClass pairedClass : pair.getClasses())
                 {
@@ -556,16 +541,18 @@ public final class SqlTableAccess extends SqlIntercode
 
 
         Condition joinCondition = new Condition();
-        UsedVariables variables = new UsedVariables();
+        UsedVariables variables = new UsedVariables(child.internal);
+
+        for(String var : parent.internal.getNames())
+            if(child.internal.get(var) == null)
+                variables.add(remap(map, parent.internal.get(var)));
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(child.internal, parent.internal))
         {
             UsedVariable childVar = pair.getLeftVariable();
             UsedVariable parentVar = pair.getRightVariable();
 
-            variables.add(childVar != null ? childVar : remap(map, parentVar));
-
-            if(childVar != null && parentVar != null && !childVar.canBeNull() && !parentVar.canBeNull())
+            if(!childVar.canBeNull() && !parentVar.canBeNull())
             {
                 for(PairedClass pairedClass : pair.getClasses())
                 {
@@ -597,19 +584,14 @@ public final class SqlTableAccess extends SqlIntercode
         Column extraCondition = extraNotNulls.isEmpty() ? null : extraNotNulls.iterator().next();
 
         Conditions conditions = new Conditions(left.conditions);
-        UsedVariables variables = new UsedVariables();
+        UsedVariables variables = new UsedVariables(left.internal);
 
-        for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left.internal, right.internal))
+        for(String var : right.internal.getNames())
         {
-            UsedVariable leftVar = pair.getLeftVariable();
-            UsedVariable rightVar = pair.getRightVariable();
+            if(left.internal.get(var) == null)
+            {
+                UsedVariable rightVar = right.internal.get(var);
 
-            if(leftVar != null)
-            {
-                variables.add(leftVar);
-            }
-            else if(variables.get(pair.getName()) == null)
-            {
                 ResourceClass resClass = rightVar.getResourceClass();
                 List<Column> columns = rightVar.getMapping(resClass);
 
@@ -630,7 +612,7 @@ public final class SqlTableAccess extends SqlIntercode
                 }
 
                 boolean canBeNull = rightVar.canBeNull() || extraCondition != null;
-                variables.add(new UsedVariable(pair.getName(), resClass, columns, canBeNull));
+                variables.add(new UsedVariable(var, resClass, columns, canBeNull));
             }
         }
 
