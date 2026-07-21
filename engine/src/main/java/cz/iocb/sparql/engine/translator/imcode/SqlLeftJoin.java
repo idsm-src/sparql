@@ -19,8 +19,9 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 
 
@@ -81,8 +82,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
     private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
     {
-        if(conditions.stream().anyMatch(f -> f == SqlNull.get() || f == falseValue
-                || (f instanceof SqlBinaryComparison && ((SqlBinaryComparison) f).isAlwaysFalseOrNull())))
+        if(conditions.stream().anyMatch(f -> f.equals(SqlNull.get()) || f.equals(falseValue)
+                || f instanceof SqlBooleanExpression b && b.isFalseOrError()))
             return false;
 
         return isJoinable(left, right);
@@ -147,7 +148,7 @@ public final class SqlLeftJoin extends SqlIntercode
         Restrictions cndRestrictions = new Restrictions(restrictions);
 
         for(SqlExpressionIntercode condition : optConditions)
-            cndRestrictions.add(condition.getRequirements(Set.of(xsdBoolean)));
+            cndRestrictions.add(condition.getRequirements());
 
         Restrictions leftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
                 cndRestrictions);
@@ -187,7 +188,7 @@ public final class SqlLeftJoin extends SqlIntercode
             Restrictions newCndRestrictions = new Restrictions(restrictions);
 
             for(SqlExpressionIntercode condition : optConditions)
-                newCndRestrictions.add(condition.getRequirements(Set.of(xsdBoolean)));
+                newCndRestrictions.add(condition.getRequirements());
 
             Restrictions newLeftRestrictions = getJoinRestrictions(optLeft.getVariables(), optRight.getVariables(),
                     newCndRestrictions);
@@ -205,10 +206,10 @@ public final class SqlLeftJoin extends SqlIntercode
         }
 
 
-        if(optLeft == SqlNoSolution.get())
+        if(optLeft.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(optRight == SqlNoSolution.get() || optRight == SqlEmptySolution.get()
+        if(optRight.equals(SqlNoSolution.get()) || optRight.equals(SqlEmptySolution.get())
                 || !isJoinable(optLeft, optRight, optConditions))
             return optLeft.optimize(request, restrictions, optReduced, evalServices);
 
@@ -257,8 +258,8 @@ public final class SqlLeftJoin extends SqlIntercode
 
         List<SqlExpressionIntercode> result = new ArrayList<SqlExpressionIntercode>(conditions.size());
 
-        conditions.stream().map(f -> f.optimize(request, variables, evalServices)).filter(f -> f != trueValue)
-                .forEach(f -> result.add(f));
+        conditions.stream().map(f -> f.optimize(request, variables, new Restriction(xsdBoolean), evalServices))
+                .filter(f -> !f.equals(trueValue)).forEach(f -> result.add(f));
 
         return result;
     }
@@ -299,7 +300,7 @@ public final class SqlLeftJoin extends SqlIntercode
         if(condition != null && !conditions.isEmpty())
             builder.append(" AND ");
 
-        builder.append(conditions.stream().map(c -> c.translate(request)).collect(joining(" AND ")));
+        builder.append(conditions.stream().map(c -> c.get(xsdBoolean).get(0).toString()).collect(joining(" AND ")));
 
         if(condition == null && conditions.isEmpty())
             builder.append("true");

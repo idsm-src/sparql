@@ -426,6 +426,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
         DataType datatype = config.getDataType(iri);
 
         //TODO: add support for casting to user literals
+
         if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
         {
             if(arguments.size() != 1)

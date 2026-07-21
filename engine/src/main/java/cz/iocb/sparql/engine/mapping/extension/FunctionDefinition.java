@@ -3,17 +3,11 @@ package cz.iocb.sparql.engine.mapping.extension;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.SimpleLiteralClass;
 
 
 
 public class FunctionDefinition
 {
-    public static final ResourceClass stringLiteral = new SimpleLiteralClass(null, "varchar", null)
-    {
-    };
-
-
     private final String functionName;
     private final Function sqlFunction;
     private final ResourceClass result;

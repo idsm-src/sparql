@@ -111,7 +111,7 @@ public final class SqlTableAccess extends SqlIntercode
             Column r2 = representants.getOrDefault(p.getRight(), p.getRight());
             Column r = r1 instanceof ConstantColumn || r2 instanceof ExpressionColumn ? r1 : r2;
 
-            representants.replaceAll((k, v) -> v.equals(r1) || v.equals(r2) ? r : v);
+            representants.replaceAll((_, v) -> v.equals(r1) || v.equals(r2) ? r : v);
 
             if(!(p.getLeft() instanceof ConstantColumn))
                 representants.put(p.getLeft(), r);
@@ -206,7 +206,7 @@ public final class SqlTableAccess extends SqlIntercode
                 return false;
 
             //TODO: support resource class generalization
-            if(tableVariable.getMapping(variable.getResourceClass()) == null)
+            if(tableVariable.getMapping(variable.getClasses().iterator().next()) == null)
                 return false;
 
             if(tableVariable.canBeNull() /*&& right.getSize() > 1*/)
@@ -237,12 +237,12 @@ public final class SqlTableAccess extends SqlIntercode
                 return Set.of();
 
             if(leftVar.canBeNull() || rightVar.canBeNull())
-                if(!leftVar.equals(rightVar)) // TODO:  take representatives into account
+                if(!leftVar.equals(rightVar)) // TODO: take representatives into account
                     return Set.of();
 
             for(PairedClass pairedClass : pair.getClasses())
             {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
                     return Set.of();
 
                 List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
@@ -301,7 +301,7 @@ public final class SqlTableAccess extends SqlIntercode
 
             for(PairedClass pairedClass : pair.getClasses())
             {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
                     return Set.of();
 
                 List<Column> parentCols = parentVar.getMapping(pairedClass.getLeftClass());
@@ -592,7 +592,7 @@ public final class SqlTableAccess extends SqlIntercode
             {
                 UsedVariable rightVar = right.internal.get(var);
 
-                ResourceClass resClass = rightVar.getResourceClass();
+                ResourceClass resClass = rightVar.getClasses().iterator().next();
                 List<Column> columns = rightVar.getMapping(resClass);
 
                 if(extraCondition != null)
@@ -601,7 +601,7 @@ public final class SqlTableAccess extends SqlIntercode
 
                     for(Column col : columns)
                     {
-                        if(col == extraCondition)
+                        if(col.equals(extraCondition))
                             modified.add(col);
                         else
                             modified.add(new ExpressionColumn(
@@ -906,6 +906,7 @@ public final class SqlTableAccess extends SqlIntercode
                 boolean hasCondition = false;
 
                 // TODO: do not use derivable conditions
+
                 for(ColumnComparison pair : condition.getAreEqual())
                 {
                     appendAnd(builder, hasCondition);
@@ -927,6 +928,7 @@ public final class SqlTableAccess extends SqlIntercode
                 }
 
                 // TODO: do not use derivable conditions
+
                 for(Column column : condition.getIsNotNull())
                 {
                     appendAnd(builder, hasCondition);

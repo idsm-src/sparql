@@ -1,84 +1,110 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.expandUnionClasses;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.TRUE_OR_ERROR;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.UserIntBlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
-import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.Pair;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlBinaryComparison extends SqlBinary
+public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanExpression
 {
+    protected static enum ComparisonType
+    {
+        DIFFERENT, NULL, NOT_NULL, FULL
+    }
+
+    private static enum ComparisonMode
+    {
+        NULL,
+        DIFF,
+        BOOLEAN,
+        FLOAT,
+        DECIMAL,
+        DATETIME,
+        DATE_EARLIER_TZ,
+        DATE_SAME_TZ,
+        DATE_LATER_TZ,
+        DATE,
+        LITERAL,
+        DIRECT,
+        BOX
+    }
+
+
     private static final int SECS_PER_DAY = 24 * 60 * 60;
 
     private final Operator operator;
-
-    private final boolean isAlwaysDifferentIfNotNull;
-    private final List<Pair<ResourceClass, ResourceClass>> comparable;
-    private final List<Pair<ResourceClass, ResourceClass>> different;
+    private final NonConstantBooleanValue value;
 
 
-    protected SqlBinaryComparison(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
-            boolean canBeNull, boolean isAlwaysDifferentIfNotNull, List<Pair<ResourceClass, ResourceClass>> comparable,
-            List<Pair<ResourceClass, ResourceClass>> different)
+    private SqlBinaryComparison(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+            Map<ResourceClass, List<Column>> mappings, boolean canBeNull, NonConstantBooleanValue value)
     {
-        super(left, right, asSet(xsdBoolean), canBeNull);
+        super(left, right, mappings, canBeNull);
+
         this.operator = operator;
-        this.isAlwaysDifferentIfNotNull = isAlwaysDifferentIfNotNull;
-        this.comparable = comparable;
-        this.different = different;
+        this.value = value;
     }
 
 
     public static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
-        List<Pair<ResourceClass, ResourceClass>> comparable = new LinkedList<Pair<ResourceClass, ResourceClass>>();
-        List<Pair<ResourceClass, ResourceClass>> different = new LinkedList<Pair<ResourceClass, ResourceClass>>();
-
-        boolean isAlwaysNull = true;
-        boolean isAlwaysDifferentIfNotNull = !left.canBeNull() && !right.canBeNull();
-        boolean canBeNull = left.canBeNull() || right.canBeNull();
+        return create(operator, left, right, Restriction.ALL);
+    }
 
 
+    private static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
+            SqlExpressionIntercode right, Restriction restriction)
+    {
         if(left instanceof SqlIri a && right instanceof SqlIri b)
         {
             if(operator == Operator.Equals)
@@ -87,136 +113,49 @@ public final class SqlBinaryComparison extends SqlBinary
                 return a.getIri().equals(b.getIri()) ? falseValue : trueValue;
         }
 
-        if(left instanceof SqlLiteral a && right instanceof SqlLiteral b)
-        {
-            if(operator == Operator.Equals)
-                return a.getLiteral().equals(b.getLiteral()) ? trueValue : falseValue;
-            else if(operator == Operator.NotEquals)
-                return a.getLiteral().equals(b.getLiteral()) ? falseValue : trueValue;
-        }
+        //TODO: add compile-time evaluation for literals
 
+        Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<ResourceClass, Set<List<ResourceClass>>>();
+        Set<List<ResourceClass>> set = new HashSet<List<ResourceClass>>();
+        map.put(xsdBoolean, set);
 
-        for(ResourceClass leftClass : left.getResourceClasses())
+        boolean isAlwaysDifferentIfNotNull = !left.canBeNull() && !right.canBeNull();
+        boolean canBeNull = left.canBeNull() || right.canBeNull();
+
+        for(ResourceClass leftClass : left.getMappings().keySet())
         {
-            for(ResourceClass rightClass : right.getResourceClasses())
+            for(ResourceClass rightClass : right.getMappings().keySet())
             {
-                if((operator == Operator.Equals || operator == Operator.NotEquals)
-                        && leftClass instanceof DateConstantZoneClass l && rightClass instanceof DateConstantZoneClass r
-                        && getTimezoneDiff(l, r) % SECS_PER_DAY != 0)
+                switch(areComparable(operator, leftClass, rightClass))
                 {
-                    // is always different
-                    isAlwaysNull = false;
-                    different.add(new Pair<>(leftClass, rightClass));
-                }
-                else if(leftClass == xsdBoolean && rightClass == xsdBoolean
-                        || isString(leftClass) && isString(rightClass) || isNumeric(leftClass) && isNumeric(rightClass)
-                        || isDateTime(leftClass) && isDateTime(rightClass) || isDate(leftClass) && isDate(rightClass))
-                {
-                    isAlwaysNull = false;
-                    isAlwaysDifferentIfNotNull = false;
-                    comparable.add(new Pair<>(leftClass, rightClass));
-                }
-                else if(operator != Operator.Equals && operator != Operator.NotEquals)
-                {
-                    // is always null
-                    canBeNull = true;
-                }
-                else if(leftClass == xsdDayTimeDuration && rightClass == xsdDayTimeDuration)
-                {
-                    isAlwaysNull = false;
-                    isAlwaysDifferentIfNotNull = false;
-                    comparable.add(new Pair<>(leftClass, rightClass));
-                }
-                else if(isLangString(leftClass) && isLangString(rightClass))
-                {
-                    if(leftClass == rightClass || leftClass == rdfLangString || rightClass == rdfLangString)
+                    case DIFFERENT ->
                     {
-                        isAlwaysNull = false;
+                        set.add(List.of(leftClass, rightClass));
+                    }
+
+                    case NULL ->
+                    {
+                        canBeNull = true;
+                    }
+
+                    case NOT_NULL ->
+                    {
                         isAlwaysDifferentIfNotNull = false;
-                        comparable.add(new Pair<>(leftClass, rightClass));
+                        set.add(List.of(leftClass, rightClass));
                     }
-                    else
+
+                    case FULL ->
                     {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                }
-                else if(leftClass instanceof UserLiteralClass && leftClass == rightClass)
-                {
-                    isAlwaysNull = false;
-                    isAlwaysDifferentIfNotNull = false;
-                    comparable.add(new Pair<>(leftClass, rightClass));
-                }
-                else if(leftClass == unsupportedLiteral && rightClass == unsupportedLiteral)
-                {
-                    // is null, if types are different
-                    canBeNull = true;
-                    isAlwaysNull = false;
-                    isAlwaysDifferentIfNotNull = false;
-                    comparable.add(new Pair<>(leftClass, rightClass));
-                }
-                else if(leftClass instanceof LiteralClass && rightClass instanceof LiteralClass)
-                {
-                    // is always null
-                    canBeNull = true;
-                }
-                else if(leftClass instanceof StrBlankNodeClass && rightClass instanceof StrBlankNodeClass)
-                {
-                    if(leftClass == rightClass || leftClass == strBlankNode || rightClass == strBlankNode)
-                    {
-                        isAlwaysNull = false;
+                        canBeNull = true;
                         isAlwaysDifferentIfNotNull = false;
-                        comparable.add(new Pair<>(leftClass, rightClass));
+                        set.add(List.of(leftClass, rightClass));
                     }
-                    else
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                }
-                else if(leftClass instanceof IntBlankNodeClass && rightClass instanceof IntBlankNodeClass)
-                {
-                    if(leftClass == rightClass || leftClass == intBlankNode || rightClass == intBlankNode)
-                    {
-                        isAlwaysNull = false;
-                        isAlwaysDifferentIfNotNull = false;
-                        comparable.add(new Pair<>(leftClass, rightClass));
-                    }
-                    else
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                }
-                else if(leftClass instanceof IriClass && rightClass instanceof IriClass)
-                {
-                    if(leftClass == rightClass || leftClass == iri || rightClass == iri)
-                    {
-                        isAlwaysNull = false;
-                        isAlwaysDifferentIfNotNull = false;
-                        comparable.add(new Pair<>(leftClass, rightClass));
-                    }
-                    else
-                    {
-                        // is always different
-                        isAlwaysNull = false;
-                        different.add(new Pair<>(leftClass, rightClass));
-                    }
-                }
-                else
-                {
-                    // is always different
-                    isAlwaysNull = false;
-                    different.add(new Pair<>(leftClass, rightClass));
                 }
             }
         }
 
 
-        if(isAlwaysNull)
+        if(set.isEmpty())
             return SqlNull.get();
 
         if(operator == Operator.Equals && !canBeNull && isAlwaysDifferentIfNotNull)
@@ -225,481 +164,337 @@ public final class SqlBinaryComparison extends SqlBinary
         if(operator == Operator.NotEquals && !canBeNull && isAlwaysDifferentIfNotNull)
             return trueValue;
 
-        return new SqlBinaryComparison(operator, left, right, canBeNull, isAlwaysDifferentIfNotNull, comparable,
-                different);
+
+        List<SqlExpressionIntercode> operands = List.of(left, right);
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(operands, map, restriction);
+
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+
+        for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
+            mappings.put(e.getKey(), e.getValue() == null ? null : translate(operator, e.getValue(), left, right));
+
+        NonConstantBooleanValue value = switch(operator)
+        {
+            case Equals -> isAlwaysDifferentIfNotNull ? FALSE_OR_ERROR : ANY;
+            case NotEquals -> isAlwaysDifferentIfNotNull ? TRUE_OR_ERROR : ANY;
+            default -> ANY;
+        };
+
+        return new SqlBinaryComparison(operator, left, right, mappings, canBeNull, value);
     }
 
 
-    @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    protected static ComparisonType areComparable(Operator operator, ResourceClass l, ResourceClass r)
     {
-        Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
-        Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
+        boolean equalityComparison = (operator == Operator.Equals || operator == Operator.NotEquals);
 
-        for(Pair<ResourceClass, ResourceClass> p : comparable)
-        {
-            leftSet.add(p.getKey());
-            rightSet.add(p.getValue());
-        }
+        if(equalityComparison && l instanceof DateConstantZoneClass ld && r instanceof DateConstantZoneClass rd
+                && getTimezoneDiff(ld, rd) % SECS_PER_DAY != 0)
+            return ComparisonType.DIFFERENT;
 
-        for(Pair<ResourceClass, ResourceClass> p : different)
-        {
-            leftSet.add(p.getKey());
-            rightSet.add(p.getValue());
-        }
+        if(isNumeric(l) && isNumeric(r))
+            return ComparisonType.NOT_NULL;
 
-        return new Restrictions(left.getRequirements(leftSet), right.getRequirements(rightSet));
+        if(isString(l) && isString(r))
+            return (equalityComparison && areDisjunct(l, r)) ? ComparisonType.DIFFERENT : ComparisonType.NOT_NULL;
+
+        if(isBoolean(l) && isBoolean(r))
+            return ComparisonType.NOT_NULL;
+
+        if(isDateTime(l) && isDateTime(r))
+            return ComparisonType.NOT_NULL;
+
+        if(isDate(l) && isDate(r))
+            return ComparisonType.NOT_NULL;
+
+        if(hasNumeric(l) && hasNumeric(r))
+            return ComparisonType.FULL;
+
+        if(hasString(l) && hasString(r))
+            return ComparisonType.FULL;
+
+        if(hasBoolean(l) && hasBoolean(r))
+            return ComparisonType.FULL;
+
+        if(hasDateTime(l) && hasDateTime(r))
+            return ComparisonType.FULL;
+
+        if(hasDate(l) && hasDate(r))
+            return ComparisonType.FULL;
+
+        if(!equalityComparison)
+            return ComparisonType.NULL;
+
+        if(isLiteral(l) && isLiteral(r) && areDisjunct(l, r))
+            return ComparisonType.NULL;
+
+        if(hasLiteral(l) && hasLiteral(r))
+            return ComparisonType.FULL;
+
+        if(areDisjunct(l, r))
+            return ComparisonType.DIFFERENT;
+
+        return ComparisonType.NOT_NULL;
     }
 
 
-    @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    private static ComparisonMode getComparisonMode(Operator operator, Set<ResourceClass> left,
+            Set<ResourceClass> right)
     {
-        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
-        SqlExpressionIntercode optRight = right.optimize(request, variables, evalServices);
+        ComparisonMode result = null;
 
-        if(optLeft == left && optRight == right)
-            return this;
+        for(ResourceClass l : expandUnionClasses(left))
+            for(ResourceClass r : expandUnionClasses(right))
+                result = mergeComparisonTypes(result, determineComparisonMode(operator, l, r));
 
-        return create(operator, optLeft, optRight);
+        return result;
     }
 
 
-    @Override
-    public String translate(Request request)
+    private static ComparisonMode determineComparisonMode(Operator operator, ResourceClass left, ResourceClass right)
     {
-        if(left instanceof SqlNodeValue && right instanceof SqlNodeValue)
-            return translateAsNodeComparison(request);
+        // special treatment for dates with constant timezones
 
-
-        StringBuilder builder = new StringBuilder();
-
-        if(different.size() == left.getResourceClasses().size() * right.getResourceClasses().size())
+        if(left instanceof DateConstantZoneClass l && right instanceof DateConstantZoneClass r)
         {
-            assert comparable.size() == 0;
-            assert operator == Operator.Equals || operator == Operator.NotEquals;
+            int diff = getTimezoneDiff(l, r);
 
-            builder.append("NULLIF(");
-
-            if(left.canBeNull())
-                builder.append(translateAsNullCheck(request, left, operator == Operator.NotEquals));
-
-            if(left.canBeNull() && right.canBeNull())
-                builder.append(operator == Operator.Equals ? " OR " : " AND ");
-
-            if(right.canBeNull())
-                builder.append(translateAsNullCheck(request, right, operator == Operator.NotEquals));
-
-            builder.append(operator == Operator.Equals ? ", true)" : ", false)");
+            if(diff == 0)
+                return ComparisonMode.DATE_SAME_TZ;
+            else if(operator == Operator.Equals || operator == Operator.NotEquals)
+                return ComparisonMode.DIFF;
+            else if(diff < 0 && diff > -SECS_PER_DAY)
+                return ComparisonMode.DATE_EARLIER_TZ;
+            else if(diff > 0 && diff < SECS_PER_DAY)
+                return ComparisonMode.DATE;
         }
-        //TODO: také podporovat, když je to integer vs integer+decimal
-        else if(different.size() == 0 && SqlExpressionIntercode.getExpressionResourceClass(
-                comparable.stream().map(r -> determineComparisonClass(r.getKey(), r.getValue()))
-                        .collect(toSet())) != null/*!(left.isBoxed() || right.isBoxed())*/)
-        {
-            Set<ResourceClass> cmpClasses = comparable.stream()
-                    .map(r -> determineComparisonClass(r.getKey(), r.getValue())).collect(toSet());
 
-            ResourceClass cmpClass = SqlExpressionIntercode.getExpressionResourceClass(cmpClasses);
 
-            if(cmpClass instanceof UserLiteralClass userClass)
-            {
-                //TODO: add special treatment
-
-                builder.append("(");
-                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
-                builder.append(" ");
-                builder.append(userClass.getOperatorCode(operator));
-                builder.append(" ");
-                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
-                builder.append(")");
-            }
-            else if(cmpClass == xsdDateTime || cmpClass == xsdDate || isFloatPoint(cmpClass))
-            {
-                //TODO: add special cases to compare xsdDate as simple date
-
-                builder.append("(");
-                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
-                builder.append(" operator(sparql.");
-                builder.append(operator.getText());
-                builder.append(") ");
-                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
-                builder.append(")");
-            }
-            else
-            {
-                builder.append("(");
-                builder.append(translateAsUnboxedOperand(request, left, cmpClass));
-                builder.append(" ");
-                builder.append(operator.getText());
-                builder.append(" ");
-                builder.append(translateAsUnboxedOperand(request, right, cmpClass));
-                builder.append(")");
-            }
-        }
+        if(isNumeric(left) && isNumeric(right))
+            return isFloatPoint(left) || isFloatPoint(right) ? ComparisonMode.FLOAT : ComparisonMode.DECIMAL;
+        else if(isDateTime(left) && isDateTime(right))
+            return ComparisonMode.DATETIME;
+        else if(isDate(left) && isDate(right))
+            return ComparisonMode.DATE;
+        else if(isBoolean(left) && isBoolean(right))
+            return ComparisonMode.BOOLEAN;
+        else if(isString(left) && isString(right))
+            return ComparisonMode.DIRECT;
+        else if(operator != Operator.Equals && operator != Operator.NotEquals)
+            return ComparisonMode.NULL;
+        else if(hasNumeric(left) && hasNumeric(right))
+            return ComparisonMode.BOX;
+        else if(hasDateTime(left) && hasDateTime(right))
+            return ComparisonMode.BOX;
+        else if(hasDate(left) && hasDate(right))
+            return ComparisonMode.BOX;
+        else if(hasBoolean(left) && hasBoolean(right))
+            return ComparisonMode.BOX;
+        else if(hasString(left) && hasString(right))
+            return ComparisonMode.BOX;
+        else if(isLiteral(left) && isLiteral(right))
+            return ResourceClass.areDisjunct(left, right) ? ComparisonMode.NULL : ComparisonMode.LITERAL;
+        else if(!hasLiteral(left) && !hasLiteral(right))
+            return ResourceClass.areDisjunct(left, right) ? ComparisonMode.DIFF : ComparisonMode.DIRECT;
         else
-        {
-            Set<ResourceClass> leftSet = new HashSet<ResourceClass>();
-            leftSet.addAll(comparable.stream().map(r -> r.getKey()).collect(toSet()));
-            leftSet.addAll(different.stream().map(r -> r.getKey()).collect(toSet()));
-
-            Set<ResourceClass> rightSet = new HashSet<ResourceClass>();
-            rightSet.addAll(comparable.stream().map(r -> r.getValue()).collect(toSet()));
-            rightSet.addAll(different.stream().map(r -> r.getValue()).collect(toSet()));
-
-            builder.append("(");
-            builder.append(translateAsBoxedOperand(request, left, leftSet));
-            builder.append(" operator(sparql.");
-            builder.append(operator.getText());
-            builder.append(") ");
-            builder.append(translateAsBoxedOperand(request, right, rightSet));
-            builder.append(")");
-        }
-
-        return builder.toString();
+            return ComparisonMode.BOX;
     }
 
 
-    public String translateAsNodeComparison(Request request)
+    private static boolean isDateMode(ComparisonMode mode)
     {
-        SqlNodeValue leftNode = (SqlNodeValue) left;
-        SqlNodeValue rightNode = (SqlNodeValue) right;
-
-        StringBuilder builder = new StringBuilder();
-        boolean hasAlternative = false;
-
-        if(comparable.size() + different.size() > 1)
-            builder.append("coalesce(");
-
-
-        for(Pair<ResourceClass, ResourceClass> pair : comparable)
-        {
-            appendComma(builder, hasAlternative);
-            hasAlternative = true;
-
-            ResourceClass leftClass = pair.getKey();
-            ResourceClass rightClass = pair.getValue();
-
-            List<Column> leftCols = leftNode.asResource(request, leftClass);
-            List<Column> rightCols = rightNode.asResource(request, rightClass);
-
-
-            if(leftClass instanceof BlankNodeClass)
-            {
-                if(leftClass instanceof UserIntBlankNodeClass && rightClass instanceof UserIntBlankNodeClass)
-                {
-                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
-                }
-                else if(leftClass instanceof UserStrBlankNodeClass && rightClass instanceof UserStrBlankNodeClass)
-                {
-                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
-                }
-                else
-                {
-                    List<Column> lcols = leftNode.asResource(request, getExpressionBaseClass(leftClass));
-                    List<Column> rcols = rightNode.asResource(request, getExpressionBaseClass(rightClass));
-
-                    builder.append("(");
-                    builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
-                    builder.append(operator == Operator.Equals ? " AND " : " OR ");
-                    builder.append(lcols.get(1) + " " + operator.getText() + " " + rcols.get(1));
-                    builder.append(")");
-                }
-            }
-            else if(leftClass == xsdBoolean || isString(leftClass) || leftClass == xsdDayTimeDuration
-                    || isNumeric(leftClass))
-            {
-                ResourceClass leftGenClass = getExpressionBaseClass(leftClass);
-                ResourceClass rightGenClass = getExpressionBaseClass(rightClass);
-
-                List<Column> leftColumns = leftNode.asResource(request, leftGenClass);
-                String left = leftGenClass.toExpression(leftColumns).toString();
-
-                List<Column> rightColumns = rightNode.asResource(request, rightGenClass);
-                String right = rightGenClass.toExpression(rightColumns).toString();
-
-                ResourceClass cmpClass = determineComparisonClass(leftGenClass, rightGenClass);
-
-                if(leftGenClass != cmpClass)
-                    left = "sparql.cast_as_" + cmpClass.getName() + "_from_" + leftGenClass.getName() + "(" + left
-                            + ")";
-
-                if(rightGenClass != cmpClass)
-                    right = "sparql.cast_as_" + cmpClass.getName() + "_from_" + rightGenClass.getName() + "(" + right
-                            + ")";
-
-                if(!isFloat(cmpClass) && !isDouble(cmpClass))
-                {
-                    builder.append("(" + left + " " + operator.getText() + " " + right + ")");
-                }
-                else
-                {
-                    builder.append("(");
-
-                    if(leftClass == xsdFloat || leftClass == xsdDouble)
-                        builder.append(leftCols.get(0) + " != 'NaN'::" + leftClass.getSqlTypes().get(0) + " AND ");
-
-                    if(rightClass == xsdFloat || rightClass == xsdDouble)
-                        builder.append(rightCols.get(0) + " != 'NaN'::" + rightClass.getSqlTypes().get(0) + " AND ");
-
-                    builder.append(left + " " + operator.getText() + " " + right + ")");
-                }
-            }
-            else if(isDateTime(leftClass))
-            {
-                String left = leftCols.get(0).toString();
-                String right = rightCols.get(0).toString();
-
-                //NOTE: it is assumed that default timezone is UTC
-                builder.append("(" + left + " " + operator.getText() + " " + right + ")");
-            }
-            else if(isDate(leftClass))
-            {
-                if(leftClass instanceof DateConstantZoneClass l && rightClass instanceof DateConstantZoneClass r
-                        && getTimezoneDiff(l, r) < SECS_PER_DAY)
-                {
-                    Operator effectiveOperator = operator;
-
-                    if(operator == Operator.LessThanOrEqual)
-                        effectiveOperator = Operator.LessThan;
-                    else if(operator == Operator.GreaterThanOrEqual)
-                        effectiveOperator = Operator.GreaterThan;
-
-                    String left = leftCols.get(0).toString();
-                    String right = rightCols.get(0).toString();
-
-                    builder.append("(" + left + " " + effectiveOperator.getText() + " " + right + ")");
-                }
-                else
-                {
-                    List<Column> lcols = leftNode.asResource(request, xsdDate);
-                    List<Column> rcols = rightNode.asResource(request, xsdDate);
-
-                    String left = null;
-                    String right = null;
-
-                    //NOTE: it is assumed that default timezone is UTC
-
-                    if(leftClass instanceof DateConstantZoneClass constantZoneClass
-                            && (constantZoneClass.getZone() == 0 || constantZoneClass.getZone() == Integer.MIN_VALUE))
-                        left = lcols.get(0) + "::timestamp";
-                    else if(leftClass instanceof DateConstantZoneClass constantZoneClass)
-                        left = "(" + lcols.get(0) + " + make_interval(secs => " + constantZoneClass.getZone() + "))";
-                    else
-                        left = "(" + lcols.get(0) + " + make_interval(secs => CASE " + lcols.get(1)
-                                + " WHEN -2147483648 THEN 0 ELSE " + lcols.get(1) + " END))";
-
-                    //NOTE: it is assumed that default timezone is UTC
-
-                    if(rightClass instanceof DateConstantZoneClass constantZoneClass
-                            && (constantZoneClass.getZone() == 0 || constantZoneClass.getZone() == Integer.MIN_VALUE))
-                        right = rcols.get(0) + "::timestamp";
-                    else if(rightClass instanceof DateConstantZoneClass constantZoneClass)
-                        right = "(" + rcols.get(0) + " + make_interval(secs => " + constantZoneClass.getZone() + "))";
-                    else
-                        right = "(" + rcols.get(0) + " + make_interval(secs => CASE " + rcols.get(1)
-                                + " WHEN -2147483648 THEN 0 ELSE " + rcols.get(1) + " END))";
-
-                    builder.append("(" + left + " " + operator.getText() + " " + right + ")");
-                }
-            }
-            else if(isLangString(leftClass))
-            {
-                if(leftClass instanceof LangStringConstantTagClass && rightClass instanceof LangStringConstantTagClass)
-                {
-                    builder.append(leftCols.get(0) + " " + operator.getText() + " " + rightCols.get(0));
-                }
-                else
-                {
-                    List<Column> lcols = leftNode.asResource(request, getExpressionBaseClass(leftClass));
-                    List<Column> rcols = rightNode.asResource(request, getExpressionBaseClass(rightClass));
-
-                    builder.append("(");
-                    builder.append(lcols.get(0) + " " + operator.getText() + " " + rcols.get(0));
-                    builder.append(operator == Operator.Equals ? " AND " : " OR ");
-                    builder.append(lcols.get(1) + " " + operator.getText() + " " + rcols.get(1));
-                    builder.append(")");
-                }
-            }
-            else if(leftClass instanceof IriClass)
-            {
-                if(leftClass == rightClass)
-                {
-                    builder.append("(");
-
-                    for(int i = 0; i < leftClass.getColumnCount(); i++)
-                    {
-                        if(operator == Operator.Equals)
-                        {
-                            appendAnd(builder, i > 0);
-                            builder.append(leftCols.get(i));
-                            builder.append(" = ");
-                            builder.append(rightCols.get(i));
-                        }
-                        else if(operator == Operator.NotEquals)
-                        {
-                            appendOr(builder, i > 0);
-                            builder.append(leftCols.get(i));
-                            builder.append(" != ");
-                            builder.append(rightCols.get(i));
-                        }
-                        else
-                        {
-                            assert false;
-                        }
-                    }
-
-                    builder.append(")");
-                }
-                else
-                {
-                    Column left = leftClass.toExpression(leftCols);
-                    Column right = rightClass.toExpression(rightCols);
-
-                    builder.append("(" + left + ", " + right + ")");
-                }
-            }
-            else if(leftClass instanceof UserLiteralClass userClass)
-            {
-                //TODO: add special treatment
-
-                builder.append("(");
-                builder.append(leftCols.get(0));
-                builder.append(" ");
-                builder.append(userClass.getOperatorCode(operator));
-                builder.append(" ");
-                builder.append(rightCols.get(0));
-                builder.append(")");
-            }
-            else if(leftClass == unsupportedLiteral)
-            {
-                builder.append("nullif(");
-                builder.append(leftCols.get(0));
-                builder.append(" ");
-                builder.append(operator.getText());
-                builder.append(" ");
-                builder.append(rightCols.get(0));
-                builder.append(operator == Operator.Equals ? " AND " : " OR ");
-                builder.append(leftCols.get(1));
-                builder.append(" ");
-                builder.append(operator.getText());
-                builder.append(" ");
-                builder.append(rightCols.get(1));
-                builder.append(operator == Operator.Equals ? ", false)" : ", true)");
-            }
-            else
-            {
-                assert false;
-            }
-        }
-
-
-        for(Pair<ResourceClass, ResourceClass> pair : different)
-        {
-            appendComma(builder, hasAlternative);
-            hasAlternative = true;
-
-            ResourceClass leftClass = pair.getKey();
-            ResourceClass rightClass = pair.getValue();
-
-            List<Column> leftCols = leftNode.asResource(request, leftClass);
-            List<Column> rightCols = rightNode.asResource(request, rightClass);
-
-            assert operator == Operator.Equals || operator == Operator.NotEquals;
-
-            boolean hasVariants = false;
-
-            builder.append("NULLIF(");
-
-            if(left.canBeNull() || leftNode.getResourceClasses().size() > 1)
-            {
-                for(int i = 0; i < leftClass.getColumnCount(); i++)
-                {
-                    if(operator == Operator.Equals)
-                        appendOr(builder, hasVariants);
-                    else
-                        appendAnd(builder, hasVariants);
-
-                    hasVariants = true;
-                    builder.append(leftCols.get(i));
-                    builder.append(operator == Operator.Equals ? " IS NULL" : " IS NOT NULL");
-                }
-            }
-
-            if(right.canBeNull() || rightNode.getResourceClasses().size() > 1)
-            {
-                for(int i = 0; i < rightClass.getColumnCount(); i++)
-                {
-                    if(operator == Operator.Equals)
-                        appendOr(builder, hasVariants);
-                    else
-                        appendAnd(builder, hasVariants);
-
-                    hasVariants = true;
-                    builder.append(rightCols.get(i));
-                    builder.append(operator == Operator.Equals ? " IS NULL" : " IS NOT NULL");
-                }
-            }
-
-            builder.append(operator == Operator.Equals ? ", true)" : ", false)");
-        }
-
-
-        if(comparable.size() + different.size() > 1)
-            builder.append(")");
-
-        return builder.toString();
+        return mode == ComparisonMode.DATE || mode == ComparisonMode.DATE_EARLIER_TZ
+                || mode == ComparisonMode.DATE_SAME_TZ || mode == ComparisonMode.DATE_LATER_TZ;
     }
 
 
-    private static ResourceClass determineComparisonClass(ResourceClass leftClass, ResourceClass rightClass)
+    private static ComparisonMode mergeComparisonTypes(ComparisonMode a, ComparisonMode b)
     {
-        if(leftClass == rightClass)
-            return leftClass;
+        if(a == null)
+            return b;
 
-        if(isString(leftClass) && isString(rightClass))
-            return xsdString;
+        if(b == null)
+            return a;
 
-        if(isDateTime(leftClass) && isDateTime(rightClass))
-            return xsdDateTime;
+        if(a == b)
+            return a;
 
-        if(isDate(leftClass) && isDate(rightClass))
-            return xsdDate;
+        if(isDateMode(a) && isDateMode(b))
+            return ComparisonMode.DATE;
 
-        if(isLangString(leftClass) || isLangString(rightClass))
-            return rdfLangString;
+        return ComparisonMode.BOX;
+    }
 
-        if(leftClass instanceof IriClass && rightClass instanceof IriClass)
-            return iri;
 
-        if(leftClass instanceof IntBlankNodeClass && rightClass instanceof IntBlankNodeClass)
-            return intBlankNode;
+    private static List<Column> translate(Operator operator, Set<List<Set<ResourceClass>>> variants,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        if(variants == null)
+            return null;
 
-        if(leftClass instanceof StrBlankNodeClass && rightClass instanceof StrBlankNodeClass)
-            return strBlankNode;
+        return List.of(Column.coalesce(
+                variants.stream().map(v -> new ExpressionColumn(translate(operator, v.get(0), v.get(1), left, right)))
+                        .collect(toSet())));
+    }
 
-        /*
-        if(leftClass == rightClass)
-            return leftClass;
-        */
 
-        if(isNumeric(leftClass) && isNumeric(rightClass))
+    private static String translate(Operator operator, Set<ResourceClass> lset, Set<ResourceClass> rset,
+            SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        return switch(getComparisonMode(operator, lset, rset))
         {
-            if(isDouble(leftClass) || isDouble(rightClass))
-                return xsdDouble;
-            else if(isFloat(leftClass) || isFloat(rightClass))
-                return xsdFloat;
-            else if(isDecimal(leftClass) || isDecimal(rightClass))
-                return xsdDecimal;
-            else if(isInteger(leftClass) || isInteger(rightClass))
-                return xsdInteger;
-            else if(isLong(leftClass) || isLong(rightClass))
-                return xsdLong;
-            else if(isInt(leftClass) || isInt(rightClass))
-                return xsdInt;
-            else if(isShort(leftClass) || isShort(rightClass))
-                return xsdShort;
-        }
+            case BOOLEAN ->
+            {
+                Column cl = left.get(xsdBoolean).get(0);
+                Column cr = right.get(xsdBoolean).get(0);
+                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+            }
+
+            case DECIMAL ->
+            {
+                ResourceClass cmp = determineNumericComparisonType(lset, rset);
+                Column cl = left.promoteNumericAs(lset, cmp);
+                Column cr = right.promoteNumericAs(rset, cmp);
+                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+            }
+
+            case FLOAT ->
+            {
+                ResourceClass cmp = determineNumericComparisonType(lset, rset);
+                Column cl = left.promoteNumericAs(lset, cmp);
+                Column cr = right.promoteNumericAs(rset, cmp);
+                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+            }
+
+            case DATETIME ->
+            {
+                Column cl = left.get(xsdCompositeDateTime).get(0);
+                Column cr = right.get(xsdCompositeDateTime).get(0);
+                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+            }
+
+            case DATE ->
+            {
+                Column cl = left.get(xsdScalarDate).get(0);
+                Column cr = right.get(xsdScalarDate).get(0);
+                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+            }
+
+            case DATE_SAME_TZ ->
+            {
+                Column cl = left.get(xsdCompositeDate).get(0);
+                Column cr = right.get(xsdCompositeDate).get(0);
+                yield "(" + cl + " " + operator.getText() + " " + cr + ")";
+            }
+
+            case DATE_EARLIER_TZ ->
+            {
+                // if the dates are equal, the left one is actually earlier
+
+                Operator effectiveOperator = switch(operator)
+                {
+                    case GreaterThanOrEqual -> Operator.GreaterThan;
+                    case LessThan -> Operator.LessThanOrEqual;
+                    default -> operator;
+                };
+
+                Column cl = left.get(xsdCompositeDate).get(0);
+                Column cr = right.get(xsdCompositeDate).get(0);
+                yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
+            }
+
+            case DATE_LATER_TZ ->
+            {
+                // if the dates are equal, the left one is actually later
+
+                Operator effectiveOperator = switch(operator)
+                {
+                    case LessThanOrEqual -> Operator.LessThan;
+                    case GreaterThan -> Operator.GreaterThanOrEqual;
+                    default -> operator;
+                };
+
+                Column cl = left.get(xsdCompositeDate).get(0);
+                Column cr = right.get(xsdCompositeDate).get(0);
+                yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
+            }
+
+            case BOX ->
+            {
+                Column cl = left.get(getUnionClass(lset, box)).get(0);
+                Column cr = right.get(getUnionClass(rset, box)).get(0);
+
+                yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
+            }
+
+            case DIFF ->
+            {
+                if(operator == Operator.Equals)
+                    yield "NULLIF(" + left.getIsNull() + " OR " + right.getIsNull() + ", true)";
+                else if(operator == Operator.NotEquals)
+                    yield "NULLIF(" + left.getIsNotNull() + " AND " + right.getIsNotNull() + ", false)";
+                else
+                    throw new IllegalArgumentException();
+            }
+
+            case DIRECT ->
+            {
+                ResourceClass cmp = getUnionClass(Stream.concat(lset.stream(), rset.stream()).collect(toSet()));
+                List<Column> cl = left.get(cmp);
+                List<Column> cr = right.get(cmp);
+
+                yield IntStream.range(0, cmp.getColumnCount())
+                        .mapToObj(i -> cl.get(i) + " " + operator.getText() + " " + cr.get(i))
+                        .collect(joining(" AND ", "(", ")"));
+            }
+
+            case LITERAL ->
+            {
+                ResourceClass cmp = getUnionClass(Stream.concat(lset.stream(), rset.stream()).collect(toSet()));
+                List<Column> cl = left.get(cmp);
+                List<Column> cr = right.get(cmp);
+
+                if(operator == Operator.Equals)
+                    yield IntStream.range(0, cmp.getColumnCount()).mapToObj(i -> cl.get(i) + " = " + cr.get(i))
+                            .collect(joining(" AND ", "NULLIF(", ", false)"));
+                else if(operator == Operator.NotEquals)
+                    yield IntStream.range(0, cmp.getColumnCount()).mapToObj(i -> cl.get(i) + " != " + cr.get(i))
+                            .collect(joining(" OR ", "NULLIF(", ", true)"));
+                throw new IllegalArgumentException();
+            }
+
+            default ->
+            {
+                throw new IllegalArgumentException();
+            }
+        };
+    }
+
+
+    private static ResourceClass determineNumericComparisonType(Set<ResourceClass> lset, Set<ResourceClass> rset)
+    {
+        Set<ResourceClass> all = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdDouble)))
+            return xsdDouble;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdFloat)))
+            return xsdFloat;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdDecimal)))
+            return xsdDecimal;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdInteger)))
+            return xsdInteger;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdLong)))
+            return xsdLong;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdInt)))
+            return xsdInt;
+
+        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdShort)))
+            return xsdShort;
 
         throw new IllegalArgumentException();
     }
@@ -711,25 +506,53 @@ public final class SqlBinaryComparison extends SqlBinary
         int rightZone = right.getZone();
 
         //NOTE: it is assumed that default timezone is UTC
+
         if(leftZone == Integer.MIN_VALUE)
             leftZone = 0;
 
         if(rightZone == Integer.MIN_VALUE)
             rightZone = 0;
 
-        return Math.abs(leftZone - rightZone);
+        return rightZone - leftZone;
     }
 
 
-    public boolean isAlwaysFalseOrNull()
+    @Override
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        return operator == Operator.Equals && isAlwaysDifferentIfNotNull;
+        Restriction leftSet = new Restriction();
+        Restriction rightSet = new Restriction();
+
+        if(restriction.contains(xsdBoolean))
+        {
+            for(ResourceClass leftClass : left.getMappings().keySet())
+            {
+                for(ResourceClass rightClass : right.getMappings().keySet())
+                {
+                    if(areComparable(operator, leftClass, rightClass) != ComparisonType.NULL)
+                    {
+                        leftSet.add(leftClass);
+                        rightSet.add(rightClass);
+                    }
+                }
+            }
+        }
+
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, leftSet, evalServices);
+        SqlExpressionIntercode optRight = right.optimize(request, variables, rightSet, evalServices);
+
+        if(optLeft == left && optRight == right && restriction.isOptimized(variable))
+            return this;
+
+        return create(operator, optLeft, optRight, restriction);
     }
 
 
-    public boolean isAlwaysTrueOrNull()
+    @Override
+    public NonConstantBooleanValue getBooleanValue()
     {
-        return operator == Operator.NotEquals && isAlwaysDifferentIfNotNull;
+        return value;
     }
 
 
@@ -767,7 +590,7 @@ public final class SqlBinaryComparison extends SqlBinary
         if(!Objects.equals(operator, imcode.operator))
             return false;
 
-        if(!left.equals(imcode.left) || !right.equals(imcode.right))
+        if(!Objects.equals(value, imcode.value))
             return false;
 
         return true;

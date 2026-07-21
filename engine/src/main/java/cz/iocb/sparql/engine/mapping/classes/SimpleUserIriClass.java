@@ -1,79 +1,68 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.Statement;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
 public abstract class SimpleUserIriClass extends UserIriClass
 {
-    public SimpleUserIriClass(String name, String sqlType)
+    protected SimpleUserIriClass(String name, String sqlType)
     {
-        super(name, List.of(sqlType));
+        super(name, List.of(sqlType), Set.of(iri, box));
+    }
+
+
+    protected abstract Column generateFunction(Column column);
+
+
+    protected abstract Column generateInverseFunction(Column column, boolean check);
+
+
+    @Override
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
+    {
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column value = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", generateFunction(value)));
+
+        if(targetClass.equals(iri))
+            return List.of(generateFunction(value));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        return List.of(generateInverseFunction(columns.get(0), true));
+        if(superClass.equals(this))
+            return columns;
+
+        ResourceClass sourceClass = superClass.getEffectiveClass();
+
+        assert isSubclassOf(sourceClass);
+
+        boolean check = !getIntersectionClass(Set.of(superClass, iri)).equals(this);
+
+        if(sourceClass.equals(box))
+            List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));
+
+        if(sourceClass.equals(iri))
+            return List.of(generateInverseFunction(columns.get(0), check));
+
+        throw new IllegalArgumentException();
     }
-
-
-    @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
-    {
-        return List.of(generateFunction(columns.get(0)));
-    }
-
-
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(generateInverseFunction(column, true));
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return generateFunction(columns.get(0));
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        return List.of(generateInverseFunction(new ExpressionColumn("sparql.rdfbox_get_iri(" + column + ")"), check));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + generateFunction(columns.get(0)) + ")");
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        return switch(node)
-        {
-            case VariableOrBlankNode var -> true;
-            case IRI iri -> match(statement, iri);
-            default -> false;
-        };
-    }
-
-
-    protected abstract Column generateFunction(Column parameter);
-
-
-    protected abstract Column generateInverseFunction(Column parameter, boolean check);
 }

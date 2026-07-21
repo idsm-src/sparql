@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDayTimeDurationIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDayTimeDurationIri;
 
 
 
@@ -8,6 +8,6 @@ public final class DayTimeDurationClass extends SimpleLiteralClass
 {
     public DayTimeDurationClass()
     {
-        super("daytimeduration", "int8", xsdDayTimeDurationIri);
+        super("daytimeduration", xsdDayTimeDurationIri, "int8");
     }
 }

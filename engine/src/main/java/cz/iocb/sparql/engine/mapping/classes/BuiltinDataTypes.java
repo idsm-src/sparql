@@ -3,8 +3,8 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
@@ -27,30 +27,12 @@ import java.time.temporal.ChronoField;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
 
 
 
 public class BuiltinDataTypes
 {
-    private static final String xsdPrefix = "http://www.w3.org/2001/XMLSchema#";
-    private static final String rdfPrefix = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-
-    public static final IRI xsdBooleanIri = new IRI(xsdPrefix + "boolean");
-    public static final IRI xsdShortIri = new IRI(xsdPrefix + "short");
-    public static final IRI xsdLongIri = new IRI(xsdPrefix + "long");
-    public static final IRI xsdIntIri = new IRI(xsdPrefix + "int");
-    public static final IRI xsdFloatIri = new IRI(xsdPrefix + "float");
-    public static final IRI xsdDoubleIri = new IRI(xsdPrefix + "double");
-    public static final IRI xsdIntegerIri = new IRI(xsdPrefix + "integer");
-    public static final IRI xsdDecimalIri = new IRI(xsdPrefix + "decimal");
-    public static final IRI xsdDateTimeIri = new IRI(xsdPrefix + "dateTime");
-    public static final IRI xsdDateIri = new IRI(xsdPrefix + "date");
-    public static final IRI xsdDayTimeDurationIri = new IRI(xsdPrefix + "dayTimeDuration");
-    public static final IRI xsdStringIri = new IRI(xsdPrefix + "string");
-    public static final IRI rdfLangStringIri = new IRI(rdfPrefix + "langString");
-
     public static final DataType xsdBooleanType = new DataType(xsdBoolean, BuiltinDataTypes::parseBoolean);
     public static final DataType xsdShortType = new DataType(xsdShort, BuiltinDataTypes::parseShort);
     public static final DataType xsdIntType = new DataType(xsdInt, BuiltinDataTypes::parseInt);
@@ -63,7 +45,7 @@ public class BuiltinDataTypes
     public static final DataType xsdDayTimeDurationType = new DataType(xsdDayTimeDuration,
             BuiltinDataTypes::parseDayTimeDuration);
 
-    public static final DataType xsdDateType = new DataType(xsdDate, BuiltinDataTypes::parseDate)
+    public static final DataType xsdDateType = new DataType(xsdCompositeDate, BuiltinDataTypes::parseDate)
     {
         @Override
         public LiteralClass getResourceClass(Literal literal)
@@ -73,11 +55,11 @@ public class BuiltinDataTypes
             if(literal.getValue() == null)
                 return unsupportedLiteral;
 
-            return DateConstantZoneClass.get(DateClass.getZone(literal));
+            return DateConstantZoneClass.get(DateCompositeClass.getZone(literal));
         }
     };
 
-    public static final DataType xsdDateTimeType = new DataType(xsdDateTime, BuiltinDataTypes::parseDateTime)
+    public static final DataType xsdDateTimeType = new DataType(xsdCompositeDateTime, BuiltinDataTypes::parseDateTime)
     {
         @Override
         public LiteralClass getResourceClass(Literal literal)
@@ -87,7 +69,7 @@ public class BuiltinDataTypes
             if(literal.getValue() == null)
                 return unsupportedLiteral;
 
-            return DateTimeConstantZoneClass.get(DateTimeClass.getZone(literal));
+            return DateTimeConstantZoneClass.get(DateTimeCompositeClass.getZone(literal));
         }
     };
 
@@ -222,7 +204,7 @@ public class BuiltinDataTypes
 
     private static Float parseFloat(String s)
     {
-        // the differences between the format of new Float(s) and xsd:float are  hexadecimal literals and the format
+        // the differences between the format of new Float(s) and xsd:float are hexadecimal literals and the format
         // of infinity
 
         try

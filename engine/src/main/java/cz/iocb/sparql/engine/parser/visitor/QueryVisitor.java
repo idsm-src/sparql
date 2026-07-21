@@ -509,7 +509,7 @@ public class QueryVisitor extends BaseVisitor<Query>
             else if(!isInAggregateMode(selectClauseCtx, solutionModifierCtx))
             {
                 HashSet<String> variables = new HashSet<String>();
-                Range range = null; //Range.compute(selectClauseCtx.star, selectClauseCtx.star);
+                Range range = Range.compute(selectClauseCtx.star, selectClauseCtx.star);
 
                 BaseVisitor<Void> variableVisitor = new BaseVisitor<Void>()
                 {
@@ -1055,10 +1055,9 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
                     @Override
                     public Void visit(IRI iri)
                     {
-                        //TODO: could be supported in a future version
                         if(config.getProcedures(service).get(iri.getValue()) != null)
                             messages.add(new TranslateMessage(MessageType.invalidProcedureCallPropertyPathCombinaion,
-                                    iri.getRange()));
+                                    iri.getRange())); //TODO: could be supported in a future version
 
                         return null;
                     }

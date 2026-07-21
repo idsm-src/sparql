@@ -1,106 +1,137 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.TRUE_OR_ERROR;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import static java.util.Collections.singletonMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlBinaryLogical extends SqlBinary
+public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpression
 {
-    private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean);
-
     private final Operator operator;
+    private final NonConstantBooleanValue value;
 
 
-    protected SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
-            Set<ResourceClass> resourceClasses, boolean canBeNull)
+    private SqlBinaryLogical(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+            Map<ResourceClass, List<Column>> mappings, boolean canBeNull, NonConstantBooleanValue value)
     {
-        super(left, right, resourceClasses, canBeNull);
+        super(left, right, mappings, canBeNull);
+
         this.operator = operator;
+        this.value = value;
     }
 
 
     public static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
-        left = SqlEffectiveBooleanValue.create(left);
-        right = SqlEffectiveBooleanValue.create(right);
+        return create(operator, left, right, Restriction.ALL);
+    }
 
-        if(left == SqlNull.get() && right == SqlNull.get())
+
+    private static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
+            SqlExpressionIntercode right, Restriction restriction)
+    {
+        if(left.equals(SqlNull.get()) && right.equals(SqlNull.get()))
             return SqlNull.get();
+
+        NonConstantBooleanValue value = ANY;
 
         if(operator == Operator.Or)
         {
-            if(left == falseValue)
+            if(left.equals(falseValue))
                 return right;
 
-            if(right == falseValue)
+            if(right.equals(falseValue))
                 return left;
 
-            if(left == trueValue || right == trueValue)
+            if(left.equals(trueValue) || right.equals(trueValue))
                 return trueValue;
 
-            if(right == SqlNull.get() && left instanceof SqlBinaryComparison cmp && cmp.isAlwaysFalseOrNull())
+            if(right.equals(SqlNull.get()) && left instanceof SqlBooleanExpression e && e.isFalseOrError())
                 return SqlNull.get();
 
-            if(left == SqlNull.get() && right instanceof SqlBinaryComparison cmp && cmp.isAlwaysFalseOrNull())
+            if(left.equals(SqlNull.get()) && right instanceof SqlBooleanExpression e && e.isFalseOrError())
                 return SqlNull.get();
+
+            if(left instanceof SqlBooleanExpression e1 && e1.isFalseOrError()
+                    && right instanceof SqlBooleanExpression e2 && e2.isFalseOrError())
+                value = FALSE_OR_ERROR;
         }
 
         if(operator == Operator.And)
         {
-            if(left == trueValue)
+            if(left.equals(trueValue))
                 return right;
 
-            if(right == trueValue)
+            if(right.equals(trueValue))
                 return left;
 
-            if(left == falseValue || right == falseValue)
+            if(left.equals(falseValue) || right.equals(falseValue))
                 return falseValue;
 
-            if(right == SqlNull.get() && left instanceof SqlBinaryComparison cmp && cmp.isAlwaysTrueOrNull())
+            if(right.equals(SqlNull.get()) && left instanceof SqlBooleanExpression e && e.isTrueOrError())
                 return SqlNull.get();
 
-            if(left == SqlNull.get() && right instanceof SqlBinaryComparison cmp && cmp.isAlwaysTrueOrNull())
+            if(left.equals(SqlNull.get()) && right instanceof SqlBooleanExpression e && e.isTrueOrError())
                 return SqlNull.get();
+
+            if(left instanceof SqlBooleanExpression e1 && e1.isTrueOrError() && right instanceof SqlBooleanExpression e2
+                    && e2.isTrueOrError())
+                value = TRUE_OR_ERROR;
         }
 
-        return new SqlBinaryLogical(operator, left, right, asSet(xsdBoolean), left.canBeNull() || right.canBeNull());
+        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operator, left, right) : null;
+        Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
+
+        return new SqlBinaryLogical(operator, left, right, mappings, left.canBeNull() || right.canBeNull(), value);
+    }
+
+
+    private static List<Column> translate(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right)
+    {
+        return List.of(new ExpressionColumn(
+                "(" + left.get(xsdBoolean).get(0) + " " + operator.getName() + " " + right.get(xsdBoolean).get(0) + ")",
+                left.canBeNull() || right.canBeNull()));
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public NonConstantBooleanValue getBooleanValue()
     {
-        return new Restrictions(left.getRequirements(operandRequirements), right.getRequirements(operandRequirements));
+        return value;
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
-        SqlExpressionIntercode optRight = getRight().optimize(request, variables, evalServices);
+        Restriction operandRestriction = new Restriction();
+
+        if(restriction.contains(xsdBoolean))
+            operandRestriction.add(xsdBoolean);
+
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, operandRestriction, evalServices);
+        SqlExpressionIntercode optRight = getRight().optimize(request, variables, operandRestriction, evalServices);
 
         if(optLeft == left && optRight == getRight())
             return this;
 
-        return create(operator, optLeft, optRight);
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        return "(" + left.translate(request) + " " + operator.getName() + " " + getRight().translate(request) + ")";
+        return create(operator, optLeft, optRight, restriction);
     }
 
 
@@ -138,7 +169,7 @@ public final class SqlBinaryLogical extends SqlBinary
         if(!Objects.equals(operator, imcode.operator))
             return false;
 
-        if(!left.equals(imcode.left) || !right.equals(imcode.right))
+        if(!Objects.equals(value, imcode.value))
             return false;
 
         return true;

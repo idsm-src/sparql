@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.translator.imcode.expression;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -33,9 +35,11 @@ public final class SqlExists extends SqlExpressionIntercode
     private final UsedVariables variables;
 
 
-    protected SqlExists(boolean negated, SqlIntercode pattern, UsedVariables variables)
+    protected SqlExists(boolean negated, SqlIntercode pattern, Map<ResourceClass, List<Column>> mappings,
+            UsedVariables variables)
     {
-        super(asSet(xsdBoolean), false, pattern.isDeterministic());
+        super(mappings, false, pattern.isDeterministic());
+
         this.negated = negated;
         this.pattern = pattern;
         this.variables = variables;
@@ -47,10 +51,17 @@ public final class SqlExists extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             UsedVariables variables)
     {
-        if(pattern == SqlNoSolution.get())
+        return create(request, negated, pattern, variables, Restriction.ALL);
+    }
+
+
+    public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
+            UsedVariables variables, Restriction restriction)
+    {
+        if(pattern.equals(SqlNoSolution.get()))
             return negated ? trueValue : falseValue;
 
-        if(pattern == SqlEmptySolution.get())
+        if(pattern.equals(SqlEmptySolution.get()))
             return negated ? falseValue : trueValue;
 
         ArrayList<UsedPairedVariable> pairs = UsedPairedVariable.getPairs(pattern.getVariables(), variables);
@@ -58,19 +69,27 @@ public final class SqlExists extends SqlExpressionIntercode
         if(pairs.stream().anyMatch(p -> !p.isJoinable()))
             return negated ? trueValue : falseValue;
 
-        return new SqlExists(negated, pattern, variables);
+
+        if(!restriction.contains(xsdBoolean))
+            return new SqlExists(negated, pattern, singletonMap(xsdBoolean, null), variables);
+
+
+        List<Column> result = translate(request, negated, pattern, variables);
+
+        return new SqlExists(negated, pattern, singletonMap(xsdBoolean, result), variables);
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         return SqlIntercode.getJoinRestrictions(variables, pattern.getVariables(), new Restrictions());
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
         SqlIntercode optPattern = pattern;
 
@@ -109,12 +128,12 @@ public final class SqlExists extends SqlExpressionIntercode
         if(optPattern == pattern && variables.equals(this.variables))
             return this;
 
-        return create(request, negated, optPattern, variables);
+        return create(request, negated, optPattern, variables, restriction);
     }
 
 
-    @Override
-    public String translate(Request request)
+    public static List<Column> translate(Request request, boolean negated, SqlIntercode pattern,
+            UsedVariables variables)
     {
         //NOTE: rename pattern columns to prevent collisions
 
@@ -165,7 +184,7 @@ public final class SqlExists extends SqlExpressionIntercode
 
         builder.append(")");
 
-        return builder.toString();
+        return List.of(new ExpressionColumn(builder.toString(), false));
     }
 
 
@@ -206,8 +225,8 @@ public final class SqlExists extends SqlExpressionIntercode
         if(!Objects.equals(pattern, imcode.pattern))
             return false;
 
-        //if(!Objects.equals(variables, imcode.variables))
-        //    return false;
+        if(!Objects.equals(variables, imcode.variables))
+            return false;
 
         return true;
     }

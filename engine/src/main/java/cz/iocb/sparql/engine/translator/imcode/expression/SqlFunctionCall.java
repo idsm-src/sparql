@@ -1,11 +1,15 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import java.util.LinkedList;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.stringLiteral;
+import static java.util.Collections.singletonMap;
+import static java.util.stream.Collectors.joining;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.request.Request;
@@ -20,10 +24,12 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     private final List<SqlExpressionIntercode> arguments;
 
 
-    protected SqlFunctionCall(FunctionDefinition definition, List<SqlExpressionIntercode> arguments, boolean canBeNull,
-            boolean isDeterministic)
+    protected SqlFunctionCall(FunctionDefinition definition, List<SqlExpressionIntercode> arguments,
+            Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
-        super(asSet(definition.getResultClass()), canBeNull, isDeterministic);
+        boolean isDeterministic = definition.isDeterministic() && arguments.stream().allMatch(a -> a.isDeterministic());
+
+        super(mappings, canBeNull, isDeterministic);
 
         for(SqlExpressionIntercode argument : arguments)
             this.referencedVariables.addAll(argument.getReferencedVariables());
@@ -35,65 +41,67 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
     public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
     {
+        return create(definition, arguments, Restriction.ALL);
+    }
+
+
+    public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments,
+            Restriction restriction)
+    {
         boolean canBeNull = definition.canBeNull() || arguments.stream().anyMatch(a -> a.canBeNull());
-        boolean isDeterministic = definition.isDeterministic() && arguments.stream().allMatch(a -> a.isDeterministic());
 
         for(int i = 0; i < arguments.size(); i++)
         {
             Set<ResourceClass> resClasses = arguments.get(i).getResourceClasses();
             ResourceClass refClass = definition.getArgumentClasses().get(i);
 
-            if(refClass == FunctionDefinition.stringLiteral)
-            {
-                if(resClasses.stream().allMatch(r -> !isStringLiteral(r)))
-                    return SqlNull.get();
-            }
-            else
-            {
-                if(ResourceClass.areDisjunct(refClass, resClasses))
-                    return SqlNull.get();
-            }
+            if(ResourceClass.areDisjunct(refClass, resClasses))
+                return SqlNull.get();
         }
 
-        return new SqlFunctionCall(definition, arguments, canBeNull, isDeterministic);
+        List<Column> cols = restriction.contains(definition.getResultClass()) ? translate(definition, arguments) : null;
+        Map<ResourceClass, List<Column>> mappings = singletonMap(definition.getResultClass(), cols);
+
+        return new SqlFunctionCall(definition, arguments, mappings, canBeNull);
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         Restrictions restrictions = new Restrictions();
 
-        for(int i = 0; i < arguments.size(); i++)
-        {
-            if(definition.getArgumentClasses().get(i) == FunctionDefinition.stringLiteral)
-                restrictions.add(arguments.get(i).getRequirements(Set.of(xsdString, rdfLangString)));
-            else
-                restrictions.add(arguments.get(i).getRequirements(Set.of(definition.getArgumentClasses().get(i))));
-        }
+        for(SqlExpressionIntercode argument : arguments)
+            restrictions.add(argument.getRequirements());
 
         return restrictions;
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables vars, Restriction restriction,
+            boolean evalServices)
     {
-        List<SqlExpressionIntercode> optArguments = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> optArguments = new ArrayList<SqlExpressionIntercode>();
 
-        for(SqlExpressionIntercode argument : arguments)
-            optArguments.add(argument.optimize(request, variables, evalServices));
+        for(int i = 0; i < arguments.size(); i++)
+        {
+            Restriction argRestriction = new Restriction();
 
+            if(restriction.contains(definition.getResultClass()))
+                argRestriction.add(definition.getArgumentClasses().get(i));
+
+            optArguments.add(arguments.get(i).optimize(request, vars, argRestriction, evalServices));
+        }
 
         if(optArguments.equals(arguments))
             return this;
 
-        return create(definition, optArguments);
+        return create(definition, optArguments, restriction);
     }
 
 
-    @Override
-    public String translate(Request request)
+    private static List<Column> translate(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
     {
         StringBuilder builder = new StringBuilder();
 
@@ -104,16 +112,17 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
         {
             appendComma(builder, i > 0);
 
-            if(definition.getArgumentClasses().get(i) == FunctionDefinition.stringLiteral)
-                builder.append(translateAsStringLiteral(request, arguments.get(i)));
+            ResourceClass argClass = definition.getArgumentClasses().get(i);
+
+            if(argClass.equals(stringLiteral)) //FIXME: use different approach
+                builder.append(arguments.get(i).getStringLiteral());
             else
-                builder.append(
-                        translateAsUnboxedOperand(request, arguments.get(i), definition.getArgumentClasses().get(i)));
+                builder.append(arguments.get(i).get(argClass).stream().map(c -> c.toString()).collect(joining(", ")));
         }
 
         builder.append(")");
 
-        return builder.toString();
+        return List.of(new ExpressionColumn(builder.toString()));
     }
 
 

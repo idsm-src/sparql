@@ -82,7 +82,7 @@ public abstract class ElementVisitor<T>
      */
     protected T aggregateResult(List<T> results)
     {
-        return results.stream().filter(x -> x != null).reduce((previous, current) -> current).orElse(null);
+        return results.stream().filter(x -> x != null).reduce((_, current) -> current).orElse(null);
     }
 
     public T visitElement(Element element)

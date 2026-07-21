@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,7 +21,6 @@ import cz.iocb.sparql.engine.translator.Pair;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
@@ -60,10 +60,10 @@ public final class SqlDistinct extends SqlIntercode
         SqlIntercode optChild = child.optimize(request, new Restrictions(distinctVariables), true, evalServices);
 
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(optChild == SqlEmptySolution.get())
+        if(optChild.equals(SqlEmptySolution.get()))
             return SqlEmptySolution.get();
 
         if(optChild.isDistinct(request, distinctVariables))
@@ -136,12 +136,12 @@ public final class SqlDistinct extends SqlIntercode
 
         for(UsedVariable v : vars.getValues())
             for(ResourceClass c : v.getClasses())
-                if(SqlExpressionIntercode.isStringLiteral(c))
+                if(isStringLiteral(c))
                     stringLiterals.add(v.getName());
 
         for(String var : stringLiterals)
             child = SqlBind.bind(request, "#hash_" + var, SqlBuiltinCall.create(request, "_strhash", false,
-                    List.of(SqlVariable.create(var, child.getVariables()))), child);
+                    List.of(SqlVariable.create(child.getVariable(var)))), child);
 
 
         StringBuilder builder = new StringBuilder();
@@ -275,7 +275,7 @@ public final class SqlDistinct extends SqlIntercode
 
             if(var != null && !var.canBeNull() && var.getClasses().size() == 1)
             {
-                ResourceClass rc = var.getResourceClass();
+                ResourceClass rc = var.getClasses().iterator().next();
                 int[] counts = new int[rc.getColumnCount()];
 
                 for(SqlIntercode child : union.getChilds())
@@ -294,7 +294,7 @@ public final class SqlDistinct extends SqlIntercode
         Map<List<Column>, List<SqlIntercode>> rev = new HashMap<List<Column>, List<SqlIntercode>>();
 
         for(Entry<SqlIntercode, List<Column>> e : values.entrySet())
-            rev.computeIfAbsent(e.getValue(), k -> new ArrayList<SqlIntercode>()).add(e.getKey());
+            rev.computeIfAbsent(e.getValue(), _ -> new ArrayList<SqlIntercode>()).add(e.getKey());
 
         List<SqlIntercode> list = new ArrayList<SqlIntercode>();
 

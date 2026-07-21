@@ -1,14 +1,16 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
+import static java.lang.String.format;
+import java.math.BigInteger;
 import java.sql.Statement;
 import java.util.List;
-import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -32,12 +34,13 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
+        builder.append("^(");
         builder.append(Pattern.quote(prefix));
 
         if(pattern != null)
             builder.append("(" + pattern + ")");
         else if(length > 0)
-            builder.append(String.format("[0-9]{%d}", length));
+            builder.append(format("[0-9]{%d}", length));
         else if(sqlType.equals("int2"))
             builder.append(generateMaxNumberPattern("32767", -length));
         else if(sqlType.equals("int4"))
@@ -49,6 +52,8 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
+
+        builder.append(")$");
 
         //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = builder.toString();
@@ -81,9 +86,15 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        IRI iri = (IRI) node;
+        return pattern.matcher(iri.getValue()).matches();
+    }
+
+
+    @Override
+    public List<Column> toColumns(Statement statement, IRI iri)
+    {
         assert match(statement, iri);
 
         String value = iri.getValue();
@@ -95,101 +106,51 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(id.isEmpty())
             id = "0";
 
-        return List.of(new ConstantColumn(id, sqlTypes.get(0)));
+        return List.of(constant(id, sqlTypes.get(0)));
     }
 
 
     @Override
-    public List<Column> toOrderColumns(List<Column> columns)
+    protected Column generateFunction(Column column)
     {
-        if(suffix == null && length > 0)
-            return columns;
+        return addPrefixAndSuffix(prefix, numberAsString(column), suffix);
+    }
 
-        String code = String.format("(%s)::varchar", columns.get(0));
 
+    @Override
+    protected Column generateInverseFunction(Column column, boolean check)
+    {
+        Column func = generateNonCheckedInverseFunction(column);
+
+        if(!check)
+            return func;
+
+        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+    }
+
+
+    private Column numberAsString(Column column)
+    {
+        if(length == 0)
+            return expression("(%s)::varchar", column);
         if(length > 0)
-            code = String.format("lpad(%s, %d, '0')", code, length);
-        else if(length < 0)
-            code = String.format("CASE WHEN 1%0" + (-1 - length) + "d <= (%s) THEN %s ELSE lpad(%s, %d, '0') END", 0,
-                    columns.get(0), code, code, -length);
-
-        if(suffix != null)
-            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
-
-        return List.of(new ExpressionColumn("(" + code + ")"));
-    }
-
-
-    @Override
-    public String getPrefix(List<Column> columns)
-    {
-        return prefix;
-    }
-
-
-
-    @Override
-    public boolean match(Statement statement, IRI iri)
-    {
-        Matcher matcher = pattern.matcher(iri.getValue());
-        return matcher.matches();
-    }
-
-
-    @Override
-    public int getCheckCost()
-    {
-        return 0;
-    }
-
-
-    @Override
-    protected Column generateFunction(Column parameter)
-    {
-        String code = String.format("(%s)::varchar", parameter);
-
-        if(length > 0)
-            code = String.format("lpad(%s, %d, '0')", code, length);
-        else if(length < 0)
-            code = String.format("CASE WHEN 1%0" + (-1 - length) + "d <= (%s) THEN %s ELSE lpad(%s, %d, '0') END", 0,
-                    parameter, code, code, -length);
-
-        code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
-
-        if(suffix != null)
-            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
-
-        return new ExpressionColumn("(" + code + ")");
-    }
-
-
-    @Override
-    protected Column generateInverseFunction(Column parameter, boolean check)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        if(check)
-        {
-            builder.append("CASE WHEN sparql.regex_string(");
-            builder.append(parameter);
-            builder.append(", '^(");
-            builder.append(regexp.replaceAll("'", "''"));
-            builder.append(")$', '') THEN ");
-        }
-
-        if(length > 0)
-            builder.append(String.format("substring(%s, %d, %d)::", parameter, prefix.length() + 1, length));
-        else if(suffix == null)
-            builder.append(String.format("right(%s, -%d)::", parameter, prefix.length()));
+            return expression("lpad((%s)::varchar, %d, '0')", column, length);
         else
-            builder.append(String.format("left(right(%s, -%d), -%d)::", parameter, prefix.length(), suffix.length()));
+            return expression("CASE WHEN %d <= %s THEN (%s)::varchar ELSE lpad((%s)::varchar, %d, '0') END",
+                    BigInteger.TEN.pow(-1 - length), column, column, column, -length);
+    }
 
-        builder.append(sqlTypes.get(0));
 
-        if(check)
-            builder.append(" END");
+    protected Column generateNonCheckedInverseFunction(Column column)
+    {
+        String sqlType = sqlTypes.get(0);
 
-        return new ExpressionColumn(builder.toString());
+        if(length > 0)
+            return expression("substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+        else if(suffix == null)
+            return expression("right(%s, -%d)::%s", column, prefix.length(), sqlType);
+        else
+            return expression("left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(), sqlType);
     }
 
 
@@ -201,52 +162,48 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         StringBuilder builder = new StringBuilder();
 
         if(minLength == 0)
-            builder.append(String.format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
+            builder.append(format("(0|[1-9][0-9]{0,%d}|", max.length() - 2));
         else if(max.length() - minLength == 1)
-            builder.append(String.format("([0-9]{%d}|", minLength));
+            builder.append(format("([0-9]{%d}|", minLength));
         else if(max.length() - minLength == 2)
-            builder.append(String.format("([1-9]?[0-9]{%d}|", minLength));
+            builder.append(format("([1-9]?[0-9]{%d}|", minLength));
         else
-            builder.append(String.format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
+            builder.append(format("(([1-9][0-9]{0,%d})?[0-9]{%d}|", max.length() - 2 - minLength, minLength));
 
-        builder.append(String.format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
+        builder.append(format("[1-%d][0-9]{%d}|", max.charAt(0) - '0' - 1, max.length() - 1));
 
         for(int i = 1; i < max.length() - 1; i++)
             if(max.charAt(i) > '0')
-                builder.append(String.format("%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
+                builder.append(format("%s[0-%d][0-9]{%d}|", max.substring(0, i), max.charAt(i) - '0' - 1,
                         max.length() - i - 1));
 
-        builder.append(
-                String.format("%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
+        builder.append(format("%s[0-%d])", max.substring(0, max.length() - 1), max.charAt(max.length() - 1) - '0'));
 
         return builder.toString();
     }
 
 
     @Override
-    public boolean equals(Object object)
+    public List<Column> toOrderColumns(List<Column> columns)
     {
-        if(object == this)
-            return true;
+        if(length > 0)
+            return columns;
 
-        if(!super.equals(object))
-            return false;
+        return List.of(addPrefixAndSuffix(null, generateNonCheckedInverseFunction(columns.get(0)), suffix));
+    }
 
-        IntegerUserIriClass other = (IntegerUserIriClass) object;
 
-        if(!regexp.equals(other.regexp))
-            return false;
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
+    }
 
-        if(!prefix.equals(other.prefix))
-            return false;
 
-        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
-            return false;
-
-        if(length != other.length)
-            return false;
-
-        return true;
+    @Override
+    public int getCheckCost()
+    {
+        return 0;
     }
 
 
@@ -265,5 +222,21 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     public int getIdLength()
     {
         return length;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        IntegerUserIriClass other = (IntegerUserIriClass) object;
+
+        return Objects.equals(regexp, other.regexp) && Objects.equals(prefix, other.prefix)
+                && Objects.equals(suffix, other.suffix) && Objects.equals(length, other.length);
     }
 }

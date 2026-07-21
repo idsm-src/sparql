@@ -90,7 +90,6 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
@@ -185,7 +184,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
             else
             {
                 Variable variable = (Variable) resource;
-                SqlExpressionIntercode expression = SqlVariable.create(variable.getSqlName(), select.getVariables());
+                SqlExpressionIntercode expression = SqlVariable.create(select.getVariable(variable.getSqlName()));
 
                 SqlExpressionIntercode filter = SqlBuiltinCall.create(request, "bound", false, List.of(expression));
                 SqlIntercode source = SqlFilter.filter(request, List.of(filter), select);
@@ -317,7 +316,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                         translatedWhereClause.getVariables(), this);
                 SqlExpressionIntercode expression = visitor.visitElement(groupBy.getExpression());
 
-                //TODO: optimize based on the expression value
+                //TODO: add optimizations based on the expression value
 
                 translatedWhereClause = SqlBind.bind(request, variable.getSqlName(), expression, translatedWhereClause);
             }
@@ -733,7 +732,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                 SqlExpressionIntercode expression = SqlEffectiveBooleanValue
                         .create(visitor.visitElement(filter.getConstraint()));
 
-                if(expression != trueValue)
+                if(!expression.equals(trueValue))
                     conditions.add(expression);
             }
         }
@@ -839,7 +838,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 for(int k = 0; k < lines.size(); k++)
                 {
-                    if(resClass == nodeResourceClasses.get(k))
+                    if(resClass.equals(nodeResourceClasses.get(k)))
                     {
                         List<Column> cols = request.getColumns(resClass, lines.get(k).get(i));
 
@@ -902,7 +901,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         ExpressionTranslateVisitor translator = new ExpressionTranslateVisitor(request, contextVariables, this);
 
-        LinkedHashMap<ParameterDefinition, SqlNodeValue> parameterNodes = new LinkedHashMap<>();
+        LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameterNodes = new LinkedHashMap<>();
 
         for(ParameterDefinition parameter : procedureDefinition.getParameters())
             parameterNodes.put(parameter, null);
@@ -914,14 +913,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             SqlExpressionIntercode value = translator.visitElement(parameter.getValue());
 
-            parameterNodes.put(parameterDefinition, (SqlNodeValue) value);
+            parameterNodes.put(parameterDefinition, value);
         }
 
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameterNodes.entrySet())
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameterNodes.entrySet())
         {
             if(entry.getValue() == null)
-                entry.setValue((SqlNodeValue) translator.visitElement(entry.getKey().getDefaultValue()));
+                entry.setValue(translator.visitElement(entry.getKey().getDefaultValue()));
         }
 
 

@@ -91,17 +91,6 @@ public class UsedVariables
     }
 
 
-    public boolean contains(String name, ResourceClass resClass)
-    {
-        UsedVariable variable = usedVariables.get(name);
-
-        if(variable == null)
-            return false;
-
-        return variable.getClasses().stream().filter(r -> r == resClass).findAny().isPresent();
-    }
-
-
     public Set<Column> getNonConstantColumns()
     {
         Set<Column> columns = new HashSet<Column>();

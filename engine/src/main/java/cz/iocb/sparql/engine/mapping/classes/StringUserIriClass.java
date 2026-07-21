@@ -1,14 +1,15 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.sql.Statement;
 import java.util.List;
-import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -32,6 +33,8 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
+        builder.append("^(");
+
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
@@ -42,6 +45,8 @@ public class StringUserIriClass extends SimpleUserIriClass
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
+
+        builder.append(")$");
 
         //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = builder.toString();
@@ -80,42 +85,76 @@ public class StringUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        IRI iri = (IRI) node;
+        return pattern.matcher(iri.getValue()).matches();
+    }
+
+
+    @Override
+    public List<Column> toColumns(Statement statement, IRI iri)
+    {
         assert match(statement, iri);
 
         String value = iri.getValue();
-
         String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
 
-        return List.of(new ConstantColumn(id, "varchar"));
+        return List.of(constant(id, "varchar"));
+    }
+
+
+    @Override
+    protected Column generateFunction(Column column)
+    {
+        return addPrefixAndSuffix(prefix, column, suffix);
+    }
+
+
+    @Override
+    protected Column generateInverseFunction(Column column, boolean check)
+    {
+        Column func = generateNonCheckedInverseFunction(column);
+
+        if(!check)
+            return func;
+
+        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+    }
+
+
+    private Column generateNonCheckedInverseFunction(Column column)
+    {
+        String sqlType = sqlTypes.get(0);
+
+        if(prefix == null && suffix == null)
+            return column;
+        else if(length > 0 && prefix == null)
+            return expression("substring(%s, %d, %d)::%s", column, 1, length, sqlType);
+        else if(length > 0)
+            return expression("substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+        else if(prefix == null)
+            return expression("left(%s, -%d)::%s", column, suffix.length(), sqlType);
+        else if(suffix == null)
+            return expression("right(%s, -%d)::%s", column, prefix.length(), sqlType);
+        else
+            return expression("left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(), sqlType);
     }
 
 
     @Override
     public List<Column> toOrderColumns(List<Column> columns)
     {
-        if(suffix == null)
-            return columns;
-
-        return List.of(new ExpressionColumn(
-                String.format("(%s || '%s')::varchar", columns.get(0), suffix.replaceAll("'", "''"))));
+        return List.of(addPrefixAndSuffix(null, columns.get(0), suffix));
     }
 
 
     @Override
     public String getPrefix(List<Column> columns)
     {
+        if(columns.get(0) instanceof ConstantColumn col)
+            return (prefix != null ? prefix : "") + col.getValue() + (suffix != null ? suffix : "");
+
         return prefix;
-    }
-
-
-    @Override
-    public boolean match(Statement statement, IRI iri)
-    {
-        Matcher matcher = pattern.matcher(iri.getValue());
-        return matcher.matches();
     }
 
 
@@ -123,89 +162,6 @@ public class StringUserIriClass extends SimpleUserIriClass
     public int getCheckCost()
     {
         return 0;
-    }
-
-
-    @Override
-    protected Column generateFunction(Column parameter)
-    {
-        if(prefix == null && suffix == null)
-            return parameter;
-
-        String code = parameter.toString();
-
-        if(prefix != null)
-            code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
-
-        if(suffix != null)
-            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
-
-        return new ExpressionColumn("(" + code + ")::varchar");
-    }
-
-
-    @Override
-    protected Column generateInverseFunction(Column parameter, boolean check)
-    {
-        if(prefix == null && suffix == null && !check)
-            return parameter;
-
-        StringBuilder builder = new StringBuilder();
-
-        if(check)
-        {
-            builder.append("CASE WHEN sparql.regex_string(");
-            builder.append(parameter);
-            builder.append(", '^(");
-            builder.append(regexp.replaceAll("'", "''"));
-            builder.append(")$', '') THEN ");
-        }
-
-        if(prefix == null && suffix == null)
-            builder.append(parameter);
-        else if(length > 0)
-            builder.append(String.format("substring(%s, %d, %d)::", parameter, prefix != null ? prefix.length() + 1 : 1,
-                    length));
-        else if(prefix == null)
-            builder.append(String.format("left(%s, -%d)::", parameter, suffix.length()));
-        else if(suffix == null)
-            builder.append(String.format("right(%s, -%d)::", parameter, prefix.length()));
-        else
-            builder.append(String.format("left(right(%s, -%d), -%d)::", parameter, prefix.length(), suffix.length()));
-
-        builder.append(sqlTypes.get(0));
-
-        if(check)
-            builder.append(" END");
-
-        return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    public boolean equals(Object object)
-    {
-        if(object == this)
-            return true;
-
-        if(!super.equals(object))
-            return false;
-
-        StringUserIriClass other = (StringUserIriClass) object;
-
-        if(!regexp.equals(other.regexp))
-            return false;
-
-        if(!prefix.equals(other.prefix))
-            return false;
-
-        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
-            return false;
-
-        if(length != other.length)
-            return false;
-
-        return true;
     }
 
 
@@ -224,5 +180,21 @@ public class StringUserIriClass extends SimpleUserIriClass
     public int getIdLength()
     {
         return length;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        StringUserIriClass other = (StringUserIriClass) object;
+
+        return Objects.equals(regexp, other.regexp) && Objects.equals(prefix, other.prefix)
+                && Objects.equals(suffix, other.suffix) && Objects.equals(length, other.length);
     }
 }

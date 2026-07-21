@@ -273,7 +273,7 @@ public class DatabaseSchema
     {
         return switch(column)
         {
-            case ConstantColumn col -> false;
+            case ConstantColumn _ -> false;
             case ExpressionColumn col -> col.canBeNull();
             default -> nullableColumns.getOrDefault(table, List.of()).contains(column);
         };

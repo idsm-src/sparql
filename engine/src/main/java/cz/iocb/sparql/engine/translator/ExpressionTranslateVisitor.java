@@ -27,6 +27,7 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryLogical;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlCast;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlEffectiveBooleanValue;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlFunctionCall;
@@ -74,7 +75,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         {
             case And:
             case Or:
-                return SqlBinaryLogical.create(operator, left, right);
+                return SqlBinaryLogical.create(operator, SqlEffectiveBooleanValue.create(left),
+                        SqlEffectiveBooleanValue.create(right));
 
             case Add:
             case Subtract:
@@ -122,7 +124,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
                 return SqlUnaryArithmetic.create(true, operand);
 
             case Not:
-                return SqlUnaryLogical.create(operand);
+                return SqlUnaryLogical.create(SqlEffectiveBooleanValue.create(operand));
         }
 
         return null;
@@ -154,13 +156,17 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
             {
                 //FIXME: use better approach to detect in-scope variables
                 //TODO: filter out group by variables
+
                 for(UsedVariable variable : variables.getValues())
                     if(!variable.getName().startsWith("@"))
-                        arguments.add(SqlVariable.create(variable.getName(), variables));
+                        arguments.add(SqlVariable.create(variables.get(variable.getName())));
             }
 
             return SqlBuiltinCall.create(request, "card", builtInCallExpression.isDistinct(), arguments);
         }
+
+        if(function.equalsIgnoreCase("if") && arguments.size() > 0)
+            arguments.set(0, SqlEffectiveBooleanValue.create(arguments.get(0)));
 
         return SqlBuiltinCall.create(request, function.toLowerCase(), builtInCallExpression.isDistinct(), arguments);
     }
@@ -186,6 +192,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         DataType datatype = request.getConfiguration().getDataType(iri);
 
         //TODO: add support for casting to user literals
+
         if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
             return SqlCast.create(datatype.getGeneralLiteralClass(), arguemnts.get(0));
 
@@ -213,6 +220,6 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     @Override
     public SqlExpressionIntercode visit(Variable variable)
     {
-        return SqlVariable.create(variable.getSqlName(), variables);
+        return SqlVariable.create(variables.get(variable.getSqlName()));
     }
 }

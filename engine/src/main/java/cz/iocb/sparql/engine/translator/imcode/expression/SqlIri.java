@@ -1,11 +1,10 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
+import static java.util.Collections.singletonMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -15,65 +14,56 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlIri extends SqlNodeValue
+public final class SqlIri extends SqlExpressionIntercode
 {
     private final IRI iri;
-    private final IriClass iriClass;
 
 
-    protected SqlIri(IRI iri, IriClass resourceClass)
+    private SqlIri(IRI iri, Map<ResourceClass, List<Column>> map)
     {
-        super(asSet(resourceClass), false);
-        this.iriClass = resourceClass;
+        super(map, false, true);
+
         this.iri = iri;
     }
 
 
     public static SqlExpressionIntercode create(Request request, IRI iri)
     {
-        return new SqlIri(iri, request.getIriClass(iri));
+        return create(request, iri, Restriction.ALL);
+    }
+
+
+    private static SqlExpressionIntercode create(Request request, IRI iri, Restriction restriction)
+    {
+        IriClass resClass = request.getIriClass(iri);
+
+        List<Column> columns = restriction.contains(resClass) ? request.getColumns(resClass, iri) : null;
+
+        return new SqlIri(iri, singletonMap(resClass, columns));
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         return new Restrictions();
     }
 
-    @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
-    {
-        return this;
-    }
-
 
     @Override
-    public String translate(Request request)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        return BuiltinClasses.iri.toExpression(request.getStatement(), iri).toString();
-    }
+        if(restriction.isOptimized(variable))
+            return this;
 
-
-    @Override
-    public List<Column> asResource(Request request, ResourceClass resourceClass)
-    {
-        if(!resourceClass.match(request.getStatement(), iri))
-            return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
-
-        return request.getColumns(resourceClass, iri);
+        return create(request, iri, restriction);
     }
 
 
     public IRI getIri()
     {
         return iri;
-    }
-
-
-    public IriClass getIriClass()
-    {
-        return iriClass;
     }
 
 
@@ -97,9 +87,6 @@ public final class SqlIri extends SqlNodeValue
             return false;
 
         if(!Objects.equals(iri, imcode.iri))
-            return false;
-
-        if(iriClass != imcode.iriClass)
             return false;
 
         return true;

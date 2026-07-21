@@ -1,29 +1,23 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.sql.Statement;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class SimpleLiteralClass extends LiteralClass implements ResultResourceClass
+public sealed class SimpleLiteralClass extends LiteralClass implements ResultResourceClass
+        permits BooleanClass, ShortClass, IntClass, LongClass, IntegerClass, DecimalClass, FloatClass, DoubleClass,
+        StringClass, DayTimeDurationClass
 {
-    protected SimpleLiteralClass(String name, String sqlType, IRI sparqlTypeIri)
+    protected SimpleLiteralClass(String name, IRI typeIri, String sqlType)
     {
-        super(name, List.of(sqlType), sparqlTypeIri);
-    }
-
-
-    @Override
-    public ResourceClass getGeneralClass()
-    {
-        return this;
+        super(name, typeIri, List.of(sqlType), Set.of(box));
     }
 
 
@@ -35,95 +29,44 @@ public class SimpleLiteralClass extends LiteralClass implements ResultResourceCl
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Literal literal)
     {
-        Object value = ((Literal) node).getValue();
-
-        if(value instanceof String string)
-            return List.of(new ConstantColumn(string, "varchar"));
-        else
-            return List.of(new ConstantColumn(value.toString(), sqlTypes.get(0)));
+        return List.of(constant(literal.getValue(), sqlTypes.get(0)));
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return columns;
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column value = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_%s(%s)", name, value));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        return columns;
-    }
+        if(superClass.equals(this))
+            return columns;
 
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(column);
-    }
+        assert isSubclassOf(sourceClass);
 
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_%s(%s)", name, columns.get(0)));
 
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        return List.of(new ExpressionColumn("sparql.rdfbox_get_" + name + "(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_" + name + "(" + columns.get(0) + ")");
-    }
-
-
-    @Override
-    public Column toExpression(Statement statement, Node node)
-    {
-        Object value = ((Literal) node).getValue();
-
-        if(value instanceof String string)
-            return new ConstantColumn(string, "varchar");
-        else
-            return new ConstantColumn(value.toString(), sqlTypes.get(0));
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
-        return code;
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        return code;
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        return "sparql.rdfbox_create_from_" + name + "(" + code + ")";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        return "sparql.rdfbox_get_" + name + "(" + code + ")";
+        throw new IllegalArgumentException();
     }
 }

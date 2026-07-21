@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getDisjunctClasses;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
 import static java.util.stream.Collectors.joining;
@@ -25,6 +26,7 @@ import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable.PairedClass;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.Restriction;
 
 
 
@@ -32,8 +34,6 @@ public abstract class SqlIntercode extends SqlBaseClass
 {
     public static class Restrictions
     {
-        private static final Set<ResourceClass> all = new HashSet<ResourceClass>();
-
         private final Map<String, Set<ResourceClass>> map = new HashMap<String, Set<ResourceClass>>();
 
         public Restrictions()
@@ -48,7 +48,7 @@ public abstract class SqlIntercode extends SqlBaseClass
         public Restrictions(Collection<String> vars)
         {
             for(String var : vars)
-                map.put(var, all);
+                map.put(var, Set.of(box));
         }
 
         public Restrictions(Restrictions a, Restrictions b)
@@ -62,11 +62,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 Set<ResourceClass> sa = a.map.get(v);
                 Set<ResourceClass> sb = b.map.get(v);
 
-                if(sa == all || sb == all)
-                {
-                    map.put(v, all);
-                }
-                else if(sa == null)
+                if(sa == null)
                 {
                     map.put(v, sb);
                 }
@@ -86,13 +82,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         public void add(String var)
         {
-            map.put(var, all);
+            map.put(var, Set.of(box));
         }
 
         public void add(Collection<String> vars)
         {
             for(String var : vars)
-                map.put(var, all);
+                map.put(var, Set.of(box));
         }
 
         public Set<String> getNames()
@@ -104,9 +100,6 @@ public abstract class SqlIntercode extends SqlBaseClass
         {
             if(!map.containsKey(var))
                 return false;
-
-            if(map.get(var) == all)
-                return true;
 
             for(ResourceClass r : map.get(var))
                 if(!ResourceClass.areDisjunct(r, resClass))
@@ -136,13 +129,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         public void add(String var, Set<ResourceClass> set)
         {
-            if(map.get(var) == all)
-                return;
+            map.computeIfAbsent(var, _ -> new HashSet<>()).addAll(set);
+        }
 
-            if(map.containsKey(var))
-                map.get(var).addAll(set);
-            else
-                map.put(var, set);
+
+        public void add(String var, ResourceClass resClass)
+        {
+            map.computeIfAbsent(var, _ -> new HashSet<>()).add(resClass);
         }
 
 
@@ -167,11 +160,11 @@ public abstract class SqlIntercode extends SqlBaseClass
                 Set<ResourceClass> sa = map.get(v);
                 Set<ResourceClass> sb = restrictions.map.get(v);
 
-                if(sb == all || sa == null)
+                if(sa == null)
                 {
                     map.put(v, sb);
                 }
-                else if(sa != all && sb != null)
+                else if(sb != null)
                 {
                     Set<ResourceClass> sc = new HashSet<ResourceClass>();
                     sc.addAll(sa);
@@ -205,9 +198,12 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         public Set<ResourceClass> get(String key)
         {
-            Set<ResourceClass> restriction = map.get(key);
+            return map.get(key);
+        }
 
-            return restriction == all ? null : restriction;
+        public Restriction getRestriction(String key)
+        {
+            return new Restriction(get(key));
         }
     }
 
@@ -265,15 +261,6 @@ public abstract class SqlIntercode extends SqlBaseClass
     public final List<Column> getMapping(String variable, ResourceClass resClass)
     {
         return variables.get(variable).getMapping(resClass);
-    }
-
-
-    public final List<Column> getMapping(String variable)
-    {
-        if(variables.get(variable) == null)
-            return null;
-
-        return variables.get(variable).getMapping();
     }
 
 
@@ -519,7 +506,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
             for(PairedClass pairedClass : pair.getClasses())
             {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
                     return false;
 
                 ResourceClass resClass = pairedClass.getLeftClass();
@@ -561,22 +548,36 @@ public abstract class SqlIntercode extends SqlBaseClass
     public static String generateJoinCondition(UsedVariables left, UsedVariables right, Table leftTable,
             Table rightTable)
     {
-        List<String> join = new ArrayList<String>();
+        Set<String> join = new HashSet<String>();
 
         for(UsedPairedVariable pair : UsedPairedVariable.getPairs(left, right))
         {
             UsedVariable leftVariable = pair.getLeftVariable();
             UsedVariable rightVariable = pair.getRightVariable();
 
-            List<String> condition = new ArrayList<String>();
+            Set<String> condition = new HashSet<String>();
 
             if(leftVariable.canBeNull())
-                condition.add(leftVariable.getNonConstantColumns().stream()
-                        .map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
+            {
+                Set<Column> cols = leftVariable.getNonConstantColumns();
+
+                if(cols.isEmpty())
+                    condition.add("true");
+                else
+                    condition.add(leftVariable.getNonConstantColumns().stream()
+                            .map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
+            }
 
             if(rightVariable.canBeNull())
-                condition.add(rightVariable.getNonConstantColumns().stream()
-                        .map(c -> c.fromTable(rightTable) + " IS NULL").sorted().collect(joining(" AND ")));
+            {
+                Set<Column> cols = rightVariable.getNonConstantColumns();
+
+                if(cols.isEmpty())
+                    condition.add("true");
+                else
+                    condition.add(rightVariable.getNonConstantColumns().stream()
+                            .map(c -> c.fromTable(rightTable) + " IS NULL").sorted().collect(joining(" AND ")));
+            }
 
             for(PairedClass pairedClass : pair.getClasses())
             {
@@ -608,7 +609,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 }
 
                 if(compare.isEmpty())
-                    condition.add("true");
+                    compare.add("true");
 
                 if(!compare.contains("false"))
                     condition.add(compare.stream().sorted().collect(joining(" AND ")));
@@ -764,7 +765,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                         List<Column> cols = var.getMapping(resClass);
 
                         for(int j = 0; j < resClass.getColumnCount(); j++)
-                            if(cols.get(j) instanceof ConstantColumn c && !consts.computeIfAbsent(j, k -> c).equals(c))
+                            if(cols.get(j) instanceof ConstantColumn c && !consts.computeIfAbsent(j, _ -> c).equals(c))
                                 return false;
                     }
                 }

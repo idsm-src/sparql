@@ -1,17 +1,18 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -34,19 +35,11 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public List<Column> toColumns(Statement statement, IRI iri)
     {
-        IRI iri = (IRI) node;
         assert match(statement, iri);
 
-        return List.of(new ConstantColumn(iri.getValue(), "varchar"));
-    }
-
-
-    @Override
-    public String getPrefix(List<Column> columns)
-    {
-        return "";
+        return List.of(constant(iri.getValue(), "varchar"));
     }
 
 
@@ -55,7 +48,7 @@ public class ListUserIriClass extends SimpleUserIriClass
     {
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
+            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -70,30 +63,35 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    protected Column generateFunction(Column column)
+    {
+        return column;
+    }
+
+
+    @Override
+    protected Column generateInverseFunction(Column column, boolean check)
+    {
+        if(!check)
+            return column;
+
+        Column access = expression("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
+
+        return expression("(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, column);
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return "";
+    }
+
+
+    @Override
     public int getCheckCost()
     {
         return 2;
-    }
-
-
-    @Override
-    protected Column generateFunction(Column parameter)
-    {
-        return parameter;
-    }
-
-
-    @Override
-    protected Column generateInverseFunction(Column parameter, boolean check)
-    {
-        if(!check)
-            return parameter;
-
-        String access = String.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
-
-        String code = String.format("(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, parameter);
-
-        return new ExpressionColumn(code);
     }
 
 
@@ -108,12 +106,6 @@ public class ListUserIriClass extends SimpleUserIriClass
 
         ListUserIriClass other = (ListUserIriClass) object;
 
-        if(!table.equals(other.table))
-            return false;
-
-        if(!column.equals(other.column))
-            return false;
-
-        return true;
+        return Objects.equals(table, other.table) && Objects.equals(column, other.column);
     }
 }

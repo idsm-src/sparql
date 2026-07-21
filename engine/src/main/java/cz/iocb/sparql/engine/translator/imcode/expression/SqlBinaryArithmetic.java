@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getNumericClasses;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
@@ -7,16 +10,24 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator.Divide;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -25,10 +36,11 @@ public final class SqlBinaryArithmetic extends SqlBinary
     private final Operator operator;
 
 
-    protected SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
-            Set<ResourceClass> resourceClasses, boolean canBeNull)
+    private SqlBinaryArithmetic(Operator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
+            Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
-        super(left, right, resourceClasses, canBeNull);
+        super(left, right, mappings, canBeNull);
+
         this.operator = operator;
     }
 
@@ -36,20 +48,64 @@ public final class SqlBinaryArithmetic extends SqlBinary
     public static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
-        Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
+        return create(operator, left, right, Restriction.ALL);
+    }
 
-        for(ResourceClass leftClass : left.getResourceClasses())
-            for(ResourceClass rightClass : right.getResourceClasses())
-                if(isNumeric(leftClass) && isNumeric(rightClass))
-                    resultClasses.add(determineResultClass(operator, leftClass, rightClass));
 
-        if(resultClasses.isEmpty())
+    private static SqlExpressionIntercode create(Operator operator, SqlExpressionIntercode left,
+            SqlExpressionIntercode right, Restriction restriction)
+    {
+        Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<ResourceClass, Set<List<ResourceClass>>>();
+
+        boolean canBeNull = left.canBeNull() || right.canBeNull();
+
+        for(ResourceClass le : left.getUsedVariable().getMappings().keySet())
+        {
+            for(ResourceClass re : right.getUsedVariable().getMappings().keySet())
+            {
+                canBeNull |= !isNumeric(le) || !isNumeric(re);
+
+                Set<ResourceClass> resultClasses = new HashSet<ResourceClass>();
+
+                for(ResourceClass l : getNumericClasses(le))
+                {
+                    for(ResourceClass r : getNumericClasses(re))
+                    {
+                        ResourceClass res = determineResultClass(l, r);
+
+                        if(operator == Divide && res.equals(xsdInteger))
+                            res = xsdDecimal;
+
+                        if(operator == Divide && res.equals(xsdDecimal) && canBeDecimalZero(right))
+                            canBeNull = true;
+
+                        resultClasses.add(res);
+                    }
+                }
+
+                if(resultClasses.size() == 1)
+                    map.computeIfAbsent(resultClasses.iterator().next(), _ -> new HashSet<List<ResourceClass>>())
+                            .add(List.of(le, re));
+                else if(!resultClasses.isEmpty())
+                    map.computeIfAbsent(getUnionClass(resultClasses, box), _ -> new HashSet<List<ResourceClass>>())
+                            .add(List.of(le, re));
+            }
+        }
+
+        if(map.isEmpty())
             return SqlNull.get();
 
-        return new SqlBinaryArithmetic(operator, left, right, resultClasses, left.canBeNull() || right.canBeNull()
-                || left.getResourceClasses().stream().anyMatch(r -> !isNumeric(r))
-                || right.getResourceClasses().stream().anyMatch(r -> !isNumeric(r))
-                || operator == Operator.Divide && resultClasses.contains(xsdDecimal) && canBeDecimalZero(right));
+
+        List<SqlExpressionIntercode> operands = List.of(left, right);
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(operands, map, restriction, box);
+
+        Map<ResourceClass, List<Column>> mappings = new HashMap<ResourceClass, List<Column>>();
+
+        for(Entry<ResourceClass, Set<List<Set<ResourceClass>>>> e : resMap.entrySet())
+            mappings.put(e.getKey(),
+                    e.getValue() == null ? null : translate(operator, e.getKey(), e.getValue(), left, right));
+
+        return new SqlBinaryArithmetic(operator, left, right, mappings, canBeNull);
     }
 
 
@@ -57,6 +113,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
     {
         if(!(operand instanceof SqlLiteral literal))
             return true;
+
+        //NOTE: the caller has already verified that operand is numeric
 
         return switch(literal.getLiteral().getValue())
         {
@@ -70,102 +128,54 @@ public final class SqlBinaryArithmetic extends SqlBinary
     }
 
 
-    private static ResourceClass determineResultClass(Operator operator, ResourceClass leftClass,
-            ResourceClass rightClass)
+    private static List<Column> translate(Operator operator, ResourceClass resultClass,
+            Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
-        if(isDouble(leftClass) || isDouble(rightClass))
-            return xsdDouble;
-        else if(isFloat(leftClass) || isFloat(rightClass))
-            return xsdFloat;
-        else if(isDecimal(leftClass) || isDecimal(rightClass) || operator == Operator.Divide)
-            return xsdDecimal;
-        else if(isInteger(leftClass) || isInteger(rightClass))
-            return xsdInteger;
+        Set<Column> cols = new HashSet<Column>();
 
-        throw new IllegalArgumentException();
-    }
+        if(Stream.of(xsdDouble, xsdFloat, xsdDecimal, xsdInteger).anyMatch(r -> r.equals(resultClass)))
+        {
+            for(List<Set<ResourceClass>> variant : variants)
+            {
+                Column cl = left.promoteNumericAs(variant.get(0), resultClass);
+                Column cr = right.promoteNumericAs(variant.get(1), resultClass);
 
-
-    @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
-    {
-        Set<ResourceClass> set = new HashSet<ResourceClass>();
-
-        if(expected == null || expected.contains(xsdDouble))
-        {
-            set.add(xsdDouble);
-            set.add(xsdFloat);
-            set.add(xsdDecimal);
-            set.add(xsdInteger);
-            set.add(xsdShort);
-            set.add(xsdInt);
-            set.add(xsdLong);
-        }
-        else if(expected.contains(xsdFloat))
-        {
-            set.add(xsdFloat);
-            set.add(xsdDecimal);
-            set.add(xsdInteger);
-            set.add(xsdShort);
-            set.add(xsdInt);
-            set.add(xsdLong);
-        }
-        else if(expected.contains(xsdDecimal))
-        {
-            set.add(xsdDecimal);
-            set.add(xsdInteger);
-            set.add(xsdShort);
-            set.add(xsdInt);
-            set.add(xsdLong);
-        }
-        else if(expected.contains(xsdInteger) && operator != Operator.Divide)
-        {
-            set.add(xsdInteger);
-            set.add(xsdShort);
-            set.add(xsdInt);
-            set.add(xsdLong);
+                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")"));
+            }
         }
         else
         {
-            return new Restrictions();
+            for(List<Set<ResourceClass>> variant : variants)
+            {
+                Column cl = left.get(getUnionClass(variant.get(0), box)).get(0);
+                Column cr = right.get(getUnionClass(variant.get(1), box)).get(0);
+
+                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")"));
+            }
         }
 
-        return new Restrictions(left.getRequirements(set), right.getRequirements(set));
+        return List.of(Column.coalesce(cols));
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
-        SqlExpressionIntercode optRight = right.optimize(request, variables, evalServices);
+        List<ResourceClass> numbers = List.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble);
+        Restriction operandRestriction = new Restriction();
 
-        if(optLeft == left && optRight == right)
+        for(ResourceClass number : List.of(xsdInteger, xsdDecimal, xsdFloat, xsdDouble))
+            if(restriction.contains(number))
+                operandRestriction.add(numbers.subList(0, numbers.indexOf(number) + 1));
+
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, operandRestriction, evalServices);
+        SqlExpressionIntercode optRight = right.optimize(request, variables, operandRestriction, evalServices);
+
+        if(optLeft == left && optRight == right && restriction.isOptimized(variable))
             return this;
 
-        return create(operator, optLeft, optRight);
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        ResourceClass expressionResourceClass = getExpressionResourceClass();
-
-        if(expressionResourceClass == null)
-        {
-            String leftCode = translateAsBoxedOperand(request, left, left.getResourceClasses(r -> isNumeric(r)));
-            String rightCode = translateAsBoxedOperand(request, right, right.getResourceClasses(r -> isNumeric(r)));
-
-            return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
-        }
-        else
-        {
-            String leftCode = translateAsUnboxedOperand(request, left, getExpressionResourceClass());
-            String rightCode = translateAsUnboxedOperand(request, right, getExpressionResourceClass());
-
-            return "(" + leftCode + " operator(sparql." + operator.getText() + ") " + rightCode + ")";
-        }
+        return create(operator, optLeft, optRight, restriction);
     }
 
 
@@ -201,9 +211,6 @@ public final class SqlBinaryArithmetic extends SqlBinary
             return false;
 
         if(!Objects.equals(operator, imcode.operator))
-            return false;
-
-        if(!left.equals(imcode.left) || !right.equals(imcode.right))
             return false;
 
         return true;

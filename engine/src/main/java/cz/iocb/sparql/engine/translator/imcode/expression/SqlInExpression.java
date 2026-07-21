@@ -1,18 +1,28 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison.areComparable;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
-import java.util.LinkedList;
+import static java.util.Collections.singletonMap;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison.ComparisonType;
 
 
 
@@ -20,70 +30,67 @@ public final class SqlInExpression extends SqlExpressionIntercode
 {
     static private final class OperandWrapper extends SqlExpressionIntercode
     {
-        private SqlExpressionIntercode operand;
+        private LinkedHashMap<Column, Column> columnMap;
 
-        protected OperandWrapper(SqlExpressionIntercode operand)
+        protected OperandWrapper(Map<ResourceClass, List<Column>> mappings, boolean canBeNull, boolean isDeterministic,
+                LinkedHashMap<Column, Column> columnMap)
         {
-            super(operand.getResourceClasses(), operand.canBeNull(), operand.isDeterministic());
-            this.operand = operand;
+            super(mappings, canBeNull, isDeterministic);
 
-            this.referencedVariables.addAll(operand.getReferencedVariables());
+            this.columnMap = columnMap;
         }
 
         public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
         {
-            if(operand instanceof SqlNodeValue)
+            if(!operand.getUsedVariable().hasExpressionColumn())
                 return operand;
 
-            return new OperandWrapper(operand);
+            LinkedHashMap<Column, Column> columnMap = new LinkedHashMap<Column, Column>();
+
+            for(Column c : operand.getUsedVariable().getExpressionColumns())
+                columnMap.put(c, new TableColumn("@col" + columnMap.size()));
+
+            Map<ResourceClass, List<Column>> mapping = operand.getUsedVariable().getMappings().entrySet().stream()
+                    .collect(toMap(e -> e.getKey(), e -> e.getValue() == null ? null :
+                            e.getValue().stream().map(c -> columnMap.getOrDefault(c, c)).collect(toList())));
+
+            return new OperandWrapper(mapping, operand.canBeNull(), operand.isDeterministic(), columnMap);
         }
 
         @Override
-        public Restrictions getRequirements(Set<ResourceClass> expected)
-        {
-            return operand.getRequirements(expected);
-        }
-
-        @Override
-        public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
-        {
-            return create(operand.optimize(request, variables, evalServices));
-        }
-
-        @Override
-        public String translate(Request request)
-        {
-            return "\"expr\"";
-        }
-
-        @Override
-        public void generateExplanation(StringBuilder builder, String indent, int priority)
+        public Restrictions getRequirements()
         {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public boolean equals(Object object)
+        public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+                boolean evalServices)
         {
-            if(this == object)
-                return true;
+            throw new UnsupportedOperationException();
+        }
 
-            if(!(object instanceof OperandWrapper imcode))
-                return false;
+        @Override
+        protected void generateExplanation(StringBuilder builder, String indent, int priority)
+        {
+            throw new UnsupportedOperationException();
+        }
 
-            if(!super.equals(imcode))
-                return false;
-
-            if(!Objects.equals(operand, imcode.operand))
-                return false;
-
-            return true;
+        public Map<Column, Column> getColumnMap()
+        {
+            return columnMap;
         }
 
         @Override
         protected int getHashCode()
         {
-            return Objects.hash(operand);
+            return System.identityHashCode(this);
+        }
+
+        @Override
+        public boolean equals(Object object)
+        {
+            return this == object;
         }
     }
 
@@ -91,19 +98,16 @@ public final class SqlInExpression extends SqlExpressionIntercode
     private boolean negated;
     private SqlExpressionIntercode left;
     private List<SqlExpressionIntercode> rights;
-    private SqlExpressionIntercode expression;
 
 
     protected SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
-            SqlExpressionIntercode expression)
+            Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
-        super(asSet(xsdBoolean), expression.canBeNull(),
-                left.isDeterministic() && rights.stream().allMatch(r -> r.isDeterministic()));
+        super(mappings, canBeNull, left.isDeterministic() && rights.stream().allMatch(r -> r.isDeterministic()));
 
         this.negated = negated;
         this.left = left;
         this.rights = rights;
-        this.expression = expression;
 
         this.referencedVariables.addAll(left.getReferencedVariables());
 
@@ -115,6 +119,13 @@ public final class SqlInExpression extends SqlExpressionIntercode
     public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights)
     {
+        return create(negated, left, rights, Restriction.ALL);
+    }
+
+
+    public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
+            List<SqlExpressionIntercode> rights, Restriction restriction)
+    {
         if(rights.isEmpty() && negated)
             return trueValue;
 
@@ -122,64 +133,99 @@ public final class SqlInExpression extends SqlExpressionIntercode
             return falseValue;
 
 
-        SqlExpressionIntercode expression = null;
-
         SqlExpressionIntercode wrappedLeft = OperandWrapper.create(left);
         Operator compareOperator = negated ? Operator.NotEquals : Operator.Equals;
         Operator logicalOperator = negated ? Operator.And : Operator.Or;
 
-        for(SqlExpressionIntercode right : rights)
-        {
-            SqlExpressionIntercode compare = SqlBinaryComparison.create(compareOperator, wrappedLeft, right);
-            expression = expression != null ? SqlBinaryLogical.create(logicalOperator, expression, compare) : compare;
-        }
+        SqlExpressionIntercode expression = negated ? trueValue : falseValue;
 
-        if(expression instanceof SqlEffectiveBooleanValue || expression instanceof SqlNull)
+        for(SqlExpressionIntercode right : rights)
+            expression = SqlBinaryLogical.create(logicalOperator, expression,
+                    SqlBinaryComparison.create(compareOperator, wrappedLeft, right));
+
+        if(expression instanceof SqlLiteral || expression instanceof SqlNull)
             return expression;
 
-        return new SqlInExpression(negated, left, rights, expression);
+        if(!restriction.contains(xsdBoolean))
+        {
+            return new SqlInExpression(negated, left, rights, singletonMap(xsdBoolean, null), expression.canBeNull());
+        }
+        else if(wrappedLeft instanceof OperandWrapper wrapped)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            Map<Column, Column> columnMap = wrapped.getColumnMap();
+
+            builder.append("(SELECT ");
+            builder.append(expression.get(xsdBoolean).get(0));
+            builder.append(" FROM (VALUES (");
+            builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
+            builder.append(")) AS \"tab\"(");
+            builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
+            builder.append("))");
+
+            List<Column> result = List.of(new ExpressionColumn(builder.toString()));
+
+            return new SqlInExpression(negated, left, rights, singletonMap(xsdBoolean, result), expression.canBeNull());
+        }
+        else
+        {
+            return new SqlInExpression(negated, left, rights, expression.getMappings(), expression.canBeNull());
+        }
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
-        return new Restrictions(expression.getRequirements(expected));
+        Restrictions restrictions = new Restrictions();
+
+        restrictions.add(left.getRequirements());
+
+        for(SqlExpressionIntercode argument : rights)
+            restrictions.add(argument.getRequirements());
+
+        return restrictions;
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        SqlExpressionIntercode optLeft = left.optimize(request, variables, evalServices);
+        Operator operator = negated ? Operator.NotEquals : Operator.Equals;
 
-        List<SqlExpressionIntercode> optRights = new LinkedList<SqlExpressionIntercode>();
+        Restriction leftSet = new Restriction();
+        List<SqlExpressionIntercode> optRights = new ArrayList<SqlExpressionIntercode>(rights.size());
 
-        for(SqlExpressionIntercode right : rights)
-            optRights.add(right.optimize(request, variables, evalServices));
+        for(ResourceClass leftClass : left.getMappings().keySet())
+        {
+            for(SqlExpressionIntercode right : rights)
+            {
+                Restriction rightSet = new Restriction();
+                boolean isComparable = false;
 
+                for(ResourceClass rightClass : right.getMappings().keySet())
+                {
+                    if(areComparable(operator, leftClass, rightClass) != ComparisonType.NULL)
+                    {
+                        leftSet.add(leftClass);
+                        rightSet.add(rightClass);
+                        isComparable = true;
+                    }
+                }
+
+                if(isComparable)
+                    optRights.add(right.optimize(request, variables, rightSet, evalServices));
+            }
+        }
+
+        SqlExpressionIntercode optLeft = left.optimize(request, variables, leftSet, evalServices);
 
         if(optRights.equals(rights) && optLeft == left)
             return this;
 
-        return create(negated, optLeft, optRights);
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        if(left instanceof SqlNodeValue)
-            return expression.translate(request);
-
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("(SELECT ");
-        builder.append(expression.translate(request));
-        builder.append(" FROM (VALUES (");
-        builder.append(left.translate(request));
-        builder.append(")) AS \"tab\"(\"expr\"))");
-        return builder.toString();
+        return create(negated, optLeft, optRights, restriction);
     }
 
 

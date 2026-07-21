@@ -1,60 +1,31 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import java.sql.Statement;
-import java.util.HashMap;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
 public class UserLiteralClass extends LiteralClass
 {
-    private static final HashMap<IRI, UserLiteralClass> instances = new HashMap<IRI, UserLiteralClass>();
     private final String equalOperator;
     private final String notEqualOperator;
 
 
-    private UserLiteralClass(int id, String sqlType, String equalOp, String notEqualOp, IRI type)
+    private UserLiteralClass(String name, String sqlType, String equalOp, String notEqualOp, IRI type)
     {
-        super("usertype" + id, List.of(sqlType), type);
+        super(name, type, List.of(sqlType), Set.of(box));
         this.equalOperator = equalOp;
         this.notEqualOperator = notEqualOp;
-    }
-
-
-    public static synchronized UserLiteralClass get(String sqlType, String equalOp, String notEqualOp, IRI type)
-    {
-        UserLiteralClass userClass = new UserLiteralClass(instances.size(), sqlType, equalOp, notEqualOp, type);
-        UserLiteralClass prevClass = instances.get(type);
-
-        if(prevClass == null)
-        {
-            instances.put(type, userClass);
-            return userClass;
-        }
-        else if(prevClass.equals(userClass))
-        {
-            return prevClass;
-        }
-        else
-        {
-            throw new IllegalArgumentException();
-        }
-    }
-
-
-    @Override
-    public ResourceClass getGeneralClass()
-    {
-        return this;
     }
 
 
@@ -66,118 +37,73 @@ public class UserLiteralClass extends LiteralClass
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Literal literal)
     {
-        Object value = ((Literal) node).getValue();
-
-        return List.of(new ConstantColumn(value.toString(), sqlTypes.get(0)));
+        return List.of(constant(literal.getValue(), sqlTypes.get(0)));
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return columns;
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column value = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_typedliteral((%s)::varchar, %s::varchar)", value,
+                    string(typeIri)));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        return columns;
-    }
+        if(superClass.equals(this))
+            return columns;
 
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(column);
-    }
+        assert isSubclassOf(sourceClass);
 
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_typedliteral_value_of_type(%s, %s::varchar)::%s",
+                    columns.get(0), string(typeIri), sqlTypes.get(0)));
 
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        //FIXME: can cause sql exception
-
-        if(check)
-            return List.of(new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value_of_type(" + column + ", '"
-                    + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0))));
-        else
-            return List.of(
-                    new ExpressionColumn(("sparql.rdfbox_get_typedliteral_value(" + column + ")::" + sqlTypes.get(0))));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_typedliteral(" + columns.get(0) + "::varchar, '"
-                + typeIri.getValue().replaceAll("'", "''") + "'::varchar)");
-    }
-
-
-    @Override
-    public Column toExpression(Statement statement, Node node)
-    {
-        Object value = ((Literal) node).getValue();
-
-        return new ConstantColumn(value.toString(), sqlTypes.get(0));
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
-        return code;
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        return code;
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        return "sparql.rdfbox_create_from_typedliteral(" + code + "::varchar, '"
-                + typeIri.getValue().replaceAll("'", "''") + "'::varchar)";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        //FIXME: can cause sql exception
-
-        if(check)
-            return ("sparql.rdfbox_get_typedliteral_value_of_type(" + code + ", '"
-                    + typeIri.getValue().replaceAll("'", "''") + "'::varchar)::" + sqlTypes.get(0));
-        else
-            return ("sparql.rdfbox_get_typedliteral_value(" + code + ")::" + sqlTypes.get(0));
+        throw new IllegalArgumentException();
     }
 
 
     public String getOperatorCode(Operator operator)
     {
-        switch(operator)
+        return switch(operator)
         {
-            case Equals:
-                return equalOperator;
-            case NotEquals:
-                return notEqualOperator;
-            default:
-                return null;
-        }
+            case Equals -> equalOperator;
+            case NotEquals -> notEqualOperator;
+            default -> throw new IllegalArgumentException();
+        };
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        UserLiteralClass other = (UserLiteralClass) object;
+
+        return Objects.equals(equalOperator, other.equalOperator)
+                && Objects.equals(notEqualOperator, other.notEqualOperator);
     }
 }

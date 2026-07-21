@@ -1,21 +1,24 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.util.stream.Collectors.joining;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -38,7 +41,7 @@ public class GeneralUserIriClass extends UserIriClass
     public GeneralUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,
             SqlCheck sqlCheck)
     {
-        super(name, sqlTypes);
+        super(name, sqlTypes, Set.of(box, iri));
 
         this.sqlCheck = sqlCheck;
         this.function = new Function(schema, function);
@@ -70,14 +73,32 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        IRI iri = ((IRI) node);
+        Matcher matcher = pattern.matcher(iri.getValue());
+
+        if(matcher.matches())
+            return sqlCheck != SqlCheck.IF_MATCH || check(statement, iri);
+        else
+            return sqlCheck == SqlCheck.IF_NOT_MATCH && check(statement, iri);
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return "";
+    }
+
+
+    @Override
+    public List<Column> toColumns(Statement statement, IRI iri)
+    {
         assert match(statement, iri);
 
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
+            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -86,7 +107,7 @@ public class GeneralUserIriClass extends UserIriClass
                 List<Column> columns = new ArrayList<Column>();
 
                 for(int i = 0; i < getColumnCount(); i++)
-                    columns.add(new ConstantColumn(result.getString(i + 1), sqlTypes.get(i)));
+                    columns.add(constant(result.getString(i + 1), sqlTypes.get(i)));
 
                 return columns;
             }
@@ -99,213 +120,41 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        List<Column> result = new ArrayList<Column>(getColumnCount());
+        if(superClass.equals(this))
+            return columns;
 
-        for(int part = 0; part < getColumnCount(); part++)
-        {
-            StringBuilder builder = new StringBuilder();
+        String call = columns.stream().map(Object::toString).collect(joining(", ", function + "(", "))"));
 
-            builder.append(inverseFunction.get(part));
-            builder.append("(");
-            builder.append(columns.get(0));
-            builder.append(")");
+        if(superClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_iri(" + call + ")"));
 
-            result.add(new ExpressionColumn(builder.toString()));
-        }
+        if(superClass.equals(iri))
+            return List.of(expression(call));
 
-        return result;
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        StringBuilder builder = new StringBuilder();
+        if(superClass.equals(this))
+            return columns;
 
-        builder.append(function);
-        builder.append("(");
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-        for(int i = 0; i < getColumnCount(); i++)
-        {
-            if(i > 0)
-                builder.append(", ");
+        assert isSubclassOf(sourceClass);
 
-            builder.append(columns.get(i));
-        }
+        if(sourceClass.equals(box))
+            return inverseFunction.stream().map(f -> expression(f + "(sparql.rdfbox_get_iri(" + columns.get(0) + "))"))
+                    .toList();
 
-        builder.append(")");
+        if(sourceClass.equals(iri))
+            return inverseFunction.stream().map(f -> expression(f + "(" + columns.get(0) + ")")).toList();
 
-        return List.of(new ExpressionColumn(builder.toString()));
-    }
-
-
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        List<Column> result = new ArrayList<Column>(getColumnCount());
-
-        String iri = column.toString();
-
-        for(int part = 0; part < getColumnCount(); part++)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            if(canBeDerivatedFromGeneral())
-            {
-                builder.append("CASE WHEN sparql.regex_string(");
-                builder.append(iri);
-                builder.append(", '^(");
-                builder.append(regexp.replaceAll("'", "''"));
-                builder.append(")$', '') THEN ");
-            }
-
-            builder.append(inverseFunction.get(part));
-            builder.append("(");
-            builder.append(iri);
-            builder.append(")");
-
-            if(canBeDerivatedFromGeneral())
-                builder.append(" END");
-
-            result.add(new ExpressionColumn(builder.toString()));
-        }
-
-        return result;
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(function);
-        builder.append("(");
-
-        for(int i = 0; i < getColumnCount(); i++)
-        {
-            if(i > 0)
-                builder.append(", ");
-
-            builder.append(columns.get(i));
-        }
-
-        builder.append(")");
-
-        return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        if(check && !canBeDerivatedFromGeneral())
-            throw new IllegalArgumentException();
-
-        List<Column> result = new ArrayList<Column>(getColumnCount());
-
-        String iri = "sparql.rdfbox_get_iri(" + column + ")";
-
-        for(int part = 0; part < getColumnCount(); part++)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            if(check)
-            {
-                builder.append("CASE WHEN sparql.regex_string(");
-                builder.append(iri);
-                builder.append(", '^(");
-                builder.append(regexp.replaceAll("'", "''"));
-                builder.append(")$', '') THEN ");
-            }
-
-            builder.append(inverseFunction.get(part));
-            builder.append("(");
-            builder.append(iri);
-            builder.append(")");
-
-            if(check)
-                builder.append(" END");
-
-            result.add(new ExpressionColumn(builder.toString()));
-        }
-
-        return result;
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append("sparql.rdfbox_create_from_iri(");
-
-        builder.append(function);
-        builder.append("(");
-
-        for(int i = 0; i < getColumnCount(); i++)
-        {
-            if(i > 0)
-                builder.append(", ");
-
-            builder.append(columns.get(i));
-        }
-
-        builder.append(")");
-        builder.append(")");
-
-        return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    public String getPrefix(List<Column> columns)
-    {
-        return "";
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        return switch(node)
-        {
-            case VariableOrBlankNode var -> true;
-            case IRI iri -> match(statement, iri);
-            default -> false;
-        };
-    }
-
-
-    @Override
-    public boolean match(Statement statement, IRI iri)
-    {
-        Matcher matcher = pattern.matcher(iri.getValue());
-
-        if(matcher.matches())
-        {
-            if(sqlCheck == SqlCheck.IF_MATCH)
-                return check(statement, iri);
-
-            return true;
-        }
-        else
-        {
-            if(sqlCheck == SqlCheck.IF_NOT_MATCH)
-                return check(statement, iri);
-
-            return false;
-        }
-    }
-
-
-    @Override
-    public boolean canBeDerivatedFromGeneral()
-    {
-        return sqlCheck == SqlCheck.NEVER;
+        throw new IllegalArgumentException();
     }
 
 
@@ -332,7 +181,7 @@ public class GeneralUserIriClass extends UserIriClass
     {
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
+            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -363,18 +212,7 @@ public class GeneralUserIriClass extends UserIriClass
 
         GeneralUserIriClass other = (GeneralUserIriClass) object;
 
-        if(!sqlCheck.equals(other.sqlCheck))
-            return false;
-
-        if(!regexp.equals(other.regexp))
-            return false;
-
-        if(!function.equals(other.function))
-            return false;
-
-        if(!inverseFunction.equals(other.inverseFunction))
-            return false;
-
-        return true;
+        return Objects.equals(sqlCheck, other.sqlCheck) && Objects.equals(regexp, other.regexp)
+                && Objects.equals(function, other.function) && Objects.equals(inverseFunction, other.inverseFunction);
     }
 }

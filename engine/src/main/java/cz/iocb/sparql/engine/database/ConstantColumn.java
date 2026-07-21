@@ -14,18 +14,6 @@ public class ConstantColumn extends Column
     }
 
 
-    public ConstantColumn(int literal, String type)
-    {
-        this(Integer.toString(literal), type);
-    }
-
-
-    public ConstantColumn(short literal, String type)
-    {
-        this(Short.toString(literal), type);
-    }
-
-
     @Override
     public String toString()
     {

@@ -1,6 +1,15 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.database.Column.coalesce;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getBaseNumericClass;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -31,11 +41,21 @@ public class UsedVariable
     }
 
 
+    public UsedVariable(Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
+    {
+        this.name = null;
+        this.canBeNull = canBeNull;
+        this.mappings.putAll(mappings);
+    }
+
+
     public UsedVariable(String name, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         this.name = name;
         this.canBeNull = canBeNull;
-        this.mappings.putAll(mappings);
+
+        if(mappings != null)
+            this.mappings.putAll(mappings);
     }
 
 
@@ -109,12 +129,9 @@ public class UsedVariable
                 if(map.getValue() == null)
                     return null;
 
-                ResourceClass targetEffectiveClass = targetClass.getEffectiveClass();
-                ResourceClass effectiveSourceClass = sourceClass.getEffectiveClass();
-
-                if(effectiveSourceClass.isSubclassOf(targetEffectiveClass))
+                if(sourceClass.isSubclassOf(targetClass))
                     variants.add(sourceClass.toGeneralClass(targetClass, map.getValue(), canBeNull));
-                else if(targetEffectiveClass.isSubclassOf(effectiveSourceClass))
+                else if(targetClass.isSubclassOf(sourceClass.getEffectiveClass()))
                     variants.add(targetClass.fromGeneralClass(sourceClass, map.getValue()));
                 else
                     throw new UnsupportedOperationException();
@@ -150,24 +167,115 @@ public class UsedVariable
     }
 
 
+    public String getIsNull()
+    {
+        //TODO: add support for different null strategy
+        //TODO: ignore constant columns (null vs non-null)
+
+        return mappings.values().stream().flatMap(l -> l.stream()).map(c -> c + " IS NULL")
+                .collect(joining(" AND ", "(", ")"));
+    }
+
+
+    public String getIsNotNull()
+    {
+        //TODO: add support for different null strategy
+        //TODO: ignore constant columns (null vs non-null)
+
+        return mappings.values().stream().flatMap(l -> l.stream()).map(c -> c + " IS NOT NULL")
+                .collect(joining(" OR ", "(", ")"));
+    }
+
+
+    public String getIsNull(ResourceClass resClass)
+    {
+        //TODO: add support for different null strategy
+        //TODO: ignore constant columns (null vs non-null)
+
+        return deriveMapping(resClass).stream().map(c -> c + " IS NULL").collect(joining(" AND ", "(", ")"));
+    }
+
+
+    public String getIsNotNull(ResourceClass resClass)
+    {
+        //TODO: add support for different null strategy
+        //TODO: ignore constant columns (null vs non-null)
+
+        return deriveMapping(resClass).stream().map(c -> c + " IS NOT NULL").collect(joining(" OR ", "(", ")"));
+    }
+
+
+    public Column getStringLiteral()
+    {
+        boolean literalCanBeNull = canBeNull || mappings.size() > 1;
+
+        Set<Column> variants = new HashSet<Column>();
+
+        for(Entry<ResourceClass, List<Column>> e : mappings.entrySet())
+        {
+            if(isString(e.getKey()))
+                variants.add(e.getKey().toClass(xsdString, e.getValue(), literalCanBeNull).get(0));
+            else if(isLangString(e.getKey()))
+                variants.add(e.getKey().toClass(rdfLangString, e.getValue(), literalCanBeNull).get(0));
+            else if(hasStringLiteral(e.getKey()))
+                variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
+                        + e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0) + ")"));
+        }
+
+        return coalesce(variants);
+    }
+
+
+    public Column getStringLiteral(Set<ResourceClass> resClasses)
+    {
+        boolean literalCanBeNull = canBeNull || mappings.size() > 1;
+
+        Set<Column> variants = new HashSet<Column>();
+
+        for(ResourceClass resClass : resClasses)
+        {
+            List<Column> columns = deriveMapping(resClass);
+
+            if(isString(resClass))
+                variants.add(resClass.toClass(xsdString, columns, literalCanBeNull).get(0));
+            else if(isLangString(resClass))
+                variants.add(resClass.toClass(rdfLangString, columns, literalCanBeNull).get(0));
+            else if(hasStringLiteral(resClass))
+                variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
+                        + resClass.toClass(box, columns, literalCanBeNull).get(0) + ")"));
+            else
+                throw new IllegalArgumentException();
+        }
+
+        return coalesce(variants);
+    }
+
+
+    public Column promoteNumericAs(ResourceClass source, ResourceClass target)
+    {
+        ResourceClass base = getBaseNumericClass(source);
+
+        Column value = deriveMapping(base).get(0);
+
+        if(base.equals(target))
+            return value;
+        else if(base.equals(box))
+            return new ExpressionColumn("sparql.rdfbox_promote_to_" + target.getName() + "(" + value + ")");
+        else
+            return new ExpressionColumn(
+                    "sparql.cast_as_" + target.getName() + "_from_" + base.getName() + "(" + value + ")");
+    }
+
+
+    public Column promoteNumericAs(Set<ResourceClass> set, ResourceClass target)
+    {
+        return Column.coalesce(set.stream().map(r -> promoteNumericAs(r, target)).collect(toSet()));
+    }
+
+
     public final Set<ResourceClass> getClasses()
     {
         return mappings.keySet();
-    }
-
-
-    public List<Column> getMapping()
-    {
-        return mappings.get(getResourceClass());
-    }
-
-
-    public final ResourceClass getResourceClass()
-    {
-        if(mappings.size() != 1)
-            throw new IllegalArgumentException();
-
-        return mappings.keySet().iterator().next();
     }
 
 
@@ -191,6 +299,20 @@ public class UsedVariable
             if(columns != null)
                 for(Column column : columns)
                     if(!(column instanceof ConstantColumn))
+                        result.add(column);
+
+        return result;
+    }
+
+
+    public Set<Column> getExpressionColumns()
+    {
+        Set<Column> result = new HashSet<Column>();
+
+        for(List<Column> columns : mappings.values())
+            if(columns != null)
+                for(Column column : columns)
+                    if(column instanceof ExpressionColumn)
                         result.add(column);
 
         return result;
@@ -236,7 +358,7 @@ public class UsedVariable
 
         UsedVariable other = (UsedVariable) object;
 
-        if(!name.equals(other.name))
+        if(!Objects.equals(name, other.name))
             return false;
 
         if(canBeNull != other.canBeNull)
@@ -259,5 +381,11 @@ public class UsedVariable
     public boolean hasMapping()
     {
         return mappings.values().stream().anyMatch(c -> c != null);
+    }
+
+
+    public boolean hasExpressionColumn()
+    {
+        return mappings.values().stream().flatMap(c -> c.stream()).anyMatch(c -> c instanceof ExpressionColumn);
     }
 }

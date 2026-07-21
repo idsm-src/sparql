@@ -85,7 +85,7 @@ public final class Multiset<E> implements Collection<E>, Serializable
     @Override
     public boolean add(E element)
     {
-        MutableInt box = map.computeIfAbsent(element, k -> new MutableInt());
+        MutableInt box = map.computeIfAbsent(element, _ -> new MutableInt());
 
         box.value++;
         size++;

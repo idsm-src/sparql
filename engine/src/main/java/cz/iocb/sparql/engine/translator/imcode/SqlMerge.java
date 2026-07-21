@@ -84,7 +84,7 @@ public final class SqlMerge extends SqlIntercode
             childRestrictions = newChildRestrictions;
         }
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(!(new UsedPairedVariable(optChild.getVariable(variable1), optChild.getVariable(variable2))).isJoinable())

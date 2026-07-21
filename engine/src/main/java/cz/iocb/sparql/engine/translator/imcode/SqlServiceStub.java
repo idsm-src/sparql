@@ -174,7 +174,7 @@ public final class SqlServiceStub extends SqlIntercode
         SqlIntercode optContext = context.optimize(request, contextRestrictions, reduced, evalServices);
 
 
-        if(optContext == SqlNoSolution.get())
+        if(optContext.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(name instanceof Variable nameVar)
@@ -239,7 +239,7 @@ public final class SqlServiceStub extends SqlIntercode
         ArrayList<RdfNode[]> rows = new ArrayList<RdfNode[]>();
         HashMap<String, Integer> varIndexes = null;
 
-        if(context == SqlEmptySolution.get())
+        if(context.equals(SqlEmptySolution.get()))
         {
             rows.add(new RdfNode[0]);
             varIndexes = new HashMap<String, Integer>();

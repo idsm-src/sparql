@@ -17,7 +17,7 @@ public abstract class QuadMapping
 
     public QuadMapping(ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object)
     {
-        //TODO: add support for ParametrisedIriMapping graphs
+        //TODO: add support for parameterized graph mapping
 
         this.graph = graph;
         this.subject = subject;

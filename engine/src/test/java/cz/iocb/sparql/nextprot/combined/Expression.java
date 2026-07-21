@@ -28,8 +28,8 @@ public class Expression
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":lowExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -40,8 +40,8 @@ public class Expression
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":mediumExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -52,8 +52,8 @@ public class Expression
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":highExpression"),
                     config.createIriMapping("annotation", "iri"));
         }

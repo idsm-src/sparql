@@ -1,35 +1,32 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static java.util.stream.Collectors.toSet;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
+import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
@@ -38,39 +35,84 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 public abstract class SqlExpressionIntercode extends SqlBaseClass
 {
-    private static final List<ResourceClass> numericOrder = List.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal,
-            xsdFloat, xsdDouble);
-
-    private final boolean canBeNull;
-    private final boolean isDeterministic;
-    private final boolean isBoxed;
-    private final Set<ResourceClass> resourceClasses;
-    protected final Set<String> referencedVariables = new HashSet<String>();
-
-
-    protected SqlExpressionIntercode(Set<ResourceClass> resourceClasses, boolean canBeNull, boolean isDeterministic)
+    public static class Restriction
     {
-        this.canBeNull = canBeNull;
-        this.isDeterministic = isDeterministic;
-        this.isBoxed = resourceClasses.size() > 0 ? isBoxed(resourceClasses) : false; //FIXME
-        this.resourceClasses = resourceClasses;
+        public static final Restriction ALL = new Restriction(box);
+
+        public static final Restriction NONE = new Restriction(box);
+
+
+        Set<ResourceClass> set = new HashSet<ResourceClass>();
+
+        public Restriction(Set<ResourceClass> classes)
+        {
+            add(classes);
+        }
+
+        public Restriction(ResourceClass... classes)
+        {
+            add(Arrays.asList(classes));
+        }
+
+        public void add(Collection<ResourceClass> classes)
+        {
+            if(classes != null)
+                set.addAll(classes);
+        }
+
+        public void add(ResourceClass... classes)
+        {
+            add(Arrays.asList(classes));
+        }
+
+        public boolean contains(ResourceClass resClass)
+        {
+            return set.stream().anyMatch(r -> !areDisjunct(r, resClass));
+        }
+
+        public boolean contains(Set<ResourceClass> resClasses)
+        {
+            return resClasses.stream().anyMatch(r -> contains(r));
+        }
+
+        public boolean isOptimized(UsedVariable variable)
+        {
+            return restrict(variable.getMappings()).equals(variable.getMappings());
+        }
+
+        public Map<ResourceClass, List<Column>> restrict(Map<ResourceClass, List<Column>> mappings)
+        {
+            Map<ResourceClass, List<Column>> result = new HashMap<ResourceClass, List<Column>>();
+
+            for(Entry<ResourceClass, List<Column>> e : mappings.entrySet())
+                result.put(e.getKey(), contains(e.getKey()) ? e.getValue() : null);
+
+            return result;
+        }
     }
 
 
-    public abstract Restrictions getRequirements(Set<ResourceClass> expected);
+    protected final boolean isDeterministic;
+    protected final Set<String> referencedVariables = new HashSet<String>();
+    protected final UsedVariable variable;
 
 
-    public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices);
+    protected SqlExpressionIntercode(Map<ResourceClass, List<Column>> mappings, boolean canBeNull,
+            boolean isDeterministic)
+    {
+        this.isDeterministic = isDeterministic;
+        this.variable = new UsedVariable(mappings, canBeNull);
+    }
 
 
-    public abstract String translate(Request request);
+    public abstract Restrictions getRequirements();
+
+
+    public abstract SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices);
 
 
     protected abstract void generateExplanation(StringBuilder builder, String indent, int priority);
-
-
-    @Override
-    protected abstract int getHashCode();
 
 
     public void generateExplanation(StringBuilder builder, String indent)
@@ -79,15 +121,238 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public boolean canBeNull()
+    public boolean hasExpressionColumn(Set<ResourceClass> resClasses)
     {
-        return canBeNull;
+        return resClasses.stream().anyMatch(r -> hasExpressionColumn(r));
     }
 
 
-    public boolean isBoxed()
+    public boolean hasExpressionColumn(ResourceClass resClass)
     {
-        return isBoxed;
+        for(Entry<ResourceClass, List<Column>> e : variable.getMappings().entrySet())
+            if(!areDisjunct(resClass, e.getKey()) && e.getValue().stream().anyMatch(c -> c instanceof ExpressionColumn))
+                return true;
+
+        return false;
+    }
+
+
+    public boolean canSafelyGeneralize(ResourceClass sourceClass, ResourceClass targetClass)
+    {
+        return sourceClass.getEffectiveClass().equals(targetClass)
+                || sourceClass.isSubclassOf(targetClass) && !hasExpressionColumn(sourceClass);
+    }
+
+
+    public static ResourceClass determineResultClass(ResourceClass operandClass)
+    {
+        if(isDouble(operandClass))
+            return xsdDouble;
+        else if(isFloat(operandClass))
+            return xsdFloat;
+        else if(isDecimal(operandClass))
+            return xsdDecimal;
+        else
+            return xsdInteger;
+    }
+
+
+    public static ResourceClass determineResultClass(ResourceClass leftClass, ResourceClass rightClass)
+    {
+        if(leftClass.equals(xsdDouble) || rightClass.equals(xsdDouble))
+            return xsdDouble;
+        else if(leftClass.equals(xsdFloat) || rightClass.equals(xsdFloat))
+            return xsdFloat;
+        else if(leftClass.equals(xsdDecimal) || rightClass.equals(xsdDecimal))
+            return xsdDecimal;
+        else
+            return xsdInteger;
+    }
+
+
+    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
+            List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
+            Restriction restriction, PrimitiveResourceClass unionClass)
+    {
+        record Input(ResourceClass result, List<ResourceClass> params)
+        {
+            public static boolean areInConflict(List<SqlExpressionIntercode> arguments, Restriction restriction,
+                    Input l, Input r)
+            {
+                if(!restriction.contains(l.result) || !restriction.contains(r.result))
+                    return false;
+
+                for(int i = 0; i < arguments.size(); i++)
+                {
+                    SqlExpressionIntercode arg = arguments.get(i);
+                    ResourceClass lc = l.params.get(i);
+                    ResourceClass rc = l.params.get(i);
+
+                    if(!areDisjunct(lc, rc) && (arg.hasExpressionColumn(lc) || arg.hasExpressionColumn(lc)))
+                        return true;
+                }
+
+                return false;
+            }
+        }
+
+        Set<Input> inputs = new HashSet<Input>();
+
+        for(Entry<ResourceClass, Set<List<ResourceClass>>> e : map.entrySet())
+            for(List<ResourceClass> c : e.getValue())
+                inputs.add(new Input(e.getKey(), c));
+
+        Collection<Set<Input>> groupParameters = UnionFind.getDisjunctEntries(inputs,
+                (l, r) -> Input.areInConflict(arguments, restriction, l, r));
+
+
+        record Midle(Set<ResourceClass> result, List<Set<ResourceClass>> params)
+        {
+        }
+
+        Set<Midle> middles = new HashSet<Midle>();
+
+        for(Set<Input> s : groupParameters)
+        {
+            Set<ResourceClass> result = new HashSet<ResourceClass>();
+            List<Set<ResourceClass>> params = new ArrayList<>();
+
+            for(int i = 0; i < arguments.size(); i++)
+                params.add(new HashSet<ResourceClass>());
+
+            for(Input e : s)
+            {
+                result.add(e.result);
+
+                for(int i = 0; i < arguments.size(); i++)
+                    params.get(i).add(e.params.get(i));
+            }
+
+            middles.add(new Midle(result, params));
+        }
+
+
+        Collection<Set<Midle>> groupResults = UnionFind.getDisjunctEntries(middles,
+                (l, r) -> !areDisjunct(l.result, r.result) && restriction.contains(l.result)
+                        && restriction.contains(r.result));
+
+        Map<ResourceClass, Set<List<Set<ResourceClass>>>> output = new HashMap<>();
+
+        for(Set<Midle> s : groupResults)
+        {
+            Set<ResourceClass> result = new HashSet<ResourceClass>();
+            Set<List<Set<ResourceClass>>> params = new HashSet<>();
+
+            for(Midle e : s)
+            {
+                result.addAll(e.result);
+                params.add(e.params);
+            }
+
+            if(!restriction.contains(result))
+                params = null;
+
+            if(result.size() == 1)
+                output.put(result.iterator().next(), params);
+            else if(unionClass != null)
+                output.put(getUnionClass(result, unionClass), params);
+            else
+                output.put(getUnionClass(result), params);
+        }
+
+        return output;
+    }
+
+
+    protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
+            List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
+            Restriction restriction)
+    {
+        return processResultMap(arguments, map, restriction, null);
+    }
+
+
+    public String getIsNull()
+    {
+        return variable.getIsNull();
+    }
+
+
+    public String getIsNotNull()
+    {
+        return variable.getIsNotNull();
+    }
+
+
+    public String getIsNull(ResourceClass resClass)
+    {
+        return variable.getIsNull(resClass);
+    }
+
+
+    public String getIsNotNull(ResourceClass resClass)
+    {
+        return variable.getIsNotNull(resClass);
+    }
+
+
+    protected Column getStringLiteral()
+    {
+        return variable.getStringLiteral();
+    }
+
+
+    protected Column getStringLiteral(Set<ResourceClass> resClasses)
+    {
+        return variable.getStringLiteral(resClasses);
+    }
+
+
+    protected Column promoteNumericAs(ResourceClass source, ResourceClass target)
+    {
+        return variable.promoteNumericAs(source, target);
+    }
+
+
+    public Column promoteNumericAs(Set<ResourceClass> set, ResourceClass target)
+    {
+        return variable.promoteNumericAs(set, target);
+    }
+
+
+    public List<Column> get(ResourceClass resClass)
+    {
+        return variable.deriveMapping(resClass);
+    }
+
+
+    public Map<ResourceClass, List<Column>> getMappings()
+    {
+        return variable.getMappings();
+    }
+
+
+    public List<Column> getMapping(ResourceClass resClass)
+    {
+        return variable.getMapping(resClass);
+    }
+
+
+    public Set<ResourceClass> getResourceClasses()
+    {
+        return variable.getClasses();
+    }
+
+
+    public boolean canBeNull()
+    {
+        return variable.canBeNull();
+    }
+
+
+    public UsedVariable getUsedVariable()
+    {
+        return variable;
     }
 
 
@@ -97,529 +362,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
-    public Set<ResourceClass> getResourceClasses()
-    {
-        return resourceClasses;
-    }
-
-
-    public ResourceClass getResourceClass()
-    {
-        if(resourceClasses.size() != 1)
-            throw new IllegalArgumentException();
-
-        return resourceClasses.iterator().next();
-    }
-
-
-    public Set<ResourceClass> getResourceClasses(Predicate<ResourceClass> predicate)
-    {
-        return resourceClasses.stream().filter(predicate).collect(toSet());
-    }
-
-
     public Set<String> getReferencedVariables()
     {
         return referencedVariables;
-    }
-
-
-    public ResourceClass getExpressionResourceClass()
-    {
-        return getExpressionResourceClass(resourceClasses);
-    }
-
-
-    protected String getResourceName()
-    {
-        if(isBoxed)
-            return "rdfbox";
-
-        ResourceClass resourceClass = getExpressionResourceClass();
-
-        if(resourceClass instanceof DateTimeConstantZoneClass)
-            return "plain_datetime";
-
-        if(resourceClass instanceof DateConstantZoneClass)
-            return "plain_date";
-
-        if(resourceClass instanceof LangStringConstantTagClass)
-            return "plain_langstring";
-
-        if(resourceClass instanceof IriClass)
-            return "iri";
-
-        return getExpressionBaseClass(resourceClass).getName();
-    }
-
-
-    public static String getResourceName(ResourceClass resourceClass)
-    {
-        if(resourceClass == null)
-            return "rdfbox";
-
-        return getExpressionBaseClass(resourceClass).getName();
-    }
-
-
-    public static boolean isIri(ResourceClass resClass)
-    {
-        return resClass instanceof IriClass;
-    }
-
-
-    public static boolean isBlankNode(ResourceClass resClass)
-    {
-        return resClass instanceof BlankNodeClass;
-    }
-
-
-    public static boolean isIntBlankNode(ResourceClass resClass)
-    {
-        return resClass instanceof IntBlankNodeClass;
-    }
-
-
-    public static boolean isStrBlankNode(ResourceClass resClass)
-    {
-        return resClass instanceof StrBlankNodeClass;
-    }
-
-
-    public static boolean isLiteral(ResourceClass resClass)
-    {
-        return resClass instanceof LiteralClass;
-    }
-
-
-    public static boolean isDateTime(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdDateTime);
-    }
-
-
-    public static boolean isDate(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdDate);
-    }
-
-
-    public static boolean isLangString(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, rdfLangString);
-    }
-
-
-    public static boolean isStringLiteral(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdString) || !ResourceClass.areDisjunct(resClass, rdfLangString);
-    }
-
-
-    public static boolean isString(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdString);
-    }
-
-
-    public static boolean isDouble(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdDouble);
-    }
-
-
-    public static boolean isFloat(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdFloat);
-    }
-
-
-    public static boolean isDecimal(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdDecimal);
-    }
-
-
-    public static boolean isInteger(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdInteger);
-    }
-
-
-    public static boolean isLong(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdLong);
-    }
-
-
-    public static boolean isInt(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdInt);
-    }
-
-
-    public static boolean isShort(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdShort);
-    }
-
-
-    public static boolean isNumeric(ResourceClass resClass)
-    {
-        return numericOrder.contains(getExpressionBaseClass(resClass));
-    }
-
-
-    public static boolean isFloatPoint(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdFloat) || !ResourceClass.areDisjunct(resClass, xsdDouble);
-    }
-
-
-    public static boolean isBoolean(ResourceClass resClass)
-    {
-        return !ResourceClass.areDisjunct(resClass, xsdBoolean);
-    }
-
-
-    public static boolean isNumericCompatibleWith(ResourceClass resClass, ResourceClass requestClass)
-    {
-        if(!isNumeric(resClass))
-            return false;
-
-        if(requestClass == null)
-            return true;
-
-        return numericOrder.indexOf(getExpressionBaseClass(resClass)) <= numericOrder
-                .indexOf(getExpressionBaseClass(requestClass));
-    }
-
-
-    public static boolean isEffectiveBooleanClass(ResourceClass resClass)
-    {
-        return isNumeric(resClass) || isBoolean(resClass) || isString(resClass) || resClass == unsupportedLiteral;
-    }
-
-
-    protected static Set<ResourceClass> asSet(ResourceClass... resourceClasses)
-    {
-        Set<ResourceClass> set = new HashSet<ResourceClass>();
-
-        for(ResourceClass resourceClass : resourceClasses)
-            set.add(resourceClass);
-
-        return set;
-    }
-
-
-    public static ResourceClass getExpressionResourceClass(Set<ResourceClass> resourceClasses)
-    {
-        if(resourceClasses.size() == 0)
-            return null; //throw new IllegalArgumentException();
-
-        ResourceClass resClass = null;
-
-        if(resourceClasses.size() == 1)
-            resClass = resourceClasses.iterator().next();
-        else if(resourceClasses.stream().map(c -> c.getGeneralClass()).distinct().count() == 1)
-            resClass = resourceClasses.iterator().next().getGeneralClass();
-
-        if(resClass != null && resClass.hasExpressionType())
-            return resClass;
-
-        return null;
-    }
-
-
-    public static boolean isBoxed(Set<ResourceClass> resourceClasses)
-    {
-        return getExpressionResourceClass(resourceClasses) == null;
-    }
-
-
-    protected static Set<ResourceClass> joinResourceClasses(Set<ResourceClass> left, Set<ResourceClass> right)
-    {
-        Set<ResourceClass> set = new HashSet<ResourceClass>();
-        set.addAll(left);
-        set.addAll(right);
-
-        Set<ResourceClass> result = new HashSet<ResourceClass>();
-
-        for(ResourceClass resClass : set)
-        {
-            if(set.contains(resClass.getGeneralClass()))
-                result.add(resClass.getGeneralClass());
-            else
-                result.add(resClass);
-        }
-
-        return result;
-    }
-
-
-    protected static Set<ResourceClass> intersectResourceClasses(Set<ResourceClass> left, Set<ResourceClass> right)
-    {
-        Set<ResourceClass> merged = new HashSet<ResourceClass>();
-        merged.addAll(left);
-        merged.addAll(right);
-
-        Set<ResourceClass> result = new HashSet<ResourceClass>();
-
-        for(ResourceClass resourceClass : merged)
-        {
-            if(left.contains(resourceClass) && right.contains(resourceClass))
-                result.add(resourceClass);
-
-            if(merged.contains(resourceClass.getGeneralClass()))
-                result.add(resourceClass);
-        }
-
-        return result;
-    }
-
-
-    protected static String translateAsNullCheck(Request request, SqlExpressionIntercode operand, boolean not)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        if(operand instanceof SqlVariable variable)
-        {
-            boolean hasOuterVariants = false;
-
-            if(variable.getResourceClasses().size() > 1)
-                builder.append("(");
-
-            for(ResourceClass resourceClass : variable.getResourceClasses())
-            {
-                if(not)
-                    appendOr(builder, hasOuterVariants);
-                else
-                    appendAnd(builder, hasOuterVariants);
-
-                hasOuterVariants = true;
-                boolean hasInnerVariants = false;
-
-                if(resourceClass.getColumnCount() > 1)
-                    builder.append("(");
-
-                for(int i = 0; i < resourceClass.getColumnCount(); i++)
-                {
-                    Column access = variable.getUsedVariable().getMapping(resourceClass).get(i);
-
-                    if(not)
-                        appendAnd(builder, hasInnerVariants);
-                    else
-                        appendOr(builder, hasInnerVariants);
-
-                    hasInnerVariants = true;
-                    builder.append(access);
-                    builder.append(not ? " IS NOT NULL" : " IS NULL");
-                }
-
-                if(resourceClass.getColumnCount() > 1)
-                    builder.append(")");
-            }
-
-            if(variable.getResourceClasses().size() > 1)
-                builder.append(")");
-        }
-        else
-        {
-            builder.append(operand.translate(request));
-            builder.append(not ? " IS NOT NULL" : " IS NULL");
-        }
-
-        return builder.toString();
-    }
-
-
-    protected static String translateAsUnboxedOperand(Request request, SqlExpressionIntercode operand,
-            ResourceClass resourceClass)
-    {
-        //FIXME: can this happen?
-        if(operand == SqlNull.get())
-            return "NULL::" + resourceClass.getSqlTypes().get(0);
-
-
-        StringBuilder builder = new StringBuilder();
-
-        if(operand instanceof SqlVariable variable)
-        {
-            List<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
-                    .filter(r -> r == resourceClass || r.getGeneralClass() == resourceClass
-                            || r == resourceClass.getGeneralClass()
-                            || isNumeric(r) && isNumeric(resourceClass) && isNumericCompatibleWith(r, resourceClass))
-                    .toList();
-
-            boolean hasAlternative = false;
-
-            if(compatibleClasses.size() > 1)
-                builder.append("coalesce(");
-
-            for(ResourceClass compatibleClass : compatibleClasses)
-            {
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                List<Column> cols = variable.getUsedVariable().getMapping(compatibleClass);
-
-                if(compatibleClass == resourceClass)
-                {
-                    builder.append(compatibleClass.toExpression(cols));
-                }
-                else if(compatibleClass.getGeneralClass() == resourceClass)
-                {
-                    boolean nullCheck = operand.canBeNull() || operand.getResourceClasses().size() > 1;
-                    List<Column> c = compatibleClass.toGeneralClass(resourceClass, cols, nullCheck);
-                    builder.append(resourceClass.toExpression(c));
-                }
-                else if(compatibleClass == resourceClass.getGeneralClass())
-                {
-                    List<Column> c = resourceClass.fromGeneralClass(resourceClass, cols);
-                    builder.append(resourceClass.toExpression(c));
-                }
-                else
-                {
-                    List<Column> columns = variable.asResource(request, compatibleClass);
-                    String code = compatibleClass.getGeneralClass().toExpression(columns).toString();
-
-                    builder.append("sparql.cast_as_");
-                    builder.append(resourceClass.getName());
-                    builder.append("_from_");
-                    builder.append(compatibleClass.getGeneralClass().getName());
-                    builder.append("(");
-                    builder.append(code);
-                    builder.append(")");
-                }
-            }
-
-            if(compatibleClasses.size() > 1)
-                builder.append(")");
-        }
-        else
-        {
-            ResourceClass expressionClass = operand.getExpressionResourceClass();
-
-            if(operand.isBoxed() && isNumeric(resourceClass))
-            {
-                builder.append(
-                        "sparql.rdfbox_promote_to_" + resourceClass.getName() + "(" + operand.translate(request) + ")");
-            }
-            else if(operand.isBoxed())
-            {
-                ResourceClass genClass = resourceClass.getGeneralClass();
-                boolean check = operand.getResourceClasses().stream().filter(c -> c.getGeneralClass() == genClass)
-                        .count() > 1;
-
-                builder.append(resourceClass.toUnboxedExpression(operand.translate(request), check));
-            }
-            else if(expressionClass == resourceClass)
-            {
-                builder.append(operand.translate(request));
-            }
-            else if(expressionClass.getGeneralClass() == resourceClass)
-            {
-                builder.append(expressionClass.toGeneralExpression(operand.translate(request)));
-            }
-            else if(expressionClass == resourceClass.getGeneralClass())
-            {
-                builder.append(resourceClass.fromGeneralExpression(operand.translate(request)));
-            }
-            else
-            {
-                builder.append("sparql.cast_as_");
-                builder.append(resourceClass.getName());
-                builder.append("_from_");
-                builder.append(expressionClass.getName());
-                builder.append("(");
-                builder.append(expressionClass.toGeneralExpression(operand.translate(request)));
-                builder.append(")");
-            }
-        }
-
-        return builder.toString();
-    }
-
-
-    protected static String translateAsBoxedOperand(Request request, SqlExpressionIntercode operand,
-            Set<ResourceClass> requestedClasses)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        if(operand instanceof SqlVariable variable)
-        {
-            boolean hasAlternative = false;
-
-            if(requestedClasses.size() > 1)
-                builder.append("coalesce(");
-
-            for(ResourceClass patternClass : requestedClasses)
-            {
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                List<Column> cols = variable.getUsedVariable().getMapping(patternClass);
-                builder.append(patternClass.toBoxedExpression(cols));
-            }
-
-            if(requestedClasses.size() > 1)
-                builder.append(")");
-        }
-        else if(operand.isBoxed())
-        {
-            builder.append(operand.translate(request));
-        }
-        else
-        {
-            ResourceClass resourceClass = operand.getExpressionResourceClass();
-            builder.append(resourceClass.toBoxedExpression(operand.translate(request)));
-        }
-
-        return builder.toString();
-    }
-
-
-    public static ResourceClass getExpressionBaseClass(ResourceClass resClass)
-    {
-        return resClass.getGeneralClass();
-    }
-
-
-    protected static String translateAsStringLiteral(Request request, SqlExpressionIntercode operand)
-    {
-        if(operand instanceof SqlVariable variable)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            Set<ResourceClass> compatible = operand.getResourceClasses().stream().filter(r -> isStringLiteral(r))
-                    .collect(toSet());
-
-            if(compatible.size() > 1)
-                builder.append("coalesce(");
-
-            boolean hasVariant = false;
-
-            for(ResourceClass resClass : compatible)
-            {
-                appendComma(builder, hasVariant);
-                hasVariant = true;
-
-                builder.append(variable.asResource(request, resClass).get(0));
-            }
-
-            if(compatible.size() > 1)
-                builder.append(")");
-
-            return builder.toString();
-        }
-        else if(!operand.isBoxed())
-        {
-            return operand.translate(request);
-        }
-        else
-        {
-            return "sparql.rdfbox_get_string_literal(" + operand.translate(request) + ")";
-        }
     }
 
 
@@ -638,10 +383,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         if(!Objects.equals(isDeterministic, imcode.isDeterministic))
             return false;
 
-        if(!Objects.equals(canBeNull, imcode.canBeNull))
-            return false;
-
-        if(!Objects.equals(resourceClasses, imcode.resourceClasses))
+        if(!Objects.equals(variable, imcode.variable))
             return false;
 
         return true;

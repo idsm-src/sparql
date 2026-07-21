@@ -63,6 +63,8 @@ public final class SqlRecursive extends SqlIntercode
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, String beginName,
             String joinName, String endName, String graphName, Restrictions restrictions)
     {
+        //TODO: accept also variables other than those directly participating in recursion
+
         Map<Column, Column> map = new HashMap<>();
         UsedVariables variables = new UsedVariables();
 
@@ -82,7 +84,7 @@ public final class SqlRecursive extends SqlIntercode
                         if(c instanceof ConstantColumn)
                             return c;
                         else
-                            return map.computeIfAbsent(c, k -> safeNames.get(i));
+                            return map.computeIfAbsent(c, _ -> safeNames.get(i));
                     }).toList());
                 }
 
@@ -96,12 +98,16 @@ public final class SqlRecursive extends SqlIntercode
             variables.add(endVar);
 
 
-        UsedVariables tmp = new UsedVariables(init.getVariables());
-        tmp.remove(endName);
+        UsedVariables tmp = new UsedVariables();
+
+        if(init.getVariables().get(beginName) != null)
+            tmp.add(init.getVariables().get(beginName));
+
+        if(init.getVariables().get(graphName) != null)
+            tmp.add(init.getVariables().get(graphName));
 
         List<Column> innerColumns = new ArrayList<>(tmp.getNonConstantColumns());
         List<Column> outerColumns = innerColumns.stream().map(c -> map.get(c)).toList();
-
 
         return new SqlRecursive(variables.restrict(restrictions), init, next, endVar, joinName, beginName, innerColumns,
                 outerColumns, graphName);
@@ -128,7 +134,7 @@ public final class SqlRecursive extends SqlIntercode
         SqlIntercode nextOpt = next.optimize(request, childRestrictions, reduced, evalServices);
 
 
-        if(initOpt == SqlNoSolution.get())
+        if(initOpt.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(beginName != null && initOpt instanceof SqlUnion union)
@@ -193,7 +199,7 @@ public final class SqlRecursive extends SqlIntercode
         }
 
 
-        if(nextOpt == SqlNoSolution.get())
+        if(nextOpt.equals(SqlNoSolution.get()))
             return SqlDistinct.create(request, initOpt, initOpt.getVariables().getNames());
 
         if(!(new UsedPairedVariable(initOpt.getVariables().get(endName), nextOpt.getVariables().get(joinName)))

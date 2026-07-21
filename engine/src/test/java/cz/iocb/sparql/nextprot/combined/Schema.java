@@ -1,6 +1,6 @@
 package cz.iocb.sparql.nextprot.combined;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateType;
@@ -74,7 +74,7 @@ public class Schema
             NodeMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"), "int4")), graph, subject,
                     config.createIriMapping("rdfs:comment"), config.createLiteralMapping(xsdString, "comment"));
         }
 
@@ -83,7 +83,7 @@ public class Schema
             NodeMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"), "int4")), graph, subject,
                     config.createIriMapping(":category"), config.createLiteralMapping(xsdString, "category"));
         }
     }
@@ -99,7 +99,7 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(table, baseTable),
-                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
@@ -114,7 +114,7 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), "int4")), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("owl:Class"));
         }
 
@@ -123,7 +123,7 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), "int4")), graph, subject,
                     config.createIriMapping("rdfs:subClassOf"), config.createIriMapping("owl:Thing"));
         }
 
@@ -132,8 +132,8 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity")),
-                            new JoinColumns(new TableColumn("notin"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), "int4"),
+                            new JoinColumns(new TableColumn("notin"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":notIn"), config.createIriMapping("schema", "iri"));
         }
 
@@ -142,8 +142,8 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity")),
-                            new JoinColumns(new TableColumn("related"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), "int4"),
+                            new JoinColumns(new TableColumn("related"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":related"), config.createIriMapping("terminology", "iri"));
         }
 
@@ -152,8 +152,8 @@ public class Schema
             NodeMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity")),
-                            new JoinColumns(new TableColumn("parent"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), "int4"),
+                            new JoinColumns(new TableColumn("parent"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("schema", "iri"));
         }
@@ -173,7 +173,7 @@ public class Schema
             // :Version
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":ttlGenerationDate"),
-                    config.createLiteralMapping(xsdDate, new Literal("2021-12-12", xsdDateType)));
+                    config.createLiteralMapping(xsdCompositeDate, new Literal("2021-12-12", xsdDateType)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":databaseRelease"), config.createLiteralMapping("2021-11-19"));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),

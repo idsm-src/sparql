@@ -1,73 +1,30 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
 public class UnsupportedIriClass extends IriClass
 {
-    UnsupportedIriClass()
+    protected UnsupportedIriClass()
     {
-        super("unsupported", List.of("varchar"));
+        super("unsupported", List.of("varchar"), Set.of(box, iri));
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        return List.of(new ConstantColumn((((IRI) node).getValue()), "varchar"));
-    }
-
-
-    @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
-    {
-        return columns;
-    }
-
-
-    @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
-    {
-        return columns;
-    }
-
-
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(column);
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        if(check)
-            throw new IllegalArgumentException();
-        else
-            return List.of(new ExpressionColumn("sparql.rdfbox_get_iri" + "(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + columns.get(0) + ")");
+        throw new IllegalArgumentException();
     }
 
 
@@ -82,20 +39,50 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public boolean match(Statement statement, Node node)
+    public List<Column> toColumns(Statement statement, IRI iri)
     {
-        return switch(node)
-        {
-            case VariableOrBlankNode var -> true;
-            case IRI iri -> true;
-            default -> false;
-        };
+        return List.of(constant(iri.getValue(), "varchar"));
     }
 
 
     @Override
-    public boolean canBeDerivatedFromGeneral()
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return false;
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column value = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", value));
+
+        if(targetClass.equals(iri))
+            return columns;
+
+        throw new IllegalArgumentException();
+    }
+
+
+    @Override
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    {
+        if(superClass.equals(this))
+            return columns;
+
+        ResourceClass sourceClass = superClass.getEffectiveClass();
+
+        assert isSubclassOf(sourceClass);
+
+        if(sourceClass.equals(box))
+            throw new UnsupportedOperationException();
+
+        if(sourceClass.equals(iri))
+            throw new UnsupportedOperationException();
+
+        throw new IllegalArgumentException();
     }
 }

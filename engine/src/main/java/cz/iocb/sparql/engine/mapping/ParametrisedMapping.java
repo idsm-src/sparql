@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.mapping;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -54,6 +55,6 @@ public abstract class ParametrisedMapping extends NodeMapping
 
         ParametrisedMapping other = (ParametrisedMapping) object;
 
-        return resourceClass == other.resourceClass && columns.equals(other.columns);
+        return Objects.equals(resourceClass, other.resourceClass) && columns.equals(other.columns);
     }
 }

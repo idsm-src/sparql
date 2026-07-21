@@ -1,13 +1,12 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
+import static java.util.Collections.singletonMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.IRI;
@@ -18,81 +17,81 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlLiteral extends SqlNodeValue
+public final class SqlLiteral extends SqlExpressionIntercode
 {
-    public static final Literal trueLiteral = new Literal("true", xsdBooleanType);
-    public static final Literal falseLiteral = new Literal("false", xsdBooleanType);
+    private static final Literal trueLiteral = new Literal("true", xsdBooleanType);
+    private static final Literal falseLiteral = new Literal("false", xsdBooleanType);
 
-    public static final SqlLiteral trueValue = new SqlLiteral(trueLiteral, xsdBoolean);
-    public static final SqlLiteral falseValue = new SqlLiteral(falseLiteral, xsdBoolean);
+    public static final SqlLiteral trueValue = create(trueLiteral);
+    public static final SqlLiteral falseValue = create(falseLiteral);
 
     private final Literal literal;
-    private final LiteralClass literalClass;
 
 
-    protected SqlLiteral(Literal literal, LiteralClass resourceClass)
+    private SqlLiteral(Literal literal, Map<ResourceClass, List<Column>> map)
     {
-        super(asSet(resourceClass), false);
-        this.literalClass = resourceClass;
+        super(map, false, true);
+
         this.literal = literal;
+    }
+
+
+    private static SqlLiteral create(Literal literal)
+    {
+        return create(literal, Restriction.ALL);
+    }
+
+
+    private static SqlLiteral create(Literal literal, Restriction restriction)
+    {
+        LiteralClass resClass = literal.isTypeSupported() ? literal.getDataType().getResourceClass(literal) :
+                unsupportedLiteral;
+
+        List<Column> columns = restriction.contains(resClass) ? resClass.toColumns(literal) : null;
+
+        return new SqlLiteral(literal, singletonMap(resClass, columns));
     }
 
 
     public static SqlExpressionIntercode create(Request request, Literal literal)
     {
+        //TODO: delete these variants after the equals method is used
+
         if(literal.equals(trueLiteral))
             return trueValue;
 
         if(literal.equals(falseLiteral))
             return falseValue;
 
-        LiteralClass resourceClass = literal.isTypeSupported() ? literal.getDataType().getResourceClass(literal) :
+        LiteralClass resClass = literal.isTypeSupported() ? literal.getDataType().getResourceClass(literal) :
                 unsupportedLiteral;
+        List<Column> columns = resClass.toColumns(literal);
 
-        return new SqlLiteral(literal, resourceClass);
+        return new SqlLiteral(literal, singletonMap(resClass, columns));
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         return new Restrictions();
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        return this;
-    }
+        if(restriction.isOptimized(variable))
+            return this;
 
-
-    @Override
-    public String translate(Request request)
-    {
-        return getResourceClass().toExpression(request.getStatement(), literal).toString();
+        return create(literal, restriction);
     }
 
 
     public Literal getLiteral()
     {
         return literal;
-    }
-
-
-    public LiteralClass getLiteralClass()
-    {
-        return literalClass;
-    }
-
-
-    @Override
-    public List<Column> asResource(Request request, ResourceClass resourceClass)
-    {
-        if(!resourceClass.match(request.getStatement(), literal))
-            return resourceClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
-
-        return resourceClass.toColumns(request.getStatement(), literal);
     }
 
 
@@ -136,9 +135,6 @@ public final class SqlLiteral extends SqlNodeValue
             return false;
 
         if(!Objects.equals(literal, imcode.literal))
-            return false;
-
-        if(literalClass != imcode.literalClass)
             return false;
 
         return true;

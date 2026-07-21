@@ -279,10 +279,10 @@ public final class SqlValues extends SqlIntercode
 
 
         Map<String, List<ResourceClass>> filteredResourceClasses = resourceClasses.entrySet().stream()
-                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, b) -> a, HashMap::new));
+                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, _) -> a, HashMap::new));
 
         LinkedHashMap<Column, List<Column>> filteredData = data.entrySet().stream()
-                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, b) -> a, LinkedHashMap::new));
+                .collect(toMap(Entry::getKey, e -> filterByMask(e.getValue(), mask), (a, _) -> a, LinkedHashMap::new));
 
         UsedVariables newVars = new UsedVariables();
 
@@ -330,7 +330,7 @@ public final class SqlValues extends SqlIntercode
 
         LinkedHashMap<Column, List<Column>> refilteredData = filteredData.entrySet().stream()
                 .filter(e -> nonConstCols.contains(e.getKey()))
-                .collect(toMap(Entry::getKey, Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+                .collect(toMap(Entry::getKey, Entry::getValue, (a, _) -> a, LinkedHashMap::new));
 
         return create(newVars, filteredResourceClasses, refilteredData, newSize);
     }

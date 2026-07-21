@@ -1,5 +1,11 @@
 package cz.iocb.sparql.engine.database;
 
+import static java.util.stream.Collectors.joining;
+import java.util.List;
+import java.util.Set;
+
+
+
 public abstract class Column implements Comparable<Column>
 {
     protected final String value;
@@ -46,9 +52,9 @@ public abstract class Column implements Comparable<Column>
     {
         return switch(column)
         {
-            case ConstantColumn c -> 0;
-            case TableColumn c -> 1;
-            case ExpressionColumn c -> 2;
+            case ConstantColumn _ -> 0;
+            case TableColumn _ -> 1;
+            case ExpressionColumn _ -> 2;
             default -> Integer.MAX_VALUE;
         };
     }
@@ -59,5 +65,16 @@ public abstract class Column implements Comparable<Column>
     {
         int typeCompare = Integer.compare(order(this), order(o));
         return typeCompare != 0 ? typeCompare : toString().compareTo(o.toString());
+    }
+
+
+    public static Column coalesce(Set<? extends Column> cols)
+    {
+        List<? extends Column> list = cols.stream().sorted().toList();
+
+        if(list.get(0) instanceof ConstantColumn || list.size() == 1)
+            return list.get(0);
+
+        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "coalesce(", ")")));
     }
 }

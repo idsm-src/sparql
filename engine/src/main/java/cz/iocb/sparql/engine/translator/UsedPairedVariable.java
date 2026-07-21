@@ -122,7 +122,7 @@ public class UsedPairedVariable
         {
             if(pairedClass.getLeftClass() != null && pairedClass.getRightClass() != null)
             {
-                if(pairedClass.getLeftClass() == pairedClass.getRightClass())
+                if(pairedClass.getLeftClass().equals(pairedClass.getRightClass()))
                 {
                     List<Column> leftCols = leftVariable.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightVariable.getMapping(pairedClass.getLeftClass());

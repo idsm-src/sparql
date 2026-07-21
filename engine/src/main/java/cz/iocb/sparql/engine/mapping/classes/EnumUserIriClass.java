@@ -1,17 +1,18 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
+import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -47,27 +48,48 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        IRI iri = (IRI) node;
-        assert match(statement, node);
+        return pattern.matcher(iri.getValue()).matches();
+    }
 
-        return List.of(new ConstantColumn(values.get(iri), sqlTypes.get(0)));
+
+    @Override
+    public List<Column> toColumns(Statement statement, IRI iri)
+    {
+        assert match(statement, iri);
+
+        return List.of(constant(values.get(iri), sqlTypes.get(0)));
+    }
+
+
+    @Override
+    protected Column generateFunction(Column column)
+    {
+        return expression("CASE %s %s END", column,
+                values.entrySet().stream().map(e -> format("WHEN %s::%s THEN %s::varchar", string(e.getValue()),
+                        sqlTypes.get(0), string(e.getKey().getValue()))).collect(joining(" ")));
+    }
+
+
+    @Override
+    protected Column generateInverseFunction(Column column, boolean check)
+    {
+        return expression(
+                "CASE %s %s END", column, values
+                        .entrySet().stream().map(e -> format("WHEN %s::varchar THEN %s::%s",
+                                string(e.getKey().getValue()), string(e.getValue()), sqlTypes.get(0)))
+                        .collect(joining(" ")));
     }
 
 
     @Override
     public String getPrefix(List<Column> columns)
     {
+        if(columns.get(0) instanceof ConstantColumn col)
+            values.get(new IRI(col.getValue()));
+
         return prefix;
-    }
-
-
-    @Override
-    public boolean match(Statement statement, IRI iri)
-    {
-        Matcher matcher = pattern.matcher(iri.getValue());
-        return matcher.matches();
     }
 
 
@@ -75,40 +97,6 @@ public class EnumUserIriClass extends SimpleUserIriClass
     public int getCheckCost()
     {
         return 0;
-    }
-
-
-    @Override
-    protected Column generateFunction(Column parameter)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(String.format("CASE %s ", parameter));
-
-        for(Entry<IRI, String> entry : values.entrySet())
-            builder.append(String.format("WHEN '%s'::%s THEN '%s' ", entry.getValue().replaceAll("'", "''"),
-                    sqlTypes.get(0), entry.getKey().getValue().replaceAll("'", "''")));
-
-        builder.append("END");
-
-        return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    protected Column generateInverseFunction(Column parameter, boolean check)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(String.format("CASE %s ", parameter));
-
-        for(Entry<IRI, String> entry : values.entrySet())
-            builder.append(String.format("WHEN '%s' THEN '%s'::%s ", entry.getKey().getValue().replaceAll("'", "''"),
-                    entry.getValue().replaceAll("'", "''"), sqlTypes.get(0)));
-
-        builder.append("END");
-
-        return new ExpressionColumn(builder.toString());
     }
 
 
@@ -123,12 +111,6 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
         EnumUserIriClass other = (EnumUserIriClass) object;
 
-        if(!regexp.equals(other.regexp))
-            return false;
-
-        if(!values.equals(other.values))
-            return false;
-
-        return true;
+        return Objects.equals(regexp, other.regexp) && Objects.equals(values, other.values);
     }
 }

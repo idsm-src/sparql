@@ -262,7 +262,7 @@ public final class SqlConstruct extends SqlIntercode
         }
 
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(optTemplates.isEmpty())
@@ -455,17 +455,17 @@ public final class SqlConstruct extends SqlIntercode
     {
         switch(node)
         {
-            case IRI iri ->
+            case IRI _ ->
             {
                 return true;
             }
 
-            case Literal literal ->
+            case Literal _ ->
             {
                 return column.isLiteralAllowed();
             }
 
-            case BlankNode bnode ->
+            case BlankNode _ ->
             {
                 return column.isBlankNodeAllowed();
             }

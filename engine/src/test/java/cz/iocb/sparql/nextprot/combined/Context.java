@@ -33,19 +33,19 @@ public class Context
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":metadata"),
                     config.createIriMapping("publication", "metadata"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("method"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("method"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":detectionMethod"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("disease"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("disease"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":disease"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("tissue"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("tissue"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":tissue"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("line"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("line"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":cellLine"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("stage"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("stage"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":developmentalStage"), config.createIriMapping("terminology", "iri"));
         }
     }

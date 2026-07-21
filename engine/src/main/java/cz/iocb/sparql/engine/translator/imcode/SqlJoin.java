@@ -22,6 +22,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Estimator;
 import cz.iocb.sparql.engine.translator.Multiset;
@@ -325,10 +326,10 @@ public final class SqlJoin extends SqlIntercode
     private static List<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Restrictions restrictions,
             DatabaseSchema schema)
     {
-        if(childs.stream().anyMatch(c -> c == SqlNoSolution.get()))
+        if(childs.stream().anyMatch(c -> c.equals(SqlNoSolution.get())))
             return List.of(SqlNoSolution.get());
 
-        childs = childs.stream().filter(c -> c != SqlEmptySolution.get()).toList();
+        childs = childs.stream().filter(c -> !c.equals(SqlEmptySolution.get())).toList();
 
         if(childs.size() == 0)
             return List.of(SqlEmptySolution.get());
@@ -342,7 +343,7 @@ public final class SqlJoin extends SqlIntercode
         for(SqlIntercode child : childs)
             for(UsedVariable v : child.getVariables().getValues())
                 if(v.isConstant()) // children are joinable, so constants should be consistent
-                    constants.computeIfAbsent(v.getName(), r -> new ArrayList<UsedVariable>()).add(v);
+                    constants.computeIfAbsent(v.getName(), _ -> new ArrayList<UsedVariable>()).add(v);
 
         ArrayList<SqlIntercode> optChilds = new ArrayList<SqlIntercode>(childs);
 
@@ -366,9 +367,11 @@ public final class SqlJoin extends SqlIntercode
 
                         for(UsedVariable o : e.getValue())
                         {
-                            if(v.getMapping(o.getResourceClass()) != null)
+                            if(v.getMapping(o.getClasses().iterator().next()) != null)
                             {
-                                cnd.addAreEqual(o.getMapping(), v.getMapping(o.getResourceClass()));
+                                ResourceClass r = o.getClasses().iterator().next();
+
+                                cnd.addAreEqual(o.getMapping(r), v.getMapping(r));
                                 skip.put(e.getKey(), o);
                             }
                         }
@@ -433,7 +436,7 @@ public final class SqlJoin extends SqlIntercode
                     {
                         SqlIntercode merged = SqlTableAccess.tryReduceJoinWithValues(schema, right, left, null);
 
-                        if(merged == SqlNoSolution.get())
+                        if(Objects.equals(merged, SqlNoSolution.get()))
                             return List.of(SqlNoSolution.get());
 
                         if(merged != null)
@@ -479,7 +482,7 @@ public final class SqlJoin extends SqlIntercode
 
                             for(PairedClass pairedClass : pair.getClasses())
                             {
-                                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                                if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
                                     continue;
 
                                 List<Column> leftCols = leftVar.getMapping(pairedClass.getLeftClass());
@@ -525,7 +528,7 @@ public final class SqlJoin extends SqlIntercode
                         merged = tryReduceDistinct(schema, left, right, null);
                     }
 
-                    if(merged == SqlNoSolution.get())
+                    if(Objects.equals(merged, SqlNoSolution.get()))
                         return List.of(SqlNoSolution.get());
 
                     if(merged != null)
@@ -543,36 +546,6 @@ public final class SqlJoin extends SqlIntercode
 
         return optChilds;
     }
-
-
-    /*
-    private static List<SqlIntercode> improveRecursive(Request request, List<SqlIntercode> childs,
-            Restrictions restrictions, DatabaseSchema schema)
-    {
-        List<SqlIntercode> newChilds = new ArrayList<SqlIntercode>(childs);
-    
-        for(SqlRecursive recursive : newChilds.stream().filter(c -> c instanceof SqlRecursive)
-                .map(c -> (SqlRecursive) c).toList())
-        {
-            List<SqlIntercode> accesses = newChilds.stream().filter(c -> c instanceof SqlTableAccess).toList();
-    
-            List<SqlIntercode> newInitChilds = new ArrayList<SqlIntercode>(accesses);
-            newInitChilds.add(recursive.init);
-    
-            SqlIntercode newRecursive = SqlRecursive.create(request, SqlJoin.join(request, newInitChilds, restrictions),
-                    recursive.next, recursive.beginName, recursive.joinName, recursive.endVar.getName(),
-                    recursive.graphName, restrictions);
-    
-            newChilds.remove(recursive);
-            newChilds.removeAll(accesses);
-            newChilds.add(newRecursive);
-    
-            break; //TODO: process others
-        }
-    
-        return newChilds;
-    }
-    */
 
 
     private static List<SqlIntercode> reduceDistinctUnion(List<SqlIntercode> childs, Restrictions restrictions,
@@ -632,7 +605,7 @@ public final class SqlJoin extends SqlIntercode
 
             for(PairedClass pairedClass : pair.getClasses())
             {
-                if(pairedClass.getLeftClass() != pairedClass.getRightClass())
+                if(!Objects.equals(pairedClass.getLeftClass(), pairedClass.getRightClass()))
                     return false;
 
                 columns.addAll(distinctVar.getMapping(pairedClass.getLeftClass()));
@@ -729,14 +702,14 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
-    private static List<List<SqlIntercode>> expand(SqlIntercode x)
+    private static List<List<SqlIntercode>> expand(SqlIntercode child)
     {
-        if(x instanceof SqlUnion union)
+        if(child instanceof SqlUnion union)
             return expandUnion(union.getChilds());
-        else if(x instanceof SqlJoin join)
+        else if(child instanceof SqlJoin join)
             return expandJoin(join.getChilds());
         else
-            return List.of(List.of(x));
+            return List.of(List.of(child));
     }
 
 
@@ -746,10 +719,10 @@ public final class SqlJoin extends SqlIntercode
 
         for(SqlIntercode child : childs)
         {
-            if(child == SqlNoSolution.get())
+            if(child.equals(SqlNoSolution.get()))
                 return List.of();
 
-            if(child == SqlEmptySolution.get())
+            if(child.equals(SqlEmptySolution.get()))
                 continue;
 
             ArrayList<List<SqlIntercode>> subresult = new ArrayList<List<SqlIntercode>>();
@@ -779,7 +752,7 @@ public final class SqlJoin extends SqlIntercode
         List<List<SqlIntercode>> result = new ArrayList<List<SqlIntercode>>();
 
         for(SqlIntercode child : childs)
-            if(child != SqlNoSolution.get())
+            if(!child.equals(SqlNoSolution.get()))
                 result.addAll(expand(child));
 
         return result;

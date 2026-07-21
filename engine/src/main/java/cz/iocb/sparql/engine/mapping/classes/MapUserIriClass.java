@@ -1,19 +1,19 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
@@ -64,6 +64,8 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         StringBuilder builder = new StringBuilder();
 
+        builder.append("^(");
+
         if(prefix != null)
             builder.append(Pattern.quote(prefix));
 
@@ -76,6 +78,8 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         if(suffix != null)
             builder.append(Pattern.quote(suffix));
+
+        builder.append(")$");
 
         //FIXME: check whether the pattern is valid also in pcre2
         this.regexp = builder.toString();
@@ -118,68 +122,14 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
-    {
-        IRI iri = (IRI) node;
-        assert match(statement, iri);
-
-        try
-        {
-            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
-
-            try(ResultSet result = statement.executeQuery(sql))
-            {
-                if(result.next())
-                {
-                    return List.of(new ConstantColumn(result.getString(1), sqlTypes.get(0)));
-                }
-                else
-                {
-                    throw new RuntimeException();
-                }
-            }
-        }
-        catch(SQLException e)
-        {
-            throw new SQLRuntimeException(e);
-        }
-    }
-
-
-    @Override
-    public List<Column> toOrderColumns(List<Column> columns)
-    {
-        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
-
-        String code = "\"@to\"";
-
-        if(suffix != null)
-            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
-
-        code = String.format("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, columns.get(0));
-
-        return List.of(new ExpressionColumn(code));
-    }
-
-
-    @Override
-    public String getPrefix(List<Column> columns)
-    {
-        return prefix;
-    }
-
-
-    @Override
     public boolean match(Statement statement, IRI iri)
     {
-        Matcher matcher = pattern.matcher(iri.getValue());
-
-        if(!matcher.matches())
+        if(!pattern.matcher(iri.getValue()).matches())
             return false;
 
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", sanitizeString(iri.getValue()));
+            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -194,104 +144,98 @@ public class MapUserIriClass extends SimpleUserIriClass
 
 
     @Override
+    public List<Column> toColumns(Statement statement, IRI iri)
+    {
+        assert match(statement, iri);
+
+        try
+        {
+            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
+
+            try(ResultSet result = statement.executeQuery(sql))
+            {
+                if(result.next())
+                    return List.of(constant(result.getString(1), sqlTypes.get(0)));
+                else
+                    throw new RuntimeException();
+            }
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
+        }
+    }
+
+
+    @Override
+    protected Column generateFunction(Column column)
+    {
+        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        Column code = addPrefixAndSuffix(prefix, expression("\"@to\""), suffix);
+
+        return expression("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, column);
+    }
+
+
+    @Override
+    protected Column generateInverseFunction(Column column, boolean check)
+    {
+        Column func = generateNonCheckedInverseFunction(column);
+
+        if(!check)
+            return func;
+
+        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+    }
+
+
+    protected Column generateNonCheckedInverseFunction(Column column)
+    {
+        Column access = expression("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        Column code = generateExtractionFunction(column);
+
+        return expression("(SELECT \"@from\"::%s FROM %s WHERE \"@to\" = %s)", sqlTypes.get(0), access, code);
+    }
+
+
+    protected Column generateExtractionFunction(Column column)
+    {
+        if(prefix == null && suffix == null)
+            return column;
+        else if(length > 0 && prefix == null)
+            return expression("substring(%s, %d, %d)::varchar", column, 1, length);
+        else if(length > 0 && prefix != null)
+            return expression("substring(%s, %d, %d)::varchar", column, prefix.length() + 1, length);
+        else if(prefix == null)
+            return expression("left(%s, -%d)::varchar", column, suffix.length());
+        else if(suffix == null)
+            return expression("right(%s, -%d)::varchar", column, prefix.length());
+        else
+            return expression("left(right(%s, -%d), -%d)::varchar", column, prefix.length(), suffix.length());
+    }
+
+
+    @Override
+    public List<Column> toOrderColumns(List<Column> columns)
+    {
+        Column access = expression("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        Column code = suffix != null ? code = expression("\"@to\" || %s", string(suffix)) : expression("\"@to\"");
+
+        return List.of(expression("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, columns.get(0)));
+    }
+
+
+    @Override
+    public String getPrefix(List<Column> columns)
+    {
+        return prefix;
+    }
+
+
+    @Override
     public int getCheckCost()
     {
         return 1;
-    }
-
-
-    @Override
-    protected Column generateFunction(Column parameter)
-    {
-        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
-
-        String code = "\"@to\"";
-
-        if(prefix != null)
-            code = String.format("'%s' || %s", prefix.replaceAll("'", "''"), code);
-
-        if(suffix != null)
-            code = String.format("%s || '%s'", code, suffix.replaceAll("'", "''"));
-
-        code = String.format("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, parameter);
-
-        return new ExpressionColumn(code);
-    }
-
-
-    @Override
-    protected Column generateInverseFunction(Column parameter, boolean check)
-    {
-        StringBuilder builder = new StringBuilder();
-
-        if(check)
-        {
-            builder.append("CASE WHEN sparql.regex_string(");
-            builder.append(parameter);
-            builder.append(", '^(");
-            builder.append(regexp.replaceAll("'", "''"));
-            builder.append(")$', '') THEN ");
-        }
-
-        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
-
-        builder.append(String.format("(SELECT \"@from\"::%s FROM %s WHERE \"@to\" = ", sqlTypes.get(0), access));
-
-        if(prefix == null && suffix == null)
-            builder.append(parameter.toString());
-        else if(length > 0)
-            builder.append(String.format("substring(%s, %d, %d)::varchar", parameter,
-                    prefix != null ? prefix.length() + 1 : 1, length));
-        else if(prefix == null)
-            builder.append(String.format("left(%s, -%d)::varchar", parameter, suffix.length()));
-        else if(suffix == null)
-            builder.append(String.format("right(%s, -%d)::varchar", parameter, prefix.length()));
-        else
-            builder.append(
-                    String.format("left(right(%s, -%d), -%d)::varchar", parameter, prefix.length(), suffix.length()));
-
-        builder.append(")");
-
-        if(check)
-            builder.append(" END");
-
-        return new ExpressionColumn(builder.toString());
-    }
-
-
-    @Override
-    public boolean equals(Object object)
-    {
-        if(object == this)
-            return true;
-
-        if(!super.equals(object))
-            return false;
-
-        MapUserIriClass other = (MapUserIriClass) object;
-
-        if(!table.equals(other.table))
-            return false;
-
-        if(!from.equals(other.from))
-            return false;
-
-        if(!to.equals(other.to))
-            return false;
-
-        if(!regexp.equals(other.regexp))
-            return false;
-
-        if(prefix == null ? other.prefix != null : !prefix.equals(other.prefix))
-            return false;
-
-        if(suffix == null ? other.suffix != null : !suffix.equals(other.suffix))
-            return false;
-
-        if(length != other.length)
-            return false;
-
-        return true;
     }
 
 
@@ -328,5 +272,22 @@ public class MapUserIriClass extends SimpleUserIriClass
     public int getIdLength()
     {
         return length;
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(object == this)
+            return true;
+
+        if(!super.equals(object))
+            return false;
+
+        MapUserIriClass other = (MapUserIriClass) object;
+
+        return Objects.equals(table, other.table) && Objects.equals(from, other.from) && Objects.equals(to, other.to)
+                && Objects.equals(regexp, other.regexp) && Objects.equals(prefix, other.prefix)
+                && Objects.equals(suffix, other.suffix) && Objects.equals(length, other.length);
     }
 }

@@ -1,22 +1,38 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.scalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.getExpressionBaseClass;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.getResourceName;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isBoolean;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDate;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isDateTime;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isIri;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumeric;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isNumericCompatibleWith;
-import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.isString;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.determineResultClass;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,11 +41,10 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.parser.model.OrderCondition.Direction;
 import cz.iocb.sparql.engine.request.ColumnMap;
 import cz.iocb.sparql.engine.request.Request;
@@ -263,16 +278,16 @@ public final class SqlSelect extends SqlIntercode
         }
 
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(limit != null && limit.compareTo(BigInteger.valueOf(0)) <= 0)
             return SqlNoSolution.get();
 
-        if(optChild == SqlEmptySolution.get() && offset == null && limit == null)
+        if(optChild.equals(SqlEmptySolution.get()) && offset == null && limit == null)
             return SqlEmptySolution.get();
 
-        if(optChild == SqlEmptySolution.get() && offset != null && offset.compareTo(BigInteger.valueOf(0)) > 0)
+        if(optChild.equals(SqlEmptySolution.get()) && offset != null && offset.compareTo(BigInteger.valueOf(0)) > 0)
             return SqlNoSolution.get();
 
         if(stripedOrderBy.isEmpty() && limit == null && (offset == null || offset.equals(BigInteger.ZERO)))
@@ -351,7 +366,7 @@ public final class SqlSelect extends SqlIntercode
         if(distinct)
         {
             builder.append(") AS tab GROUP BY ");
-            builder.append(translateInnerSelectVariables(variables)); // FIXME
+            builder.append(translateInnerSelectVariables(variables));
             builder.append(" ORDER BY min(\"#rn\")");
         }
         else if(!orderBy.isEmpty() || !simpleOrderBy.isEmpty())
@@ -439,7 +454,32 @@ public final class SqlSelect extends SqlIntercode
             if(variable == null || !variable.hasMapping())
                 continue;
 
-            Set<ResourceClass> classes = variable.getClasses();
+
+            Map<ResourceClass, Set<ResourceClass>> sortSet = new HashMap<ResourceClass, Set<ResourceClass>>();
+
+            for(ResourceClass r : variable.getClasses())
+            {
+                if(isBlankNode(r))
+                    sortSet.computeIfAbsent(scalarBlankNode, _ -> new HashSet<>()).add(r);
+                else if(isIri(r))
+                    sortSet.computeIfAbsent(iri, _ -> new HashSet<>()).add(r);
+                else if(isNumeric(r))
+                    sortSet.computeIfAbsent(numeric, _ -> new HashSet<>()).add(r);
+                else if(isBoolean(r))
+                    sortSet.computeIfAbsent(xsdBoolean, _ -> new HashSet<>()).add(r);
+                else if(isString(r))
+                    sortSet.computeIfAbsent(xsdString, _ -> new HashSet<>()).add(r);
+                else if(isDate(r))
+                    sortSet.computeIfAbsent(xsdScalarDate, _ -> new HashSet<>()).add(r);
+                else if(isDateTime(r))
+                    sortSet.computeIfAbsent(xsdScalarDateTime, _ -> new HashSet<>()).add(r);
+                else if(hasBlankNode(r) || hasIri(r) || hasNumeric(r) || hasBoolean(r) || hasString(r) || hasDate(r)
+                        || hasDateTime(r))
+                    sortSet.computeIfAbsent(box, _ -> new HashSet<>()).add(r);
+            }
+
+            if(sortSet.get(box) != null)
+                sortSet = Map.of(box, sortSet.values().stream().flatMap(r -> r.stream()).collect(toSet()));
 
 
             // order unbounded
@@ -448,95 +488,41 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                boolean hasOuterVariants = false;
-
-                if(classes.size() > 1)
-                    builder.append("(");
-
-                for(ResourceClass resourceClass : classes)
-                {
-                    Set<Column> columns = variable.getNonConstantColumns(resourceClass);
-
-                    if(columns.isEmpty())
-                        continue;
-
-                    appendOr(builder, hasOuterVariants);
-
-                    hasOuterVariants = true;
-                    boolean hasInnerVariants = false;
-
-                    if(columns.size() > 1)
-                        builder.append("(");
-
-                    for(Column column : columns)
-                    {
-                        appendAnd(builder, hasInnerVariants);
-                        hasInnerVariants = true;
-
-                        builder.append(column);
-                        builder.append(" IS NOT NULL");
-                    }
-
-                    if(columns.size() > 1)
-                        builder.append(")");
-                }
-
-                if(classes.size() > 1)
-                    builder.append(")");
+                builder.append(variable.getIsNotNull());
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
 
-
             // order blank nodes
-            for(ResourceClass resClass : variable.getClasses())
+            if(sortSet.get(scalarBlankNode) != null)
             {
-                if(resClass instanceof BlankNodeClass)
-                {
-                    appendComma(builder, hasOrderCondition);
-                    hasOrderCondition = true;
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
 
-                    builder.append(variable.getMapping(resClass).get(0));
-                    builder.append(" IS NULL");
+                builder.append(variable.getIsNull(getUnionClass(sortSet.get(scalarBlankNode))));
 
-                    if(order.getValue() == Direction.Descending)
-                        builder.append(" DESC");
-                }
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
             }
 
-
             // order IRIs
-            Set<ResourceClass> iris = classes.stream().filter(r -> isIri(r)).collect(toSet());
-
-            if(iris.size() > 0)
+            if(sortSet.get(iri) != null)
             {
-                if(iris.size() > 1)
+                Set<ResourceClass> iris = sortSet.get(iri);
+
+                if(iris.size() > 1 || !(iris.iterator().next() instanceof IriClass iriClass))
                 {
                     appendComma(builder, hasOrderCondition);
                     hasOrderCondition = true;
 
-                    builder.append("coalesce(");
-
-                    boolean hasVariants = false;
-
-                    for(ResourceClass res : iris)
-                    {
-                        appendComma(builder, hasVariants);
-                        hasVariants = true;
-
-                        builder.append(res.toExpression(variable.getMapping(res)));
-                    }
-
-                    builder.append(")");
+                    builder.append(variable.deriveMapping(iri).get(0));
 
                     if(order.getValue() == Direction.Descending)
                         builder.append(" DESC");
                 }
                 else
                 {
-                    IriClass iriClass = (IriClass) iris.iterator().next();
-
                     for(Column col : iriClass.toOrderColumns(variable.getMapping(iriClass)))
                     {
                         appendComma(builder, hasOrderCondition);
@@ -550,234 +536,114 @@ public final class SqlSelect extends SqlIntercode
                 }
             }
 
-
             // order numerics
-            Set<ResourceClass> numerics = classes.stream().filter(r -> isNumeric(r)).collect(toSet());
-
-            if(numerics.size() > 0)
+            if(sortSet.get(numeric) != null)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                Set<ResourceClass> decimals = classes.stream().filter(r -> isNumericCompatibleWith(r, xsdDecimal))
-                        .collect(toSet());
+                Set<ResourceClass> numerics = sortSet.get(numeric);
 
-                if(numerics.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass numeric : numerics)
+                if(numerics.stream().allMatch(r -> isFloatPoint(r)))
                 {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
+                    ResourceClass sortClass = xsdFloat;
 
-                    if(decimals.size() > 0 && decimals.size() != numerics.size())
-                        builder.append("sparql.rdfbox_create_from_").append(getResourceName(numeric)).append("(");
+                    for(ResourceClass r : numerics)
+                        sortClass = determineResultClass(sortClass, r);
 
-                    builder.append(variable.deriveMapping(getExpressionBaseClass(numeric)).get(0));
-
-                    if(decimals.size() > 0 && decimals.size() != numerics.size())
-                        builder.append(")");
+                    builder.append(variable.promoteNumericAs(numerics, sortClass));
                 }
+                else if(numerics.stream().allMatch(r -> !isFloatPoint(r)))
+                {
+                    ResourceClass sortClass = xsdShort;
 
-                if(numerics.size() > 1)
-                    builder.append(")");
+                    for(ResourceClass r : numerics)
+                        sortClass = determineResultClass(sortClass, r);
+
+                    builder.append(variable.promoteNumericAs(numerics, sortClass));
+                }
+                else
+                {
+                    builder.append(variable.deriveMapping(getUnionClass(numerics, box)));
+                }
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
-
 
             // order xsd:booleans
-            Set<ResourceClass> bools = classes.stream().filter(r -> isBoolean(r)).collect(toSet());
-
-            if(bools.size() > 0)
+            if(sortSet.get(xsdBoolean) != null)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(bools.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass bool : bools)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
-
-                    builder.append(bool.toGeneralClass(xsdBoolean, variable.getMapping(bool), true).get(0));
-                }
-
-                if(bools.size() > 1)
-                    builder.append(")");
+                builder.append(variable.deriveMapping(xsdBoolean).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
-
 
             // order xsd:strings
-            Set<ResourceClass> strings = classes.stream().filter(r -> isString(r)).collect(toSet());
-
-            if(strings.size() > 0)
+            if(sortSet.get(xsdString) != null)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(strings.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass string : strings)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
-
-                    builder.append(string.toGeneralClass(xsdString, variable.getMapping(string), true).get(0));
-                }
-
-                if(strings.size() > 1)
-                    builder.append(")");
+                builder.append(variable.deriveMapping(xsdString).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
-
 
             // order xsd:dateTimes
-            Set<ResourceClass> dateTimes = classes.stream().filter(r -> isDateTime(r)).collect(toSet());
-
-            if(dateTimes.size() > 0)
+            if(sortSet.get(xsdScalarDateTime) != null)
             {
+                Set<ResourceClass> dateTimes = sortSet.get(xsdScalarDateTime);
+
+                ResourceClass sortClass = dateTimes.stream().allMatch(r -> r.isSubclassOf(xsdCompositeDateTime)) ?
+                        xsdCompositeDateTime : xsdScalarDateTime;
+
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(dateTimes.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass dateTime : dateTimes)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
-
-                    builder.append(variable.getMapping(dateTime).get(0));
-                }
-
-                if(dateTimes.size() > 1)
-                    builder.append(")");
+                builder.append(variable.deriveMapping(sortClass).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
-
 
             // order xsd:dates
-            Set<ResourceClass> dates = classes.stream().filter(r -> isDate(r)).collect(toSet());
-
-            if(dates.size() > 0)
+            if(sortSet.get(xsdScalarDate) != null)
             {
+                Set<ResourceClass> dates = sortSet.get(xsdScalarDate);
+
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(dates.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass date : dates)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
-
-                    builder.append(variable.getMapping(date).get(0));
-                }
-
-                if(dates.size() > 1)
-                    builder.append(")");
+                if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateConstantZoneClass c)
+                    builder.append(variable.deriveMapping(c).get(0));
+                else
+                    builder.append(variable.deriveMapping(xsdScalarDate).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
 
-
-            // user literals
-            Set<ResourceClass> others = classes.stream().filter(r -> r instanceof UserLiteralClass).collect(toSet());
-
-            if(others.size() > 0)
+            // order boxed values
+            if(sortSet.get(box) != null)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(others.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasTypeVariants = false;
-
-                for(ResourceClass other : others)
-                {
-                    appendComma(builder, hasTypeVariants);
-                    hasTypeVariants = true;
-
-                    builder.append("'" + ((UserLiteralClass) other).getTypeIri().getValue().replaceAll("'", "''")
-                            + "'::varchar");
-                }
-
-                if(others.size() > 1)
-                    builder.append(")");
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-
-
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                if(others.size() > 1)
-                    builder.append("coalesce(");
-
-                boolean hasVariants = false;
-
-                for(ResourceClass other : others)
-                {
-                    appendComma(builder, hasVariants);
-                    hasVariants = true;
-
-                    builder.append(variable.getMapping(other).get(0) + "::varchar");
-                }
-
-                if(others.size() > 1)
-                    builder.append(")");
+                builder.append(variable.deriveMapping(getUnionClass(sortSet.get(box), box)).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
             }
 
-
-            // unsupported literal
-            if(variable.containsClass(unsupportedLiteral))
-            {
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(variable.getMapping(unsupportedLiteral).get(1));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-
-                appendComma(builder, hasOrderCondition);
-                hasOrderCondition = true;
-
-                builder.append(variable.getMapping(unsupportedLiteral).get(0));
-
-                if(order.getValue() == Direction.Descending)
-                    builder.append(" DESC");
-            }
+            //TODO: sort other types of literals as well
         }
+
 
         if(withSimple && !simpleOrderBy.isEmpty())
         {

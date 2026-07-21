@@ -12,21 +12,24 @@ public class JoinTableQuadMapping extends QuadMapping
 {
     public static class JoinColumns
     {
-        private List<Column> leftColumns;
-        private List<Column> rightColumns;
+        private final List<Column> leftColumns;
+        private final List<Column> rightColumns;
+        private final List<String> types;
 
-        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns)
+        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns, List<String> types)
         {
             this.leftColumns = leftColumns;
             this.rightColumns = rightColumns;
+            this.types = types;
 
             assert leftColumns.size() == rightColumns.size();
         }
 
-        public JoinColumns(Column leftColumn, Column rightColumn)
+        public JoinColumns(Column leftColumn, Column rightColumn, String type)
         {
             this.leftColumns = List.of(leftColumn);
             this.rightColumns = List.of(rightColumn);
+            this.types = List.of(type);
         }
 
         public List<Column> getLeftColumns()
@@ -37,6 +40,11 @@ public class JoinTableQuadMapping extends QuadMapping
         public List<Column> getRightColumns()
         {
             return rightColumns;
+        }
+
+        public List<String> getTypes()
+        {
+            return types;
         }
 
         @Override

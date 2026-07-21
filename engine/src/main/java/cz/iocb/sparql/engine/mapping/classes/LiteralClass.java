@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
@@ -11,49 +12,55 @@ import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public abstract class LiteralClass extends ResourceClass
+public abstract class LiteralClass extends PrimitiveResourceClass
 {
     protected final IRI typeIri;
 
 
-    protected LiteralClass(String name, List<String> sqlTypes, IRI typeIri)
+    protected LiteralClass(String name, IRI typeIri, List<String> sqlTypes, Set<ResourceClass> superClasses)
     {
-        super(name, sqlTypes);
+        super(name, sqlTypes, superClasses);
         this.typeIri = typeIri;
     }
 
 
-    public abstract List<Column> toColumns(Node node);
+    public abstract List<Column> toColumns(Literal literal);
+
+
+    public boolean match(Statement statement, Literal literal)
+    {
+        IRI literalTypeIri = literal.getTypeIri();
+
+        if(typeIri == null)
+            return !literal.isTypeSupported() || literal.getValue() == null;
+        else if(literal.getValue() == null)
+            return false;
+        else if(typeIri.equals(literalTypeIri))
+            return !typeIri.equals(rdfLangString.getTypeIri()) || literal.getLanguageTag() == null;
+        else
+            return false;
+    }
+
+
+    @Override
+    public final boolean match(Statement statement, Node node)
+    {
+        return switch(node)
+        {
+            case VariableOrBlankNode _ -> true;
+            case Literal literal -> match(statement, literal);
+            default -> false;
+        };
+    }
 
 
     @Override
     public final List<Column> toColumns(Statement statement, Node node)
     {
-        return toColumns(node);
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        return switch(node)
-        {
-            case VariableOrBlankNode var -> true;
-            case Literal literal ->
-            {
-                IRI literalTypeIri = literal.getTypeIri();
-
-                if(typeIri == null)
-                    yield !literal.isTypeSupported() || literal.getValue() == null;
-                else if(literal.getValue() == null)
-                    yield false;
-                else if(typeIri.equals(literalTypeIri))
-                    yield !typeIri.equals(rdfLangString.getTypeIri()) || literal.getLanguageTag() == null;
-                else
-                    yield false;
-            }
-            default -> false;
-        };
+        if(node instanceof Literal literal)
+            return toColumns(literal);
+        else
+            throw new IllegalArgumentException();
     }
 
 

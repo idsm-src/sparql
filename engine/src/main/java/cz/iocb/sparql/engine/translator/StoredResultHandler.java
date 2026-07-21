@@ -83,7 +83,7 @@ public class StoredResultHandler extends ResultHandler
             if(!restrictions.contains(entry.getKey(), resClass))
                 continue;
 
-            resourceClasses.computeIfAbsent(entry.getKey(), k -> new ArrayList<>(nCopies(batchSize, null)))
+            resourceClasses.computeIfAbsent(entry.getKey(), _ -> new ArrayList<>(nCopies(batchSize, null)))
                     .set(batchCount, resClass);
 
             List<Column> vals = getColumns(request, resClass, entry.getValue());
@@ -109,7 +109,7 @@ public class StoredResultHandler extends ResultHandler
             }
 
             for(int i = 0; i < vals.size(); i++)
-                data.computeIfAbsent(cols.get(i), k -> new ArrayList<>(nCopies(batchSize, null))).set(batchCount,
+                data.computeIfAbsent(cols.get(i), _ -> new ArrayList<>(nCopies(batchSize, null))).set(batchCount,
                         vals.get(i));
 
             if(rowCount == 0)
@@ -209,7 +209,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        return SqlTableAccess.create(table, vars).optimize(request, restrictions, false, false);//FIXME;
+        return SqlTableAccess.create(table, vars).optimize(request, restrictions, false, false);
     }
 
 

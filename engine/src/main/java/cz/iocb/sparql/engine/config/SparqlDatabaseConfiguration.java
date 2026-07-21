@@ -390,22 +390,22 @@ public class SparqlDatabaseConfiguration
 
 
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object)
+            String objectTableJoinColumn, String type, ConstantIriMapping graph, NodeMapping subject,
+            ConstantIriMapping predicate, NodeMapping object)
     {
-        addQuadMapping(List.of(subjectTable, objectTable), List
-                .of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn))),
+        addQuadMapping(List.of(subjectTable, objectTable), List.of(
+                new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn), type)),
                 graph, subject, predicate, object);
     }
 
 
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, ConstantIriMapping graph, NodeMapping subject, ConstantIriMapping predicate,
-            NodeMapping object, Conditions subjectCondition, Conditions objectCondition)
+            String objectTableJoinColumn, String type, ConstantIriMapping graph, NodeMapping subject,
+            ConstantIriMapping predicate, NodeMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
-        addQuadMapping(List.of(subjectTable, objectTable),
-                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn),
-                        new TableColumn(objectTableJoinColumn))),
+        addQuadMapping(
+                List.of(subjectTable, objectTable), List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn),
+                        new TableColumn(objectTableJoinColumn), type)),
                 graph, subject, predicate, object, List.of(subjectCondition, objectCondition));
     }
 
@@ -500,7 +500,7 @@ public class SparqlDatabaseConfiguration
 
     public void addBasicServiceDescription()
     {
-        //FIXME: Code depends on prefix definitions.
+        //FIXME: code depends on prefix definitions
 
         ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
         ConstantIriMapping endpoint = createIriMapping(serviceIri);
@@ -567,7 +567,7 @@ public class SparqlDatabaseConfiguration
 
     public void addDatasetServiceDescription()
     {
-        //FIXME: Code depends on prefix definitions.
+        //FIXME: code depends on prefix definitions
 
         ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
         ConstantIriMapping endpoint = createIriMapping(serviceIri);

@@ -5,25 +5,27 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public abstract class IriClass extends ResourceClass
+public abstract class IriClass extends PrimitiveResourceClass
 {
-    protected IriClass(String name, List<String> sqlTypes)
+    protected IriClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
     {
-        super(name, sqlTypes);
+        super(name, sqlTypes, superClasses);
     }
 
 
-    @Override
-    public ResourceClass getGeneralClass()
-    {
-        return iri;
-    }
+    public abstract boolean match(Statement statement, IRI iri);
+
+
+    public abstract List<Column> toColumns(Statement statement, IRI iri);
+
+
+    public abstract String getPrefix(List<Column> columns);
 
 
     @Override
@@ -34,45 +36,29 @@ public abstract class IriClass extends ResourceClass
 
 
     @Override
-    public Column toExpression(Statement statement, Node node)
+    public final boolean match(Statement statement, Node node)
     {
-        return new ConstantColumn(((IRI) node).getValue(), "varchar");
+        return switch(node)
+        {
+            case VariableOrBlankNode _ -> true;
+            case IRI iri -> match(statement, iri);
+            default -> false;
+        };
     }
 
 
     @Override
-    public String fromGeneralExpression(String code)
+    public final List<Column> toColumns(Statement statement, Node node)
     {
-        return code;
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        return code;
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        return "sparql.rdfbox_create_from_iri(" + code + ")";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        return "sparql.rdfbox_get_iri(" + code + ")";
+        if(node instanceof IRI iri)
+            return toColumns(statement, iri);
+        else
+            throw new IllegalArgumentException();
     }
 
 
     public List<Column> toOrderColumns(List<Column> columns)
     {
-        return List.of(toExpression(columns));
+        return toGeneralClass(iri, columns, true);
     }
-
-
-    public abstract String getPrefix(List<Column> columns);
 }

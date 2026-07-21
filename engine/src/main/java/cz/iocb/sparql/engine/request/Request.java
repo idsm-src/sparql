@@ -68,10 +68,10 @@ public class Request implements AutoCloseable
 
             this.type = switch(syntaxTree)
             {
-                case SelectQuery s -> ResultType.SELECT;
-                case AskQuery a -> ResultType.ASK;
-                case DescribeQuery d -> ResultType.DESCRIBE;
-                case ConstructQuery c -> ResultType.CONSTRUCT;
+                case SelectQuery _ -> ResultType.SELECT;
+                case AskQuery _ -> ResultType.ASK;
+                case DescribeQuery _ -> ResultType.DESCRIBE;
+                case ConstructQuery _ -> ResultType.CONSTRUCT;
                 default -> null;
             };
         }
@@ -437,7 +437,7 @@ public class Request implements AutoCloseable
         int restTime = (int) ((timeout - (System.nanoTime() - begin)) / 1000000000);
 
         if(restTime <= 0)
-            return 1; //FIXME: throw exception?
+            return 1; //FIXME: throw exception
 
         return restTime;
     }
@@ -544,12 +544,12 @@ public class Request implements AutoCloseable
             IriClass cachedClass = iriCache.getIriClass(iri);
 
             if(cachedClass != null)
-                return iriClass == cachedClass;
+                return iriClass.equals(cachedClass);
 
             cachedClass = config.getIriCache().getIriClass(iri);
 
             if(cachedClass != null)
-                return iriClass == cachedClass;
+                return iriClass.equals(cachedClass);
 
             Set<IriClass> set = missmatches.get(iri);
 

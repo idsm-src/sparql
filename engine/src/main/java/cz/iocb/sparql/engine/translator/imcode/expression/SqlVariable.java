@@ -1,8 +1,9 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -12,97 +13,75 @@ import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlVariable extends SqlNodeValue
+public final class SqlVariable extends SqlExpressionIntercode
 {
-    private final UsedVariable variable;
+    private final String name;
 
 
-    protected SqlVariable(UsedVariable variable, Set<ResourceClass> resourceClasses, boolean canBeNull)
+    private SqlVariable(String name, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
-        super(resourceClasses, canBeNull);
-        this.variable = variable;
+        super(mappings, canBeNull, true);
 
-        this.referencedVariables.add(variable.getName());
+        this.name = name;
+        this.referencedVariables.add(name);
     }
 
 
-    public static SqlExpressionIntercode create(String variable, UsedVariables variables)
+    public static SqlExpressionIntercode create(UsedVariable variable)
     {
-        UsedVariable usedVariable = variables.get(variable);
+        return create(variable, Restriction.ALL);
+    }
 
-        if(usedVariable == null)
+
+    private static SqlExpressionIntercode create(UsedVariable variable, Restriction restriction)
+    {
+        if(variable == null)
             return SqlNull.get();
 
-        return new SqlVariable(usedVariable, usedVariable.getClasses(), usedVariable.canBeNull());
+        return new SqlVariable(variable.getName(), restriction.restrict(variable.getMappings()), variable.canBeNull());
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         Restrictions restrictions = new Restrictions();
 
-        if(expected == null)
-            restrictions.add(variable.getName());
-        else
-            restrictions.add(variable.getName(), expected);
+        for(Entry<ResourceClass, List<Column>> e : variable.getMappings().entrySet())
+            if(e.getValue() != null)
+                restrictions.add(name, e.getKey());
 
         return restrictions;
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        if(variables.get(variable.getName()) == null)
+        UsedVariable var = variables.get(name);
+
+        if(var == null)
             return SqlNull.get();
 
-        if(variable.equals(variables.get(variable.getName())))
+
+        if(variable.equals(var) && restriction.isOptimized(variable))
             return this;
 
-        return create(variable.getName(), variables);
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        if(isBoxed())
-            return translateAsBoxedOperand(request, this, getResourceClasses());
-        else
-            return translateAsUnboxedOperand(request, this, getExpressionResourceClass());
-    }
-
-
-    Column getExpressionValue(ResourceClass resourceClass)
-    {
-        return resourceClass.toExpression(variable.getMapping(resourceClass));
-    }
-
-
-    @Override
-    public List<Column> asResource(Request request, ResourceClass resourceClass)
-    {
-        return variable.deriveMapping(resourceClass);
-    }
-
-
-    public String getName()
-    {
-        return variable.getName();
-    }
-
-
-    public UsedVariable getUsedVariable()
-    {
-        return variable;
+        return create(var, restriction);
     }
 
 
     @Override
     public void generateExplanation(StringBuilder builder, String indent, int priority)
     {
-        builder.append(variable.getName());
+        builder.append(name);
+    }
+
+
+    public String getName()
+    {
+        return name;
     }
 
 
@@ -118,7 +97,7 @@ public final class SqlVariable extends SqlNodeValue
         if(!super.equals(imcode))
             return false;
 
-        if(!Objects.equals(variable, imcode.variable))
+        if(!name.equals(imcode.name))
             return false;
 
         return true;
@@ -128,6 +107,6 @@ public final class SqlVariable extends SqlNodeValue
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(variable);
+        return Objects.hash(name);
     }
 }

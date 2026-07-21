@@ -72,50 +72,51 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":swissprotDisplayed"),
                     config.createLiteralMapping(xsdBoolean, "swissprot_displayed"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("absorption_max"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":absorptionMax"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("absorption_max"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":absorptionMax"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("absorption_note"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":absorptionNote"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("absorption_note"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":absorptionNote"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("allergen"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("allergen"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":allergen"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("initiator_methionine"), new TableColumn("id"))), graph,
-                    subject, config.createIriMapping(":initiatorMethionine"),
+                    asList(new JoinColumns(new TableColumn("initiator_methionine"), new TableColumn("id"), "int4")),
+                    graph, subject, config.createIriMapping(":initiatorMethionine"),
                     config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("kinetic_k_m"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":kineticKM"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("kinetic_k_m"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":kineticKM"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("kinetic_note"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":kineticNote"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("kinetic_note"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":kineticNote"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("kinetic_vmax"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":kineticVmax"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("kinetic_vmax"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":kineticVmax"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("non_consecutive_residue"), new TableColumn("id"))), graph,
-                    subject, config.createIriMapping(":nonConsecutiveResidue"),
+                    asList(new JoinColumns(new TableColumn("non_consecutive_residue"), new TableColumn("id"), "int4")),
+                    graph, subject, config.createIriMapping(":nonConsecutiveResidue"),
                     config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("peroxisome_transit_peptide"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("peroxisome_transit_peptide"), new TableColumn("id"),
+                            "int4")),
                     graph, subject, config.createIriMapping(":peroxisomeTransitPeptide"),
                     config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("pharmaceutical"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":pharmaceutical"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("pharmaceutical"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":pharmaceutical"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("ph_dependence"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":phDependence"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("ph_dependence"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":phDependence"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("redox_potential"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":redoxPotential"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("redox_potential"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":redoxPotential"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("signal_peptide"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":signalPeptide"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("signal_peptide"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":signalPeptide"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("temperature_dependence"), new TableColumn("id"))), graph,
-                    subject, config.createIriMapping(":temperatureDependence"),
+                    asList(new JoinColumns(new TableColumn("temperature_dependence"), new TableColumn("id"), "int4")),
+                    graph, subject, config.createIriMapping(":temperatureDependence"),
                     config.createIriMapping("annotation", "iri"));
         }
 
@@ -125,8 +126,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "proteoform_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("proteoform"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("proteoform"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":proteoform"),
                     config.createIriMapping("proteoform", "iri"));
         }
@@ -137,8 +138,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":activeSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -149,8 +150,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":activityRegulation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -161,8 +162,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":antibodyMapping"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -173,8 +174,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":betaStrand"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -185,8 +186,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":binaryInteraction"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -197,8 +198,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":bindingSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -209,8 +210,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":biophysicochemicalProperty"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -221,8 +222,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":calciumBindingRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -233,8 +234,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":catalyticActivity"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -245,8 +246,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":caution"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -256,8 +257,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":cellularComponent"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -268,8 +269,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":cleavageSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -280,8 +281,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":cofactor"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -291,8 +292,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":cofactorInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -303,8 +304,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":coiledCoilRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -315,8 +316,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":compositionallyBiasedRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -327,8 +328,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":crossLink"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -339,8 +340,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":detectedExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -351,8 +352,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":developmentalStageInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -363,8 +364,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":disease"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -374,8 +375,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":disulfideBond"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -386,8 +387,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":dnaBindingRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -398,8 +399,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":domain"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -409,8 +410,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":domainInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -421,8 +422,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":electrophysiologicalParameter"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -433,8 +434,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":enzymeClassification"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -445,8 +446,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":expression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -457,8 +458,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":expressionInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -469,8 +470,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":expressionProfile"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -481,8 +482,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":function"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -492,8 +493,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":functionInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -504,8 +505,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":generalAnnotation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -516,8 +517,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":glycosylationSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -528,8 +529,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":goBiologicalProcess"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -540,8 +541,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":goCellularComponent"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -552,8 +553,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":goMolecularFunction"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -564,8 +565,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":helix"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -575,8 +576,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":induction"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -587,8 +588,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interactingRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -599,8 +600,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interaction"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -611,8 +612,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interactionInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -623,8 +624,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":intramembraneRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -635,8 +636,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":keyword"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -646,8 +647,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":lipidationSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -658,8 +659,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":mapping"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -669,8 +670,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":matureProtein"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -681,8 +682,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":medical"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -692,8 +693,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":metalBindingSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -704,8 +705,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":miscellaneous"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -716,8 +717,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":miscellaneousRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -728,8 +729,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":miscellaneousSite"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -740,8 +741,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":mitochondrialTransitPeptide"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -752,8 +753,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":modifiedResidue"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -764,8 +765,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":mutagenesis"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -776,8 +777,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":nonTerminalResidue"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -788,8 +789,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":nucleotidePhosphateBindingRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -800,8 +801,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":pathway"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -811,8 +812,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":pdbMapping"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -823,8 +824,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":peptideMapping"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -835,8 +836,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":positionalAnnotation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -847,8 +848,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":processingProduct"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -859,8 +860,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":propeptide"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -871,8 +872,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":ptm"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -882,8 +883,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":ptmInfo"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -893,8 +894,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":region"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -904,8 +905,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":repeat"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -915,8 +916,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":secondaryStructure"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -927,8 +928,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":selenocysteine"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -939,8 +940,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":sequenceCaution"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -951,8 +952,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":sequenceConflict"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -963,8 +964,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":shortSequenceMotif"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -975,8 +976,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":site"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -986,8 +987,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":smallMoleculeInteraction"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -998,8 +999,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":srmPeptideMapping"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1010,8 +1011,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":subcellularLocation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1022,8 +1023,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":subcellularLocationNote"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1034,8 +1035,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":topologicalDomain"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1046,8 +1047,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":topology"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -1057,8 +1058,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":transmembraneRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1069,8 +1070,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":transportActivity"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1081,8 +1082,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":turn"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -1092,8 +1093,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":undetectedExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1104,8 +1105,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":uniprotKeyword"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1116,8 +1117,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":variant"), config.createIriMapping("annotation", "iri"));
         }
 
@@ -1127,8 +1128,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":variantInfo"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1139,8 +1140,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":zincFingerRegion"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1151,8 +1152,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interactionMapping"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1168,17 +1169,17 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("quality"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("quality"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":quality"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("term"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("term"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":term"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("impacted_object"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":impactedObject"), config.createIriMapping("annotation", "iri"));
+                    asList(new JoinColumns(new TableColumn("impacted_object"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":impactedObject"), config.createIriMapping("annotation", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":entryAnnotationId"),
                     config.createLiteralMapping(xsdString, "entry_annotation"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":variation"),
@@ -1215,8 +1216,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "evidence_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("evidence"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("evidence"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":evidence"), config.createIriMapping("evidence", "iri"));
         }
 
@@ -1226,8 +1227,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "evidence_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("evidence"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("evidence"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":negativeEvidence"),
                     config.createIriMapping("evidence", "iri"));
         }
@@ -1238,8 +1239,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("disease"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("disease"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":disease"), config.createIriMapping("terminology", "iri"));
         }
 
@@ -1248,8 +1249,9 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"))), graph, subject,
-                    config.createIriMapping("rdfs:comment"), config.createLiteralMapping(xsdString, "comment"));
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
+                    subject, config.createIriMapping("rdfs:comment"),
+                    config.createLiteralMapping(xsdString, "comment"));
         }
 
         {
@@ -1258,8 +1260,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("specificity"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("specificity"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":isoformSpecificity"),
                     config.createIriMapping("schema", "iri"));
         }
@@ -1270,8 +1272,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "entry_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("interactant"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("interactant"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interactant"), config.createIriMapping("entry", "iri"));
         }
 
@@ -1281,8 +1283,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "isoform_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation")),
-                            new JoinColumns(new TableColumn("interactant"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4"),
+                            new JoinColumns(new TableColumn("interactant"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":interactant"), config.createIriMapping("isoform", "iri"));
         }
 
@@ -1291,8 +1293,9 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"))), graph, subject,
-                    config.createIriMapping(":peptideSet"), config.createLiteralMapping(xsdString, "peptide_set"));
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
+                    subject, config.createIriMapping(":peptideSet"),
+                    config.createLiteralMapping(xsdString, "peptide_set"));
         }
     }
 
@@ -1312,24 +1315,24 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":numberOfExperiments"),
                     config.createLiteralMapping(xsdInteger, "number_of_experiments"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("evidence_code"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":evidenceCode"), config.createIriMapping("terminology", "iri"));
+                    asList(new JoinColumns(new TableColumn("evidence_code"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":evidenceCode"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":experimentalContext"),
                     config.createIriMapping("context", "experimental_context"));
             config.addQuadMapping(asList(table, new Table(schema, "source_bases")),
-                    asList(new JoinColumns(new TableColumn("assigned_by"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":assignedBy"), config.createIriMapping("source", "iri"));
+                    asList(new JoinColumns(new TableColumn("assigned_by"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":assignedBy"), config.createIriMapping("source", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("expression_level"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":expressionLevel"), config.createIriMapping("schema", "iri"));
+                    asList(new JoinColumns(new TableColumn("expression_level"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":expressionLevel"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "database_bases")),
-                    asList(new JoinColumns(new TableColumn("from_xref"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":fromXref"), config.createIriMapping("database", "iri"));
+                    asList(new JoinColumns(new TableColumn("from_xref"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":fromXref"), config.createIriMapping("database", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("integration_level"), new TableColumn("id"))), graph,
+                    asList(new JoinColumns(new TableColumn("integration_level"), new TableColumn("id"), "int4")), graph,
                     subject, config.createIriMapping(":integrationLevel"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("quality"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("quality"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":quality"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoformSpecificity"),
                     config.createLiteralMapping(xsdString, "isoform_specificity"));
@@ -1346,7 +1349,8 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":negativeIsoformSpecificity"),
                     config.createLiteralMapping(xsdString, "negative_isoform_specificity"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("interaction_detection_method"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("interaction_detection_method"), new TableColumn("id"),
+                            "int4")),
                     graph, subject, config.createIriMapping(":interactionDetectionMethod"),
                     config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":expressionScore"),
@@ -1366,7 +1370,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("evidence", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "evidence_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("evidence"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("evidence"), "int4")), graph, subject,
                     config.createIriMapping(":reference"), config.createIriMapping("publication", "publication"));
         }
     }
@@ -1385,8 +1389,8 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":isoformCount"),
                     config.createLiteralMapping(xsdInteger, "isoform_count"));
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("existence"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":existence"), config.createIriMapping("schema", "iri"));
+                    asList(new JoinColumns(new TableColumn("existence"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":existence"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("skos:exactMatch"),
                     config.createIriMapping("uniprot", "uniprot"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":swissprotPage"),
@@ -1399,8 +1403,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "entry_bases"), table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry")),
-                            new JoinColumns(new TableColumn("classifier"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4"),
+                            new JoinColumns(new TableColumn("classifier"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":classifiedWith"),
                     config.createIriMapping("terminology", "iri"));
         }
@@ -1410,8 +1414,8 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table, new Table(schema, "gene_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry")),
-                            new JoinColumns(new TableColumn("gene"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4"),
+                            new JoinColumns(new TableColumn("gene"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":gene"), config.createIriMapping("gene", "iri"));
         }
 
@@ -1420,7 +1424,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":isoform"), config.createIriMapping("isoform", "iri"));
         }
 
@@ -1429,7 +1433,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":reference"), config.createIriMapping("publication", "publication"));
         }
 
@@ -1438,7 +1442,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":recommendedName"), config.createBlankNodeMapping(nameBlankNode, "name"));
         }
 
@@ -1447,7 +1451,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":alternativeName"), config.createBlankNodeMapping(nameBlankNode, "name"));
         }
 
@@ -1456,7 +1460,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":additionalNames"),
                     config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
@@ -1466,7 +1470,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":cleavedRegionNames"),
                     config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
@@ -1476,7 +1480,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
                     config.createIriMapping(":fonctionalRegionNames"),
                     config.createBlankNodeMapping(nameListBlankNode, "name_list"));
         }
@@ -1503,8 +1507,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":generalAnnotation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1515,8 +1519,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":genericPhenotype"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1527,8 +1531,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":modification"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1539,8 +1543,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":phenotypicVariation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1551,8 +1555,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":positionalAnnotation"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1563,8 +1567,8 @@ public class Chromosome
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform")),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("proteoform"), "int4"),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":diseaseRelatedVariant"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -1600,8 +1604,8 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("gene", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "gene_bases"), table, new Table(schema, "entry_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene")),
-                            new JoinColumns(new TableColumn("mapping"), new TableColumn("id"))),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene"), "int4"),
+                            new JoinColumns(new TableColumn("mapping"), new TableColumn("id"), "int4")),
                     graph, subject, config.createIriMapping(":bestGeneMapping"),
                     config.createIriMapping("entry", "iri"));
         }
@@ -1611,7 +1615,7 @@ public class Chromosome
             NodeMapping subject = config.createIriMapping("gene", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "gene_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene"), "int4")), graph, subject,
                     config.createIriMapping(":name"), config.createLiteralMapping(xsdString, "name"));
         }
     }
@@ -1638,7 +1642,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "chain"));
 
             config.addQuadMapping(asList(new Table(schema, "isoform_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4")), graph,
                     config.createIriMapping("isoform", "iri"), config.createIriMapping(":sequence"), subject);
         }
     }
@@ -1656,7 +1660,7 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":FamilyInfo"));
             config.addQuadMapping(asList(table, new Table(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("term"), new TableColumn("id"))), graph, subject,
+                    asList(new JoinColumns(new TableColumn("term"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping(":term"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":region"),
                     config.createLiteralMapping(xsdString, "region"));
@@ -1664,7 +1668,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "description"));
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph,
                     config.createIriMapping("entry", "iri"), config.createIriMapping(":family"), subject);
         }
     }
@@ -1695,7 +1699,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "name"));
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph,
                     config.createIriMapping("entry", "iri"), config.createIriMapping(":history"), subject);
         }
     }
@@ -1713,13 +1717,13 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Identifier"));
             config.addQuadMapping(asList(table, new Table(schema, "database_bases")),
-                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
+                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph,
                     config.createIriMapping("entry", "iri"), config.createIriMapping(":reference"), subject);
         }
     }
@@ -1737,13 +1741,13 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
             config.addQuadMapping(asList(table, new Table(schema, "database_bases")),
-                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
+                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph,
                     config.createIriMapping("entry", "iri"), config.createIriMapping(":reference"), subject);
         }
     }
@@ -1761,13 +1765,13 @@ public class Chromosome
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
             config.addQuadMapping(asList(table, new Table(schema, "database_bases")),
-                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"))), graph, subject,
-                    config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
+                    asList(new JoinColumns(new TableColumn("provenance"), new TableColumn("id"), "int4")), graph,
+                    subject, config.createIriMapping(":provenance"), config.createIriMapping("database", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":accession"),
                     config.createLiteralMapping(xsdString, "accession"));
 
             config.addQuadMapping(asList(new Table(schema, "evidence_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("evidence"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("evidence"), "int4")), graph,
                     config.createIriMapping("evidence", "iri"), config.createIriMapping(":reference"), subject);
         }
     }
@@ -1796,7 +1800,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "label"));
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
                     config.createIriMapping("annotation", "iri"), config.createIriMapping(":interactant"), subject);
         }
     }
@@ -1823,7 +1827,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "label"));
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
                     config.createIriMapping("annotation", "iri"), config.createIriMapping(":interactant"), subject);
         }
     }
@@ -1850,7 +1854,7 @@ public class Chromosome
                     config.createLiteralMapping(xsdString, "label"));
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"))), graph,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
                     config.createIriMapping("annotation", "iri"), config.createIriMapping(":interactant"), subject);
         }
     }

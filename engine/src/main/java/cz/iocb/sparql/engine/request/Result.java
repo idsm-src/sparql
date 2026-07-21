@@ -38,10 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.CommonIriClass;
-import cz.iocb.sparql.engine.mapping.classes.DateClass;
-import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.DateTimeClass;
-import cz.iocb.sparql.engine.mapping.classes.DateTimeConstantZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
 import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationClass;
 import cz.iocb.sparql.engine.mapping.classes.DecimalClass;
 import cz.iocb.sparql.engine.mapping.classes.DoubleClass;
@@ -50,7 +48,6 @@ import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.IntClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringClass;
-import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LongClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
@@ -164,56 +161,48 @@ public class Result implements AutoCloseable
 
                 rowData[idx] = switch(rc)
                 {
-                    case IntBlankNodeClass c -> new BNode(encodeIBlankNodeLabel((Integer) value, rs.getInt(i++)));
+                    case IntBlankNodeClass _ -> new BNode(encodeIBlankNodeLabel((Integer) value, rs.getInt(i++)));
 
-                    case StrBlankNodeClass c -> new BNode(encodeSBlankNodeLabel((String) value, rs.getInt(i++)));
+                    case StrBlankNodeClass _ -> new BNode(encodeSBlankNodeLabel((String) value, rs.getInt(i++)));
 
-                    case CommonIriClass c -> new IriNode((String) value);
+                    case CommonIriClass _ -> new IriNode((String) value);
 
-                    case BooleanClass c -> new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
+                    case BooleanClass _ -> new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
 
-                    case ShortClass c -> new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
+                    case ShortClass _ -> new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
 
-                    case IntClass c -> new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
+                    case IntClass _ -> new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
 
-                    case LongClass c -> new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
+                    case LongClass _ -> new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
 
-                    case FloatClass c ->
+                    case FloatClass _ ->
                     {
                         Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
                         yield new TypedLiteral(decimalFormat.format(data), xsdFloatType.getTypeIri());
                     }
 
-                    case DoubleClass c -> new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
+                    case DoubleClass _ -> new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
 
-                    case IntegerClass c -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                    case IntegerClass _ -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
                             xsdIntegerType.getTypeIri());
 
-                    case DecimalClass c -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                    case DecimalClass _ -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
                             xsdDecimalType.getTypeIri());
 
-                    case DateTimeClass c -> new TypedLiteral(dateTimeToString((LocalDateTime) value, rs.getInt(i++)),
-                            xsdDateTimeType.getTypeIri());
+                    case DateTimeCompositeClass _ -> new TypedLiteral(
+                            dateTimeToString((LocalDateTime) value, rs.getInt(i++)), xsdDateTimeType.getTypeIri());
 
-                    case DateTimeConstantZoneClass c -> new TypedLiteral(
-                            dateTimeToString((LocalDateTime) value, c.getZone()), xsdDateTimeType.getTypeIri());
-
-                    case DateClass c -> new TypedLiteral(dateToString((LocalDate) value, rs.getInt(i++)),
+                    case DateCompositeClass _ -> new TypedLiteral(dateToString((LocalDate) value, rs.getInt(i++)),
                             xsdDateType.getTypeIri());
 
-                    case DateConstantZoneClass c -> new TypedLiteral(dateToString((LocalDate) value, c.getZone()),
-                            xsdDateType.getTypeIri());
-
-                    case DayTimeDurationClass c -> new TypedLiteral(durationToString((Long) value),
+                    case DayTimeDurationClass _ -> new TypedLiteral(durationToString((Long) value),
                             xsdDayTimeDurationType.getTypeIri());
 
-                    case StringClass c -> new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
+                    case StringClass _ -> new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
 
-                    case LangStringClass c -> new LanguageTaggedLiteral(value.toString(), rs.getString(i++));
+                    case LangStringClass _ -> new LanguageTaggedLiteral(value.toString(), rs.getString(i++));
 
-                    case LangStringConstantTagClass c -> new LanguageTaggedLiteral(value.toString(), c.getTag());
-
-                    case UnsupportedLiteralClass c -> new TypedLiteral(value.toString(), rs.getString(i++));
+                    case UnsupportedLiteralClass _ -> new TypedLiteral(value.toString(), rs.getString(i++));
 
                     default ->
                     {

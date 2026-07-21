@@ -1,5 +1,16 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
@@ -10,116 +21,100 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdBooleanIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDecimalIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDoubleIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdFloatIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdIntIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdIntegerIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdLongIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdShortIri;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
-import static java.util.stream.Collectors.toSet;
-import java.math.BigDecimal;
-import java.math.BigInteger;
+import static java.util.Collections.singletonMap;
+import static java.util.stream.Collectors.joining;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.IRI;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue;
 
 
 
 public final class SqlEffectiveBooleanValue extends SqlUnary
 {
-    private static final Set<ResourceClass> operandRequirements = Set.of(xsdBoolean, xsdShort, xsdInt, xsdLong,
-            xsdInteger, xsdDecimal, xsdFloat, xsdDouble, xsdString);
+    private static final Set<ResourceClass> operandClasses = Set.of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger,
+            xsdDecimal, xsdFloat, xsdDouble, xsdString, unsupportedLiteral);
 
-    private static final List<IRI> ebvTypes = List.of(xsdBoolean.getTypeIri(), xsdShort.getTypeIri(),
-            xsdInt.getTypeIri(), xsdLong.getTypeIri(), xsdInteger.getTypeIri(), xsdDecimal.getTypeIri(),
-            xsdFloat.getTypeIri(), xsdDouble.getTypeIri(), xsdString.getTypeIri());
+    private static final ResourceClass operandClass = getUnionClass(operandClasses);
 
 
-    protected SqlEffectiveBooleanValue(SqlExpressionIntercode operand, boolean canBeNull)
+    private SqlEffectiveBooleanValue(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings,
+            boolean canBeNull, NonConstantBooleanValue value)
     {
-        super(operand, asSet(xsdBoolean), canBeNull);
+        super(operand, mappings, canBeNull);
     }
 
 
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
     {
-        if(operand instanceof SqlLiteral literal)
-        {
-            ResourceClass literalClass = operand.getResourceClasses().iterator().next();
+        return create(operand, Restriction.ALL);
+    }
 
-            if(!isEffectiveBooleanClass(literalClass))
-                return SqlNull.get();
 
-            Object value = literal.getLiteral().getValue();
-
-            if(literalClass == unsupportedLiteral && ebvTypes.contains(literal.getLiteral().getTypeIri()))
-                return falseValue;
-            else if(literalClass == xsdBoolean)
-                return getConstantCode((Boolean) value);
-            else if(literalClass == xsdShort)
-                return getConstantCode((Short) value != 0);
-            else if(literalClass == xsdInt)
-                return getConstantCode((Integer) value != 0);
-            else if(literalClass == xsdLong)
-                return getConstantCode((Long) value != 0l);
-            else if(literalClass == xsdInteger)
-                return getConstantCode(!((BigInteger) value).equals(BigInteger.ZERO));
-            else if(literalClass == xsdDecimal)
-                return getConstantCode(!((BigDecimal) value).equals(BigDecimal.ZERO));
-            else if(literalClass == xsdFloat)
-                return getConstantCode((Float) value != 0 && !((Float) value).isNaN());
-            else if(literalClass == xsdDouble)
-                return getConstantCode((Double) value != 0 && !((Double) value).isNaN());
-            else if(literalClass == xsdString)
-                return getConstantCode(!((String) value).isEmpty());
-            else
-                return SqlNull.get();
-        }
-
-        if(operand instanceof SqlIri)
+    private static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
+    {
+        if(operand.equals(SqlNull.get()))
             return SqlNull.get();
 
-        if(operand == SqlNull.get())
-            return SqlNull.get();
-
-
-        Set<ResourceClass> operandClasses = operand.getResourceClasses();
-
-        if(!operand.isBoxed() && operandClasses.contains(xsdBoolean))
+        if(operand.equals(trueValue) || operand.equals(falseValue))
             return operand;
 
+        //TODO: add compile-time evaluation for literals
 
-        Set<ResourceClass> compatibleClasses = operandClasses.stream().filter(r -> isEffectiveBooleanClass(r))
-                .collect(toSet());
-
-        if(compatibleClasses.isEmpty())
+        if(operand.getMappings().keySet().stream().noneMatch(r -> !areDisjunct(r, operandClass)))
             return SqlNull.get();
 
+        Set<ResourceClass> classes = operand.getMappings().keySet();
 
-        return new SqlEffectiveBooleanValue(operand,
-                operand.canBeNull() || operandClasses.size() > compatibleClasses.size());
-    }
+        boolean canBeNull = operand.canBeNull() || classes.stream().anyMatch(r -> !r.isSubclassOf(operandClass));
 
-
-    private static SqlExpressionIntercode getConstantCode(boolean constant)
-    {
-        return constant ? trueValue : falseValue;
-    }
+        NonConstantBooleanValue value = classes.stream().allMatch(r -> r.isSubclassOf(unsupportedLiteral)) ?
+                FALSE_OR_ERROR : ANY;
 
 
-    @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
-    {
-        return operand.getRequirements(operandRequirements);
+        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operand) : null;
+        Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
+
+        return new SqlEffectiveBooleanValue(operand, mappings, canBeNull, value);
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
+        Restriction operandRestriction = new Restriction();
+
+        if(restriction.contains(xsdBoolean))
+            operandRestriction.add(operandClasses);
+
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, operandRestriction, evalServices);
+
+        if(optOperand.getResourceClasses().stream().allMatch(r -> isBoolean(r)))
+            return optOperand;
 
         if(optOperand == operand)
             return this;
@@ -128,84 +123,78 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
     }
 
 
-    @Override
-    public String translate(Request request)
+    private static List<Column> translate(SqlExpressionIntercode operand)
     {
-        if(operand instanceof SqlNodeValue variable)
+        Set<Column> cols = new HashSet<Column>();
+
+        for(Entry<ResourceClass, List<Column>> e : operand.getMappings().entrySet())
         {
-            Set<ResourceClass> compatibleClasses = variable.getResourceClasses().stream()
-                    .filter(r -> isEffectiveBooleanClass(r)).collect(toSet());
-
-
-            StringBuilder builder = new StringBuilder();
-            boolean hasAlternative = false;
-
-            if(compatibleClasses.size() > 1)
-                builder.append("coalesce(");
-
-            for(ResourceClass resourceClass : compatibleClasses)
+            if(isShort(e.getKey()))
             {
-                appendComma(builder, hasAlternative);
-                hasAlternative = true;
-
-                ResourceClass baseClass = getExpressionBaseClass(resourceClass);
-
-                List<Column> columns = variable.asResource(request, baseClass);
-                Column column = baseClass.toExpression(columns);
-
-                String sqlType = baseClass.getSqlTypes().get(0);
-
-                if(isString(resourceClass))
-                    builder.append("(octet_length(" + column + ") != 0)");
-                if(isFloat(resourceClass) || isDouble(resourceClass))
-                    builder.append("(" + column + " not in ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))");
-                else if(isNumeric(resourceClass))
-                    builder.append("(" + column + " != '0'::" + sqlType + ")");
-                else if(isBoolean(resourceClass))
-                    builder.append(column);
-                else
-                    throw new IllegalArgumentException();
+                Column col = e.getKey().toGeneralClass(xsdShort, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdShort.getSqlTypes().get(0) + ")"));
+            }
+            else if(isInt(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdInt, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdInt.getSqlTypes().get(0) + ")"));
+            }
+            else if(isLong(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdLong, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdLong.getSqlTypes().get(0) + ")"));
             }
 
-            if(compatibleClasses.size() > 1)
-                builder.append(")");
+            else if(isInteger(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdInteger, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdInteger.getSqlTypes().get(0) + ")"));
+            }
+            else if(isDecimal(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdDecimal, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdDecimal.getSqlTypes().get(0) + ")"));
+            }
+            else if(isFloat(e.getKey()))
+            {
+                String type = xsdFloat.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(xsdFloat, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
+            }
+            else if(isDouble(e.getKey()))
+            {
+                String type = xsdDouble.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(xsdDouble, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
+            }
+            else if(isString(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdString, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(octet_length(" + col + ") != 0)"));
+            }
+            else if(isBoolean(e.getKey()))
+            {
+                Column col = e.getKey().toGeneralClass(xsdBoolean, e.getValue(), true).get(0);
+                cols.add(col);
+            }
+            else if(isUnsupportedLiteral(e.getKey()))
+            {
+                String types = Stream
+                        .of(xsdBooleanIri, xsdShortIri, xsdIntIri, xsdLongIri, xsdIntegerIri, xsdDecimalIri,
+                                xsdFloatIri, xsdDoubleIri)
+                        .map(i -> "'" + i.getValue().replaceAll("'", "''") + "'").collect(joining(", ", "(", ")"));
 
-            return builder.toString();
+                Column col = e.getKey().toGeneralClass(unsupportedLiteral, e.getValue(), true).get(1);
+                cols.add(new ExpressionColumn("NULLIF(" + col + " NOT IN " + types + ", true)"));
+            }
+            else if(!areDisjunct(e.getKey(), operandClass))
+            {
+                Column col = operand.get(getUnionClass(operandClasses, box)).get(0);
+                cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")"));
+            }
         }
-        else if(operand.isBoxed())
-        {
-            return "sparql.ebv_rdfbox(" + operand.translate(request) + ")";
-        }
-        else if(operand.getResourceClasses().stream().allMatch(r -> isString(r)))
-        {
-            String code = operand.getExpressionResourceClass().toGeneralExpression(operand.translate(request));
 
-            return "(octet_length(" + code + ") != 0)";
-        }
-        else if(operand.getResourceClasses().stream().allMatch(r -> isFloat(r) || isDouble(r)))
-        {
-            ResourceClass resClass = operand.getExpressionResourceClass();
-            String sqlType = getExpressionBaseClass(resClass).getSqlTypes().get(0);
-            String code = resClass.toGeneralExpression(operand.translate(request));
-
-            return "(" + code + " NOT IN ('0'::" + sqlType + ", 'NaN'::" + sqlType + "))";
-        }
-        else if(operand.getResourceClasses().stream().allMatch(r -> isNumeric(r)))
-        {
-            ResourceClass resClass = operand.getExpressionResourceClass();
-            String sqlType = getExpressionBaseClass(resClass).getSqlTypes().get(0);
-            String code = resClass.toGeneralExpression(operand.translate(request));
-
-            return "(" + code + " != '0'::" + sqlType + ")";
-        }
-        else if(operand.getResourceClasses().stream().allMatch(r -> isBoolean(r)))
-        {
-            return operand.getExpressionResourceClass().toGeneralExpression(operand.translate(request));
-        }
-        else
-        {
-            throw new IllegalArgumentException();
-        }
+        return List.of(Column.coalesce(cols));
     }
 
 
@@ -228,9 +217,6 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             return false;
 
         if(!super.equals(imcode))
-            return false;
-
-        if(!Objects.equals(operand, imcode.operand))
             return false;
 
         return true;

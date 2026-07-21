@@ -1,212 +1,109 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.rdfLangStringIri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public final class LangStringConstantTagClass extends LiteralClass implements ResultResourceClass
+public final class LangStringConstantTagClass extends LiteralClass
 {
-    private static final Hashtable<String, LangStringConstantTagClass> instances = new Hashtable<String, LangStringConstantTagClass>();
+    private static final ConcurrentMap<String, LangStringConstantTagClass> instances = new ConcurrentHashMap<>();
 
-    private final String lang;
+    private final String tag;
 
 
-    private LangStringConstantTagClass(String lang)
+    private LangStringConstantTagClass(String tag)
     {
-        super("lang-" + lang, List.of("varchar"), rdfLangStringIri);
-        this.lang = lang;
+        super("lang-" + tag, rdfLangStringIri, List.of("varchar"), Set.of(box, rdfLangString));
+        this.tag = tag;
     }
 
 
-    @Override
-    public ResourceClass getGeneralClass()
+    public static LangStringConstantTagClass get(String tag)
     {
-        return rdfLangString;
+        return instances.computeIfAbsent(tag.toLowerCase(), LangStringConstantTagClass::new);
     }
 
 
     @Override
     public Set<ResultResourceClass> getResultResourceClasses()
     {
-        return Set.of(this);
-    }
-
-
-    public static synchronized LangStringConstantTagClass get(String lang)
-    {
-        lang = lang.toLowerCase();
-
-        LangStringConstantTagClass instance = instances.get(lang);
-
-        if(instance == null)
-        {
-            synchronized(instances)
-            {
-                instance = instances.get(lang);
-
-                if(instance == null)
-                {
-                    instance = new LangStringConstantTagClass(lang);
-                    instances.put(lang, instance);
-                }
-            }
-        }
-
-        return instance;
+        return Set.of(rdfLangString);
     }
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Literal literal)
     {
-        return List.of(new ConstantColumn(((String) ((Literal) node).getValue()), "varchar"));
+        return List.of(constant(literal.getValue(), "varchar"));
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        StringBuilder builder = new StringBuilder();
+        assert isSubclassOf(superClass);
 
-        builder.append("CASE WHEN ");
-        builder.append(columns.get(1));
-        builder.append(" = '");
-        builder.append(lang);
-        builder.append("'::varchar THEN ");
-        builder.append(columns.get(0));
-        builder.append(" END");
+        ResourceClass targetClass = superClass.getEffectiveClass();
 
-        return List.of(new ExpressionColumn(builder.toString()));
-    }
+        if(targetClass.equals(this))
+            return columns;
 
+        Column string = columns.get(0);
 
-    @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
-    {
-        List<Column> result = new ArrayList<Column>(getGeneralClass().getColumnCount());
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_langstring(%s, '%s'::varchar)", string, tag));
 
-        result.add(columns.get(0));
+        if(targetClass.equals(rdfLangString))
+            return List.of(string, !canBeNull ? constant(tag, "varchar") :
+                    expression("CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
 
-        if(check == false)
-        {
-            result.add(new ConstantColumn(lang, "varchar"));
-        }
-        else
-        {
-            StringBuilder builder = new StringBuilder();
-
-            builder.append("CASE WHEN ");
-            builder.append(columns.get(0));
-            builder.append(" IS NOT NULL THEN '");
-            builder.append(lang);
-            builder.append("'::varchar END");
-
-            result.add(new ExpressionColumn(builder.toString()));
-        }
-
-        return result;
-    }
-
-
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(column);
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        if(check)
-            return List.of(new ExpressionColumn(
-                    "sparql.rdfbox_get_langstring_value_of_lang(" + column + ", '" + lang + "'::varchar)"));
-        else
-            return List.of(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn(
-                "sparql.rdfbox_create_from_langstring(" + columns.get(0) + ", '" + lang + "'::varchar)");
-    }
-
-
-
-    @Override
-    public Column toExpression(Statement statement, Node node)
-    {
-        return new ConstantColumn(((String) ((Literal) node).getValue()), "varchar");
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public String toGeneralExpression(String code)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
+        if(superClass.equals(this))
+            return columns;
+
+        ResourceClass sourceClass = superClass.getEffectiveClass();
+
+        assert isSubclassOf(sourceClass);
+
+        if(sourceClass.equals(box))
+            return List.of(
+                    expression("sparql.rdfbox_get_langstring_value_of_lang(%s, '%s'::varchar)", columns.get(0), tag));
+
+        if(sourceClass.equals(rdfLangString))
+            return List.of(expression("CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag, columns.get(0)));
+
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public String toBoxedExpression(String code)
+    public boolean match(Statement statement, Literal literal)
     {
-        return "sparql.rdfbox_create_from_langstring(" + code + ", '" + lang + "'::varchar)";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        if(check)
-            return "sparql.rdfbox_get_langstring_value_of_lang(" + code + ", '" + lang + "'::varchar)";
-        else
-            return "sparql.rdfbox_get_langstring_value(" + code + ")";
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        if(!super.match(statement, node))
-            return false;
-
-        if(node instanceof Literal literal)
-            return lang.equals(literal.getLanguageTag());
-
-        return true;
+        return super.match(statement, literal) && Objects.equals(literal.getLanguageTag(), tag);
     }
 
 
     public String getTag()
     {
-        return lang;
+        return tag;
     }
 
 
@@ -221,9 +118,6 @@ public final class LangStringConstantTagClass extends LiteralClass implements Re
 
         LangStringConstantTagClass other = (LangStringConstantTagClass) object;
 
-        if(!lang.equals(other.lang))
-            return false;
-
-        return true;
+        return Objects.equals(tag, other.tag);
     }
 }

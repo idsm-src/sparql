@@ -1,91 +1,78 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public class CommonIriClass extends IriClass implements ResultResourceClass
+public final class CommonIriClass extends IriClass implements ResultResourceClass
 {
-    CommonIriClass()
+    protected CommonIriClass()
     {
-        super("iri", List.of("varchar"));
+        super("iri", List.of("varchar"), Set.of(box));
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public boolean match(Statement statement, IRI iri)
     {
-        return List.of(new ConstantColumn(((IRI) node).getValue(), "varchar"));
+        return true;
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toColumns(Statement statement, IRI iri)
     {
-        return columns;
+        return List.of(constant(iri.getValue(), "varchar"));
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return columns;
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column iri = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", iri));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> fromExpression(Column column)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        return List.of(column);
-    }
+        if(superClass.equals(this))
+            return columns;
 
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
+        assert isSubclassOf(sourceClass);
 
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)));
 
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        return List.of(new ExpressionColumn("sparql.rdfbox_get_iri" + "(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_iri(" + columns.get(0) + ")");
+        throw new IllegalArgumentException();
     }
 
 
     @Override
     public String getPrefix(List<Column> columns)
     {
-        if(columns.get(0) instanceof ConstantColumn col)
-            return col.getValue();
-
-        return "";
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        return switch(node)
-        {
-            case VariableOrBlankNode var -> true;
-            case IRI iri -> true;
-            default -> false;
-        };
+        return columns.get(0) instanceof ConstantColumn col ? col.getValue() : "";
     }
 }

@@ -3,23 +3,20 @@ package cz.iocb.sparql.engine.translator.imcode;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
@@ -27,8 +24,6 @@ import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 public final class SqlBind extends SqlIntercode
 {
-    private static final Column expressionColumn = new TableColumn("#expression");
-
     private final SqlIntercode child;
     private final String variableName;
     private final SqlExpressionIntercode expression;
@@ -55,53 +50,28 @@ public final class SqlBind extends SqlIntercode
     protected static SqlIntercode bind(Request request, String varName, SqlExpressionIntercode expression,
             SqlIntercode child, Restrictions restrictions)
     {
-        UsedVariable variable = null;
+        Map<ResourceClass, List<Column>> columns = new HashMap<>();
 
-        if(expression instanceof SqlIri iri)
+        for(Entry<ResourceClass, List<Column>> e : expression.getMappings().entrySet())
         {
-            IriClass resClass = iri.getIriClass();
-            List<Column> columns = request.getColumns(resClass, iri.getIri());
-            variable = new UsedVariable(varName, resClass, columns, expression.canBeNull());
-        }
-        else if(expression instanceof SqlLiteral literal)
-        {
-            LiteralClass resClass = literal.getLiteralClass();
-            List<Column> columns = request.getColumns(resClass, literal.getLiteral());
-            variable = new UsedVariable(varName, resClass, columns, expression.canBeNull());
-        }
-        else if(expression instanceof SqlVariable var)
-        {
-            UsedVariable source = child.getVariables().get(var.getName());
-            variable = new UsedVariable(varName, source.getMappings(), expression.canBeNull());
-        }
-        else
-        {
-            Set<ResourceClass> resClasses = expression.getResourceClasses();
+            List<Column> names = e.getKey().createColumns(request.getColumnMap(), varName);
 
-            //FIXME:
-            /*
-            for(ResourceClass resClass : resClasses)
+            List<Column> list = new ArrayList<Column>(e.getKey().getColumnCount());
+
+            for(int i = 0; i < e.getKey().getColumnCount(); i++)
             {
-                if(!resClass.canBeDerivatedFromGeneral())
-                {
-                    ResourceClass genClass = resClass.getGeneralClass();
-
-                    if(resClasses.stream().filter(c -> c.getGeneralClass() == genClass).count() > 1)
-                    {
-                        resClasses = resClasses.stream().filter(c -> c.getGeneralClass() != genClass).collect(toSet());
-                        resClasses.add(genClass);
-                    }
-                }
+                if(e.getValue().get(i) instanceof ExpressionColumn)
+                    list.add(names.get(i));
+                else
+                    list.add(e.getValue().get(i));
             }
-            */
 
-            UsedVariable bindVar = new UsedVariable(varName, expression.canBeNull());
-            resClasses.stream().forEach(r -> bindVar.addMapping(r, r.createColumns(request.getColumnMap(), varName)));
-            variable = bindVar;
+            columns.put(e.getKey(), list);
         }
+
 
         UsedVariables variables = child.getVariables().restrict(restrictions);
-        variables.add(variable);
+        variables.add(new UsedVariable(varName, columns, expression.canBeNull()));
 
         return new SqlBind(variables, varName, expression, child);
     }
@@ -113,24 +83,30 @@ public final class SqlBind extends SqlIntercode
         SqlExpressionIntercode optExpression = expression;
         SqlIntercode optChild = child;
 
+        Restriction varRestriction = restrictions.getRestriction(variableName);
+
+        if(varRestriction == null)
+            return optChild.optimize(request, restrictions, reduced, false);
+
         while(true)
         {
             boolean optReduced = reduced && optExpression.isDeterministic();
-            Restrictions expressionRequirements = optExpression.getRequirements(null);
+            Restrictions expressionRequirements = optExpression.getRequirements();
             Restrictions childRestrictions = new Restrictions(restrictions, expressionRequirements);
 
             optChild = optChild.optimize(request, childRestrictions, optReduced, evalServices);
-            optExpression = optExpression.optimize(request, optChild.getVariables(), evalServices);
+            optExpression = optExpression.optimize(request, optChild.getVariables(), varRestriction, evalServices);
 
-            if(optExpression.getRequirements(null).equals(expressionRequirements))
+            if(optExpression.getRequirements().equals(expressionRequirements))
                 break;
         }
 
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
-        if(optExpression == SqlNull.get() || !restrictions.contains(variableName, optExpression.getResourceClasses()))
+        if(optExpression.equals(SqlNull.get())
+                || !restrictions.contains(variableName, optExpression.getResourceClasses()))
             return optChild.optimize(request, restrictions, reduced, false);
 
         if(optChild instanceof SqlUnion union)
@@ -139,7 +115,8 @@ public final class SqlBind extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                SqlExpressionIntercode expr = optExpression.optimize(request, child.getVariables(), evalServices);
+                SqlExpressionIntercode expr = optExpression.optimize(request, child.getVariables(), varRestriction,
+                        evalServices);
 
                 childs.add(bind(request, variableName, expr, child, restrictions));
             }
@@ -168,41 +145,41 @@ public final class SqlBind extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        if(expression instanceof SqlNodeValue)
+        if(!expression.getUsedVariable().hasExpressionColumn())
             return child.translate(request);
 
 
-        UsedVariable variable = getVariables().get(variableName);
-        boolean expand = isExpressionExpansionNeeded(expression);
+        StringBuilder builder = new StringBuilder();
 
-        Column column = expand ? expressionColumn : variable.getMapping(variable.getClasses().iterator().next()).get(0);
+        builder.append("SELECT ");
+
+        UsedVariable variable = getVariables().get(variableName);
+        boolean hasSelect = false;
+
+        for(Entry<ResourceClass, List<Column>> e : expression.getUsedVariable().getMappings().entrySet())
+        {
+            List<Column> cols = e.getValue();
+            ResourceClass resClass = e.getKey();
+            List<Column> names = variable.getMapping(resClass);
+
+            for(int i = 0; i < resClass.getColumnCount(); i++)
+            {
+                if(cols.get(i) instanceof ExpressionColumn)
+                {
+                    appendComma(builder, hasSelect);
+                    hasSelect = true;
+
+                    builder.append(cols.get(i));
+                    builder.append(" AS ");
+                    builder.append(names.get(i));
+                }
+            }
+        }
+
 
         UsedVariables tmp = new UsedVariables(getVariables());
         tmp.remove(variableName);
         Set<Column> columns = tmp.getNonConstantColumns();
-
-        StringBuilder builder = new StringBuilder();
-
-        if(expand)
-        {
-            builder.append("SELECT ");
-
-            if(variable.hasMapping())
-                builder.append(translateExpressionExpansion(column, variable, expression.isBoxed()));
-
-            if(variable.hasMapping() && !columns.isEmpty())
-                builder.append(", ");
-
-            if(!columns.isEmpty())
-                builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
-
-            builder.append(" FROM (");
-        }
-
-        builder.append("SELECT ");
-        builder.append(expression.translate(request));
-        builder.append(" AS ");
-        builder.append(column);
 
         if(!columns.isEmpty())
         {
@@ -210,74 +187,14 @@ public final class SqlBind extends SqlIntercode
             builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
         }
 
-        if(child != SqlEmptySolution.get())
+
+        if(!child.equals(SqlEmptySolution.get()))
         {
             builder.append(" FROM (");
             builder.append(child.translate(request));
             builder.append(" ) AS tab");
         }
 
-        if(expand)
-            builder.append(" ) AS tab");
-
-        return builder.toString();
-    }
-
-
-    protected static boolean isExpressionExpansionNeeded(SqlExpressionIntercode expression)
-    {
-        if(expression.isBoxed() || expression.getResourceClasses().size() != 1)
-            return true;
-
-        ResourceClass resourceClass = expression.getResourceClasses().iterator().next();
-
-        if(resourceClass instanceof UserIriClass || resourceClass.getColumnCount() != 1)
-            return true;
-
-        return false;
-    }
-
-
-    protected static String translateExpressionExpansion(Column column, UsedVariable variable, boolean isBoxed)
-    {
-        Set<ResourceClass> resClasses = variable.getClasses();
-
-        StringBuilder builder = new StringBuilder();
-        boolean hasSelect = false;
-
-        for(ResourceClass resClass : resClasses)
-        {
-            if(variable.getMapping(resClass) == null)
-                continue;
-
-            List<Column> columns = null;
-
-            if(isBoxed)
-            {
-                //FIXME
-                boolean check = true;
-                /*
-                ResourceClass generalClass = resClass.getGeneralClass();
-                boolean check = resClasses.stream().filter(r -> r.getGeneralClass() == generalClass).count() > 1;
-                */
-                columns = resClass.fromBoxedExpression(column, check);
-            }
-            else
-            {
-                Column expression = new ExpressionColumn(resClass.fromGeneralExpression(column.toString()));
-                columns = resClass.fromExpression(expression);
-            }
-
-            for(int i = 0; i < resClass.getColumnCount(); i++)
-            {
-                appendComma(builder, hasSelect);
-                hasSelect = true;
-
-                builder.append(columns.get(i));
-                builder.append(" AS ");
-                builder.append(variable.getMapping(resClass).get(i));
-            }
-        }
 
         return builder.toString();
     }

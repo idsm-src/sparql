@@ -1,203 +1,109 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDateIri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
-public final class DateConstantZoneClass extends LiteralClass implements ResultResourceClass
+public final class DateConstantZoneClass extends LiteralClass
 {
-    private static final Hashtable<Integer, DateConstantZoneClass> instances = new Hashtable<Integer, DateConstantZoneClass>();
+    private static final ConcurrentMap<Integer, DateConstantZoneClass> instances = new ConcurrentHashMap<>();
 
     private final int zone;
 
 
     private DateConstantZoneClass(int zone)
     {
-        super("date$" + zone, List.of("date"), xsdDateIri);
+        super("date$" + zone, xsdDateIri, List.of("date"), Set.of(box, xsdScalarDate, xsdCompositeDate));
         this.zone = zone;
     }
 
 
-    @Override
-    public ResourceClass getGeneralClass()
+    public static DateConstantZoneClass get(int zone)
     {
-        return xsdDate;
+        return instances.computeIfAbsent(zone, DateConstantZoneClass::new);
     }
 
 
     @Override
     public Set<ResultResourceClass> getResultResourceClasses()
     {
-        return Set.of(this);
-    }
-
-
-    public static DateConstantZoneClass get(int zone)
-    {
-        DateConstantZoneClass instance = instances.get(zone);
-
-        if(instance == null)
-        {
-            synchronized(instances)
-            {
-                instance = instances.get(zone);
-
-                if(instance == null)
-                {
-                    instance = new DateConstantZoneClass(zone);
-                    instances.put(zone, instance);
-                }
-            }
-        }
-
-        return instance;
+        return Set.of(xsdCompositeDate);
     }
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Literal literal)
     {
-        return List.of(new ConstantColumn(DateClass.getDate((Literal) node), "date"));
+        return List.of(constant(DateCompositeClass.getDate(literal), "date"));
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        StringBuilder builder = new StringBuilder();
+        assert isSubclassOf(superClass);
 
-        builder.append("CASE WHEN ");
-        builder.append(columns.get(1));
-        builder.append(" = '");
-        builder.append(zone);
-        builder.append("'::int4 THEN ");
-        builder.append(columns.get(0));
-        builder.append(" END");
+        ResourceClass targetClass = superClass.getEffectiveClass();
 
-        return List.of(new ExpressionColumn(builder.toString()));
+        if(targetClass.equals(this))
+            return columns;
+
+        Column date = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_date(%s, '%d'::int4)", date, zone));
+
+        if(targetClass.equals(xsdScalarDate))
+            return List.of(expression("sparql.zoneddate_create(%s, '%d'::int4)", date, zone));
+
+        if(targetClass.equals(xsdCompositeDate))
+            return List.of(date, !canBeNull ? constant(zone, "int4") :
+                    expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", date, zone));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        List<Column> result = new ArrayList<Column>(getGeneralClass().getColumnCount());
+        if(superClass.equals(this))
+            return columns;
 
-        result.add(columns.get(0));
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-        if(check == false)
-        {
-            result.add(new ConstantColumn(zone, "int4"));
-        }
-        else
-        {
-            StringBuilder builder = new StringBuilder();
+        assert isSubclassOf(sourceClass);
 
-            builder.append("CASE WHEN ");
-            builder.append(columns.get(0));
-            builder.append(" IS NOT NULL THEN '");
-            builder.append(zone);
-            builder.append("'::int4 END");
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_date_value_of_zone(%s, '%d'::int4)", columns.get(0), zone));
 
-            result.add(new ExpressionColumn(builder.toString()));
-        }
+        if(sourceClass.equals(xsdScalarDate))
+            return List.of(expression("sparql.zoneddate_get_value_of_zone(%s, '%d'::int4)", columns.get(0), zone));
 
-        return result;
+        if(sourceClass.equals(xsdCompositeDate))
+            return List.of(expression("CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), zone, columns.get(0)));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> fromExpression(Column column)
+    public boolean match(Statement statement, Literal literal)
     {
-        return List.of(column);
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        if(check)
-            return List.of(new ExpressionColumn(
-                    ("sparql.rdfbox_get_date_value_of_zone(" + column + ", '" + zone + "'::int4)")));
-        else
-            return List.of(new ExpressionColumn("sparql.rdfbox_get_date_value(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn("sparql.rdfbox_create_from_date(" + columns.get(0) + ", '" + zone + "'::int4)");
-    }
-
-
-    @Override
-    public Column toExpression(Statement statement, Node node)
-    {
-        return new ExpressionColumn(
-                "sparql.zoneddate_get_value('" + ((Literal) node).getValue() + "'::sparql.zoneddate)");
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
-        return "sparql.zoneddate_get_value_of_zone(" + code + ", '" + zone + "'::int4)";
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        return "sparql.zoneddate_create(" + code + ", '" + zone + "'::int4)";
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        return "sparql.rdfbox_create_from_date(" + code + ", '" + zone + "'::int4)";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        if(check)
-            return "sparql.rdfbox_get_date_value_of_zone(" + code + ", '" + zone + "'::int4)";
-        else
-            return "sparql.rdfbox_get_date_value(" + code + ")";
-    }
-
-
-    @Override
-    public boolean match(Statement statement, Node node)
-    {
-        if(!super.match(statement, node))
-            return false;
-
-        if(node instanceof Literal literal)
-            return DateClass.getZone(literal) == zone;
-
-        return true;
+        return super.match(statement, literal) && DateCompositeClass.getZone(literal) == zone;
     }
 
 
@@ -218,9 +124,6 @@ public final class DateConstantZoneClass extends LiteralClass implements ResultR
 
         DateConstantZoneClass other = (DateConstantZoneClass) object;
 
-        if(zone != other.zone)
-            return false;
-
-        return true;
+        return Objects.equals(zone, other.zone);
     }
 }

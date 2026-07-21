@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdStringIri;
 
 
 
@@ -8,6 +8,6 @@ public final class StringClass extends SimpleLiteralClass
 {
     public StringClass()
     {
-        super("string", "varchar", xsdStringIri);
+        super("string", xsdStringIri, "varchar");
     }
 }

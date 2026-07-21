@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,7 +23,8 @@ import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedPairedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariable;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlNodeValue;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
@@ -34,13 +36,13 @@ public final class SqlProcedureCall extends SqlIntercode
 
     private final SqlIntercode child;
     private final ProcedureDefinition procedure;
-    private final LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters;
+    private final LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters;
     private final LinkedHashMap<ResultDefinition, String> results;
     private final Map<Column, Column> columnMap;
 
 
     protected SqlProcedureCall(UsedVariables variables, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Map<Column, Column> columnMap)
     {
         super(variables, child.isDeterministic()); //TODO: is procedure deterministic?
@@ -54,7 +56,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     public static SqlIntercode create(Request request, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child)
     {
         return create(request, procedure, parameters, results, child, null);
@@ -62,19 +64,19 @@ public final class SqlProcedureCall extends SqlIntercode
 
 
     protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
-            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters,
+            LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, String> results, SqlIntercode child, Restrictions restrictions)
     {
         Map<String, Set<ResourceClass>> resClasses = new HashMap<String, Set<ResourceClass>>();
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
             ResourceClass resClass = definition.getParameterClass();
-            SqlNodeValue node = entry.getValue();
+            SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-                resClasses.computeIfAbsent(var.getName(), k -> new HashSet<ResourceClass>()).add(resClass);
+                resClasses.computeIfAbsent(var.getName(), _ -> new HashSet<ResourceClass>()).add(resClass);
         }
 
 
@@ -82,7 +84,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
         for(Entry<String, Set<ResourceClass>> e : resClasses.entrySet())
         {
-            ResourceClass interClass = ResourceClass.getIntersectionClass(e.getValue());
+            ResourceClass interClass = getIntersectionClass(e.getValue());
             String name = e.getKey();
 
             if(interClass == null)
@@ -125,12 +127,14 @@ public final class SqlProcedureCall extends SqlIntercode
 
         Restrictions childRestrictions = new Restrictions(restrictions);
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
-            childRestrictions.add(entry.getValue().getRequirements(Set.of(entry.getKey().getParameterClass())));
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
+            childRestrictions.add(entry.getValue().getRequirements());
 
         //FIXME: is procedure deterministic?
+
         SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
-        LinkedHashMap<ParameterDefinition, SqlNodeValue> optParameters = optimize(request, parameters, optChild);
+        LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optParameters = optimize(request, parameters,
+                optChild);
 
 
         if(optChild instanceof SqlUnion union)
@@ -139,7 +143,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
             for(SqlIntercode child : union.getChilds())
             {
-                LinkedHashMap<ParameterDefinition, SqlNodeValue> childParams = optimize(request, optParameters, child);
+                LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> childParams = optimize(request,
+                        optParameters, child);
                 childs.add(create(request, procedure, childParams, optResults, child, restrictions));
             }
 
@@ -149,15 +154,15 @@ public final class SqlProcedureCall extends SqlIntercode
 
         Map<String, Set<ResourceClass>> resClasses = new HashMap<String, Set<ResourceClass>>();
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : optParameters.entrySet())
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : optParameters.entrySet())
         {
             ParameterDefinition definition = entry.getKey();
             ResourceClass resClass = definition.getParameterClass();
-            SqlNodeValue node = entry.getValue();
+            SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-                resClasses.computeIfAbsent(var.getName(), k -> new HashSet<ResourceClass>()).add(resClass);
-            else if(node == null || ResourceClass.areDisjunct(resClass, node.getResourceClass()))
+                resClasses.computeIfAbsent(var.getName(), _ -> new HashSet<ResourceClass>()).add(resClass);
+            else if(node == null || ResourceClass.areDisjunct(resClass, node.getResourceClasses()))
                 return SqlNoSolution.get();
         }
 
@@ -166,7 +171,7 @@ public final class SqlProcedureCall extends SqlIntercode
 
         for(Entry<String, Set<ResourceClass>> e : resClasses.entrySet())
         {
-            ResourceClass interClass = ResourceClass.getIntersectionClass(e.getValue());
+            ResourceClass interClass = getIntersectionClass(e.getValue());
             String name = e.getKey();
 
             if(interClass == null)
@@ -206,13 +211,14 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
-    protected static LinkedHashMap<ParameterDefinition, SqlNodeValue> optimize(Request request,
-            LinkedHashMap<ParameterDefinition, SqlNodeValue> parameters, SqlIntercode context)
+    protected static LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optimize(Request request,
+            LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters, SqlIntercode context)
     {
-        LinkedHashMap<ParameterDefinition, SqlNodeValue> result = new LinkedHashMap<ParameterDefinition, SqlNodeValue>();
+        LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> result = new LinkedHashMap<ParameterDefinition, SqlExpressionIntercode>();
 
-        for(Entry<ParameterDefinition, SqlNodeValue> e : parameters.entrySet())
-            result.put(e.getKey(), (SqlNodeValue) e.getValue().optimize(request, context.getVariables(), false));
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> e : parameters.entrySet())
+            result.put(e.getKey(), e.getValue().optimize(request, context.getVariables(),
+                    new Restriction(e.getKey().getParameterClass()), false));
 
         return result;
     }
@@ -250,14 +256,14 @@ public final class SqlProcedureCall extends SqlIntercode
         boolean hasParameter = false;
         builder.append("(");
 
-        for(Entry<ParameterDefinition, SqlNodeValue> entry : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> entry : parameters.entrySet())
         {
             appendComma(builder, hasParameter);
             hasParameter = true;
 
             ResourceClass resClass = entry.getKey().getParameterClass();
-            SqlNodeValue node = entry.getValue();
-            List<Column> columns = node.asResource(request, resClass);
+            SqlExpressionIntercode node = entry.getValue();
+            List<Column> columns = node.get(resClass);
 
             for(int i = 0; i < resClass.getColumnCount(); i++)
             {
@@ -279,7 +285,7 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(column);
         }
 
-        if(child != SqlEmptySolution.get())
+        if(!child.equals(SqlEmptySolution.get()))
         {
             builder.append(" FROM (");
             builder.append(child.translate(request));
@@ -350,7 +356,7 @@ public final class SqlProcedureCall extends SqlIntercode
             builder.append(e.getValue());
         }
 
-        for(Entry<ParameterDefinition, SqlNodeValue> e : parameters.entrySet())
+        for(Entry<ParameterDefinition, SqlExpressionIntercode> e : parameters.entrySet())
         {
             indentInfo(builder, indent, true);
             builder.append(e.getKey().getParamName());

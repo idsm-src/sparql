@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdIntIri;
 
 
 
@@ -8,6 +8,6 @@ public final class IntClass extends SimpleLiteralClass
 {
     public IntClass()
     {
-        super("int", "int4", xsdIntIri);
+        super("int", xsdIntIri, "int4");
     }
 }

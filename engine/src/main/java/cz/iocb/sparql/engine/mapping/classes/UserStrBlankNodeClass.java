@@ -1,152 +1,105 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import java.util.ArrayList;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intCompositeBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strCompositeBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strScalarBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
 public class UserStrBlankNodeClass extends StrBlankNodeClass
 {
-    static private int counter;
+    static private AtomicInteger counter = new AtomicInteger();
 
     private final int segment;
 
 
     public UserStrBlankNodeClass()
     {
-        super("sblanknode-" + Integer.toHexString(counter), List.of("varchar"));
-        this.segment = counter++;
+        int segment = counter.getAndIncrement();
+
+        super("sblanknode-" + Integer.toHexString(segment), List.of("varchar"),
+                Set.of(box, strScalarBlankNode, strCompositeBlankNode));
+        this.segment = segment;
     }
 
 
     public UserStrBlankNodeClass(int segment)
     {
-        super("sblanknode-" + Integer.toHexString(segment), List.of("varchar"));
-        this.segment = segment;
+        super("sblanknode-" + Integer.toHexString(segment), List.of("varchar"),
+                Set.of(box, strScalarBlankNode, strCompositeBlankNode));
 
         if(segment >= 0)
             throw new IllegalArgumentException();
+
+        this.segment = segment;
     }
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return List.of(new ConstantColumn(((BlankNodeLiteral) node).getLabel(), "varchar"));
+        assert isSubclassOf(superClass);
+
+        ResourceClass targetClass = superClass.getEffectiveClass();
+
+        if(targetClass.equals(this))
+            return columns;
+
+        Column bnvalue = columns.get(0);
+
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_sblanknode(%s, '%d'::int4)", bnvalue, segment));
+
+        if(targetClass.equals(strScalarBlankNode))
+            return List.of(expression("sparql.sblanknode_create(%s, '%d'::int4)", bnvalue, segment));
+
+        if(targetClass.equals(strCompositeBlankNode))
+            return List.of(bnvalue, !canBeNull ? constant(segment, "int4") :
+                    expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", bnvalue, segment));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
-        StringBuilder builder = new StringBuilder();
+        if(superClass.equals(this))
+            return columns;
 
-        builder.append("CASE WHEN ");
-        builder.append(columns.get(1));
-        builder.append(" = '");
-        builder.append(segment);
-        builder.append("'::int4 THEN ");
-        builder.append(columns.get(0));
-        builder.append(" END");
+        ResourceClass sourceClass = superClass.getEffectiveClass();
 
-        return List.of(new ExpressionColumn(builder.toString()));
+        assert isSubclassOf(sourceClass);
+
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_sblanknode_value_of_segment(%s, '%d'::int4)", columns.get(0),
+                    segment));
+
+        if(sourceClass.equals(intScalarBlankNode))
+            return List
+                    .of(expression("sparql.sblanknode_get_value_of_segment(%s, '%d'::int4)", columns.get(0), segment));
+
+        if(sourceClass.equals(intCompositeBlankNode))
+            return List
+                    .of(expression("CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), segment, columns.get(0)));
+
+        throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
+    public List<Column> toColumns(BlankNodeLiteral bnode)
     {
-        List<Column> result = new ArrayList<Column>(getGeneralClass().getColumnCount());
-
-        result.add(columns.get(0));
-
-        if(check == false)
-        {
-            result.add(new ConstantColumn(segment, "int4"));
-        }
-        else
-        {
-            StringBuilder builder = new StringBuilder();
-
-            builder.append("CASE WHEN ");
-            builder.append(columns.get(0));
-            builder.append(" IS NOT NULL THEN '");
-            builder.append(segment);
-            builder.append("'::int4 END");
-
-            result.add(new ExpressionColumn(builder.toString()));
-        }
-
-        return result;
-    }
-
-
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
-        return List.of(column);
-    }
-
-
-    @Override
-    public Column toExpression(List<Column> columns)
-    {
-        return columns.get(0);
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        if(check)
-            return List.of(new ExpressionColumn(
-                    "sparql.rdfbox_get_sblanknode_value_of_segment(" + column + ", '" + segment + "'::int4"));
-        else
-            return List.of(new ExpressionColumn("sparql.rdfbox_get_sblanknode_value(" + column + ")"));
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn(
-                "sparql.rdfbox_create_from_sblanknode(" + columns.get(0) + ", '" + segment + "'::int4)");
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
-        return "sparql.sblanknode_get_value_of_segment(" + code + ", '" + segment + "'::int4)";
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        return "sparql.sblanknode_create(" + code + ", '" + segment + "'::int4)";
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        return "sparql.rdfbox_create_from_sblanknode(" + code + ", '" + segment + "'::int4)";
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        if(check)
-            return "sparql.rdfbox_get_sblanknode_value_of_segment(" + code + ", '" + segment + "'::int4)";
-        else
-            return "sparql.rdfbox_get_sblanknode_value(" + code + ")";
+        return List.of(constant(bnode.getLabel(), sqlTypes.get(0)));
     }
 
 
@@ -167,9 +120,6 @@ public class UserStrBlankNodeClass extends StrBlankNodeClass
 
         UserStrBlankNodeClass other = (UserStrBlankNodeClass) object;
 
-        if(segment != other.segment)
-            return false;
-
-        return true;
+        return segment == other.segment;
     }
 }

@@ -1,8 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerType;
-import static cz.iocb.sparql.engine.translator.imcode.SqlBind.isExpressionExpansionNeeded;
-import static cz.iocb.sparql.engine.translator.imcode.SqlBind.translateExpressionExpansion;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,7 +13,6 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
@@ -67,33 +64,11 @@ public final class SqlAggregation extends SqlIntercode
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
         {
-            if(entry.getValue() != SqlNull.get())
-            {
-                Set<ResourceClass> resClasses = entry.getValue().getResourceClasses();
-
-                //FIXME
-                /*
-                for(ResourceClass resClass : resClasses)
-                {
-                    if(!resClass.canBeDerivatedFromGeneral())
-                    {
-                        ResourceClass genClass = resClass.getGeneralClass();
-
-                        if(resClasses.stream().filter(c -> c.getGeneralClass() == genClass).count() > 1)
-                        {
-                            resClasses = resClasses.stream().filter(c -> c.getGeneralClass() != genClass)
-                                    .collect(toSet());
-                            resClasses.add(genClass);
-                        }
-                    }
-                }
-                */
-
-                UsedVariable variable = new UsedVariable(entry.getKey(), entry.getValue().canBeNull());
-                resClasses.stream().forEach(
-                        res -> variable.addMapping(res, res.createColumns(request.getColumnMap(), entry.getKey())));
-                variables.add(variable);
-            }
+            Set<ResourceClass> resClasses = entry.getValue().getResourceClasses();
+            UsedVariable variable = new UsedVariable(entry.getKey(), entry.getValue().canBeNull());
+            resClasses.stream().forEach(
+                    res -> variable.addMapping(res, res.createColumns(request.getColumnMap(), entry.getKey())));
+            variables.add(variable);
         }
 
         variables = variables.restrict(restrictions);
@@ -122,7 +97,7 @@ public final class SqlAggregation extends SqlIntercode
         while(true)
         {
             optChild = optChild.optimize(request, childRestrictions, childReduce, evalServices);
-            optAggregations = optimizeAggregations(request, optAggregations, optChild, evalServices);
+            optAggregations = optimizeAggregations(request, optAggregations, optChild, restrictions, evalServices);
 
             boolean newChildReduce = optAggregations.values().stream()
                     .allMatch(a -> a instanceof SqlBuiltinCall c && c.isDistinct());
@@ -148,7 +123,7 @@ public final class SqlAggregation extends SqlIntercode
                 for(SqlIntercode child : segs)
                 {
                     Map<String, SqlExpressionIntercode> aggregations = optimizeAggregations(request, optAggregations,
-                            child, evalServices);
+                            child, restrictions, evalServices);
                     childs.add(aggregate(request, groupVariables, aggregations, child));
                 }
 
@@ -181,7 +156,7 @@ public final class SqlAggregation extends SqlIntercode
 
                     SqlIntercode aggregate = aggregate(request, groupVariables, subAggregations, code);
 
-                    SqlExpressionIntercode card = SqlVariable.create("@card", aggregate.getVariables());
+                    SqlExpressionIntercode card = SqlVariable.create(aggregate.getVariable("@card"));
                     SqlExpressionIntercode factor = SqlLiteral.create(request,
                             new Literal(count.toString(), xsdIntegerType));
                     SqlExpressionIntercode expression = SqlBinaryArithmetic.create(Operator.Multiply, factor, card);
@@ -198,7 +173,7 @@ public final class SqlAggregation extends SqlIntercode
 
             SqlIntercode optUnion = SqlUnion.union(request, unionList);
 
-            List<SqlExpressionIntercode> args = List.of(SqlVariable.create("@bind", optUnion.getVariables()));
+            List<SqlExpressionIntercode> args = List.of(SqlVariable.create(optUnion.getVariable("@bind")));
             SqlExpressionIntercode expr = SqlBuiltinCall.create(request, "sum", false, args);
 
             Map<String, SqlExpressionIntercode> outerAggregations = new LinkedHashMap<String, SqlExpressionIntercode>();
@@ -222,7 +197,7 @@ public final class SqlAggregation extends SqlIntercode
                     distinctVars.add(v);
 
             SqlIntercode child = SqlDistinct.create(request, optChild, distinctVars);
-            List<SqlExpressionIntercode> args = List.of(SqlVariable.create(var.getName(), child.getVariables()));
+            List<SqlExpressionIntercode> args = List.of(SqlVariable.create(child.getVariable(var.getName())));
 
             Map<String, SqlExpressionIntercode> subAggregations = Map.of(optAggregations.keySet().iterator().next(),
                     SqlBuiltinCall.create(request, "count", false, args));
@@ -239,7 +214,7 @@ public final class SqlAggregation extends SqlIntercode
             SqlIntercode result = SqlEmptySolution.get();
 
             for(Entry<String, SqlExpressionIntercode> entry : optAggregations.entrySet())
-                if(entry.getValue() != SqlNull.get())
+                if(!entry.getValue().equals(SqlNull.get()))
                     result = SqlBind.bind(request, entry.getKey(), entry.getValue(), result);
 
             return result.optimize(request, restrictions, reduced, evalServices);
@@ -254,12 +229,22 @@ public final class SqlAggregation extends SqlIntercode
 
 
     private Map<String, SqlExpressionIntercode> optimizeAggregations(Request request,
-            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, boolean evalServices)
+            Map<String, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions,
+            boolean evalServices)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         LinkedHashMap<String, SqlExpressionIntercode> opt = new LinkedHashMap<String, SqlExpressionIntercode>();
-        aggregations.forEach((k, v) -> opt.put(k, v.optimize(request, child.getVariables(), evalServices)));
+
+        for(Entry<String, SqlExpressionIntercode> e : aggregations.entrySet())
+        {
+            SqlExpressionIntercode optExpr = e.getValue().optimize(request, child.getVariables(),
+                    restrictions.getRestriction(e.getKey()), evalServices);
+
+            if(optExpr.getResourceClasses().stream().anyMatch(r -> restrictions.contains(e.getKey(), r)))
+                opt.put(e.getKey(), optExpr);
+        }
+
 
         /* change count(var) on count(*) if possible  */
         for(Map.Entry<String, SqlExpressionIntercode> entry : opt.entrySet())
@@ -287,7 +272,7 @@ public final class SqlAggregation extends SqlIntercode
 
         for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
             if(restrictions.contains(entry.getKey(), entry.getValue().getResourceClasses()))
-                childRestrictions.add(entry.getValue().getRequirements(null));
+                childRestrictions.add(entry.getValue().getRequirements());
 
         return childRestrictions;
     }
@@ -296,8 +281,6 @@ public final class SqlAggregation extends SqlIntercode
     @Override
     public String translate(Request request)
     {
-        boolean useTwoPhases = aggregations.values().stream().anyMatch(e -> isExpressionExpansionNeeded(e));
-
         Set<Column> groupByColumns = new HashSet<Column>();
 
         for(String variableName : groupVariables)
@@ -306,56 +289,6 @@ public final class SqlAggregation extends SqlIntercode
 
 
         StringBuilder builder = new StringBuilder();
-
-        if(useTwoPhases)
-        {
-            builder.append("SELECT ");
-            boolean hasSelect = false;
-
-            for(Entry<String, SqlExpressionIntercode> entry : aggregations.entrySet())
-            {
-                String variableName = entry.getKey();
-                SqlExpressionIntercode expression = entry.getValue();
-                UsedVariable variable = getVariables().get(variableName);
-
-                if(variable == null)
-                    continue;
-
-                if(!isExpressionExpansionNeeded(expression))
-                {
-                    Set<Column> columns = variable.getNonConstantColumns();
-
-                    if(!columns.isEmpty())
-                    {
-                        appendComma(builder, hasSelect);
-                        hasSelect = true;
-
-                        builder.append(columns.stream().map(Object::toString).collect(joining(", ")));
-                    }
-                }
-                else if(variable.hasMapping())
-                {
-                    appendComma(builder, hasSelect);
-                    hasSelect = true;
-
-                    Column column = new TableColumn(variableName + "##expression");
-                    builder.append(translateExpressionExpansion(column, variable, expression.isBoxed()));
-                }
-            }
-
-            if(!groupByColumns.isEmpty())
-            {
-                appendComma(builder, hasSelect);
-                hasSelect = true;
-                builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
-            }
-
-            if(!hasSelect)
-                builder.append("1");
-
-            builder.append(" FROM (");
-        }
-
 
         builder.append("SELECT ");
         boolean hasSelect = false;
@@ -366,19 +299,22 @@ public final class SqlAggregation extends SqlIntercode
             SqlExpressionIntercode expression = entry.getValue();
             UsedVariable variable = getVariables().get(variableName);
 
-            if(variable == null)
-                continue;
+            for(Entry<ResourceClass, List<Column>> e : expression.getUsedVariable().getMappings().entrySet())
+            {
+                ResourceClass resClass = e.getKey();
+                List<Column> names = variable.getMapping(resClass);
+                List<Column> cols = expression.get(resClass);
 
-            appendComma(builder, hasSelect);
-            hasSelect = true;
+                for(int i = 0; i < resClass.getColumnCount(); i++)
+                {
+                    appendComma(builder, hasSelect);
+                    hasSelect = true;
 
-            boolean expand = isExpressionExpansionNeeded(expression);
-            Column column = expand ? new TableColumn(variableName + "##expression") :
-                    variable.getMapping(variable.getClasses().iterator().next()).get(0);
-
-            builder.append(expression.translate(request));
-            builder.append(" AS ");
-            builder.append(column);
+                    builder.append(cols.get(i));
+                    builder.append(" AS ");
+                    builder.append(names.get(i));
+                }
+            }
         }
 
         if(!groupByColumns.isEmpty())
@@ -391,27 +327,18 @@ public final class SqlAggregation extends SqlIntercode
         if(!hasSelect)
             builder.append("1");
 
+
         builder.append(" FROM (");
         builder.append(child.translate(request));
         builder.append(" ) AS tab");
 
         if(!groupByColumns.isEmpty())
-        {
-            builder.append(" GROUP BY ");
-            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ")));
-        }
+            builder.append(groupByColumns.stream().map(Object::toString).collect(joining(", ", " GROUP BY ", "")));
         else if(!groupVariables.isEmpty())
-        {
             builder.append(" GROUP BY true::boolean");
-        }
         else if(aggregations.values().stream().noneMatch(e -> e instanceof SqlBuiltinCall c && c.isAggregateFunction()))
-        {
             builder.append(" GROUP BY ()");
-        }
 
-
-        if(useTwoPhases)
-            builder.append(" ) AS tab");
 
         return builder.toString();
     }

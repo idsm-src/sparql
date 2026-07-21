@@ -21,6 +21,12 @@ public class ExpressionColumn extends Column
     }
 
 
+    public ExpressionColumn(String format, Object... args)
+    {
+        this(String.format(format, args), true);
+    }
+
+
     @Override
     public String toString()
     {

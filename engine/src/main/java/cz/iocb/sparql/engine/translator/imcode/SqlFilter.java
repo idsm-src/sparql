@@ -14,8 +14,9 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.Multiset;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.translator.imcode.expression.SqlNull;
 
 
@@ -61,7 +62,7 @@ public final class SqlFilter extends SqlIntercode
         Restrictions childRestrictions = new Restrictions(restrictions);
 
         for(SqlExpressionIntercode cnd : optCnds)
-            childRestrictions.add(cnd.getRequirements(Set.of(xsdBoolean)));
+            childRestrictions.add(cnd.getRequirements());
 
         while(true)
         {
@@ -71,13 +72,14 @@ public final class SqlFilter extends SqlIntercode
 
             for(SqlExpressionIntercode cnd : optCnds)
             {
-                SqlExpressionIntercode expression = cnd.optimize(request, newOptChild.getVariables(), evalServices);
+                SqlExpressionIntercode expression = cnd.optimize(request, newOptChild.getVariables(),
+                        new Restriction(xsdBoolean), evalServices);
 
-                if(expression == SqlNull.get() || expression == falseValue)
+                if(expression.equals(SqlNull.get()) || expression.equals(falseValue))
                     return SqlNoSolution.get();
-                else if(expression instanceof SqlBinaryComparison binary && binary.isAlwaysFalseOrNull())
+                else if(expression instanceof SqlBooleanExpression expr && expr.isFalseOrError())
                     return SqlNoSolution.get();
-                else if(expression != trueValue)
+                else if(!expression.equals(trueValue))
                     newOptCnds.add(expression);
             }
 
@@ -86,7 +88,7 @@ public final class SqlFilter extends SqlIntercode
 
             boolean newChildReduced = reduced && optCnds.stream().allMatch(r -> r.isDeterministic());
             Restrictions newChildRestrictions = new Restrictions(restrictions);
-            newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements(Set.of(xsdBoolean))));
+            newOptCnds.forEach(c -> newChildRestrictions.add(c.getRequirements()));
 
             if(newChildReduced == childReduced && newChildRestrictions.equals(childRestrictions))
                 break;
@@ -96,7 +98,7 @@ public final class SqlFilter extends SqlIntercode
         }
 
 
-        if(optChild == SqlNoSolution.get())
+        if(optChild.equals(SqlNoSolution.get()))
             return SqlNoSolution.get();
 
         if(optCnds.isEmpty())
@@ -108,8 +110,9 @@ public final class SqlFilter extends SqlIntercode
             merged.addAll(filter.conditions);
             merged.addAll(optCnds);
 
-            List<SqlExpressionIntercode> cnds = merged.stream()
-                    .map(c -> c.optimize(request, filter.child.getVariables(), evalServices)).toList();
+            List<SqlExpressionIntercode> cnds = merged.stream().map(
+                    c -> c.optimize(request, filter.child.getVariables(), new Restriction(xsdBoolean), evalServices))
+                    .toList();
 
             return filter(request, cnds, filter.child).optimize(request, restrictions, reduced, evalServices);
         }
@@ -121,7 +124,8 @@ public final class SqlFilter extends SqlIntercode
             for(SqlIntercode child : union.getChilds())
             {
                 List<SqlExpressionIntercode> cnds = optCnds.stream()
-                        .map(c -> c.optimize(request, child.getVariables(), evalServices)).toList();
+                        .map(c -> c.optimize(request, child.getVariables(), new Restriction(xsdBoolean), evalServices))
+                        .toList();
 
                 childs.add(filter(request, cnds, child, restrictions));
             }
@@ -157,7 +161,7 @@ public final class SqlFilter extends SqlIntercode
 
         builder.append(" WHERE ");
 
-        builder.append(conditions.stream().map(cnd -> cnd.translate(request)).collect(joining(" AND ")));
+        builder.append(conditions.stream().map(cnd -> cnd.get(xsdBoolean).get(0).toString()).collect(joining(" AND ")));
 
         return builder.toString();
     }

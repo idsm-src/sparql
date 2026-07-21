@@ -1,31 +1,21 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.rdfLangStringIri;
-import java.sql.Statement;
-import java.util.ArrayList;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.rdfLangStringIri;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
+import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
 
 
 
 public final class LangStringClass extends LiteralClass implements ResultResourceClass
 {
-    LangStringClass()
+    protected LangStringClass()
     {
-        super("lang", List.of("varchar", "varchar"), rdfLangStringIri);
-    }
-
-
-    @Override
-    public ResourceClass getGeneralClass()
-    {
-        return rdfLangString;
+        super("lang", rdfLangStringIri, List.of("varchar", "varchar"), Set.of(box));
     }
 
 
@@ -37,109 +27,46 @@ public final class LangStringClass extends LiteralClass implements ResultResourc
 
 
     @Override
-    public List<Column> toColumns(Node node)
+    public List<Column> toColumns(Literal literal)
     {
-        Literal literal = (Literal) node;
-
-        List<Column> result = new ArrayList<Column>(getColumnCount());
-
-        result.add(new ConstantColumn(((String) literal.getValue()), "varchar"));
-        result.add(new ConstantColumn(literal.getLanguageTag(), "varchar"));
-
-        return result;
+        return List.of(constant(literal.getValue(), "varchar"), constant(literal.getLanguageTag(), "varchar"));
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(List<Column> columns)
+    public List<Column> toGeneralClass(ResourceClass superClass, List<Column> columns, boolean canBeNull)
     {
-        return columns;
-    }
+        assert isSubclassOf(superClass);
 
+        ResourceClass targetClass = superClass.getEffectiveClass();
 
-    @Override
-    public List<Column> toGeneralClass(List<Column> columns, boolean check)
-    {
-        return columns;
-    }
+        if(targetClass.equals(this))
+            return columns;
 
+        Column string = columns.get(0);
+        Column lang = columns.get(1);
 
-    @Override
-    public List<Column> fromExpression(Column column)
-    {
+        if(targetClass.equals(box))
+            return List.of(expression("sparql.rdfbox_create_from_langstring(%s, %s)", string, lang));
+
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public Column toExpression(List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
     {
+        if(superClass.equals(this))
+            return columns;
+
+        ResourceClass sourceClass = superClass.getEffectiveClass();
+
+        assert isSubclassOf(sourceClass);
+
+        if(sourceClass.equals(box))
+            return List.of(expression("sparql.rdfbox_get_langstring_value(%s)", columns.get(0)),
+                    expression("sparql.rdfbox_get_langstring_lang(%s)", columns.get(0)));
+
         throw new IllegalArgumentException();
-    }
-
-
-    @Override
-    public List<Column> fromBoxedExpression(Column column, boolean check)
-    {
-        List<Column> result = new ArrayList<Column>(getColumnCount());
-
-        result.add(new ExpressionColumn("sparql.rdfbox_get_langstring_value(" + column + ")"));
-        result.add(new ExpressionColumn("sparql.rdfbox_get_langstring_lang(" + column + ")"));
-
-        return result;
-    }
-
-
-    @Override
-    public Column toBoxedExpression(List<Column> columns)
-    {
-        return new ExpressionColumn(
-                "sparql.rdfbox_create_from_langstring(" + columns.get(0) + ", " + columns.get(1) + ")");
-    }
-
-
-    @Override
-    public Column toExpression(Statement statement, Node node)
-    {
-        Literal literal = (Literal) node;
-
-        return new ExpressionColumn(
-                "sparql.rdfbox_create_from_langstring('" + ((String) literal.getValue()).replaceAll("'", "''")
-                        + "'::varchar, '" + literal.getLanguageTag() + "'::varchar)");
-    }
-
-
-    @Override
-    public String fromGeneralExpression(String code)
-    {
-        throw new IllegalArgumentException();
-    }
-
-
-    @Override
-    public String toGeneralExpression(String code)
-    {
-        throw new IllegalArgumentException();
-    }
-
-
-    @Override
-    public String toBoxedExpression(String code)
-    {
-        throw new IllegalArgumentException();
-    }
-
-
-    @Override
-    public String toUnboxedExpression(String code, boolean check)
-    {
-        throw new IllegalArgumentException();
-    }
-
-
-    @Override
-    public boolean hasExpressionType()
-    {
-        return false;
     }
 }

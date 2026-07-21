@@ -403,8 +403,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
             SqlIntercode union = SqlUnion.union(request, List.of(subjects, objects));
 
-            SqlIntercode bind = SqlBind.bind(request, objectName, SqlVariable.create(subjectName, union.getVariables()),
-                    union);
+            SqlIntercode bind = SqlBind.bind(request, objectName,
+                    SqlVariable.create(union.getVariables().get(subjectName)), union);
 
             return SqlDistinct.create(request, bind, distinctVariables);
         }
@@ -487,7 +487,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(i < tables.size() - 1)
                 {
-                    resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getLeftColumns().size());
+                    resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getTypes());
                     NodeMapping nodeMapping = new InternalNodeMapping(resourceClass,
                             joinColumnsPairs.get(i).getLeftColumns());
                     node = parent.createVariable(variablePrefix);
@@ -548,7 +548,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     variables.add(new UsedVariable(variableName, resourceClass, columns, false));
                 }
-                else if(other.getResourceClass() == resourceClass)
+                else if(other.getClasses().iterator().next().equals(resourceClass))
                 {
                     List<Column> current = other.getMapping(resourceClass);
                     condition.addAreEqual(columns, current);
@@ -556,7 +556,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 else
                 {
                     //FIXME: common (general) classes cannot be used in mappings
-                    assert ResourceClass.areDisjunct(other.getResourceClass(), resourceClass);
+                    assert ResourceClass.areDisjunct(other.getClasses().iterator().next(), resourceClass);
                     return SqlNoSolution.get();
                 }
             }
@@ -590,7 +590,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         return switch(node)
         {
-            case VariableOrBlankNode variable -> SqlVariable.create(variable.getSqlName(), variables);
+            case VariableOrBlankNode variable -> SqlVariable.create(variables.get(variable.getSqlName()));
             case IRI iri -> SqlIri.create(request, iri);
             case Literal literal -> SqlLiteral.create(request, literal);
             default -> null;

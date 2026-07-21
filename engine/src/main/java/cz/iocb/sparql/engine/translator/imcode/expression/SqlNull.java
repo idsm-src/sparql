@@ -1,8 +1,6 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
-import java.util.HashSet;
-import java.util.Set;
-import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import java.util.Map;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
 import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
@@ -16,7 +14,7 @@ public final class SqlNull extends SqlExpressionIntercode
 
     private SqlNull()
     {
-        super(new HashSet<ResourceClass>(), true, true);
+        super(Map.of(), true, true);
     }
 
 
@@ -27,23 +25,17 @@ public final class SqlNull extends SqlExpressionIntercode
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public Restrictions getRequirements()
     {
         return new Restrictions();
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        return singleton;
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        return "NULL";
+        return this;
     }
 
 
@@ -57,13 +49,13 @@ public final class SqlNull extends SqlExpressionIntercode
     @Override
     public boolean equals(Object object)
     {
-        return object == singleton;
+        return object == this;
     }
 
 
     @Override
     protected int getHashCode()
     {
-        return System.identityHashCode(singleton);
+        return System.identityHashCode(this);
     }
 }

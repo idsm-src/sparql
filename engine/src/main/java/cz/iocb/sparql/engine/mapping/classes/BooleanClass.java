@@ -1,13 +1,13 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdBooleanIri;
 
 
 
 public final class BooleanClass extends SimpleLiteralClass
 {
-    public BooleanClass()
+    protected BooleanClass()
     {
-        super("boolean", "bool", xsdBooleanIri);
+        super("boolean", xsdBooleanIri, "bool");
     }
 }

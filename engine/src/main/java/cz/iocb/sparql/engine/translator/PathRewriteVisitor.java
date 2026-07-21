@@ -113,7 +113,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
             case BracketedPath child:
                 return visitElement(new InversePath(child.getChild()));
 
-            case IRI child:
+            case IRI _:
                 return path;
 
             default:

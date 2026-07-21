@@ -1,65 +1,97 @@
 package cz.iocb.sparql.engine.translator.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
+import static cz.iocb.sparql.engine.translator.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.TRUE_OR_ERROR;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral.trueValue;
+import static java.util.Collections.singletonMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.UsedVariables;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
-public final class SqlUnaryLogical extends SqlUnary
+public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpression
 {
-    protected SqlUnaryLogical(SqlExpressionIntercode operand, Set<ResourceClass> resourceClasses, boolean canBeNull)
+    private final NonConstantBooleanValue value;
+
+
+    private SqlUnaryLogical(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings,
+            boolean canBeNull, NonConstantBooleanValue value)
     {
-        super(operand, resourceClasses, canBeNull);
+        super(operand, mappings, canBeNull);
+
+        this.value = value;
     }
 
 
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
     {
-        operand = SqlEffectiveBooleanValue.create(operand);
+        return create(operand, Restriction.ALL);
+    }
 
-        if(operand == SqlNull.get())
+
+    public static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
+    {
+        if(operand.equals(SqlNull.get()))
             return SqlNull.get();
 
-        if(operand == falseValue)
+        if(operand.equals(falseValue))
             return trueValue;
 
-        if(operand == trueValue)
+        if(operand.equals(trueValue))
             return falseValue;
 
-        return new SqlUnaryLogical(operand, asSet(xsdBoolean), operand.canBeNull());
+        NonConstantBooleanValue value = ANY;
+
+        if(operand instanceof SqlBooleanExpression e && e.isFalseOrError())
+            value = TRUE_OR_ERROR;
+
+        if(operand instanceof SqlBooleanExpression e && e.isTrueOrError())
+            value = FALSE_OR_ERROR;
+
+        List<Column> columns = restriction.contains(xsdBoolean) ? translate(operand) : null;
+        Map<ResourceClass, List<Column>> mappings = singletonMap(xsdBoolean, columns);
+
+        return new SqlUnaryLogical(operand, mappings, operand.canBeNull(), value);
+    }
+
+
+    private static List<Column> translate(SqlExpressionIntercode operand)
+    {
+        return List.of(new ExpressionColumn("(not " + operand.get(xsdBoolean).get(0) + ")", operand.canBeNull()));
     }
 
 
     @Override
-    public Restrictions getRequirements(Set<ResourceClass> expected)
+    public NonConstantBooleanValue getBooleanValue()
     {
-        return operand.getRequirements(Set.of(xsdBoolean));
+        return value;
     }
 
 
     @Override
-    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, boolean evalServices)
+    public SqlExpressionIntercode optimize(Request request, UsedVariables variables, Restriction restriction,
+            boolean evalServices)
     {
-        SqlExpressionIntercode optOperand = operand.optimize(request, variables, evalServices);
+        Restriction operandRestriction = new Restriction();
+
+        if(restriction.contains(xsdBoolean))
+            operandRestriction.add(xsdBoolean);
+
+        SqlExpressionIntercode optOperand = operand.optimize(request, variables, operandRestriction, evalServices);
 
         if(optOperand == operand)
             return this;
 
-        return create(optOperand);
-    }
-
-
-    @Override
-    public String translate(Request request)
-    {
-        return "(not " + operand.translate(request) + ")";
+        return create(optOperand, restriction);
     }
 
 
@@ -81,9 +113,6 @@ public final class SqlUnaryLogical extends SqlUnary
             return false;
 
         if(!super.equals(imcode))
-            return false;
-
-        if(!Objects.equals(operand, imcode.operand))
             return false;
 
         return true;

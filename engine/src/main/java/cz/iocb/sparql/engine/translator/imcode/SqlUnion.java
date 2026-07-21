@@ -40,7 +40,7 @@ public final class SqlUnion extends SqlIntercode
     {
         /* special cases */
 
-        branches = branches.stream().filter(i -> i != SqlNoSolution.get()).toList();
+        branches = branches.stream().filter(i -> !i.equals(SqlNoSolution.get())).toList();
 
         if(branches.isEmpty())
             return SqlNoSolution.get();
@@ -177,7 +177,7 @@ public final class SqlUnion extends SqlIntercode
     {
         List<SqlIntercode> optChilds = childs.stream()
                 .map(c -> c.optimize(request, restrictions, reduced, evalServices))
-                .filter(i -> i != SqlNoSolution.get()).toList();
+                .filter(i -> !i.equals(SqlNoSolution.get())).toList();
 
 
         if(optChilds.isEmpty())

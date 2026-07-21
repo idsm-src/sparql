@@ -607,8 +607,10 @@ public class EndpointServlet extends HttpServlet
         out.append("  },\n");
         out.append("  \"properties\": [\n");
 
+        //TODO: include predicates and classes not only from constant iri mappings
+
         out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
-                .filter(m -> m.getPredicate() instanceof ConstantIriMapping) // FIXME:
+                .filter(m -> m.getPredicate() instanceof ConstantIriMapping)
                 .map(m -> ((IRI) ((ConstantIriMapping) m.getPredicate()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 

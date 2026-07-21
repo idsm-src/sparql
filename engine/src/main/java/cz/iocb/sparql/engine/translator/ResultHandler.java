@@ -80,7 +80,7 @@ public abstract class ResultHandler implements AutoCloseable
 
             if(resClass.match(request.getStatement(), iri))
             {
-                if(resClass != iriClasses.getFirst())
+                if(!resClass.equals(iriClasses.getFirst()))
                 {
                     it.remove();
                     iriClasses.addFirst(resClass);
