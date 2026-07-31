@@ -1,0 +1,83 @@
+package cz.iocb.sparql.engine.model;
+
+import cz.iocb.sparql.engine.model.base.BaseComplexNode;
+import cz.iocb.sparql.engine.model.triple.Verb;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
+
+
+
+/**
+ * Represents a variable.
+ */
+public final class VariableNode extends BaseComplexNode implements VarOrIri, Verb, VariableOrBlankNode
+{
+    private final String name;
+    private final String scope;
+
+
+    public VariableNode(String name)
+    {
+        if(name.startsWith("$") || name.startsWith("?"))
+            name = name.substring(1);
+
+        this.scope = null;
+        this.name = name;
+    }
+
+
+    public VariableNode(String scope, String name)
+    {
+        if(name.startsWith("$") || name.startsWith("?"))
+            name = name.substring(1);
+
+        this.scope = scope;
+        this.name = name;
+    }
+
+
+    public String getName()
+    {
+        return name;
+    }
+
+
+    public String getScope()
+    {
+        return scope;
+    }
+
+
+    @Override
+    public int hashCode()
+    {
+        return name.hashCode();
+    }
+
+
+    @Override
+    public boolean equals(Object object)
+    {
+        if(this == object)
+            return true;
+
+        if(object == null || getClass() != object.getClass())
+            return false;
+
+        VariableNode variable = (VariableNode) object;
+
+        if(!name.equals(variable.name))
+            return false;
+
+        if(scope == null && variable.scope != null || !scope.equals(variable.scope))
+            return false;
+
+        return true;
+    }
+
+
+    @Override
+    public <T> T accept(ElementVisitor<T> visitor)
+    {
+        return visitor.visit(this);
+    }
+}

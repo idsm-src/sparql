@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,17 +9,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.IriCache;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -30,7 +30,7 @@ public abstract class ResultHandler implements AutoCloseable
     protected final Restrictions restrictions;
 
     private final IriCache iriCache = new IriCache(10000);
-    private final HashMap<String, List<UserIriClass>> typeIriClassesMap = new HashMap<String, List<UserIriClass>>();
+    private final Map<Variable, List<UserIriClass>> typeIriClassesMap = new HashMap<>();
 
 
     protected ResultHandler(Request request, Restrictions restrictions)
@@ -38,32 +38,32 @@ public abstract class ResultHandler implements AutoCloseable
         this.request = request;
         this.restrictions = restrictions;
 
-        for(String var : restrictions.getNames())
+        for(Variable var : restrictions.getNames())
         {
             Set<ResourceClass> restriction = restrictions.get(var);
 
             if(restriction == null || restriction.contains(unsupportedIri))
-                typeIriClassesMap.put(var, new LinkedList<UserIriClass>(request.getConfiguration().getIriClasses()));
+                typeIriClassesMap.put(var, new LinkedList<>(request.getConfiguration().getIriClasses()));
             else
-                typeIriClassesMap.put(var, new LinkedList<UserIriClass>(restriction.stream()
-                        .filter(c -> c instanceof UserIriClass).map(c -> (UserIriClass) c).toList()));
+                typeIriClassesMap.put(var, new LinkedList<>(restriction.stream().filter(c -> c instanceof UserIriClass)
+                        .map(c -> (UserIriClass) c).toList()));
         }
     }
 
 
-    protected final ResourceClass getResourceClass(Request request, Node value, String variable)
+    protected final ResourceClass getResourceClass(Request request, RdfTerm value, Variable variable)
     {
         return switch(value)
         {
-            case Literal lit -> lit.isTypeSupported() ? lit.getDataType().getResourceClass(lit) : unsupportedLiteral;
-            case IRI iri -> getIriClass(request, iri, variable);
-            case BlankNodeLiteral bn -> bn.getResourceClass();
+            case Literal lit -> getLiteralClass(request, lit);
+            case Iri iri -> getIriClass(request, iri, variable);
+            case BlankNode bn -> getBlankNodeClass(request, bn);
             default -> null;
         };
     }
 
 
-    private ResourceClass getIriClass(Request request, IRI iri, String variable)
+    private ResourceClass getIriClass(Request request, Iri iri, Variable variable)
     {
         IriClass iriClass = iriCache.getIriClass(iri);
 
@@ -94,16 +94,28 @@ public abstract class ResultHandler implements AutoCloseable
     }
 
 
-    public List<Column> getColumns(Request request, ResourceClass resClass, Node node)
+    private ResourceClass getLiteralClass(Request request, Literal literal)
     {
-        if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
-            return getColumns(request, iriClass, iri);
-
-        return resClass.toColumns(request.getStatement(), node);
+        return request.getLiteralClass(literal);
     }
 
 
-    public List<Column> getColumns(Request request, IriClass iriClass, IRI iri)
+    private ResourceClass getBlankNodeClass(Request request, BlankNode bnode)
+    {
+        return request.getBlankNodeClass(bnode);
+    }
+
+
+    public List<Column> getColumns(Request request, ResourceClass resClass, RdfTerm term)
+    {
+        if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
+            return getColumns(request, iriClass, iri);
+
+        return resClass.toColumns(request.getStatement(), term);
+    }
+
+
+    public List<Column> getColumns(Request request, IriClass iriClass, Iri iri)
     {
         List<Column> columns = iriCache.getIriColumns(iri);
 
@@ -116,7 +128,7 @@ public abstract class ResultHandler implements AutoCloseable
     }
 
 
-    public abstract void add(Map<String, Node> row) throws SQLException;
+    public abstract void add(Map<Variable, RdfTerm> row) throws SQLException;
 
 
     public abstract SqlIntercode get() throws SQLException;

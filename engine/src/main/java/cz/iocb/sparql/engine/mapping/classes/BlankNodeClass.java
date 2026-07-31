@@ -4,9 +4,8 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
@@ -18,25 +17,13 @@ public abstract class BlankNodeClass extends PrimitiveResourceClass
     }
 
 
-    public abstract List<Column> toColumns(BlankNodeLiteral bnode);
+    public abstract List<Column> toColumns(BlankNode bnode);
 
 
     @Override
-    public final boolean match(Statement statement, Node node)
+    public final List<Column> toColumns(Statement statement, RdfTerm term)
     {
-        return switch(node)
-        {
-            case VariableOrBlankNode _ -> true;
-            case BlankNodeLiteral bnode -> bnode.getResourceClass().isSubclassOf(this);
-            default -> false;
-        };
-    }
-
-
-    @Override
-    public final List<Column> toColumns(Statement statement, Node node)
-    {
-        if(node instanceof BlankNodeLiteral bnode)
+        if(term instanceof BlankNode bnode)
             return toColumns(bnode);
         else
             throw new IllegalArgumentException();

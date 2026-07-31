@@ -5,16 +5,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import cz.iocb.sparql.engine.parser.ElementVisitor;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.triple.AlternativePath;
-import cz.iocb.sparql.engine.parser.model.triple.BracketedPath;
-import cz.iocb.sparql.engine.parser.model.triple.InversePath;
-import cz.iocb.sparql.engine.parser.model.triple.NegatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.Path;
-import cz.iocb.sparql.engine.parser.model.triple.RepeatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.RepeatedPath.Kind;
-import cz.iocb.sparql.engine.parser.model.triple.SequencePath;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.triple.AlternativePath;
+import cz.iocb.sparql.engine.model.triple.BracketedPath;
+import cz.iocb.sparql.engine.model.triple.InversePath;
+import cz.iocb.sparql.engine.model.triple.NegatedPath;
+import cz.iocb.sparql.engine.model.triple.Path;
+import cz.iocb.sparql.engine.model.triple.RepeatedPath;
+import cz.iocb.sparql.engine.model.triple.RepeatedPath.Kind;
+import cz.iocb.sparql.engine.model.triple.SequencePath;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
@@ -23,7 +23,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
     @Override
     public Path visit(AlternativePath path)
     {
-        List<Path> alternatives = new LinkedList<Path>();
+        List<Path> alternatives = new LinkedList<>();
 
         for(Path child : path.getChildren())
         {
@@ -42,8 +42,8 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
     @Override
     public Path visit(SequencePath path)
     {
-        List<List<Path>> sequences = new LinkedList<List<Path>>();
-        sequences.add(new LinkedList<Path>());
+        List<List<Path>> sequences = new LinkedList<>();
+        sequences.add(new LinkedList<>());
 
         for(Path child : path.getChildren())
         {
@@ -51,13 +51,13 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
 
             if(rewrited instanceof AlternativePath alternativePath)
             {
-                List<List<Path>> tmp = new LinkedList<List<Path>>();
+                List<List<Path>> tmp = new LinkedList<>();
 
                 for(List<Path> s1 : sequences)
                 {
                     for(Path s2 : alternativePath.getChildren())
                     {
-                        List<Path> merged = new LinkedList<Path>(s1);
+                        List<Path> merged = new LinkedList<>(s1);
                         tmp.add(merged);
 
                         if(s2 instanceof SequencePath sequencePath)
@@ -113,7 +113,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
             case BracketedPath child:
                 return visitElement(new InversePath(child.getChild()));
 
-            case IRI _:
+            case IriNode _:
                 return path;
 
             default:
@@ -155,7 +155,7 @@ public class PathRewriteVisitor extends ElementVisitor<Path>
 
 
     @Override
-    public Path visit(IRI path)
+    public Path visit(IriNode path)
     {
         return path;
     }

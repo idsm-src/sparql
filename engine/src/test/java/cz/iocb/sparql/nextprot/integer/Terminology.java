@@ -6,7 +6,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.MapUserIriClass;
 
 
@@ -26,7 +26,7 @@ public class Terminology
 
         {
             Table table = new Table(schema, "terminology_bases");
-            NodeMapping subject = config.createIriMapping("terminology", "id");
+            TermMapping subject = config.createIriMapping("terminology", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("schema", "type"));
@@ -34,7 +34,7 @@ public class Terminology
 
         {
             Table table = new Table(schema, "terminology_parents");
-            NodeMapping subject = config.createIriMapping("terminology", "term");
+            TermMapping subject = config.createIriMapping("terminology", "term");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":childOf"),
                     config.createIriMapping("terminology", "parent"));
@@ -42,7 +42,7 @@ public class Terminology
 
         {
             Table table = new Table(schema, "terminology_related_terms");
-            NodeMapping subject = config.createIriMapping("terminology", "term");
+            TermMapping subject = config.createIriMapping("terminology", "term");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":related"),
                     config.createIriMapping("terminology", "related"));
@@ -50,7 +50,7 @@ public class Terminology
 
         {
             Table table = new Table(schema, "terminology_labels");
-            NodeMapping subject = config.createIriMapping("terminology", "term");
+            TermMapping subject = config.createIriMapping("terminology", "term");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));

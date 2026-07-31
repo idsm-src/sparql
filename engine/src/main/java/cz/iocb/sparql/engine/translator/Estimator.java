@@ -5,10 +5,11 @@ import java.sql.SQLException;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.iocb.sparql.engine.imcode.SqlDistinct;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.imcode.SqlDistinct;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
 
 
 
@@ -23,7 +24,7 @@ public class Estimator
     }
 
 
-    public long estimateDistinct(Request request, SqlIntercode imcode, String var) throws SQLException
+    public long estimateDistinct(Request request, SqlIntercode imcode, Variable var) throws SQLException
     {
         Restrictions restrictions = new Restrictions();
         restrictions.add(var);
@@ -36,7 +37,7 @@ public class Estimator
     }
 
 
-    public long estimateDistinct(Request request, SqlIntercode imcode, Set<String> vars)
+    public long estimateDistinct(Request request, SqlIntercode imcode, Set<Variable> vars)
     {
         if(vars.isEmpty())
             return 0;

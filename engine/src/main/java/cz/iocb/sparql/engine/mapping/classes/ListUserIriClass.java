@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -35,7 +35,7 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, IRI iri)
+    public List<Column> toColumns(Statement statement, Iri iri)
     {
         assert match(statement, iri);
 
@@ -44,7 +44,7 @@ public class ListUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, IRI iri)
+    public boolean match(Statement statement, Iri iri)
     {
         try
         {

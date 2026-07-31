@@ -18,7 +18,7 @@ public abstract class PrimitiveResourceClass extends ResourceClass
         super(name);
 
         this.sqlTypes = sqlTypes;
-        this.superClasses = new HashSet<ResourceClass>(superClasses);
+        this.superClasses = new HashSet<>(superClasses);
     }
 
 

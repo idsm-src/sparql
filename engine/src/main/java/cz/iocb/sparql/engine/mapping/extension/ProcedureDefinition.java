@@ -18,8 +18,8 @@ public class ProcedureDefinition
     {
         this.procedureName = procedureName;
         this.sqlProcedure = sqlProcedure;
-        this.parameters = new LinkedHashMap<String, ParameterDefinition>();
-        this.results = new LinkedHashMap<String, ResultDefinition>();
+        this.parameters = new LinkedHashMap<>();
+        this.results = new LinkedHashMap<>();
     }
 
 

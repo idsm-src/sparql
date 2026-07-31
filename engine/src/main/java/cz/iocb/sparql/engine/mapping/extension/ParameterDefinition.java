@@ -1,7 +1,7 @@
 package cz.iocb.sparql.engine.mapping.extension;
 
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.model.triple.Node;
 
 
 

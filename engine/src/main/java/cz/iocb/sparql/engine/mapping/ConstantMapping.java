@@ -4,42 +4,42 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
 
 
-public abstract class ConstantMapping extends NodeMapping
+public abstract class ConstantMapping extends TermMapping
 {
-    protected final Node value;
+    protected final RdfTerm value;
 
 
-    protected ConstantMapping(Node value, ResourceClass resourceClass, List<Column> columns)
+    protected ConstantMapping(RdfTerm value, ResourceClass resourceClass, List<Column> columns)
     {
         super(resourceClass, columns);
         this.value = value;
     }
 
 
-    public Node getValue()
+    public RdfTerm getValue()
     {
         return value;
     }
 
 
     @Override
-    public boolean match(Request request, Node node)
+    public boolean match(Request request, RdfTerm term)
     {
-        if(node instanceof VariableOrBlankNode)
+        if(term instanceof Variable)
             return true;
 
-        return value.equals(node);
+        return value.equals(term);
     }
 
 
     @Override
-    public NodeMapping remap(List<ColumnPair> columnMap)
+    public TermMapping remap(List<ColumnPair> columnMap)
     {
         return this;
     }

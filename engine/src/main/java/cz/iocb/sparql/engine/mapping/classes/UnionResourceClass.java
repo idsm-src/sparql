@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
@@ -33,9 +33,9 @@ public class UnionResourceClass extends CompoundResourceClass
 
 
     @Override
-    public boolean match(Statement statement, Node node)
+    public boolean match(Statement statement, RdfTerm term)
     {
-        return resClasses.stream().anyMatch(r -> r.match(statement, node));
+        return resClasses.stream().anyMatch(r -> r.match(statement, term));
     }
 
 

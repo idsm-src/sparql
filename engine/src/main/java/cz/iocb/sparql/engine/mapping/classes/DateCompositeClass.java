@@ -2,13 +2,15 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDateIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateType;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.TemporalDatatype;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -16,7 +18,7 @@ public final class DateCompositeClass extends LiteralClass implements ResultReso
 {
     protected DateCompositeClass()
     {
-        super("date@2c", xsdDateIri, List.of("date", "int4"), Set.of(box, xsdScalarDate));
+        super("date@2c", xsdDateType, List.of("date", "int4"), Set.of(box, xsdScalarDate));
     }
 
 
@@ -79,15 +81,15 @@ public final class DateCompositeClass extends LiteralClass implements ResultReso
     }
 
 
-    protected static String getDate(Literal literal)
+    public static String getDate(Literal literal)
     {
-        return ((String) literal.getValue()).replaceFirst("(Z|(\\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))$", "");
+        return Datatype.getCollapsedForm(literal.getValue()).replaceFirst(TemporalDatatype.ZONE + "$", "");
     }
 
 
-    protected static int getZone(Literal literal)
+    public static int getZone(Literal literal)
     {
-        String value = (String) literal.getValue();
+        String value = Datatype.getCollapsedForm(literal.getValue()).replaceFirst("[-+]00:00", "Z");
 
         String[] parts = value.replaceFirst(".*(Z|(([+-])([0-9][0-9]):([0-9][0-9])))$", "$31#0$4#0$5").split("#");
 

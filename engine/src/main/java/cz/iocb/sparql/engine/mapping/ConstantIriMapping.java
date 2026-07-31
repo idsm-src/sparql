@@ -4,20 +4,20 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
 
 
 
 public class ConstantIriMapping extends ConstantMapping
 {
-    public ConstantIriMapping(IRI iri, IriClass iriClass, List<Column> columns)
+    public ConstantIriMapping(Iri iri, IriClass iriClass, List<Column> columns)
     {
         super(iri, iriClass, columns);
     }
 
 
-    public ConstantIriMapping(IRI iri)
+    public ConstantIriMapping(Iri iri)
     {
         this(iri, null, null);
     }
@@ -29,7 +29,7 @@ public class ConstantIriMapping extends ConstantMapping
         if(resourceClass != null)
             return resourceClass;
 
-        return request.getIriClass((IRI) value);
+        return request.getIriClass((Iri) value);
     }
 
 
@@ -55,8 +55,8 @@ public class ConstantIriMapping extends ConstantMapping
     }
 
 
-    public IRI getIRI()
+    public Iri getIri()
     {
-        return (IRI) value;
+        return (Iri) value;
     }
 }

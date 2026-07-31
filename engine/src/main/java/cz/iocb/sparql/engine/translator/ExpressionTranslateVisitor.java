@@ -1,57 +1,73 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic.ArithmeticOperator.ADD;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic.ArithmeticOperator.DIVIDE;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic.ArithmeticOperator.MULTIPLY;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic.ArithmeticOperator.SUBTRACT;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN_OR_EQUAL;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.LESS_THAN;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.LESS_THAN_OR_EQUAL;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.NOT_EQUAL;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.AND;
+import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.OR;
+import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
+import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
+import static cz.iocb.sparql.engine.translator.TermGenerator.getVariable;
 import java.util.LinkedList;
 import java.util.List;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryArithmetic;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlCast;
+import cz.iocb.sparql.engine.imcode.expression.SqlEffectiveBooleanValue;
+import cz.iocb.sparql.engine.imcode.expression.SqlExists;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlFunctionCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
+import cz.iocb.sparql.engine.imcode.expression.SqlIri;
+import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryArithmetic;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
-import cz.iocb.sparql.engine.parser.Element;
-import cz.iocb.sparql.engine.parser.ElementVisitor;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.Prologue;
-import cz.iocb.sparql.engine.parser.model.Variable;
-import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
-import cz.iocb.sparql.engine.parser.model.expression.BracketedExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BuiltInCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.ExistsExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Expression;
-import cz.iocb.sparql.engine.parser.model.expression.FunctionCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.InExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.Prologue;
+import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.base.Element;
+import cz.iocb.sparql.engine.model.expression.BinaryExpression;
+import cz.iocb.sparql.engine.model.expression.BinaryExpression.Operator;
+import cz.iocb.sparql.engine.model.expression.BracketedExpression;
+import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
+import cz.iocb.sparql.engine.model.expression.ExistsExpression;
+import cz.iocb.sparql.engine.model.expression.Expression;
+import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
+import cz.iocb.sparql.engine.model.expression.InExpression;
+import cz.iocb.sparql.engine.model.expression.LiteralNode;
+import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
+import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryArithmetic;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryComparison;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBinaryLogical;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlCast;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlEffectiveBooleanValue;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlExists;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlFunctionCall;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlInExpression;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlUnaryArithmetic;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlUnaryLogical;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 
 public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionIntercode>
 {
     private final Request request;
-    private final UsedVariables variables;
+    private final VariableBindings bindings;
     private final TranslateVisitor parent;
     private final Prologue prologue;
 
 
-    public ExpressionTranslateVisitor(Request request, UsedVariables variables, TranslateVisitor parent)
+    public ExpressionTranslateVisitor(Request request, VariableBindings bindings, TranslateVisitor parent)
     {
         this.request = request;
-        this.variables = variables;
+        this.bindings = bindings;
         this.parent = parent;
         this.prologue = parent.getPrologue();
     }
@@ -71,29 +87,24 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         SqlExpressionIntercode left = visitElement(binaryExpression.getLeft());
         SqlExpressionIntercode right = visitElement(binaryExpression.getRight());
 
-        switch(operator)
+        return switch(operator)
         {
-            case And:
-            case Or:
-                return SqlBinaryLogical.create(operator, SqlEffectiveBooleanValue.create(left),
-                        SqlEffectiveBooleanValue.create(right));
-
-            case Add:
-            case Subtract:
-            case Multiply:
-            case Divide:
-                return SqlBinaryArithmetic.create(operator, left, right);
-
-            case Equals:
-            case NotEquals:
-            case LessThan:
-            case LessThanOrEqual:
-            case GreaterThan:
-            case GreaterThanOrEqual:
-                return SqlBinaryComparison.create(operator, left, right);
-        }
-
-        return null;
+            case And -> SqlBinaryLogical.create(AND, SqlEffectiveBooleanValue.create(left),
+                    SqlEffectiveBooleanValue.create(right));
+            case Or -> SqlBinaryLogical.create(OR, SqlEffectiveBooleanValue.create(left),
+                    SqlEffectiveBooleanValue.create(right));
+            case Add -> SqlBinaryArithmetic.create(ADD, left, right);
+            case Subtract -> SqlBinaryArithmetic.create(SUBTRACT, left, right);
+            case Multiply -> SqlBinaryArithmetic.create(MULTIPLY, left, right);
+            case Divide -> SqlBinaryArithmetic.create(DIVIDE, left, right);
+            case Equals -> SqlBinaryComparison.create(EQUAL, left, right);
+            case NotEquals -> SqlBinaryComparison.create(NOT_EQUAL, left, right);
+            case LessThan -> SqlBinaryComparison.create(LESS_THAN, left, right);
+            case LessThanOrEqual -> SqlBinaryComparison.create(LESS_THAN_OR_EQUAL, left, right);
+            case GreaterThan -> SqlBinaryComparison.create(GREATER_THAN, left, right);
+            case GreaterThanOrEqual -> SqlBinaryComparison.create(GREATER_THAN_OR_EQUAL, left, right);
+            default -> null;
+        };
     }
 
 
@@ -101,7 +112,7 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(InExpression inExpression)
     {
         SqlExpressionIntercode left = visitElement(inExpression.getLeft());
-        List<SqlExpressionIntercode> right = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> right = new LinkedList<>();
 
         for(Expression expression : inExpression.getRight())
             right.add(visitElement(expression));
@@ -142,28 +153,13 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(BuiltInCallExpression builtInCallExpression)
     {
         String function = builtInCallExpression.getFunctionName();
-        List<SqlExpressionIntercode> arguments = new LinkedList<SqlExpressionIntercode>();
+        List<SqlExpressionIntercode> arguments = new LinkedList<>();
 
         for(Expression expression : builtInCallExpression.getArguments())
             arguments.add(visitElement(expression));
 
         if(function.equalsIgnoreCase("iri") || function.equalsIgnoreCase("uri"))
-            arguments.add(SqlIri.create(request, prologue.getBase()));
-
-        if(function.equalsIgnoreCase("count") && arguments.size() == 0)
-        {
-            if(builtInCallExpression.isDistinct())
-            {
-                //FIXME: use better approach to detect in-scope variables
-                //TODO: filter out group by variables
-
-                for(UsedVariable variable : variables.getValues())
-                    if(!variable.getName().startsWith("@"))
-                        arguments.add(SqlVariable.create(variables.get(variable.getName())));
-            }
-
-            return SqlBuiltinCall.create(request, "card", builtInCallExpression.isDistinct(), arguments);
-        }
+            arguments.add(SqlIri.create(request, new Iri(prologue.getBase())));
 
         if(function.equalsIgnoreCase("if") && arguments.size() > 0)
             arguments.set(0, SqlEffectiveBooleanValue.create(arguments.get(0)));
@@ -176,20 +172,20 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(ExistsExpression existsExpression)
     {
         SqlIntercode pattern = parent.visitElement(existsExpression.getPattern());
-        return SqlExists.create(request, existsExpression.isNegated(), pattern, variables);
+        return SqlExists.create(request, existsExpression.isNegated(), pattern, bindings);
     }
 
 
     @Override
     public SqlExpressionIntercode visit(FunctionCallExpression functionCallExpression)
     {
-        IRI iri = functionCallExpression.getFunction();
-        List<SqlExpressionIntercode> arguemnts = new LinkedList<SqlExpressionIntercode>();
+        Iri iri = getIri(functionCallExpression.getFunction());
+        List<SqlExpressionIntercode> arguemnts = new LinkedList<>();
 
         for(Expression expression : functionCallExpression.getArguments())
             arguemnts.add(visitElement(expression));
 
-        DataType datatype = request.getConfiguration().getDataType(iri);
+        Datatype datatype = request.getConfiguration().getDatatype(iri);
 
         //TODO: add support for casting to user literals
 
@@ -204,22 +200,22 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 
 
     @Override
-    public SqlExpressionIntercode visit(IRI iri)
+    public SqlExpressionIntercode visit(IriNode iri)
     {
-        return SqlIri.create(request, iri);
+        return SqlIri.create(request, getIri(iri));
     }
 
 
     @Override
-    public SqlExpressionIntercode visit(Literal literal)
+    public SqlExpressionIntercode visit(LiteralNode literal)
     {
-        return SqlLiteral.create(request, literal);
+        return SqlLiteral.create(request, getLiteral(literal));
     }
 
 
     @Override
-    public SqlExpressionIntercode visit(Variable variable)
+    public SqlExpressionIntercode visit(VariableNode variable)
     {
-        return SqlVariable.create(variables.get(variable.getSqlName()));
+        return SqlVariable.create(bindings.get(getVariable(variable)));
     }
 }

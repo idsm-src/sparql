@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
+import static cz.iocb.sparql.engine.translator.TermGenerator.getTerm;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,80 +14,85 @@ import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.imcode.SqlBind;
+import cz.iocb.sparql.engine.imcode.SqlDistinct;
+import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
+import cz.iocb.sparql.engine.imcode.SqlFilter;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.SqlJoin;
+import cz.iocb.sparql.engine.imcode.SqlNoSolution;
+import cz.iocb.sparql.engine.imcode.SqlRecursive;
+import cz.iocb.sparql.engine.imcode.SqlTableAccess;
+import cz.iocb.sparql.engine.imcode.SqlUnion;
+import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
+import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
+import cz.iocb.sparql.engine.imcode.expression.SqlIri;
+import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
+import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantMapping;
 import cz.iocb.sparql.engine.mapping.InternalNodeMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
-import cz.iocb.sparql.engine.mapping.MappedNode;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedIriMapping;
 import cz.iocb.sparql.engine.mapping.ParametrisedMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.InternalResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.Element;
-import cz.iocb.sparql.engine.parser.ElementVisitor;
-import cz.iocb.sparql.engine.parser.model.DataSet;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VarOrIri;
-import cz.iocb.sparql.engine.parser.model.Variable;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.AlternativePath;
-import cz.iocb.sparql.engine.parser.model.triple.BracketedPath;
-import cz.iocb.sparql.engine.parser.model.triple.InversePath;
-import cz.iocb.sparql.engine.parser.model.triple.NegatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.parser.model.triple.Path;
-import cz.iocb.sparql.engine.parser.model.triple.RepeatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.RepeatedPath.Kind;
-import cz.iocb.sparql.engine.parser.model.triple.SequencePath;
-import cz.iocb.sparql.engine.parser.model.triple.Verb;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.VarOrIri;
+import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.base.Element;
+import cz.iocb.sparql.engine.model.triple.AlternativePath;
+import cz.iocb.sparql.engine.model.triple.BracketedPath;
+import cz.iocb.sparql.engine.model.triple.InversePath;
+import cz.iocb.sparql.engine.model.triple.NegatedPath;
+import cz.iocb.sparql.engine.model.triple.Path;
+import cz.iocb.sparql.engine.model.triple.RepeatedPath;
+import cz.iocb.sparql.engine.model.triple.RepeatedPath.Kind;
+import cz.iocb.sparql.engine.model.triple.SequencePath;
+import cz.iocb.sparql.engine.model.triple.Verb;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.imcode.SqlBind;
-import cz.iocb.sparql.engine.translator.imcode.SqlDistinct;
-import cz.iocb.sparql.engine.translator.imcode.SqlEmptySolution;
-import cz.iocb.sparql.engine.translator.imcode.SqlFilter;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
-import cz.iocb.sparql.engine.translator.imcode.SqlJoin;
-import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
-import cz.iocb.sparql.engine.translator.imcode.SqlRecursive;
-import cz.iocb.sparql.engine.translator.imcode.SqlTableAccess;
-import cz.iocb.sparql.engine.translator.imcode.SqlUnion;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlBuiltinCall;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlExpressionIntercode;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlIri;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlLiteral;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlUnaryLogical;
-import cz.iocb.sparql.engine.translator.imcode.expression.SqlVariable;
 
 
 
 public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 {
+    private static record MappedTerm(RdfTerm term, TermMapping mapping)
+    {
+    }
+
+
     private static final String variablePrefix = "@pathvar";
 
     private final Request request;
 
     private final TranslateVisitor parent;
-    private final List<DataSet> datasets;
-
-    private Node graph = null;
-    private Node subject = null;
-    private Node object = null;
+    private final List<QuadMapping> mappings;
 
 
-    public PathTranslateVisitor(Request request, TranslateVisitor parent, List<DataSet> datasets)
+    private RdfTerm graph = null;
+    private RdfTerm subject = null;
+    private RdfTerm object = null;
+
+
+    public PathTranslateVisitor(Request request, TranslateVisitor parent, List<QuadMapping> mappings)
     {
         this.request = request;
         this.parent = parent;
-        this.datasets = datasets;
+        this.mappings = mappings;
     }
 
 
-    public SqlIntercode translate(Node graph, Node subject, Verb predicate, Node object)
+    public SqlIntercode translate(RdfTerm graph, RdfTerm subject, Verb predicate, RdfTerm object)
     {
         if(predicate instanceof Path)
             predicate = new PathRewriteVisitor().visitElement(predicate);
@@ -98,13 +105,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    SqlIntercode visitElement(Element element, Node subject, Node object)
+    SqlIntercode visitElement(Element element, RdfTerm subject, RdfTerm object)
     {
         if(element == null || subject == null || object == null)
             return SqlNoSolution.get();
 
-        Node prevSubject = this.subject;
-        Node prevObject = this.object;
+        RdfTerm prevSubject = this.subject;
+        RdfTerm prevObject = this.object;
 
         this.subject = subject;
         this.object = object;
@@ -131,7 +138,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         List<Path> path = sequencePath.getChildren();
 
-        List<Node> nodes = new ArrayList<Node>(path.size() + 1);
+        List<RdfTerm> nodes = new ArrayList<>(path.size() + 1);
 
         nodes.add(subject);
 
@@ -160,51 +167,46 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(RepeatedPath repeatedPath)
     {
-        Set<String> distinct = Stream.of(subject, object).filter(e -> e instanceof VariableOrBlankNode)
-                .map(e -> ((VariableOrBlankNode) e).getSqlName()).collect(toSet());
+        Set<Variable> distinct = Stream.of(subject, object).filter(e -> e instanceof Variable).map(e -> (Variable) e)
+                .collect(toSet());
 
         if(repeatedPath.getKind() == Kind.ZeroOrOne)
             return SqlDistinct.create(request, SqlUnion.union(request, List.of(translateZeroPath(subject, object),
                     visitElement(repeatedPath.getChild(), subject, object))), distinct);
 
 
-        Variable joinNode = parent.createVariable(variablePrefix);
-        String joinName = joinNode.getSqlName();
-        String graphName = graph instanceof VariableOrBlankNode v ? v.getSqlName() : null;
+        Variable joinVar = parent.createVariable(variablePrefix);
+        Variable graphVar = graph instanceof Variable v ? v : null;
 
 
         // if it is more suitable, the reverse order is used
-        if(!(object instanceof VariableOrBlankNode) && subject instanceof VariableOrBlankNode)
+        if(!(object instanceof Variable) && subject instanceof Variable endVar)
         {
-            String endName = ((VariableOrBlankNode) subject).getSqlName();
-
             SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(object, subject) :
                     visitElement(repeatedPath.getChild(), subject, object);
 
-            SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinNode);
+            SqlIntercode next = visitElement(repeatedPath.getChild(), subject, joinVar);
 
-            return SqlRecursive.create(request, init, next, null, joinName, endName, graphName);
+            return SqlRecursive.create(request, init, next, null, joinVar, endVar, graphVar);
         }
 
 
-        Node cndNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? null : object;
-        Node endNode = (object instanceof VariableOrBlankNode && !object.equals(subject)) ? object :
+        RdfTerm cndTerm = (object instanceof Variable && !object.equals(subject)) ? null : object;
+        Variable beginVar = subject instanceof Variable var ? var : null;
+        Variable endVar = (object instanceof Variable var && !object.equals(subject)) ? var :
                 parent.createVariable(variablePrefix);
 
-        String beginName = subject instanceof VariableOrBlankNode ? ((VariableOrBlankNode) subject).getSqlName() : null;
-        String endName = ((VariableOrBlankNode) endNode).getSqlName();
+        SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endVar) :
+                visitElement(repeatedPath.getChild(), subject, endVar);
 
-        SqlIntercode init = repeatedPath.getKind() == Kind.ZeroOrMore ? translateZeroPath(subject, endNode) :
-                visitElement(repeatedPath.getChild(), subject, endNode);
+        SqlIntercode next = visitElement(repeatedPath.getChild(), joinVar, endVar);
 
-        SqlIntercode next = visitElement(repeatedPath.getChild(), joinNode, endNode);
+        SqlIntercode intercode = SqlRecursive.create(request, init, next, beginVar, joinVar, endVar, graphVar);
 
-        SqlIntercode intercode = SqlRecursive.create(request, init, next, beginName, joinName, endName, graphName);
-
-        if(cndNode != null)
+        if(cndTerm != null)
         {
-            SqlExpressionIntercode filter = getComparisonExpression(request, cndNode, endNode, false,
-                    intercode.getVariables());
+            SqlExpressionIntercode filter = getComparisonExpression(request, cndTerm, endVar, false,
+                    intercode.getVariableBindings());
             intercode = SqlFilter.filter(request, List.of(filter), intercode);
         }
 
@@ -215,28 +217,27 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     @Override
     public SqlIntercode visit(NegatedPath negatedPath)
     {
-        List<IRI> negIriSet = new LinkedList<IRI>();
-        List<IRI> invNegIriSet = new LinkedList<IRI>();
+        List<Iri> negIriSet = new LinkedList<>();
+        List<Iri> invNegIriSet = new LinkedList<>();
 
-        if(negatedPath.getChild() instanceof IRI)
+        if(negatedPath.getChild() instanceof IriNode node)
         {
-            negIriSet.add((IRI) negatedPath.getChild());
+            negIriSet.add(getIri(node));
         }
-        else if(negatedPath.getChild() instanceof InversePath)
+        else if(negatedPath.getChild() instanceof InversePath path)
         {
-            invNegIriSet.add((IRI) ((InversePath) negatedPath.getChild()).getChild());
+            invNegIriSet.add(getIri((IriNode) path.getChild()));
         }
         else
         {
             for(Path child : ((AlternativePath) ((BracketedPath) negatedPath.getChild()).getChild()).getChildren())
             {
-                if(child instanceof IRI iri)
-                    negIriSet.add(iri);
+                if(child instanceof IriNode node)
+                    negIriSet.add(getIri(node));
                 else if(child instanceof InversePath inversePath)
-                    invNegIriSet.add((IRI) inversePath.getChild());
+                    invNegIriSet.add(getIri((IriNode) inversePath.getChild()));
             }
         }
-
 
         if(!negIriSet.isEmpty() && invNegIriSet.isEmpty())
             return translateNegatedPath(subject, negIriSet, object);
@@ -257,14 +258,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     @Override
-    public SqlIntercode visit(IRI predicate)
+    public SqlIntercode visit(IriNode predicate)
     {
         return visit((VarOrIri) predicate);
     }
 
 
     @Override
-    public SqlIntercode visit(Variable predicate)
+    public SqlIntercode visit(VariableNode predicate)
     {
         return visit((VarOrIri) predicate);
     }
@@ -272,32 +273,15 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
     public SqlIntercode visit(VarOrIri predicate)
     {
-        List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+        RdfTerm predicateTerm = getTerm(predicate);
 
-        for(QuadMapping mapping : request.getConfiguration().getMappings(parent.getService()))
+        List<SqlIntercode> unionList = new ArrayList<>();
+
+        for(QuadMapping mapping : mappings)
         {
-            if(!datasets.isEmpty())
+            if(mapping.match(request, graph, subject, predicateTerm, object))
             {
-                ConstantIriMapping graphMapping = mapping.getGraph();
-
-                if(graphMapping == null)
-                    continue;
-
-                IRI graphIri = ((IRI) graphMapping.getValue());
-                boolean useDefaultDataset = graph == null;
-
-                if(datasets.stream().filter(d -> d.isDefault() == useDefaultDataset)
-                        .noneMatch(d -> d.getSourceSelector().equals(graphIri)))
-                    continue;
-            }
-            else if(graph == null && mapping.getGraph() != null)
-            {
-                continue;
-            }
-
-            if(mapping.match(request, graph, subject, predicate, object))
-            {
-                SqlIntercode translated = translateMapping(mapping, graph, subject, predicate, object,
+                SqlIntercode translated = translateMapping(mapping, graph, subject, predicateTerm, object,
                         new Conditions(true));
                 unionList.add(translated);
             }
@@ -307,34 +291,19 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateNegatedPath(Node subject, List<IRI> negatedIriSet, Node object)
+    private SqlIntercode translateNegatedPath(RdfTerm subject, List<Iri> negatedIriSet, RdfTerm object)
     {
-        List<SqlIntercode> unionList = new ArrayList<SqlIntercode>();
+        List<SqlIntercode> unionList = new ArrayList<>();
 
         Variable fakePredicate = parent.createVariable(variablePrefix);
 
-        for(QuadMapping mapping : request.getConfiguration().getMappings(parent.getService()))
+        for(QuadMapping mapping : mappings)
         {
-            if(!datasets.isEmpty())
-            {
-                ConstantIriMapping graphMapping = mapping.getGraph();
-
-                if(graphMapping == null)
-                    continue;
-
-                IRI graphIri = ((IRI) graphMapping.getValue());
-                boolean useDefaultDataset = graph == null;
-
-                if(datasets.stream().filter(d -> d.isDefault() == useDefaultDataset)
-                        .noneMatch(d -> d.getSourceSelector().equals(graphIri)))
-                    continue;
-            }
-
             if(mapping.match(request, graph, subject, fakePredicate, object))
             {
                 if(mapping.getPredicate() instanceof ConstantIriMapping constIriMapping)
                 {
-                    IRI predicate = (IRI) constIriMapping.getValue();
+                    Iri predicate = (Iri) constIriMapping.getValue();
 
                     if(negatedIriSet.contains(predicate))
                         continue;
@@ -347,13 +316,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 {
                     Conditions extraConditions = new Conditions(true);
 
-                    for(IRI node : negatedIriSet)
+                    for(Iri iri : negatedIriSet)
                     {
-                        if(mapping.getPredicate().match(request, node))
+                        if(mapping.getPredicate().match(request, iri))
                         {
                             ParametrisedIriMapping pm = (ParametrisedIriMapping) mapping.getPredicate();
                             List<Column> columns = pm.getColumns(request);
-                            List<Column> values = request.getColumns(pm.getResourceClass(request), node);
+                            List<Column> values = request.getColumns(pm.getResourceClass(request), iri);
                             Conditions conditions = new Conditions(false);
 
                             for(int i = 0; i < columns.size(); i++)
@@ -381,73 +350,66 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private SqlIntercode translateZeroPath(Node subject, Node object)
+    private SqlIntercode translateZeroPath(RdfTerm subject, RdfTerm object)
     {
-        if(subject instanceof VariableOrBlankNode subjectVar && object instanceof VariableOrBlankNode objectVar)
+        if(subject instanceof Variable subjectVar && object instanceof Variable objectVar)
         {
-            String subjectName = subjectVar.getSqlName();
-            String objectName = objectVar.getSqlName();
-
-            SqlIntercode subjects = visitElement(parent.createVariable(variablePrefix), subject,
+            SqlIntercode subjects = visitElement(parent.createVariableNode(variablePrefix), subject,
                     parent.createVariable(variablePrefix));
 
-            SqlIntercode objects = visitElement(parent.createVariable(variablePrefix),
+            SqlIntercode objects = visitElement(parent.createVariableNode(variablePrefix),
                     parent.createVariable(variablePrefix), subject);
 
-            Set<String> distinctVariables = new HashSet<String>();
-            distinctVariables.add(subjectName);
-            distinctVariables.add(objectName);
+            Set<Variable> distinctVariables = new HashSet<>();
+            distinctVariables.add(subjectVar);
+            distinctVariables.add(objectVar);
 
-            if(graph instanceof VariableOrBlankNode graphVar)
-                distinctVariables.add(graphVar.getSqlName());
+            if(graph instanceof Variable graphVar)
+                distinctVariables.add(graphVar);
 
             SqlIntercode union = SqlUnion.union(request, List.of(subjects, objects));
 
-            SqlIntercode bind = SqlBind.bind(request, objectName,
-                    SqlVariable.create(union.getVariables().get(subjectName)), union);
+            SqlIntercode bind = SqlBind.bind(request, objectVar,
+                    SqlVariable.create(union.getVariableBindings().get(subjectVar)), union);
 
             return SqlDistinct.create(request, bind, distinctVariables);
         }
-        else if(subject instanceof VariableOrBlankNode variable)
+        else if(subject instanceof Variable variable)
         {
-            String subjectName = variable.getSqlName();
+            SqlExpressionIntercode expression = getExpression(request, object, new VariableBindings());
 
-            SqlExpressionIntercode expression = getExpression(request, object, new UsedVariables());
-
-            return SqlBind.bind(request, subjectName, expression, SqlEmptySolution.get());
+            return SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
         }
-        else if(object instanceof VariableOrBlankNode variable)
+        else if(object instanceof Variable variable)
         {
-            String objectName = variable.getSqlName();
+            SqlExpressionIntercode expression = getExpression(request, subject, new VariableBindings());
 
-            SqlExpressionIntercode expression = getExpression(request, subject, new UsedVariables());
-
-            return SqlBind.bind(request, objectName, expression, SqlEmptySolution.get());
+            return SqlBind.bind(request, variable, expression, SqlEmptySolution.get());
         }
         else
         {
             SqlIntercode child = SqlEmptySolution.get();
 
             SqlExpressionIntercode filter = getComparisonExpression(request, subject, object, false,
-                    child.getVariables());
+                    child.getVariableBindings());
 
             return SqlFilter.filter(request, List.of(filter), child);
         }
     }
 
 
-    private SqlIntercode translateMapping(QuadMapping qmapping, Node graph, Node subject, Node predicate, Node object,
-            Conditions predicateConditions)
+    private SqlIntercode translateMapping(QuadMapping qmapping, RdfTerm graph, RdfTerm subject, RdfTerm predicate,
+            RdfTerm object, Conditions predicateConditions)
     {
         if(qmapping instanceof SingleTableQuadMapping mapping)
         {
             Conditions conditions = Conditions.and(mapping.getConditions(), predicateConditions);
 
-            List<MappedNode> maps = new ArrayList<MappedNode>();
-            maps.add(new MappedNode(graph, mapping.getGraph()));
-            maps.add(new MappedNode(subject, mapping.getSubject()));
-            maps.add(new MappedNode(predicate, mapping.getPredicate()));
-            maps.add(new MappedNode(object, mapping.getObject()));
+            List<MappedTerm> maps = new ArrayList<>();
+            maps.add(new MappedTerm(graph, mapping.getGraph()));
+            maps.add(new MappedTerm(subject, mapping.getSubject()));
+            maps.add(new MappedTerm(predicate, mapping.getPredicate()));
+            maps.add(new MappedTerm(object, mapping.getObject()));
 
             return getTableAccess(request, mapping.getTable(), conditions, maps);
         }
@@ -457,41 +419,41 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
             ResourceClass resourceClass = null;
-            Node node = subject;
+            RdfTerm term = subject;
 
             SqlIntercode result = SqlEmptySolution.get();
 
             for(int i = 0; i < tables.size(); i++)
             {
-                List<MappedNode> maps = new ArrayList<MappedNode>();
+                List<MappedTerm> maps = new ArrayList<>();
 
                 if(i == 0)
-                    maps.add(new MappedNode(graph, mapping.getGraph()));
+                    maps.add(new MappedTerm(graph, mapping.getGraph()));
 
                 if(i == mapping.getSubjectTableIdx())
-                    maps.add(new MappedNode(subject, mapping.getSubject()));
+                    maps.add(new MappedTerm(subject, mapping.getSubject()));
 
                 if(i == mapping.getPredicateTableIdx())
-                    maps.add(new MappedNode(predicate, mapping.getPredicate()));
+                    maps.add(new MappedTerm(predicate, mapping.getPredicate()));
 
                 if(i == mapping.getObjectTableIdx())
-                    maps.add(new MappedNode(object, mapping.getObject()));
+                    maps.add(new MappedTerm(object, mapping.getObject()));
 
 
                 if(i > 0)
                 {
-                    NodeMapping nodeMapping = new InternalNodeMapping(resourceClass,
+                    TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
                             joinColumnsPairs.get(i - 1).getRightColumns());
-                    maps.add(new MappedNode(node, nodeMapping));
+                    maps.add(new MappedTerm(term, nodeMapping));
                 }
 
                 if(i < tables.size() - 1)
                 {
                     resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getTypes());
-                    NodeMapping nodeMapping = new InternalNodeMapping(resourceClass,
+                    TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
                             joinColumnsPairs.get(i).getLeftColumns());
-                    node = parent.createVariable(variablePrefix);
-                    maps.add(new MappedNode(node, nodeMapping));
+                    term = parent.createVariable(variablePrefix);
+                    maps.add(new MappedTerm(term, nodeMapping));
                 }
 
 
@@ -514,22 +476,22 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     private static SqlIntercode getTableAccess(Request request, Table table, Conditions extraCondition,
-            List<MappedNode> maps)
+            List<MappedTerm> maps)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
         Condition condition = new Condition();
-        UsedVariables variables = new UsedVariables();
+        VariableBindings bindings = new VariableBindings();
 
-        for(MappedNode map : maps)
+        for(MappedTerm map : maps)
         {
-            Node node = map.getNode();
-            NodeMapping mapping = map.getMapping();
+            RdfTerm term = map.term();
+            TermMapping mapping = map.mapping();
 
-            if(node == null)
+            if(term == null)
                 continue;
 
-            if(!(node instanceof VariableOrBlankNode) && mapping instanceof ConstantMapping)
+            if(!(term instanceof Variable) && mapping instanceof ConstantMapping)
                 continue; //NOTE: already checked
 
             ResourceClass resourceClass = mapping.getResourceClass(request);
@@ -539,14 +501,13 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(schema.isNullableColumn(table, column))
                     condition.addIsNotNull(column);
 
-            if(node instanceof VariableOrBlankNode variable)
+            if(term instanceof Variable variable)
             {
-                String variableName = variable.getSqlName();
-                UsedVariable other = variables.get(variableName);
+                VariableBinding other = bindings.get(variable);
 
                 if(other == null)
                 {
-                    variables.add(new UsedVariable(variableName, resourceClass, columns, false));
+                    bindings.add(new VariableBinding(variable, resourceClass, columns, false));
                 }
                 else if(other.getClasses().iterator().next().equals(resourceClass))
                 {
@@ -562,20 +523,20 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
             else if(mapping instanceof ParametrisedMapping)
             {
-                List<Column> values = request.getColumns(mapping.getResourceClass(request), node);
+                List<Column> values = request.getColumns(mapping.getResourceClass(request), term);
                 condition.addAreEqual(columns, values);
             }
         }
 
-        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), variables);
+        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), bindings);
     }
 
 
-    private static SqlExpressionIntercode getComparisonExpression(Request request, Node node1, Node node2, boolean not,
-            UsedVariables variables)
+    private static SqlExpressionIntercode getComparisonExpression(Request request, RdfTerm term1, RdfTerm term2,
+            boolean not, VariableBindings bindings)
     {
-        SqlExpressionIntercode expr1 = getExpression(request, node1, variables);
-        SqlExpressionIntercode expr2 = getExpression(request, node2, variables);
+        SqlExpressionIntercode expr1 = getExpression(request, term1, bindings);
+        SqlExpressionIntercode expr2 = getExpression(request, term2, bindings);
 
         SqlExpressionIntercode compare = SqlBuiltinCall.create(request, "sameterm", false, List.of(expr1, expr2));
 
@@ -586,12 +547,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    private static SqlExpressionIntercode getExpression(Request request, Node node, UsedVariables variables)
+    private static SqlExpressionIntercode getExpression(Request request, RdfTerm term, VariableBindings bindings)
     {
-        return switch(node)
+        return switch(term)
         {
-            case VariableOrBlankNode variable -> SqlVariable.create(variables.get(variable.getSqlName()));
-            case IRI iri -> SqlIri.create(request, iri);
+            case Variable variable -> SqlVariable.create(bindings.get(variable));
+            case Iri iri -> SqlIri.create(request, iri);
             case Literal literal -> SqlLiteral.create(request, literal);
             default -> null;
         };

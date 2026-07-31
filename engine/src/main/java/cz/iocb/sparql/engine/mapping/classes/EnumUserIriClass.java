@@ -6,13 +6,13 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import java.sql.Statement;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -20,11 +20,11 @@ public class EnumUserIriClass extends SimpleUserIriClass
 {
     private final Pattern pattern;
     private final String regexp;
-    private final HashMap<IRI, String> values;
+    private final Map<Iri, String> values;
     private final String prefix;
 
 
-    public EnumUserIriClass(String name, String sqlType, HashMap<IRI, String> values)
+    public EnumUserIriClass(String name, String sqlType, Map<Iri, String> values)
     {
         super(name, sqlType);
 
@@ -48,14 +48,14 @@ public class EnumUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, IRI iri)
+    public boolean match(Statement statement, Iri iri)
     {
         return pattern.matcher(iri.getValue()).matches();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, IRI iri)
+    public List<Column> toColumns(Statement statement, Iri iri)
     {
         assert match(statement, iri);
 
@@ -87,7 +87,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
     public String getPrefix(List<Column> columns)
     {
         if(columns.get(0) instanceof ConstantColumn col)
-            values.get(new IRI(col.getValue()));
+            values.get(new Iri(col.getValue()));
 
         return prefix;
     }

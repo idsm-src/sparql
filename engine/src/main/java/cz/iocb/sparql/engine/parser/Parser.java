@@ -13,6 +13,7 @@ import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.grammar.SparqlLexer;
 import cz.iocb.sparql.engine.grammar.SparqlParser;
+import cz.iocb.sparql.engine.model.base.Range;
 
 
 

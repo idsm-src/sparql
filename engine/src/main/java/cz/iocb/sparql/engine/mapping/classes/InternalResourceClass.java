@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
@@ -28,14 +28,14 @@ public final class InternalResourceClass extends PrimitiveResourceClass
 
 
     @Override
-    public boolean match(Statement statement, Node node)
+    public boolean match(Statement statement, RdfTerm term)
     {
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public List<Column> toColumns(Statement statement, RdfTerm term)
     {
         throw new IllegalArgumentException();
     }

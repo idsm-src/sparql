@@ -41,8 +41,10 @@ public class BuiltinClasses
 
     /* built-in special classes */
     public static final UnsupportedIriClass unsupportedIri = new UnsupportedIriClass();
-    public static final UserIntBlankNodeClass bnodeIntBlankNode = new UserIntBlankNodeClass();
-    public static final UserStrBlankNodeClass bnodeStrBlankNode = new UserStrBlankNodeClass();
+    public static final IntBlankNodeConstantSegmentClass bnodeIntBlankNode = new IntBlankNodeConstantSegmentClass(
+            Integer.MIN_VALUE);
+    public static final StrBlankNodeConstantSegmentClass bnodeStrBlankNode = new StrBlankNodeConstantSegmentClass(
+            Integer.MIN_VALUE);
 
     /* built-in union classes */
     public static final ResourceClass scalarBlankNode = getUnionClass(intScalarBlankNode, strScalarBlankNode);

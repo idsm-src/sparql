@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression.Operator;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -21,9 +21,9 @@ public class UserLiteralClass extends LiteralClass
     private final String notEqualOperator;
 
 
-    private UserLiteralClass(String name, String sqlType, String equalOp, String notEqualOp, IRI type)
+    private UserLiteralClass(String name, String sqlType, String equalOp, String notEqualOp, Datatype datatype)
     {
-        super(name, type, List.of(sqlType), Set.of(box));
+        super(name, datatype, List.of(sqlType), Set.of(box));
         this.equalOperator = equalOp;
         this.notEqualOperator = notEqualOp;
     }
@@ -39,7 +39,8 @@ public class UserLiteralClass extends LiteralClass
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), sqlTypes.get(0)));
+        //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
+        return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }
 
 
@@ -57,7 +58,7 @@ public class UserLiteralClass extends LiteralClass
 
         if(targetClass.equals(box))
             return List.of(expression("sparql.rdfbox_create_from_typedliteral((%s)::varchar, %s::varchar)", value,
-                    string(typeIri)));
+                    string(datatype.getTypeIri())));
 
         throw new IllegalArgumentException();
     }
@@ -75,18 +76,18 @@ public class UserLiteralClass extends LiteralClass
 
         if(sourceClass.equals(box))
             return List.of(expression("sparql.rdfbox_get_typedliteral_value_of_type(%s, %s::varchar)::%s",
-                    columns.get(0), string(typeIri), sqlTypes.get(0)));
+                    columns.get(0), string(datatype.getTypeIri()), sqlTypes.get(0)));
 
         throw new IllegalArgumentException();
     }
 
 
-    public String getOperatorCode(Operator operator)
+    public String getOperatorCode(ComparisonOperator operator)
     {
         return switch(operator)
         {
-            case Equals -> equalOperator;
-            case NotEquals -> notEqualOperator;
+            case EQUAL -> equalOperator;
+            case NOT_EQUAL -> notEqualOperator;
             default -> throw new IllegalArgumentException();
         };
     }

@@ -6,7 +6,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
@@ -26,17 +26,17 @@ public class RdfBoxClass extends PrimitiveResourceClass
 
 
     @Override
-    public boolean match(Statement statement, Node node)
+    public boolean match(Statement statement, RdfTerm term)
     {
         return true;
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public List<Column> toColumns(Statement statement, RdfTerm term)
     {
-        return resultClasses.stream().map(r -> (ResourceClass) r).filter(r -> r.match(statement, node))
-                .map(r -> r.toGeneralClass(box, r.toColumns(statement, node), false)).findFirst().get();
+        return resultClasses.stream().map(r -> (ResourceClass) r).filter(r -> r.match(statement, term))
+                .map(r -> r.toGeneralClass(box, r.toColumns(statement, term), false)).findFirst().get();
     }
 
 

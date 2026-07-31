@@ -1,8 +1,8 @@
 package cz.iocb.sparql.engine.mapping;
 
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 
 
@@ -10,12 +10,12 @@ import cz.iocb.sparql.engine.request.Request;
 public abstract class QuadMapping
 {
     private final ConstantIriMapping graph;
-    private final NodeMapping subject;
-    private final NodeMapping predicate;
-    private final NodeMapping object;
+    private final TermMapping subject;
+    private final TermMapping predicate;
+    private final TermMapping object;
 
 
-    public QuadMapping(ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate, NodeMapping object)
+    public QuadMapping(ConstantIriMapping graph, TermMapping subject, TermMapping predicate, TermMapping object)
     {
         //TODO: add support for parameterized graph mapping
 
@@ -26,7 +26,10 @@ public abstract class QuadMapping
     }
 
 
-    public boolean match(Request request, Node graph, Node subject, Node predicate, Node object)
+    public abstract QuadMapping asDefaultGraphMapping();
+
+
+    public boolean match(Request request, RdfTerm graph, RdfTerm subject, RdfTerm predicate, RdfTerm object)
     {
         if(!match(request, this.graph, graph))
             return false;
@@ -62,24 +65,25 @@ public abstract class QuadMapping
     }
 
 
-    private boolean match(Request request, NodeMapping mapping, Node node)
+    private boolean match(Request request, TermMapping mapping, RdfTerm term)
     {
-        if(node == null)
+        if(term == null && mapping == null)
             return true;
 
-        if(mapping == null)
+        if(term == null || mapping == null)
             return false;
 
-        return mapping.match(request, node);
+        return mapping.match(request, term);
     }
 
 
-    private boolean checkNodeCondition(Request request, Node node1, Node node2, NodeMapping map1, NodeMapping map2)
+    private boolean checkNodeCondition(Request request, RdfTerm term1, RdfTerm term2, TermMapping map1,
+            TermMapping map2)
     {
-        if(!(node1 instanceof VariableOrBlankNode && node2 instanceof VariableOrBlankNode))
+        if(!(term1 instanceof Variable && term2 instanceof Variable))
             return true;
 
-        if(!node1.equals(node2))
+        if(!term1.equals(term2))
             return true;
 
         if(map1 instanceof ConstantMapping cmap1 && map2 instanceof ConstantMapping cmap2)
@@ -95,19 +99,19 @@ public abstract class QuadMapping
     }
 
 
-    public final NodeMapping getSubject()
+    public final TermMapping getSubject()
     {
         return subject;
     }
 
 
-    public final NodeMapping getPredicate()
+    public final TermMapping getPredicate()
     {
         return predicate;
     }
 
 
-    public final NodeMapping getObject()
+    public final TermMapping getObject()
     {
         return object;
     }

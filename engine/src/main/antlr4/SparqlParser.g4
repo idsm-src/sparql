@@ -72,7 +72,7 @@ describeQuery
     ;
 
 describeClause
-    : DESCRIBE (varOrIRI+ | '*')
+    : DESCRIBE (varOrIri+ | '*')
     ;
 
 askQuery
@@ -226,7 +226,7 @@ quadsDetails
     ;
 
 quadsNotTriples
-    : GRAPH varOrIRI '{' triplesTemplate? '}'
+    : GRAPH varOrIri '{' triplesTemplate? '}'
     ;
     
 triplesTemplate
@@ -258,11 +258,11 @@ optionalGraphPattern
     ;
 
 graphGraphPattern
-    : GRAPH varOrIRI groupGraphPattern
+    : GRAPH varOrIri groupGraphPattern
     ;
 
 serviceGraphPattern
-    : SERVICE SILENT? varOrIRI ('(' ')')? groupGraphPattern
+    : SERVICE SILENT? varOrIri ('(' ')')? groupGraphPattern
     ;
     
 bind
@@ -338,7 +338,7 @@ propertyListNotEmpty
     ;
 
 verb
-    : varOrIRI | A
+    : varOrIri | A
     ;    
 
 objectList
@@ -457,7 +457,7 @@ varOrTerm
     : var | graphTerm
     ;
 
-varOrIRI
+varOrIri
     : var | iri
     ;
 

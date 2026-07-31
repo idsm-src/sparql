@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.SimpleLiteralClass;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -20,11 +20,11 @@ public class SubsetLiteralClass extends LiteralClass
 
     public SubsetLiteralClass(SimpleLiteralClass org)
     {
-        Set<ResourceClass> superClasses = new HashSet<ResourceClass>();
+        Set<ResourceClass> superClasses = new HashSet<>();
         superClasses.addAll(org.getSuperClasses());
         superClasses.add(org);
 
-        super(org.getName() + "_sub", org.getTypeIri(), org.getSqlTypes(), superClasses);
+        super(org.getName() + "_sub", org.getDatatype(), org.getSqlTypes(), superClasses);
 
         original = org;
     }

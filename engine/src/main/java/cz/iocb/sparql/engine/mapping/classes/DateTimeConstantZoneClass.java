@@ -3,9 +3,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeType;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -26,7 +26,7 @@ public final class DateTimeConstantZoneClass extends LiteralClass
 
     private DateTimeConstantZoneClass(int zone)
     {
-        super("datetime$" + zone, xsdDateTimeIri, List.of("timestamptz"),
+        super("datetime$" + zone, xsdDateTimeType, List.of("timestamptz"),
                 Set.of(box, xsdScalarDateTime, xsdCompositeDateTime));
         this.zone = zone;
     }

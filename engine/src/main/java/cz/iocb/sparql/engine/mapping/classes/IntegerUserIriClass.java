@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -86,14 +86,14 @@ public class IntegerUserIriClass extends SimpleUserIriClass
 
 
     @Override
-    public boolean match(Statement statement, IRI iri)
+    public boolean match(Statement statement, Iri iri)
     {
         return pattern.matcher(iri.getValue()).matches();
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, IRI iri)
+    public List<Column> toColumns(Statement statement, Iri iri)
     {
         assert match(statement, iri);
 

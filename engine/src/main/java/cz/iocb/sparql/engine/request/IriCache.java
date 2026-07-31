@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -17,16 +17,16 @@ public class IriCache
     }
 
 
-    private final Map<IRI, CacheItem> cache;
+    private final Map<Iri, CacheItem> cache;
 
 
     public IriCache(int majorSize)
     {
-        cache = new HashMap<IRI, CacheItem>(majorSize);
+        cache = new HashMap<>(majorSize);
     }
 
 
-    public IriClass getIriClass(IRI iri)
+    public IriClass getIriClass(Iri iri)
     {
         CacheItem items = cache.get(iri);
 
@@ -37,7 +37,7 @@ public class IriCache
     }
 
 
-    public List<Column> getIriColumns(IRI iri)
+    public List<Column> getIriColumns(Iri iri)
     {
         CacheItem items = cache.get(iri);
 
@@ -48,11 +48,11 @@ public class IriCache
     }
 
 
-    public IRI getIri(IriClass iriClass, List<Column> columns)
+    public Iri getIri(IriClass iriClass, List<Column> columns)
     {
         CacheItem item = new CacheItem(iriClass, columns);
 
-        for(Entry<IRI, CacheItem> entry : cache.entrySet())
+        for(Entry<Iri, CacheItem> entry : cache.entrySet())
             if(entry.getValue().equals(item))
                 return entry.getKey();
 
@@ -60,7 +60,7 @@ public class IriCache
     }
 
 
-    public void storeToCache(IRI iri, IriClass iriClass, List<Column> columns)
+    public void storeToCache(Iri iri, IriClass iriClass, List<Column> columns)
     {
         CacheItem item = new CacheItem(iriClass, columns);
         cache.put(iri, item);

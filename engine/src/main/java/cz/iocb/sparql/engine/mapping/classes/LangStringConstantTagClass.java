@@ -2,9 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.rdfLangStringIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringType;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
@@ -12,7 +12,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -25,7 +26,7 @@ public final class LangStringConstantTagClass extends LiteralClass
 
     private LangStringConstantTagClass(String tag)
     {
-        super("lang-" + tag, rdfLangStringIri, List.of("varchar"), Set.of(box, rdfLangString));
+        super("lang-" + tag, rdfLangStringType, List.of("varchar"), Set.of(box, rdfLangString));
         this.tag = tag;
     }
 
@@ -45,7 +46,7 @@ public final class LangStringConstantTagClass extends LiteralClass
 
     @Override
     public List<Column> toColumns(Literal literal)
-    {
+    { //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
         return List.of(constant(literal.getValue(), "varchar"));
     }
 
@@ -97,7 +98,10 @@ public final class LangStringConstantTagClass extends LiteralClass
     @Override
     public boolean match(Statement statement, Literal literal)
     {
-        return super.match(statement, literal) && Objects.equals(literal.getLanguageTag(), tag);
+        if(!super.match(statement, literal))
+            return false;
+
+        return literal instanceof LangStringLiteral lang && Objects.equals(lang.getTag(), tag);
     }
 
 

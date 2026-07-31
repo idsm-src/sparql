@@ -16,7 +16,7 @@ public class ParametrisedLiteralMapping extends ParametrisedMapping
 
 
     @Override
-    public NodeMapping remap(List<ColumnPair> columnMap)
+    public TermMapping remap(List<ColumnPair> columnMap)
     {
         return new ParametrisedLiteralMapping((LiteralClass) resourceClass, remapColumns(columnMap));
     }

@@ -1,20 +1,21 @@
 package cz.iocb.sparql.engine.translator;
 
-import java.util.HashSet;
+import static java.util.stream.Collectors.toList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import cz.iocb.sparql.engine.parser.ElementVisitor;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.Variable;
-import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BracketedExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BuiltInCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.ExistsExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Expression;
-import cz.iocb.sparql.engine.parser.model.expression.FunctionCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.InExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.expression.UnaryExpression;
+import java.util.Set;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.expression.BinaryExpression;
+import cz.iocb.sparql.engine.model.expression.BracketedExpression;
+import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
+import cz.iocb.sparql.engine.model.expression.ExistsExpression;
+import cz.iocb.sparql.engine.model.expression.Expression;
+import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
+import cz.iocb.sparql.engine.model.expression.InExpression;
+import cz.iocb.sparql.engine.model.expression.LiteralNode;
+import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
@@ -22,13 +23,16 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
 {
     private static final String variablePrefix = "@aggregationvar";
     private final TranslateVisitor parent;
-    private final LinkedHashMap<Variable, BuiltInCallExpression> aggregations = new LinkedHashMap<>();
-    private final HashSet<String> groupVars;
+    private final LinkedHashMap<VariableNode, BuiltInCallExpression> aggregations = new LinkedHashMap<>();
+    private final Set<VariableNode> scopeVars;
+    private final Set<VariableNode> groupVars;
 
 
-    public ExpressionAggregationRewriteVisitor(TranslateVisitor parent, HashSet<String> groupVars)
+    public ExpressionAggregationRewriteVisitor(TranslateVisitor parent, Set<VariableNode> scopeVars,
+            Set<VariableNode> groupVars)
     {
         this.parent = parent;
+        this.scopeVars = scopeVars;
         this.groupVars = groupVars;
     }
 
@@ -79,7 +83,19 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     {
         if(builtInCallExpression.isAggregateFunction())
         {
-            Variable result = parent.createVariable(variablePrefix);
+            if(builtInCallExpression.getFunctionName().equalsIgnoreCase("count")
+                    && builtInCallExpression.getArguments().isEmpty())
+            {
+                List<Expression> args = builtInCallExpression.isDistinct() ?
+                        scopeVars.stream().map(v -> (Expression) v).collect(toList()) : List.of();
+
+                BuiltInCallExpression card = new BuiltInCallExpression("card", args);
+                card.setRange(builtInCallExpression.getRange());
+
+                builtInCallExpression = card;
+            }
+
+            VariableNode result = parent.createVariableNode(variablePrefix);
             aggregations.put(result, builtInCallExpression);
             result.setRange(builtInCallExpression.getRange());
             return result;
@@ -113,30 +129,30 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
 
 
     @Override
-    public Expression visit(IRI iri)
+    public Expression visit(IriNode iri)
     {
         return iri;
     }
 
 
     @Override
-    public Expression visit(Literal literal)
+    public Expression visit(LiteralNode literal)
     {
         return literal;
     }
 
 
     @Override
-    public Expression visit(Variable variable)
+    public Expression visit(VariableNode variable)
     {
-        if(groupVars.contains(variable.getSqlName()))
+        if(groupVars.contains(variable))
             return variable;
 
 
         BuiltInCallExpression builtInCallExpression = new BuiltInCallExpression("sample", List.of(variable));
         builtInCallExpression.setRange(variable.getRange());
 
-        Variable result = parent.createVariable(variablePrefix);
+        VariableNode result = parent.createVariableNode(variablePrefix);
         aggregations.put(result, builtInCallExpression);
         result.setRange(variable.getRange());
 
@@ -144,7 +160,7 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     }
 
 
-    public LinkedHashMap<Variable, BuiltInCallExpression> getAggregations()
+    public LinkedHashMap<VariableNode, BuiltInCallExpression> getAggregations()
     {
         return aggregations;
     }

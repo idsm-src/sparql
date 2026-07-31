@@ -4,7 +4,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
@@ -22,9 +22,9 @@ public abstract class CompoundResourceClass extends ResourceClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, Node node)
+    public List<Column> toColumns(Statement statement, RdfTerm term)
     {
-        return effectiveClass.toColumns(statement, node);
+        return effectiveClass.toColumns(statement, term);
     }
 
 
