@@ -84,8 +84,8 @@ public class JoinTableQuadMapping extends QuadMapping
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            int subjectTableIdx, NodeMapping subject, int predicateTableIdx, NodeMapping predicate, int objectTableIdx,
-            NodeMapping object, List<Conditions> conditions)
+            int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate, int objectTableIdx,
+            TermMapping object, List<Conditions> conditions)
     {
         super(graph, subject, predicate, object);
 
@@ -101,17 +101,25 @@ public class JoinTableQuadMapping extends QuadMapping
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object, List<Conditions> conditions)
+            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         this(tables, joinColumnsPairs, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
     }
 
 
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            NodeMapping subject, ConstantIriMapping predicate, NodeMapping object)
+            TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
                 Collections.nCopies(tables.size(), new Conditions(true)));
+    }
+
+
+    @Override
+    public QuadMapping asDefaultGraphMapping()
+    {
+        return new JoinTableQuadMapping(tables, joinColumnsPairs, null, subjectTableIdx, getSubject(),
+                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), conditions);
     }
 
 

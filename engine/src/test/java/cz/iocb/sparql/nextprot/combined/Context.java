@@ -7,7 +7,7 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 
 
@@ -26,7 +26,7 @@ public class Context
 
         {
             Table table = new Table(schema, "context_bases");
-            NodeMapping subject = config.createIriMapping("context", "id");
+            TermMapping subject = config.createIriMapping("context", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":ExperimentalContext"));

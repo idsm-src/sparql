@@ -1,7 +1,7 @@
 package cz.iocb.sparql.engine.mapping;
 
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 

@@ -4,10 +4,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
+import cz.iocb.sparql.engine.rdf.IntBlankNode;
 
 
 
@@ -16,6 +17,13 @@ public final class CommonIntBlankNodeCompositeClass extends IntBlankNodeClass im
     protected CommonIntBlankNodeCompositeClass()
     {
         super("iblanknode@2c", List.of("int4", "int4"), Set.of(box, intScalarBlankNode));
+    }
+
+
+    @Override
+    public boolean match(Statement statement, IntBlankNode term)
+    {
+        return true;
     }
 
 
@@ -65,9 +73,9 @@ public final class CommonIntBlankNodeCompositeClass extends IntBlankNodeClass im
 
 
     @Override
-    public List<Column> toColumns(BlankNodeLiteral bnode)
+    public List<Column> toColumns(IntBlankNode bnode)
     {
-        int segment = ((UserIntBlankNodeClass) bnode.getResourceClass()).getSegment();
-        return List.of(constant(bnode.getLabel(), sqlTypes.get(0)), constant(segment, sqlTypes.get(1)));
+        int segment = bnode.getSegment();
+        return List.of(constant(bnode.getValue(), sqlTypes.get(0)), constant(segment, sqlTypes.get(1)));
     }
 }

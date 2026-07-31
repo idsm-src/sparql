@@ -1,8 +1,8 @@
 package cz.iocb.sparql.endpoint;
 
 import static cz.iocb.sparql.endpoint.EndpointServlet.OutputType.RDF_JSON;
-import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.PREDICATE;
-import static cz.iocb.sparql.engine.translator.imcode.SqlConstruct.ConstructColumn.SUBJECT;
+import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
+import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.joining;
 import java.io.IOException;
@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -32,26 +33,29 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
-import cz.iocb.sparql.engine.parser.model.DataSet;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.request.BNode;
+import cz.iocb.sparql.engine.model.DataSet;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Engine;
-import cz.iocb.sparql.engine.request.IriNode;
-import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
 import cz.iocb.sparql.engine.request.LimitExceedException;
-import cz.iocb.sparql.engine.request.LiteralNode;
-import cz.iocb.sparql.engine.request.RdfNode;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.request.Result.ResultType;
-import cz.iocb.sparql.engine.request.TypedLiteral;
 
 
 
-@SuppressWarnings("serial")
 public class EndpointServlet extends HttpServlet
 {
+    private static final long serialVersionUID = 1L;
+
+
     static enum OutputType
     {
         NONE(""),
@@ -94,8 +98,10 @@ public class EndpointServlet extends HttpServlet
         }
     }
 
-    static class Graph extends LinkedHashMap<RdfNode, LinkedHashMap<RdfNode, LinkedHashSet<RdfNode>>>
+
+    static class Graph extends LinkedHashMap<RdfTerm, LinkedHashMap<RdfTerm, LinkedHashSet<RdfTerm>>>
     {
+        private static final long serialVersionUID = 1L;
     }
 
 
@@ -314,11 +320,11 @@ public class EndpointServlet extends HttpServlet
             {
                 if(defaultGraphs != null)
                     for(String defaultGraph : defaultGraphs)
-                        dataSets.add(new DataSet(new IRI(defaultGraph), true));
+                        dataSets.add(new DataSet(new IriNode(defaultGraph), true));
 
                 if(namedGraphs != null)
                     for(String namedGraph : namedGraphs)
-                        dataSets.add(new DataSet(new IRI(namedGraph), false));
+                        dataSets.add(new DataSet(new IriNode(namedGraph), false));
             }
             catch(IllegalArgumentException e)
             {
@@ -354,7 +360,8 @@ public class EndpointServlet extends HttpServlet
             {
                 PreparedQuery preparedQuery = request.prepareQuery(query, dataSets);
                 OutputType format = detectOutputType(req, preparedQuery.getResultType());
-                List<String> order = format == RDF_JSON ? List.of(SUBJECT.getName(), PREDICATE.getName()) : List.of();
+                List<Variable> order = format == RDF_JSON ? List.of(SUBJECT.getVariable(), PREDICATE.getVariable()) :
+                        List.of();
 
                 try(Result result = request.execute(preparedQuery, order, 0, limit, fetchSize, timeout, sqlSizeLimit))
                 {
@@ -547,13 +554,15 @@ public class EndpointServlet extends HttpServlet
 
         // @formatter:off
         res.getOutputStream().print(
-                "<!DOCTYPE html>\n" +
-                "<html lang='en'>\n" +
-                "  <head>\n" +
-                "    <meta charset='utf-8'>\n" +
-                "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n" +
-                "    <title>YASGUI</title>\n" +
-                "    <style>\n");
+                """
+                    <!DOCTYPE html>
+                    <html lang='en'>
+                      <head>
+                        <meta charset='utf-8'>
+                        <meta name='viewport' content='width=device-width, initial-scale=1'>
+                        <title>YASGUI</title>
+                        <style>
+                    """);
 
                 try(InputStream stream = getClass().getResourceAsStream("yasgui.min.css"))
                 {
@@ -579,12 +588,14 @@ public class EndpointServlet extends HttpServlet
         }
 
         res.getOutputStream().print(
-                "  </script>\n" +
-                "  </head>\n" +
-                "  <body>\n" +
-                "    <div id='yasgui'></div>\n" +
-                "  </body>\n" +
-                "</html>\n");
+                """
+                      </script>
+                      </head>
+                      <body>
+                        <div id='yasgui'></div>
+                      </body>
+                    </html>
+                    """);
         // @formatter:on
     }
 
@@ -593,7 +604,7 @@ public class EndpointServlet extends HttpServlet
     {
         res.setContentType("application/json");
 
-        final IRI type = new IRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+        final Iri type = new Iri("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 
         PrintWriter out = res.getWriter();
 
@@ -611,7 +622,7 @@ public class EndpointServlet extends HttpServlet
 
         out.append(sparqlConfig.getMappings(sparqlConfig.getServiceIri()).stream()
                 .filter(m -> m.getPredicate() instanceof ConstantIriMapping)
-                .map(m -> ((IRI) ((ConstantIriMapping) m.getPredicate()).getValue()).getValue()).distinct().sorted()
+                .map(m -> ((Iri) ((ConstantIriMapping) m.getPredicate()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
@@ -622,7 +633,7 @@ public class EndpointServlet extends HttpServlet
                 .filter(m -> m.getPredicate() instanceof ConstantIriMapping
                         && ((ConstantIriMapping) m.getPredicate()).getValue().equals(type)
                         && m.getObject() instanceof ConstantIriMapping)
-                .map(m -> ((IRI) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
+                .map(m -> ((Iri) ((ConstantIriMapping) m.getObject()).getValue()).getValue()).distinct().sorted()
                 .map(i -> "    \"" + i + "\"").collect(joining(",\n")));
 
         out.append("\n");
@@ -816,10 +827,10 @@ public class EndpointServlet extends HttpServlet
 
         out.println("\t<head>");
 
-        for(String head : result.getHeads())
+        for(Variable head : result.getHeads())
         {
             out.print("\t\t<variable name=\"");
-            writeXmlValue(out, head);
+            writeXmlValue(out, head.getName());
             out.println("\"/>");
         }
 
@@ -833,48 +844,42 @@ public class EndpointServlet extends HttpServlet
 
             for(int i = 0; i < result.getHeads().size(); i++)
             {
-                RdfNode node = result.get(i);
+                RdfTerm term = result.get(i);
 
-                if(node == null)
+                if(term == null)
                     continue;
 
 
                 out.print("\t\t\t<binding name=\"");
-                writeXmlValue(out, result.getHeads().get(i));
+                writeXmlValue(out, result.getHeads().get(i).getName());
                 out.print("\">");
 
-                if(node instanceof IriNode)
+                if(term instanceof Iri iri)
                 {
                     out.print("<uri>");
-                    writeXmlValue(out, node.getValue());
+                    writeXmlValue(out, iri.getValue());
                     out.print("</uri>");
                 }
-                else if(node instanceof LanguageTaggedLiteral)
+                else if(term instanceof LangStringLiteral literal)
                 {
                     out.print("<literal xml:lang=\"");
-                    writeXmlValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+                    writeXmlValue(out, literal.getTag());
                     out.print("\">");
-                    writeXmlValue(out, node.getValue());
+                    writeXmlValue(out, literal.getValue());
                     out.print("</literal>");
                 }
-                else if(node instanceof TypedLiteral)
+                else if(term instanceof TypedLiteral literal)
                 {
                     out.print("<literal datatype=\"");
-                    writeXmlValue(out, ((TypedLiteral) node).getDatatype().getValue());
+                    writeXmlValue(out, literal.getType().getValue());
                     out.print("\">");
-                    writeXmlValue(out, node.getValue());
+                    writeXmlValue(out, literal.getValue());
                     out.print("</literal>");
                 }
-                else if(node instanceof LiteralNode)
-                {
-                    out.print("<literal>");
-                    writeXmlValue(out, node.getValue());
-                    out.print("</literal>");
-                }
-                else if(node instanceof BNode)
+                else if(term instanceof BlankNode bnode)
                 {
                     out.print("<bnode>");
-                    writeXmlValue(out, node.getValue());
+                    writeXmlValue(out, bnode.getLabel());
                     out.print("</bnode>");
                 }
 
@@ -911,7 +916,7 @@ public class EndpointServlet extends HttpServlet
 
         boolean hasHead = false;
 
-        for(String head : result.getHeads())
+        for(Variable head : result.getHeads())
         {
             if(hasHead)
                 out.print(", ");
@@ -919,7 +924,7 @@ public class EndpointServlet extends HttpServlet
                 hasHead = true;
 
             out.print('"');
-            writeJsonValue(out, head);
+            writeJsonValue(out, head.getName());
             out.print('"');
         }
 
@@ -941,9 +946,9 @@ public class EndpointServlet extends HttpServlet
 
             for(int i = 0; i < result.getHeads().size(); i++)
             {
-                RdfNode node = result.get(i);
+                RdfTerm term = result.get(i);
 
-                if(node == null)
+                if(term == null)
                     continue;
 
                 if(hasResultHead)
@@ -952,9 +957,9 @@ public class EndpointServlet extends HttpServlet
                     hasResultHead = true;
 
                 out.print("\t\t\"");
-                writeJsonValue(out, result.getHeads().get(i));
+                writeJsonValue(out, result.getHeads().get(i).getName());
                 out.print("\": ");
-                writeJsonNode(out, node);
+                writeJsonNode(out, term);
             }
 
             out.print("\n\t}");
@@ -991,14 +996,14 @@ public class EndpointServlet extends HttpServlet
     {
         boolean hasHead = false;
 
-        for(String head : result.getHeads())
+        for(Variable head : result.getHeads())
         {
             if(hasHead)
                 out.print("\t");
             else
                 hasHead = true;
 
-            writeTsvValue(out, head);
+            writeTsvValue(out, head.getName());
         }
 
         out.print("\r\n");
@@ -1027,14 +1032,14 @@ public class EndpointServlet extends HttpServlet
     {
         boolean hasHead = false;
 
-        for(String head : result.getHeads())
+        for(Variable head : result.getHeads())
         {
             if(hasHead)
                 out.print(",");
             else
                 hasHead = true;
 
-            writeCsvValue(out, head);
+            writeCsvValue(out, head.getName());
         }
 
         out.print("\r\n");
@@ -1051,10 +1056,10 @@ public class EndpointServlet extends HttpServlet
                 else
                     hasResult = true;
 
-                RdfNode node = result.get(i);
+                RdfTerm term = result.get(i);
 
-                if(node != null)
-                    writeCsvValue(out, node.getValue());
+                if(term != null)
+                    writeCsvNode(out, term);
             }
 
             out.print("\r\n");
@@ -1070,7 +1075,7 @@ public class EndpointServlet extends HttpServlet
         out.println("<?xml version=\"1.0\"?>");
         out.println("<sparql xmlns=\"http://www.w3.org/2005/sparql-results#\">");
         out.println("\t<head></head>");
-        out.println("\t<boolean>" + result.get(0).getValue() + "</boolean>");
+        out.println("\t<boolean>" + ((Literal) result.get(0)).getValue() + "</boolean>");
         out.println("</sparql>");
     }
 
@@ -1082,7 +1087,7 @@ public class EndpointServlet extends HttpServlet
 
         out.println("{");
         out.println("\t\"head\": { },");
-        out.println("\t\"boolean\": " + result.get(0).getValue());
+        out.println("\t\"boolean\": " + ((Literal) result.get(0)).getValue());
         out.println("}");
     }
 
@@ -1092,7 +1097,7 @@ public class EndpointServlet extends HttpServlet
         result.next();
 
         out.println("\"bool\"");
-        out.println(result.get(0).getValue());
+        out.println(((Literal) result.get(0)).getValue());
     }
 
 
@@ -1101,13 +1106,13 @@ public class EndpointServlet extends HttpServlet
         result.next();
 
         out.println("\"bool\"");
-        out.println(result.get(0).getValue());
+        out.println(((Literal) result.get(0)).getValue());
     }
 
 
     private static void writeGraphXml(PrintWriter out, Result result) throws IOException, SQLException
     {
-        RdfNode subject = null;
+        RdfTerm subject = null;
 
         out.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         out.println("<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
@@ -1124,18 +1129,26 @@ public class EndpointServlet extends HttpServlet
 
                 out.print("\t<rdf:Description ");
 
-                if(subject instanceof IriNode)
+                if(subject instanceof Iri iri)
+                {
                     out.print("rdf:about=\"");
-                else
+                    writeXmlValue(out, iri.getValue());
+                }
+                else if(subject instanceof BlankNode bnode)
+                {
                     out.print("rdf:nodeID=\"");
-
-                writeXmlValue(out, subject.getValue());
+                    writeXmlValue(out, bnode.getLabel());
+                }
+                else
+                {
+                    throw new IllegalArgumentException();
+                }
 
                 out.println("\">");
             }
 
-            RdfNode predicate = result.get(1);
-            RdfNode object = result.get(2);
+            Iri predicate = (Iri) result.get(1);
+            RdfTerm object = result.get(2);
 
             String prefix = predicate.getValue().replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
             String name = predicate.getValue().substring(prefix.length());
@@ -1146,41 +1159,41 @@ public class EndpointServlet extends HttpServlet
             writeXmlValue(out, prefix);
             out.print("\"");
 
-            if(object instanceof IriNode)
+            if(object instanceof Iri iri)
             {
                 out.print(" rdf:resource=\"");
-                writeXmlValue(out, object.getValue());
+                writeXmlValue(out, iri.getValue());
                 out.println("\"/>");
             }
-            else if(object instanceof BNode)
+            else if(object instanceof BlankNode node)
             {
                 out.print(" rdf:nodeID=\"");
-                writeXmlValue(out, object.getValue());
+                writeXmlValue(out, node.getLabel());
                 out.println("\"/>");
             }
-            else
+            if(object instanceof LangStringLiteral literal)
             {
-                if(object instanceof LanguageTaggedLiteral)
-                {
-                    out.print(" xml:lang=\"");
-                    writeXmlValue(out, ((LanguageTaggedLiteral) object).getLanguage());
-                    out.print("\">");
-                }
-                else if(object instanceof TypedLiteral)
-                {
-                    out.print(" rdf:datatype=\"");
-                    writeXmlValue(out, ((TypedLiteral) object).getDatatype().getValue());
-                    out.print("\">");
-                }
-                else
-                {
-                    out.print(">");
-                }
-
-                writeXmlValue(out, object.getValue());
+                out.print(" xml:lang=\"");
+                writeXmlValue(out, literal.getTag());
+                out.print("\">");
+                writeXmlValue(out, literal.getValue());
                 out.print("</p:");
                 out.print(name);
                 out.println(">");
+            }
+            else if(object instanceof TypedLiteral literal)
+            {
+                out.print(" rdf:datatype=\"");
+                writeXmlValue(out, literal.getValue());
+                out.print("\">");
+                writeXmlValue(out, literal.getValue());
+                out.print("</p:");
+                out.print(name);
+                out.println(">");
+            }
+            else
+            {
+                throw new IllegalArgumentException();
             }
         }
 
@@ -1193,8 +1206,8 @@ public class EndpointServlet extends HttpServlet
 
     private static void writeGraphJson(PrintWriter out, Result result) throws IOException, SQLException
     {
-        RdfNode subject = null;
-        RdfNode predicate = null;
+        RdfTerm subject = null;
+        Iri predicate = null;
 
         out.println("{");
 
@@ -1209,7 +1222,12 @@ public class EndpointServlet extends HttpServlet
                 predicate = null;
 
                 out.print("\t\"");
-                writeJsonValue(out, subject.getValue());
+
+                if(subject instanceof Iri iri)
+                    writeJsonValue(out, iri.getValue());
+                else
+                    writeJsonValue(out, ((BlankNode) subject).getLabel());
+
                 out.println("\" : {");
             }
 
@@ -1218,7 +1236,7 @@ public class EndpointServlet extends HttpServlet
                 if(predicate != null)
                     out.println("\n\t\t],");
 
-                predicate = result.get(1);
+                predicate = (Iri) result.get(1);
 
                 out.print("\t\t\"");
                 writeJsonValue(out, predicate.getValue());
@@ -1243,13 +1261,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeGraphTurtle(PrintWriter out, Result result, HashMap<String, String> systemPrefixes)
+    private static void writeGraphTurtle(PrintWriter out, Result result, Map<String, String> systemPrefixes)
             throws IOException, SQLException
     {
-        HashMap<String, String> prefixes = new HashMap<String, String>();
+        Map<String, String> prefixes = new HashMap<>();
 
-        RdfNode subject = null;
-        RdfNode predicate = null;
+        RdfTerm subject = null;
+        RdfTerm predicate = null;
 
         while(result.next())
         {
@@ -1324,47 +1342,46 @@ public class EndpointServlet extends HttpServlet
 
         while(result.next())
         {
-            writeCsvValue(out, result.get(0).getValue());
+            writeCsvNode(out, result.get(0));
             out.print(',');
-            writeCsvValue(out, result.get(1).getValue());
+            writeCsvNode(out, result.get(1));
             out.print(',');
-            writeCsvValue(out, result.get(2).getValue());
+            writeCsvNode(out, result.get(2));
             out.print("\r\n");
         }
     }
 
 
-    private static void writeJsonNode(PrintWriter out, RdfNode node) throws IOException
+    private static void writeJsonNode(PrintWriter out, RdfTerm term) throws IOException
     {
         out.print("{ \"type\": ");
 
-        if(node instanceof IriNode)
-            out.print("\"uri\",");
-        else if(node instanceof LiteralNode)
-            out.print("\"literal\",");
-        else
-            out.print("\"bnode\",");
-
-        out.print(" \"value\": ");
-
-        out.print('"');
-        writeJsonValue(out, node.getValue());
-        out.print('"');
-
-        if(node instanceof LanguageTaggedLiteral)
+        if(term instanceof Iri iri)
         {
-            out.print(", \"xml:lang\": ");
-
-            out.print('"');
-            writeJsonValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+            out.print("\"uri\", \"value\": \"");
+            writeJsonValue(out, iri.getValue());
             out.print('"');
         }
-        else if(node instanceof TypedLiteral)
+        else if(term instanceof LangStringLiteral literal)
         {
-            out.print(", \"datatype\": ");
-
+            out.print("\"literal\", \"value\": \"");
+            writeJsonValue(out, literal.getValue());
+            out.print("\", \"xml:lang\": \"");
+            writeJsonValue(out, literal.getTag());
             out.print('"');
-            writeJsonValue(out, ((TypedLiteral) node).getDatatype().getValue());
+        }
+        else if(term instanceof TypedLiteral literal)
+        {
+            out.print("\"literal\", \"value\": \"");
+            writeJsonValue(out, literal.getValue());
+            out.print("\", \"datatype\": \"");
+            writeJsonValue(out, literal.getType().getValue());
+            out.print('"');
+        }
+        else if(term instanceof BlankNode bnode)
+        {
+            out.print("\"bnode\", \"value\": \"");
+            writeJsonValue(out, bnode.getLabel());
             out.print('"');
         }
 
@@ -1372,66 +1389,58 @@ public class EndpointServlet extends HttpServlet
     }
 
 
-    private static void writeTripleNode(PrintWriter out, RdfNode node) throws IOException
+    private static void writeTripleNode(PrintWriter out, RdfTerm term) throws IOException
     {
-        if(node instanceof IriNode)
+        if(term instanceof Iri iri)
         {
             out.print('<');
-            writeTsvIriValue(out, node.getValue());
+            writeTsvIriValue(out, iri.getValue());
             out.print('>');
         }
-        else if(node instanceof LanguageTaggedLiteral)
+        else if(term instanceof LangStringLiteral literal)
         {
             out.print('"');
-            writeTsvLiteralValue(out, node.getValue());
+            writeTsvLiteralValue(out, literal.getValue());
             out.print("\"@");
-            writeTsvValue(out, ((LanguageTaggedLiteral) node).getLanguage());
+            writeTsvValue(out, literal.getTag());
         }
-        else if(node instanceof TypedLiteral)
+        else if(term instanceof TypedLiteral literal)
         {
             out.print('"');
-            writeTsvLiteralValue(out, node.getValue());
+            writeTsvLiteralValue(out, literal.getValue());
             out.print("\"^^<");
-            writeTsvIriValue(out, ((TypedLiteral) node).getDatatype().getValue());
+            writeTsvIriValue(out, literal.getType().getValue());
             out.print('>');
         }
-        else if(node instanceof LiteralNode)
-        {
-            out.print('"');
-            writeTsvLiteralValue(out, node.getValue());
-            out.print('"');
-        }
-        else if(node instanceof BNode)
+        else if(term instanceof BlankNode bnode)
         {
             out.print("_:");
-            writeTsvValue(out, node.getValue());
+            writeTsvValue(out, bnode.getLabel());
         }
     }
 
 
-    private static void writeTripleNode(PrintWriter out, RdfNode node, HashMap<String, String> prefixes)
-            throws IOException
+    private static void writeTripleNode(PrintWriter out, RdfTerm term, Map<String, String> prefixes) throws IOException
     {
-        if(node instanceof IriNode)
+        if(term instanceof Iri iri)
         {
-            writeTripleIri(out, (IriNode) node, prefixes);
+            writeTripleIri(out, iri, prefixes);
         }
-        else if(node instanceof TypedLiteral)
+        else if(term instanceof TypedLiteral literal)
         {
             out.print('"');
-            writeTsvLiteralValue(out, node.getValue());
+            writeTsvLiteralValue(out, literal.getValue());
             out.print("\"^^");
-            writeTripleIri(out, ((TypedLiteral) node).getDatatype(), prefixes);
+            writeTripleIri(out, literal.getType(), prefixes);
         }
         else
         {
-            writeTripleNode(out, node);
+            writeTripleNode(out, term);
         }
     }
 
 
-    private static void writeTripleIri(PrintWriter out, IriNode node, HashMap<String, String> prefixes)
-            throws IOException
+    private static void writeTripleIri(PrintWriter out, Iri node, Map<String, String> prefixes) throws IOException
     {
         String iri = node.getValue();
 
@@ -1452,6 +1461,23 @@ public class EndpointServlet extends HttpServlet
         }
 
         writeTripleNode(out, node);
+    }
+
+
+    private static void writeCsvNode(PrintWriter out, RdfTerm term) throws IOException
+    {
+        if(term instanceof Iri iri)
+        {
+            writeCsvValue(out, iri.getValue());
+        }
+        else if(term instanceof Literal literal)
+        {
+            writeCsvValue(out, literal.getValue());
+        }
+        else if(term instanceof BlankNode bnode)
+        {
+            writeCsvValue(out, "_:" + bnode.getLabel());
+        }
     }
 
 

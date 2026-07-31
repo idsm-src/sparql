@@ -1,42 +1,42 @@
 package cz.iocb.sparql.engine.translator;
 
 import java.util.List;
-import cz.iocb.sparql.engine.parser.ElementVisitor;
-import cz.iocb.sparql.engine.parser.model.GroupCondition;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.OrderCondition;
-import cz.iocb.sparql.engine.parser.model.Projection;
-import cz.iocb.sparql.engine.parser.model.Select;
-import cz.iocb.sparql.engine.parser.model.Variable;
-import cz.iocb.sparql.engine.parser.model.expression.BinaryExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BracketedExpression;
-import cz.iocb.sparql.engine.parser.model.expression.BuiltInCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.ExistsExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Expression;
-import cz.iocb.sparql.engine.parser.model.expression.FunctionCallExpression;
-import cz.iocb.sparql.engine.parser.model.expression.InExpression;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.expression.UnaryExpression;
-import cz.iocb.sparql.engine.parser.model.pattern.Bind;
-import cz.iocb.sparql.engine.parser.model.pattern.Filter;
-import cz.iocb.sparql.engine.parser.model.pattern.Graph;
-import cz.iocb.sparql.engine.parser.model.pattern.GraphPattern;
-import cz.iocb.sparql.engine.parser.model.pattern.GroupGraph;
-import cz.iocb.sparql.engine.parser.model.pattern.Minus;
-import cz.iocb.sparql.engine.parser.model.pattern.Optional;
-import cz.iocb.sparql.engine.parser.model.pattern.Pattern;
-import cz.iocb.sparql.engine.parser.model.pattern.Service;
-import cz.iocb.sparql.engine.parser.model.pattern.Union;
-import cz.iocb.sparql.engine.parser.model.pattern.Values;
-import cz.iocb.sparql.engine.parser.model.pattern.Values.ValuesList;
-import cz.iocb.sparql.engine.parser.model.triple.AlternativePath;
-import cz.iocb.sparql.engine.parser.model.triple.BlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.BracketedPath;
-import cz.iocb.sparql.engine.parser.model.triple.InversePath;
-import cz.iocb.sparql.engine.parser.model.triple.NegatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.RepeatedPath;
-import cz.iocb.sparql.engine.parser.model.triple.SequencePath;
-import cz.iocb.sparql.engine.parser.model.triple.Triple;
+import cz.iocb.sparql.engine.model.GroupCondition;
+import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.OrderCondition;
+import cz.iocb.sparql.engine.model.Projection;
+import cz.iocb.sparql.engine.model.Select;
+import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.expression.BinaryExpression;
+import cz.iocb.sparql.engine.model.expression.BracketedExpression;
+import cz.iocb.sparql.engine.model.expression.BuiltInCallExpression;
+import cz.iocb.sparql.engine.model.expression.ExistsExpression;
+import cz.iocb.sparql.engine.model.expression.Expression;
+import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
+import cz.iocb.sparql.engine.model.expression.InExpression;
+import cz.iocb.sparql.engine.model.expression.LiteralNode;
+import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.pattern.Bind;
+import cz.iocb.sparql.engine.model.pattern.Filter;
+import cz.iocb.sparql.engine.model.pattern.Graph;
+import cz.iocb.sparql.engine.model.pattern.GraphPattern;
+import cz.iocb.sparql.engine.model.pattern.GroupGraph;
+import cz.iocb.sparql.engine.model.pattern.Minus;
+import cz.iocb.sparql.engine.model.pattern.Optional;
+import cz.iocb.sparql.engine.model.pattern.Pattern;
+import cz.iocb.sparql.engine.model.pattern.Service;
+import cz.iocb.sparql.engine.model.pattern.Union;
+import cz.iocb.sparql.engine.model.pattern.Values;
+import cz.iocb.sparql.engine.model.pattern.Values.ValuesList;
+import cz.iocb.sparql.engine.model.triple.AlternativePath;
+import cz.iocb.sparql.engine.model.triple.BlankNode;
+import cz.iocb.sparql.engine.model.triple.BracketedPath;
+import cz.iocb.sparql.engine.model.triple.InversePath;
+import cz.iocb.sparql.engine.model.triple.NegatedPath;
+import cz.iocb.sparql.engine.model.triple.RepeatedPath;
+import cz.iocb.sparql.engine.model.triple.SequencePath;
+import cz.iocb.sparql.engine.model.triple.Triple;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
@@ -441,7 +441,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
 
 
     @Override
-    public Void visit(IRI iri)
+    public Void visit(IriNode iri)
     {
         builder.append('<');
         builder.append(iri.getValue());
@@ -452,23 +452,23 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
 
 
     @Override
-    public Void visit(Literal literal)
+    public Void visit(LiteralNode literal)
     {
         builder.append("'");
-        builder.append(literal.getStringValue().replaceAll("(['\\\\])", "\\\\$1").replaceAll("\n", "\\\\n")
-                .replaceAll("\r", "\\\\r"));
+        builder.append(literal.getValue().replaceAll("(['\\\\])", "\\\\$1").replaceAll("\n", "\\\\n").replaceAll("\r",
+                "\\\\r"));
         builder.append("'");
 
-        if(literal.getLanguageTag() != null)
+        if(literal.getTag() != null)
         {
             builder.append('@');
-            builder.append(literal.getLanguageTag());
+            builder.append(literal.getTag());
         }
-
-        else if(literal.getTypeIri() != null && !literal.isSimple())
+        else if(literal.getType() != null)
         {
-            builder.append("^^");
-            visitElement(literal.getTypeIri());
+            builder.append("^^<");
+            builder.append(literal.getType().getValue());
+            builder.append(">");
         }
 
         builder.append(' ');
@@ -478,7 +478,7 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
 
 
     @Override
-    public Void visit(Variable variable)
+    public Void visit(VariableNode variable)
     {
         builder.append(" ?");
         builder.append(variable.getName());

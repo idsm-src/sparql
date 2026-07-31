@@ -1,13 +1,15 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.rdfLangStringIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringType;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -15,7 +17,7 @@ public final class LangStringClass extends LiteralClass implements ResultResourc
 {
     protected LangStringClass()
     {
-        super("lang", rdfLangStringIri, List.of("varchar", "varchar"), Set.of(box));
+        super("lang", rdfLangStringType, List.of("varchar", "varchar"), Set.of(box));
     }
 
 
@@ -27,9 +29,21 @@ public final class LangStringClass extends LiteralClass implements ResultResourc
 
 
     @Override
+    public boolean match(Statement statement, Literal literal)
+    {
+        if(!super.match(statement, literal))
+            return false;
+
+        return literal instanceof LangStringLiteral;
+    }
+
+
+    @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), "varchar"), constant(literal.getLanguageTag(), "varchar"));
+        LangStringLiteral langLiteral = (LangStringLiteral) literal;
+
+        return List.of(constant(langLiteral.getValue(), "varchar"), constant(langLiteral.getTag(), "varchar"));
     }
 
 

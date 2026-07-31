@@ -6,18 +6,18 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public sealed class SimpleLiteralClass extends LiteralClass implements ResultResourceClass
+public sealed abstract class SimpleLiteralClass extends LiteralClass implements ResultResourceClass
         permits BooleanClass, ShortClass, IntClass, LongClass, IntegerClass, DecimalClass, FloatClass, DoubleClass,
         StringClass, DayTimeDurationClass
 {
-    protected SimpleLiteralClass(String name, IRI typeIri, String sqlType)
+    protected SimpleLiteralClass(String name, Datatype datatype, String sqlType)
     {
-        super(name, typeIri, List.of(sqlType), Set.of(box));
+        super(name, datatype, List.of(sqlType), Set.of(box));
     }
 
 
@@ -31,7 +31,8 @@ public sealed class SimpleLiteralClass extends LiteralClass implements ResultRes
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), sqlTypes.get(0)));
+        //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
+        return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }
 
 

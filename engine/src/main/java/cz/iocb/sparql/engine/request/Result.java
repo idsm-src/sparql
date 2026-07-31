@@ -1,23 +1,22 @@
 package cz.iocb.sparql.engine.request;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdBooleanType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateTimeType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDayTimeDurationType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDecimalType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDoubleType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdFloatType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdLongType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdShortType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdStringType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringType;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -29,6 +28,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -55,6 +55,13 @@ import cz.iocb.sparql.engine.mapping.classes.ShortClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.StringClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedLiteralClass;
+import cz.iocb.sparql.engine.rdf.IntBlankNode;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
+import cz.iocb.sparql.engine.rdf.Variable;
 
 
 
@@ -73,8 +80,6 @@ public class Result implements AutoCloseable
     private static final long USECS_PER_HOUR = 3600000000l;
     private static final long USECS_PER_MINUTE = 60000000l;
     private static final long USECS_PER_SEC = 1000000l;
-    private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd',
-            'e', 'f' };
 
     private static final Map<String, Class<?>> typeMap = Map.ofEntries(Map.entry("bool", Boolean.class),
             Map.entry("char", Character.class), Map.entry("int2", Short.class), Map.entry("int4", Integer.class),
@@ -83,10 +88,10 @@ public class Result implements AutoCloseable
             Map.entry("timestamptz", LocalDateTime.class));
 
     protected final ResultType type;
-    protected final Map<String, List<ResultResourceClass>> description;
-    protected final HashMap<String, Integer> varNames = new HashMap<String, Integer>();
-    protected final List<String> heads = new ArrayList<String>();
-    protected RdfNode[] rowData;
+    protected final Map<Variable, List<ResultResourceClass>> description;
+    protected final Map<Variable, Integer> varNames = new HashMap<>();
+    protected final List<Variable> heads = new ArrayList<>();
+    protected RdfTerm[] rowData;
 
     private final ResultSet rs;
 
@@ -107,19 +112,19 @@ public class Result implements AutoCloseable
     }
 
 
-    public Result(ResultType type, Map<String, List<ResultResourceClass>> description, ResultSet rs, long begin,
+    public Result(ResultType type, Map<Variable, List<ResultResourceClass>> description, ResultSet rs, long begin,
             long timeout) throws SQLException
     {
         this.rs = rs;
         this.description = description;
-        this.rowData = new RdfNode[description.size()];
+        this.rowData = new RdfTerm[description.size()];
 
         this.type = type;
         this.begin = begin;
         this.timeout = timeout;
         this.checkSize = Math.max(100, rs.getFetchSize());
 
-        for(String var : description.keySet())
+        for(Variable var : description.keySet())
         {
             varNames.put(var, varNames.size());
             heads.add(var);
@@ -138,13 +143,12 @@ public class Result implements AutoCloseable
         if(!rs.next())
             return false;
 
-        for(int i = 0; i < rowData.length; i++)
-            rowData[i] = null;
+        Arrays.fill(rowData, null);
 
         int i = 1;
         int idx = 0;
 
-        for(Entry<String, List<ResultResourceClass>> entry : description.entrySet())
+        for(Entry<Variable, List<ResultResourceClass>> entry : description.entrySet())
         {
             for(ResultResourceClass rc : entry.getValue())
             {
@@ -161,19 +165,19 @@ public class Result implements AutoCloseable
 
                 rowData[idx] = switch(rc)
                 {
-                    case IntBlankNodeClass _ -> new BNode(encodeIBlankNodeLabel((Integer) value, rs.getInt(i++)));
+                    case IntBlankNodeClass _ -> new IntBlankNode((Integer) value, rs.getInt(i++));
 
-                    case StrBlankNodeClass _ -> new BNode(encodeSBlankNodeLabel((String) value, rs.getInt(i++)));
+                    case StrBlankNodeClass _ -> new StrBlankNode((String) value, rs.getInt(i++));
 
-                    case CommonIriClass _ -> new IriNode((String) value);
+                    case CommonIriClass _ -> new Iri((String) value);
 
-                    case BooleanClass _ -> new TypedLiteral(value.toString(), xsdBooleanType.getTypeIri());
+                    case BooleanClass _ -> new TypedLiteral(value.toString(), xsdBooleanIri);
 
-                    case ShortClass _ -> new TypedLiteral(value.toString(), xsdShortType.getTypeIri());
+                    case ShortClass _ -> new TypedLiteral(value.toString(), xsdShortIri);
 
-                    case IntClass _ -> new TypedLiteral(value.toString(), xsdIntType.getTypeIri());
+                    case IntClass _ -> new TypedLiteral(value.toString(), xsdIntIri);
 
-                    case LongClass _ -> new TypedLiteral(value.toString(), xsdLongType.getTypeIri());
+                    case LongClass _ -> new TypedLiteral(value.toString(), xsdLongIri);
 
                     case FloatClass _ ->
                     {
@@ -200,9 +204,9 @@ public class Result implements AutoCloseable
 
                     case StringClass _ -> new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
 
-                    case LangStringClass _ -> new LanguageTaggedLiteral(value.toString(), rs.getString(i++));
+                    case LangStringClass _ -> new LangStringLiteral(value.toString(), rs.getString(i++));
 
-                    case UnsupportedLiteralClass _ -> new TypedLiteral(value.toString(), rs.getString(i++));
+                    case UnsupportedLiteralClass _ -> new TypedLiteral(value.toString(), new Iri(rs.getString(i++)));
 
                     default ->
                     {
@@ -227,7 +231,7 @@ public class Result implements AutoCloseable
 
     public List<String> getWarnings() throws SQLException
     {
-        LinkedList<String> warnings = new LinkedList<String>();
+        LinkedList<String> warnings = new LinkedList<>();
 
         for(SQLWarning warning = rs.getStatement().getWarnings(); warning != null; warning = warning.getNextWarning())
             warnings.add(warning.getMessage());
@@ -236,27 +240,27 @@ public class Result implements AutoCloseable
     }
 
 
-    public List<String> getHeads()
+    public List<Variable> getHeads()
     {
         return heads;
     }
 
 
-    public HashMap<String, Integer> getVariableIndexes()
+    public Map<Variable, Integer> getVariableIndexes()
     {
         return varNames;
     }
 
 
-    public RdfNode get(int idx)
+    public RdfTerm get(int idx)
     {
         return rowData[idx];
     }
 
 
-    public RdfNode get(String name)
+    public RdfTerm get(Variable var)
     {
-        Integer idx = varNames.get(name);
+        Integer idx = varNames.get(var);
 
         if(idx == null)
             return null;
@@ -265,7 +269,7 @@ public class Result implements AutoCloseable
     }
 
 
-    public RdfNode[] getRow()
+    public RdfTerm[] getRow()
     {
         return rowData.clone();
     }
@@ -275,39 +279,6 @@ public class Result implements AutoCloseable
     public void close() throws SQLException
     {
         rs.close();
-    }
-
-
-    private static String encodeIBlankNodeLabel(int value, int segment)
-    {
-        return String.format("i%8s%8s", Integer.toHexString(segment), Integer.toHexString(value)).replace(' ', '0');
-    }
-
-
-    private static String encodeSBlankNodeLabel(String value, int segment)
-    {
-        byte[] data = value.getBytes(StandardCharsets.UTF_8);
-
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(String.format("s%8s", Integer.toHexString(segment)).replace(' ', '0'));
-
-        for(int j = 0; j < data.length; j++)
-        {
-            if((data[j] < '0' || data[j] > '9') && (data[j] < 'A' || data[j] > 'Z') && (data[j] < 'a' || data[j] > 'z'))
-            {
-                int val = data[j] < 0 ? data[j] + 256 : data[j];
-                builder.append('-');
-                builder.append(encodeTable[val / 16]);
-                builder.append(encodeTable[val % 16]);
-            }
-            else
-            {
-                builder.append((char) data[j]);
-            }
-        }
-
-        return builder.toString();
     }
 
 

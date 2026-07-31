@@ -1,7 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
 import java.io.Serializable;
-import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,7 +45,7 @@ public final class Multiset<E> implements Collection<E>, Serializable
 
     private static final long serialVersionUID = 1L;
 
-    private final HashMap<E, MutableInt> map = new HashMap<>();
+    private final Map<E, MutableInt> map = new HashMap<>();
     private int size = 0;
 
 
@@ -62,7 +62,7 @@ public final class Multiset<E> implements Collection<E>, Serializable
 
     public static <E> Multiset<E> copyOf(Iterable<? extends E> it)
     {
-        Multiset<E> ms = new Multiset<E>();
+        Multiset<E> ms = new Multiset<>();
         ms.addAll(it);
 
         return ms;
@@ -154,7 +154,7 @@ public final class Multiset<E> implements Collection<E>, Serializable
     @Override
     public Iterator<E> iterator()
     {
-        return new Iterator<E>()
+        return new Iterator<>()
         {
             private final Iterator<Map.Entry<E, MutableInt>> entryIt = map.entrySet().iterator();
             private E currentElement;
@@ -266,7 +266,7 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
-    private boolean mapEquals(HashMap<?, MutableInt> other)
+    private boolean mapEquals(Map<?, MutableInt> other)
     {
         if(this.map.size() != other.size())
             return false;
@@ -378,15 +378,16 @@ public final class Multiset<E> implements Collection<E>, Serializable
 
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T[] toArray(T[] a)
     {
-        T[] array = (a.length >= size) ? a : (T[]) Array.newInstance(a.getClass().getComponentType(), size);
 
+        T[] array = (a.length >= size) ? a : Arrays.copyOf(a, size);
+
+        Object[] destination = array;
         int i = 0;
 
         for(Object e : this)
-            array[i++] = (T) e;
+            destination[i++] = e;
 
         if(array.length > size)
             array[size] = null;

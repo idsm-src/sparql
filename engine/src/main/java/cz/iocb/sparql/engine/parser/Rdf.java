@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.parser;
 
+
+
 /**
  * Static class that holds IRIs in the RDF namespace.
  */
@@ -8,6 +10,7 @@ public abstract class Rdf
     private Rdf()
     {
     }
+
 
     /**
      * The RDF namespace.

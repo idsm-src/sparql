@@ -16,7 +16,7 @@ public class ParametrisedBlankNodeMapping extends ParametrisedMapping
 
 
     @Override
-    public NodeMapping remap(List<ColumnPair> columnMap)
+    public TermMapping remap(List<ColumnPair> columnMap)
     {
         return new ParametrisedBlankNodeMapping((BlankNodeClass) resourceClass, remapColumns(columnMap));
     }

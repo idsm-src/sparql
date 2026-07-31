@@ -3,10 +3,11 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -15,6 +16,13 @@ public final class UnsupportedLiteralClass extends LiteralClass implements Resul
     protected UnsupportedLiteralClass()
     {
         super("literal", null, List.of("varchar", "varchar"), Set.of(box));
+    }
+
+
+    @Override
+    public boolean match(Statement statement, Literal literal)
+    {
+        throw new IllegalArgumentException();
     }
 
 
@@ -28,8 +36,7 @@ public final class UnsupportedLiteralClass extends LiteralClass implements Resul
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getStringValue(), "varchar"),
-                constant(literal.getTypeIri().getValue(), "varchar"));
+        return List.of(constant(literal.getValue(), "varchar"), constant(literal.getType().getValue(), "varchar"));
     }
 
 

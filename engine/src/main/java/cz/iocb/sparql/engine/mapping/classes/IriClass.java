@@ -5,9 +5,9 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 
 
 
@@ -19,10 +19,10 @@ public abstract class IriClass extends PrimitiveResourceClass
     }
 
 
-    public abstract boolean match(Statement statement, IRI iri);
+    public abstract boolean match(Statement statement, Iri iri);
 
 
-    public abstract List<Column> toColumns(Statement statement, IRI iri);
+    public abstract List<Column> toColumns(Statement statement, Iri iri);
 
 
     public abstract String getPrefix(List<Column> columns);
@@ -36,21 +36,21 @@ public abstract class IriClass extends PrimitiveResourceClass
 
 
     @Override
-    public final boolean match(Statement statement, Node node)
+    public final boolean match(Statement statement, RdfTerm term)
     {
-        return switch(node)
+        return switch(term)
         {
-            case VariableOrBlankNode _ -> true;
-            case IRI iri -> match(statement, iri);
+            case Variable _ -> true;
+            case Iri iri -> match(statement, iri);
             default -> false;
         };
     }
 
 
     @Override
-    public final List<Column> toColumns(Statement statement, Node node)
+    public final List<Column> toColumns(Statement statement, RdfTerm term)
     {
-        if(node instanceof IRI iri)
+        if(term instanceof Iri iri)
             return toColumns(statement, iri);
         else
             throw new IllegalArgumentException();

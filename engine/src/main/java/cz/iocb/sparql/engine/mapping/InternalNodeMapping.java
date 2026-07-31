@@ -16,7 +16,7 @@ public final class InternalNodeMapping extends ParametrisedMapping
 
 
     @Override
-    public NodeMapping remap(List<ColumnPair> columnMap)
+    public TermMapping remap(List<ColumnPair> columnMap)
     {
         return new InternalNodeMapping(resourceClass, remapColumns(columnMap));
     }

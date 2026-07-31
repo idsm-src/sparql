@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
@@ -52,8 +53,7 @@ public class DatabaseSchema
             if(object == null || getClass() != object.getClass())
                 return false;
 
-            @SuppressWarnings("rawtypes")
-            Pair other = (Pair) object;
+            Pair<?> other = (Pair<?>) object;
 
             return left.equals(other.left) && right.equals(other.right);
         }
@@ -78,10 +78,10 @@ public class DatabaseSchema
     }
 
 
-    protected final HashMap<Table, List<Column>> nullableColumns = new HashMap<Table, List<Column>>();
-    protected final HashMap<Table, List<List<Column>>> primaryKeys = new HashMap<Table, List<List<Column>>>();
-    protected final HashMap<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<TablePair, List<Set<ColumnPair>>>();
-    protected final HashMap<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<TablePair, List<List<ColumnPair>>>();
+    protected final Map<Table, List<Column>> nullableColumns = new HashMap<>();
+    protected final Map<Table, List<List<Column>>> primaryKeys = new HashMap<>();
+    protected final Map<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<>();
+    protected final Map<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<>();
 
 
     public DatabaseSchema(DataSource connectionPool) throws SQLException
@@ -129,7 +129,7 @@ public class DatabaseSchema
                                 if(columns != null)
                                     addPrimaryKeys(table, columns);
 
-                                columns = new ArrayList<Column>();
+                                columns = new ArrayList<>();
                             }
 
                             columns.add(new TableColumn(indexes.getString("COLUMN_NAME")));
@@ -143,8 +143,8 @@ public class DatabaseSchema
                     try(ResultSet indexes = metaData.getCrossReference(null, tableSchema, tableName, null, null, null))
                     {
                         Table foreignTable = null;
-                        List<Column> parentColumns = new ArrayList<Column>();
-                        List<Column> foreignColumns = new ArrayList<Column>();
+                        List<Column> parentColumns = new ArrayList<>();
+                        List<Column> foreignColumns = new ArrayList<>();
 
 
                         while(indexes.next())
@@ -157,8 +157,8 @@ public class DatabaseSchema
                                 {
                                     addForeignKeys(table, parentColumns, foreignTable, foreignColumns);
 
-                                    parentColumns = new ArrayList<Column>();
-                                    foreignColumns = new ArrayList<Column>();
+                                    parentColumns = new ArrayList<>();
+                                    foreignColumns = new ArrayList<>();
                                 }
 
                                 foreignTable = new Table(indexes.getString("FKTABLE_SCHEM"),
@@ -181,16 +181,16 @@ public class DatabaseSchema
     public DatabaseSchema(DatabaseSchema other)
     {
         for(Entry<Table, List<Column>> e : other.nullableColumns.entrySet())
-            nullableColumns.put(e.getKey(), new ArrayList<Column>(e.getValue()));
+            nullableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
 
         for(Entry<Table, List<List<Column>>> e : other.primaryKeys.entrySet())
-            primaryKeys.put(e.getKey(), new ArrayList<List<Column>>(e.getValue()));
+            primaryKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
         for(Entry<TablePair, List<Set<ColumnPair>>> e : other.foreignKeys.entrySet())
-            foreignKeys.put(e.getKey(), new ArrayList<Set<ColumnPair>>(e.getValue()));
+            foreignKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
         for(Entry<TablePair, List<List<ColumnPair>>> e : other.unjoinableColumns.entrySet())
-            unjoinableColumns.put(e.getKey(), new ArrayList<List<ColumnPair>>(e.getValue()));
+            unjoinableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
     }
 
 
@@ -200,7 +200,7 @@ public class DatabaseSchema
 
         if(columnList == null)
         {
-            columnList = new ArrayList<Column>();
+            columnList = new ArrayList<>();
             nullableColumns.put(table, columnList);
         }
 
@@ -214,14 +214,11 @@ public class DatabaseSchema
 
         if(primaryKeyList == null)
         {
-            primaryKeyList = new ArrayList<List<Column>>();
+            primaryKeyList = new ArrayList<>();
             primaryKeys.put(table, primaryKeyList);
         }
 
-        ArrayList<Column> key = new ArrayList<Column>();
-        key.addAll(columns);
-
-        primaryKeyList.add(key);
+        primaryKeyList.add(new ArrayList<>(columns));
     }
 
 
@@ -234,11 +231,11 @@ public class DatabaseSchema
 
         if(foreignKeyList == null)
         {
-            foreignKeyList = new ArrayList<Set<ColumnPair>>();
+            foreignKeyList = new ArrayList<>();
             foreignKeys.put(tablePair, foreignKeyList);
         }
 
-        Set<ColumnPair> keyPairs = new HashSet<ColumnPair>();
+        Set<ColumnPair> keyPairs = new HashSet<>();
 
         for(int i = 0; i < parentColumns.size(); i++)
             keyPairs.add(new ColumnPair(parentColumns.get(i), foreignColumns.get(i)));
@@ -256,11 +253,11 @@ public class DatabaseSchema
 
         if(unjoinableList == null)
         {
-            unjoinableList = new ArrayList<List<ColumnPair>>();
+            unjoinableList = new ArrayList<>();
             unjoinableColumns.put(tablePair, unjoinableList);
         }
 
-        ArrayList<ColumnPair> columnPairs = new ArrayList<ColumnPair>();
+        List<ColumnPair> columnPairs = new ArrayList<>();
 
         for(int i = 0; i < leftColumns.size(); i++)
             columnPairs.add(new ColumnPair(leftColumns.get(i), rightColumns.get(i)));
@@ -304,7 +301,7 @@ public class DatabaseSchema
         {
             if(columns.stream().allMatch(k -> key.contains(k)))
             {
-                Set<Column> covered = new HashSet<Column>();
+                Set<Column> covered = new HashSet<>();
 
                 for(ColumnPair pair : key)
                     covered.add(pair.getRight());
@@ -327,7 +324,7 @@ public class DatabaseSchema
         {
             if(key.stream().allMatch(k -> columns.contains(k)))
             {
-                Set<Column> covered = new HashSet<Column>();
+                Set<Column> covered = new HashSet<>();
 
                 for(ColumnPair keyPair : key)
                     for(ColumnPair pair : columns)

@@ -1,6 +1,5 @@
 package cz.iocb.sparql.engine.request;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
 import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -24,27 +23,35 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
+import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.model.AskQuery;
+import cz.iocb.sparql.engine.model.ConstructQuery;
+import cz.iocb.sparql.engine.model.DataSet;
+import cz.iocb.sparql.engine.model.DescribeQuery;
+import cz.iocb.sparql.engine.model.Query;
+import cz.iocb.sparql.engine.model.Select;
+import cz.iocb.sparql.engine.model.SelectQuery;
 import cz.iocb.sparql.engine.parser.Parser;
-import cz.iocb.sparql.engine.parser.model.AskQuery;
-import cz.iocb.sparql.engine.parser.model.ConstructQuery;
-import cz.iocb.sparql.engine.parser.model.DataSet;
-import cz.iocb.sparql.engine.parser.model.DescribeQuery;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.Query;
-import cz.iocb.sparql.engine.parser.model.Select;
-import cz.iocb.sparql.engine.parser.model.SelectQuery;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
-import cz.iocb.sparql.engine.parser.visitor.QueryVisitor;
+import cz.iocb.sparql.engine.parser.QueryVisitor;
+import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.IntBlankNode;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.engine.translator.TranslateVisitor;
-import cz.iocb.sparql.engine.translator.imcode.SqlSelect;
 
 
 
@@ -109,12 +116,12 @@ public class Request implements AutoCloseable
     private final boolean serviceReorder;
 
     private final IriCache iriCache = new IriCache(10000);
-    private final Map<IRI, Set<IriClass>> missmatches = new HashMap<IRI, Set<IriClass>>();
+    private final Map<Iri, Set<IriClass>> missmatches = new HashMap<>();
 
     private Connection connection;
     private Statement statement;
     private ColumnMap columnMap = new ColumnMap();
-    private List<Table> tables = new ArrayList<Table>();
+    private List<Table> tables = new ArrayList<>();
 
     private long begin;
     private long timeout;
@@ -136,7 +143,7 @@ public class Request implements AutoCloseable
 
     public List<TranslateMessage> check(String query, List<DataSet> dataSets, long timeout)
     {
-        List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
+        List<TranslateMessage> messages = new LinkedList<>();
 
         try
         {
@@ -184,7 +191,7 @@ public class Request implements AutoCloseable
         {
             MDC.put("sparql", query);
 
-            List<TranslateMessage> messages = new LinkedList<TranslateMessage>();
+            List<TranslateMessage> messages = new LinkedList<>();
 
             Parser parser = new Parser(messages);
             ParserRuleContext context = parser.parse(query);
@@ -219,7 +226,7 @@ public class Request implements AutoCloseable
 
 
 
-    public Result execute(PreparedQuery query, List<String> order, int offset, int limit, int fetchSize, long timeout,
+    public Result execute(PreparedQuery query, List<Variable> order, int offset, int limit, int fetchSize, long timeout,
             int sqlSizeLimit) throws LimitExceedException, SQLException, ServiceException
     {
         try
@@ -264,6 +271,18 @@ public class Request implements AutoCloseable
             imcode = imcode.optimize(this, true);
 
             String code = imcode.translate(this);
+
+            /*
+            System.err.println();
+            System.err.println();
+            System.err.println();
+            System.err.println(query.getQuery());
+            System.err.println();
+            System.err.println(imcode.getExplanation());
+            System.err.println();
+            System.err.println(code);
+            System.err.println();
+            */
 
             if(sqlSizeLimit > 0 && code.length() > sqlSizeLimit)
                 throw new LimitExceedException("generated SQL query exceeded the maximum allowed limit");
@@ -313,7 +332,7 @@ public class Request implements AutoCloseable
     }
 
 
-    public Result execute(String query, List<DataSet> dataSets, List<String> order, int offset, int limit,
+    public Result execute(String query, List<DataSet> dataSets, List<Variable> order, int offset, int limit,
             int fetchSize, long timeout)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
@@ -495,19 +514,19 @@ public class Request implements AutoCloseable
     }
 
 
-    public ResourceClass getResourceClass(Node value)
+    public ResourceClass getResourceClass(RdfTerm term)
     {
-        return switch(value)
+        return switch(term)
         {
-            case Literal lit -> lit.isTypeSupported() ? lit.getDataType().getResourceClass(lit) : unsupportedLiteral;
-            case IRI iri -> getIriClass(iri);
-            case BlankNodeLiteral bn -> bn.getResourceClass();
+            case Literal lit -> getLiteralClass(lit);
+            case Iri iri -> getIriClass(iri);
+            case BlankNode bn -> getBlankNodeClass(bn);
             default -> null;
         };
     }
 
 
-    public IriClass getIriClass(IRI value)
+    public IriClass getIriClass(Iri value)
     {
         IriClass iriClass = iriCache.getIriClass(value);
 
@@ -527,7 +546,33 @@ public class Request implements AutoCloseable
     }
 
 
-    private IriClass detectIriClass(IRI value)
+    public LiteralClass getLiteralClass(Literal literal)
+    {
+        Datatype datatype = getConfiguration().getDatatype(literal.getType());
+
+        //FIXME: language tags?
+
+        if(datatype == null || !datatype.isValidForm(literal.getValue()))
+            return BuiltinClasses.unsupportedLiteral;
+
+        return datatype.getResourceClass(literal);
+    }
+
+
+    public BlankNodeClass getBlankNodeClass(BlankNode bnode)
+    {
+        //TODO use cache
+
+        return switch(bnode)
+        {
+            case StrBlankNode s -> new StrBlankNodeConstantSegmentClass(s.getSegment());
+            case IntBlankNode i -> new IntBlankNodeConstantSegmentClass(i.getSegment());
+            default -> throw new IllegalArgumentException();
+        };
+    }
+
+
+    private IriClass detectIriClass(Iri value)
     {
         for(UserIriClass iriClass : getConfiguration().getIriClasses())
             if(iriClass.match(getStatement(), value))
@@ -537,9 +582,9 @@ public class Request implements AutoCloseable
     }
 
 
-    public boolean match(ResourceClass resClass, Node node)
+    public boolean match(ResourceClass resClass, RdfTerm term)
     {
-        if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
+        if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
         {
             IriClass cachedClass = iriCache.getIriClass(iri);
 
@@ -570,7 +615,7 @@ public class Request implements AutoCloseable
             {
                 if(set == null)
                 {
-                    set = new HashSet<IriClass>();
+                    set = new HashSet<>();
                     missmatches.put(iri, set);
                 }
 
@@ -580,20 +625,20 @@ public class Request implements AutoCloseable
             }
         }
 
-        return resClass.match(getStatement(), node);
+        return resClass.match(getStatement(), term);
     }
 
 
-    public List<Column> getColumns(ResourceClass resClass, Node node)
+    public List<Column> getColumns(ResourceClass resClass, RdfTerm term)
     {
-        if(resClass instanceof IriClass iriClass && node instanceof IRI iri)
+        if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
             return getColumns(iriClass, iri);
 
-        return resClass.toColumns(getStatement(), node);
+        return resClass.toColumns(getStatement(), term);
     }
 
 
-    public List<Column> getColumns(IriClass iriClass, IRI iri)
+    public List<Column> getColumns(IriClass iriClass, Iri iri)
     {
         List<Column> columns = iriCache.getIriColumns(iri);
 
@@ -613,7 +658,7 @@ public class Request implements AutoCloseable
 
     public String getIriPrefix(IriClass iriClass, List<Column> columns)
     {
-        IRI iri = iriCache.getIri(iriClass, columns);
+        Iri iri = iriCache.getIri(iriClass, columns);
 
         if(iri != null)
             return iri.getValue();

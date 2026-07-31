@@ -2,10 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
-import java.time.LocalDateTime;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeType;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -17,15 +16,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.TemporalDatatype;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
 public final class DateTimeCompositeClass extends LiteralClass implements ResultResourceClass
 {
-    private static final Map<Long, String> era = Map.of(0l, " BC", 1l, "");
+    private static final DateTimeFormatter inputDateTimeFormatter = new DateTimeFormatterBuilder()//
+            .appendText(ChronoField.ERA, Map.of(0l, "-", 1l, ""))//
+            .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NEVER).appendLiteral("-")//
+            .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
+            .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
+            .appendValue(ChronoField.HOUR_OF_DAY, 2).appendLiteral(":")//
+            .appendValue(ChronoField.MINUTE_OF_HOUR, 2).appendLiteral(":")//
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
+            .appendOffset("+HH:MM", "Z")//
+            .toFormatter(Locale.ENGLISH);
 
-    private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()//
+    private static final DateTimeFormatter outputDateTimeFormatter = new DateTimeFormatterBuilder()//
             .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
             .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
@@ -34,25 +45,13 @@ public final class DateTimeCompositeClass extends LiteralClass implements Result
             .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
             .appendOffset("+HH:MM", "Z")//
-            .appendText(ChronoField.ERA, era)//
-            .toFormatter(Locale.ENGLISH);
-
-    private static final DateTimeFormatter localDateTimeFormatter = new DateTimeFormatterBuilder()//
-            .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
-            .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
-            .appendValue(ChronoField.DAY_OF_MONTH, 2).appendLiteral("T")//
-            .appendValue(ChronoField.HOUR_OF_DAY, 2).appendLiteral(":")//
-            .appendValue(ChronoField.MINUTE_OF_HOUR, 2).appendLiteral(":")//
-            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)//
-            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)//
-            .appendLiteral("Z")//
-            .appendText(ChronoField.ERA, era)//
+            .appendText(ChronoField.ERA, Map.of(0l, " BC", 1l, ""))//
             .toFormatter(Locale.ENGLISH);
 
 
     protected DateTimeCompositeClass()
     {
-        super("datetime", xsdDateTimeIri, List.of("timestamptz", "int4"), Set.of(box, xsdScalarDateTime));
+        super("datetime", xsdDateTimeType, List.of("timestamptz", "int4"), Set.of(box, xsdScalarDateTime));
     }
 
 
@@ -115,21 +114,26 @@ public final class DateTimeCompositeClass extends LiteralClass implements Result
     }
 
 
-    protected static String getDateTime(Literal literal)
+    public static String getDateTime(Literal literal)
     {
-        return switch(literal.getValue())
-        {
-            case OffsetDateTime value -> value.atZoneSameInstant(ZoneOffset.UTC).format(dateTimeFormatter);
-            case LocalDateTime value -> value.format(localDateTimeFormatter);
-            default -> null;
-        };
+        String value = Datatype.getCollapsedForm(literal.getValue()).replace("(\\.[0-9]{6})[0-9]*", "$1");
+
+        if(!value.matches(".*" + TemporalDatatype.ZONE))
+            value = value + "Z";
+
+        OffsetDateTime date = OffsetDateTime.parse(value, inputDateTimeFormatter);
+        return date.atZoneSameInstant(ZoneOffset.UTC).format(outputDateTimeFormatter);
     }
 
 
-    protected static int getZone(Literal literal)
+    public static int getZone(Literal literal)
     {
-        if(literal.getValue() instanceof OffsetDateTime value)
-            return value.getOffset().getTotalSeconds();
+        String value = Datatype.getCollapsedForm(literal.getValue()).replaceFirst("[-+]00:00", "Z");
+
+        String[] parts = value.replaceFirst(".*(Z|(([+-])([0-9][0-9]):([0-9][0-9])))$", "$31#0$4#0$5").split("#");
+
+        if(parts.length == 3)
+            return Integer.parseInt(parts[0]) * (Integer.parseInt(parts[1]) * 3600 + Integer.parseInt(parts[2]) * 60);
 
         return Integer.MIN_VALUE;
     }

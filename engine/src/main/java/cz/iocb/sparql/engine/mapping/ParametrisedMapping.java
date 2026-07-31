@@ -6,12 +6,12 @@ import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Request;
 
 
 
-public abstract class ParametrisedMapping extends NodeMapping
+public abstract class ParametrisedMapping extends TermMapping
 {
     protected ParametrisedMapping(ResourceClass resourceClass, List<Column> columns)
     {
@@ -20,15 +20,15 @@ public abstract class ParametrisedMapping extends NodeMapping
 
 
     @Override
-    public boolean match(Request request, Node node)
+    public boolean match(Request request, RdfTerm term)
     {
-        return request.match(resourceClass, node);
+        return request.match(resourceClass, term);
     }
 
 
-    public ArrayList<Column> remapColumns(List<ColumnPair> columnMap)
+    public List<Column> remapColumns(List<ColumnPair> columnMap)
     {
-        ArrayList<Column> remappedColumns = new ArrayList<Column>();
+        List<Column> remappedColumns = new ArrayList<>();
 
         for(Column col : columns)
             remappedColumns.add(columnMap.stream().filter(s -> s.getLeft().equals(col)).findAny().get().getRight());

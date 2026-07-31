@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -46,7 +46,7 @@ public class GeneralUserIriClass extends UserIriClass
         this.sqlCheck = sqlCheck;
         this.function = new Function(schema, function);
 
-        this.inverseFunction = new ArrayList<Function>(sqlTypes.size());
+        this.inverseFunction = new ArrayList<>(sqlTypes.size());
 
         if(sqlTypes.size() == 1)
         {
@@ -73,7 +73,7 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public boolean match(Statement statement, IRI iri)
+    public boolean match(Statement statement, Iri iri)
     {
         Matcher matcher = pattern.matcher(iri.getValue());
 
@@ -92,7 +92,7 @@ public class GeneralUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> toColumns(Statement statement, IRI iri)
+    public List<Column> toColumns(Statement statement, Iri iri)
     {
         assert match(statement, iri);
 
@@ -104,7 +104,7 @@ public class GeneralUserIriClass extends UserIriClass
             {
                 result.next();
 
-                List<Column> columns = new ArrayList<Column>();
+                List<Column> columns = new ArrayList<>();
 
                 for(int i = 0; i < getColumnCount(); i++)
                     columns.add(constant(result.getString(i + 1), sqlTypes.get(i)));
@@ -177,7 +177,7 @@ public class GeneralUserIriClass extends UserIriClass
     }
 
 
-    private boolean check(Statement statement, IRI iri)
+    private boolean check(Statement statement, Iri iri)
     {
         try
         {

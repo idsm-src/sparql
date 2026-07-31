@@ -1,26 +1,26 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.VariableOrBlankNode;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 
 
 
 public abstract class LiteralClass extends PrimitiveResourceClass
 {
-    protected final IRI typeIri;
+    final protected Datatype datatype;
 
 
-    protected LiteralClass(String name, IRI typeIri, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected LiteralClass(String name, Datatype datatype, List<String> sqlTypes, Set<ResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
-        this.typeIri = typeIri;
+        this.datatype = datatype;
     }
 
 
@@ -29,25 +29,22 @@ public abstract class LiteralClass extends PrimitiveResourceClass
 
     public boolean match(Statement statement, Literal literal)
     {
-        IRI literalTypeIri = literal.getTypeIri();
+        if(!datatype.getTypeIri().equals(literal.getType()))
+            return false;
 
-        if(typeIri == null)
-            return !literal.isTypeSupported() || literal.getValue() == null;
-        else if(literal.getValue() == null)
+        if(!datatype.isValidForm(literal.getValue()))
             return false;
-        else if(typeIri.equals(literalTypeIri))
-            return !typeIri.equals(rdfLangString.getTypeIri()) || literal.getLanguageTag() == null;
-        else
-            return false;
+
+        return true;
     }
 
 
     @Override
-    public final boolean match(Statement statement, Node node)
+    public final boolean match(Statement statement, RdfTerm term)
     {
-        return switch(node)
+        return switch(term)
         {
-            case VariableOrBlankNode _ -> true;
+            case Variable _ -> true;
             case Literal literal -> match(statement, literal);
             default -> false;
         };
@@ -55,18 +52,24 @@ public abstract class LiteralClass extends PrimitiveResourceClass
 
 
     @Override
-    public final List<Column> toColumns(Statement statement, Node node)
+    public final List<Column> toColumns(Statement statement, RdfTerm term)
     {
-        if(node instanceof Literal literal)
+        if(term instanceof Literal literal)
             return toColumns(literal);
         else
             throw new IllegalArgumentException();
     }
 
 
-    public final IRI getTypeIri()
+    public final Datatype getDatatype()
     {
-        return typeIri;
+        return datatype;
+    }
+
+
+    public final Iri getTypeIri()
+    {
+        return datatype != null ? datatype.getTypeIri() : null;
     }
 
 
@@ -77,11 +80,6 @@ public abstract class LiteralClass extends PrimitiveResourceClass
             return true;
 
         if(!super.equals(object))
-            return false;
-
-        LiteralClass other = (LiteralClass) object;
-
-        if(!typeIri.equals(other.typeIri))
             return false;
 
         return true;

@@ -7,7 +7,7 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 
 
 
@@ -24,7 +24,7 @@ public class Expression
 
         {
             Table table = new Table(schema, "isoform_low_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -36,7 +36,7 @@ public class Expression
 
         {
             Table table = new Table(schema, "isoform_medium_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -48,7 +48,7 @@ public class Expression
 
         {
             Table table = new Table(schema, "isoform_high_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),

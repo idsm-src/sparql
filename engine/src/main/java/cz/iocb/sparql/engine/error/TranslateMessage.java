@@ -1,7 +1,7 @@
 package cz.iocb.sparql.engine.error;
 
 import java.io.Serializable;
-import cz.iocb.sparql.engine.parser.Range;
+import cz.iocb.sparql.engine.model.base.Range;
 
 
 

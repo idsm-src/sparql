@@ -73,10 +73,10 @@ public class Condition
     }
 
 
-    final Set<Column> isNotNull = new HashSet<Column>();
-    final Set<Column> isNull = new HashSet<Column>();
-    final Set<ColumnComparison> areEqual = new HashSet<ColumnComparison>();
-    final Set<ColumnComparison> areNotEqual = new HashSet<ColumnComparison>();
+    final Set<Column> isNotNull = new HashSet<>();
+    final Set<Column> isNull = new HashSet<>();
+    final Set<ColumnComparison> areEqual = new HashSet<>();
+    final Set<ColumnComparison> areNotEqual = new HashSet<>();
 
 
     public Condition()
@@ -207,7 +207,7 @@ public class Condition
             return true;
 
 
-        Set<Column> set = new HashSet<Column>();
+        Set<Column> set = new HashSet<>();
 
         for(ColumnComparison p : areEqual)
         {
@@ -234,7 +234,7 @@ public class Condition
 
     public Set<Column> getEqualTableColumns(Column col)
     {
-        Set<Column> set = new HashSet<Column>();
+        Set<Column> set = new HashSet<>();
 
         if(col instanceof TableColumn)
             set.add(col);
@@ -248,7 +248,7 @@ public class Condition
 
     public Set<Column> getEqualColumns(Column col)
     {
-        Set<Column> set = new HashSet<Column>();
+        Set<Column> set = new HashSet<>();
         set.add(col);
 
         areEqual.stream().filter(p -> p.contains(col)).map(p -> p.getOther(col)).forEach(c -> set.add(c));
@@ -259,7 +259,7 @@ public class Condition
 
     public Set<Column> getNonConstantColumns()
     {
-        Set<Column> columns = new HashSet<Column>();
+        Set<Column> columns = new HashSet<>();
 
         isNotNull.stream().filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
         isNull.stream().filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);

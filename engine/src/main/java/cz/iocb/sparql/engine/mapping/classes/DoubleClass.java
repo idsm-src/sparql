@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDoubleIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleType;
 
 
 
@@ -8,6 +8,6 @@ public final class DoubleClass extends SimpleLiteralClass
 {
     public DoubleClass()
     {
-        super("double", xsdDoubleIri, "float8");
+        super("double", xsdDoubleType, "float8");
     }
 }

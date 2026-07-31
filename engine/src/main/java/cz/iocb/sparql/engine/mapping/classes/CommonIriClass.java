@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.parser.model.IRI;
+import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
@@ -21,14 +21,14 @@ public final class CommonIriClass extends IriClass implements ResultResourceClas
 
 
     @Override
-    public boolean match(Statement statement, IRI iri)
+    public boolean match(Statement statement, Iri iri)
     {
         return true;
     }
 
 
     @Override
-    public List<Column> toColumns(Statement statement, IRI iri)
+    public List<Column> toColumns(Statement statement, Iri iri)
     {
         return List.of(constant(iri.getValue(), "varchar"));
     }

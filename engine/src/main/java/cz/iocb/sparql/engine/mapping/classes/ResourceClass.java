@@ -14,7 +14,8 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.ColumnMap;;
 
 
@@ -42,20 +43,20 @@ public abstract class ResourceClass
      * Check if the given RDF term can be represented in this resource class.
      *
      * @param statement database statement
-     * @param node RDF term
+     * @param term RDF term
      * @return true the RDF term can be represented in this resource class, false otherwise
      */
-    public abstract boolean match(Statement statement, Node node);
+    public abstract boolean match(Statement statement, RdfTerm term);
 
 
     /**
      * Create list of columns that represent the given RDF term.
      *
      * @param statement database statement
-     * @param node RDF term
-     * @return list of columns representing the node value
+     * @param term RDF term
+     * @return list of columns representing the term value
      */
-    public abstract List<Column> toColumns(Statement statement, Node node);
+    public abstract List<Column> toColumns(Statement statement, RdfTerm term);
 
 
     /**
@@ -168,16 +169,17 @@ public abstract class ResourceClass
     }
 
 
-    public List<Column> createColumns(ColumnMap map, String variable)
+    public List<Column> createColumns(ColumnMap map, Variable variable)
     {
         //FIXME: consider whether there might be a collision of names with those generated in another part of the query
 
         int count = getColumnCount();
 
-        List<Column> columns = new ArrayList<Column>(count);
+        List<Column> columns = new ArrayList<>(count);
 
         for(int i = 0; i < count; i++)
-            columns.add(new TableColumn(map.getSafeName(variable + "#" + name + (count > 0 ? "_par" + i : ""))));
+            columns.add(
+                    new TableColumn(map.getSafeName(variable.getName() + "#" + name + (count > 0 ? "_par" + i : ""))));
 
         return columns;
     }
@@ -249,7 +251,7 @@ public abstract class ResourceClass
 
     public static ResourceClass getUnionClass(ResourceClass... classes)
     {
-        return getUnionClass(new HashSet<ResourceClass>(Arrays.asList(classes)));
+        return getUnionClass(new HashSet<>(Arrays.asList(classes)));
     }
 
 
@@ -283,7 +285,7 @@ public abstract class ResourceClass
     {
         Iterator<ResourceClass> it = classes.iterator();
 
-        Set<PrimitiveResourceClass> candidates = new HashSet<PrimitiveResourceClass>();
+        Set<PrimitiveResourceClass> candidates = new HashSet<>();
 
         PrimitiveResourceClass first = (PrimitiveResourceClass) it.next();
 
@@ -294,7 +296,7 @@ public abstract class ResourceClass
 
         while(it.hasNext())
         {
-            Set<ResourceClass> set = new HashSet<ResourceClass>();
+            Set<ResourceClass> set = new HashSet<>();
 
             PrimitiveResourceClass other = (PrimitiveResourceClass) it.next();
 

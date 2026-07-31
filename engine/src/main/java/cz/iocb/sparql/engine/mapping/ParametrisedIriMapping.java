@@ -16,7 +16,7 @@ public class ParametrisedIriMapping extends ParametrisedMapping
 
 
     @Override
-    public NodeMapping remap(List<ColumnPair> columnMap)
+    public TermMapping remap(List<ColumnPair> columnMap)
     {
         return new ParametrisedIriMapping((IriClass) resourceClass, remapColumns(columnMap));
     }

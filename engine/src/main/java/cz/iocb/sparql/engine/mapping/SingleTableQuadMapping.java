@@ -11,20 +11,27 @@ public class SingleTableQuadMapping extends QuadMapping
     private final Conditions conditions;
 
 
-    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate,
-            NodeMapping object)
+    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object)
     {
         this(table, graph, subject, predicate, object, new Conditions(true));
     }
 
 
-    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, NodeMapping subject, NodeMapping predicate,
-            NodeMapping object, Conditions conditions)
+    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object, Conditions conditions)
     {
         super(graph, subject, predicate, object);
 
         this.table = table;
         this.conditions = conditions;
+    }
+
+
+    @Override
+    public QuadMapping asDefaultGraphMapping()
+    {
+        return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(), conditions);
     }
 
 

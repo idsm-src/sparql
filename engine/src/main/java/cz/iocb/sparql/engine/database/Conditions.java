@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 public class Conditions
 {
-    private Set<Condition> conditions = new HashSet<Condition>();
+    private Set<Condition> conditions = new HashSet<>();
 
 
     public Conditions(boolean value)
@@ -159,14 +159,14 @@ public class Conditions
     public Set<Column> getIsNotNull()
     {
         if(conditions.isEmpty())
-            return Collections.unmodifiableSet(new HashSet<Column>());
+            return Collections.unmodifiableSet(new HashSet<>());
 
         Set<Column> result = null;
 
         for(Condition condition : conditions)
         {
             if(result == null)
-                result = new HashSet<Column>(condition.getIsNotNull());
+                result = new HashSet<>(condition.getIsNotNull());
             else
                 result.retainAll(condition.getIsNotNull());
         }
@@ -178,14 +178,14 @@ public class Conditions
     public Set<Column> getIsNull()
     {
         if(conditions.isEmpty())
-            return Collections.unmodifiableSet(new HashSet<Column>());
+            return Collections.unmodifiableSet(new HashSet<>());
 
         Set<Column> result = null;
 
         for(Condition condition : conditions)
         {
             if(result == null)
-                result = new HashSet<Column>(condition.getIsNull());
+                result = new HashSet<>(condition.getIsNull());
             else
                 result.retainAll(condition.getIsNull());
         }
@@ -197,14 +197,14 @@ public class Conditions
     public Set<ColumnComparison> getAreEqual()
     {
         if(conditions.isEmpty())
-            return Collections.unmodifiableSet(new HashSet<ColumnComparison>());
+            return Collections.unmodifiableSet(new HashSet<>());
 
         Set<ColumnComparison> result = null;
 
         for(Condition condition : conditions)
         {
             if(result == null)
-                result = new HashSet<ColumnComparison>(condition.getAreEqual());
+                result = new HashSet<>(condition.getAreEqual());
             else
                 result.retainAll(condition.getAreEqual());
         }
@@ -216,14 +216,14 @@ public class Conditions
     public Set<ColumnComparison> getAreNotEqual()
     {
         if(conditions.isEmpty())
-            return Collections.unmodifiableSet(new HashSet<ColumnComparison>());
+            return Collections.unmodifiableSet(new HashSet<>());
 
         Set<ColumnComparison> result = null;
 
         for(Condition condition : conditions)
         {
             if(result == null)
-                result = new HashSet<ColumnComparison>(condition.getAreNotEqual());
+                result = new HashSet<>(condition.getAreNotEqual());
             else
                 result.retainAll(condition.getAreNotEqual());
         }

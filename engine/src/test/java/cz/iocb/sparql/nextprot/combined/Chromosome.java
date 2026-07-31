@@ -11,17 +11,17 @@ import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
-import cz.iocb.sparql.engine.mapping.classes.UserIntBlankNodeClass;
 
 
 
 public class Chromosome
 {
-    private static final BlankNodeClass nameBlankNode = new UserIntBlankNodeClass();
-    private static final BlankNodeClass nameListBlankNode = new UserIntBlankNodeClass();
+    private static final BlankNodeClass nameBlankNode = new IntBlankNodeConstantSegmentClass(1);
+    private static final BlankNodeClass nameListBlankNode = new IntBlankNodeConstantSegmentClass(2);
 
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
@@ -63,7 +63,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_bases");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Isoform"));
@@ -122,7 +122,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_proteoforms");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "proteoform_bases")),
@@ -134,7 +134,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_active_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -146,7 +146,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_activity_regulations");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -158,7 +158,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_antibody_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -170,7 +170,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_beta_strands");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -182,7 +182,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_binary_interactions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -194,7 +194,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_binding_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -206,7 +206,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_biophysicochemical_properties");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -218,7 +218,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_calcium_binding_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -230,7 +230,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_catalytic_activities");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -242,7 +242,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cautions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -253,7 +253,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cellular_components");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -265,7 +265,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cleavage_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -277,7 +277,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cofactors");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -288,7 +288,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cofactor_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -300,7 +300,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_coiled_coil_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -312,7 +312,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_compositionally_biased_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -324,7 +324,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_cross_links");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -336,7 +336,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_detected_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -348,7 +348,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_developmental_stage_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -360,7 +360,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_diseases");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -371,7 +371,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_disulfide_bonds");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -383,7 +383,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_dna_binding_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -395,7 +395,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_domains");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -406,7 +406,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_domain_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -418,7 +418,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_electrophysiological_parameters");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -430,7 +430,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_enzyme_classifications");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -442,7 +442,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -454,7 +454,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_expression_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -466,7 +466,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_expression_profiles");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -478,7 +478,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_functions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -489,7 +489,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_function_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -501,7 +501,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_general_annotations");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -513,7 +513,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_glycosylation_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -525,7 +525,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_go_biological_processs");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -537,7 +537,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_go_cellular_components");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -549,7 +549,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_go_molecular_functions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -561,7 +561,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_helixs");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -572,7 +572,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_inductions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -584,7 +584,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_interacting_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -596,7 +596,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_interactions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -608,7 +608,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_interaction_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -620,7 +620,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_intramembrane_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -632,7 +632,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_keywords");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -643,7 +643,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_lipidation_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -655,7 +655,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -666,7 +666,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_mature_proteins");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -678,7 +678,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_medicals");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -689,7 +689,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_metal_binding_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -701,7 +701,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_miscellaneouss");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -713,7 +713,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_miscellaneous_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -725,7 +725,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_miscellaneous_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -737,7 +737,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_mitochondrial_transit_peptides");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -749,7 +749,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_modified_residues");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -761,7 +761,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_mutagenesiss");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -773,7 +773,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_non_terminal_residues");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -785,7 +785,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_nucleotide_phosphate_binding_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -797,7 +797,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_pathways");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -808,7 +808,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_pdb_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -820,7 +820,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_peptide_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -832,7 +832,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_positional_annotations");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -844,7 +844,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_processing_products");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -856,7 +856,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_propeptides");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -868,7 +868,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_ptms");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -879,7 +879,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_ptm_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -890,7 +890,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -901,7 +901,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_repeats");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -912,7 +912,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_secondary_structures");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -924,7 +924,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_selenocysteines");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -936,7 +936,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_sequence_cautions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -948,7 +948,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_sequence_conflicts");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -960,7 +960,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_short_sequence_motifs");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -972,7 +972,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_sites");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -983,7 +983,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_small_molecule_interactions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -995,7 +995,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_srm_peptide_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1007,7 +1007,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_subcellular_locations");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1019,7 +1019,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_subcellular_location_notes");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1031,7 +1031,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_topological_domains");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1043,7 +1043,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_topologies");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1054,7 +1054,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_transmembrane_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1066,7 +1066,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_transport_activities");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1078,7 +1078,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_turns");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1089,7 +1089,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_undetected_expressions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1101,7 +1101,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_uniprot_keywords");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1113,7 +1113,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_variants");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1124,7 +1124,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_variant_infos");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1136,7 +1136,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_zinc_finger_regions");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1148,7 +1148,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_interaction_mappings");
-            NodeMapping subject = config.createIriMapping("isoform", "iri");
+            TermMapping subject = config.createIriMapping("isoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "isoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1166,7 +1166,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_bases");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
                     asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), "int4")), graph, subject,
@@ -1212,7 +1212,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_evidences");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "evidence_bases")),
@@ -1223,7 +1223,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_negative_evidences");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "evidence_bases")),
@@ -1235,7 +1235,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_diseases");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "terminology_bases")),
@@ -1246,7 +1246,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_comments");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
@@ -1256,7 +1256,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_isoform_specificities");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "schema_bases")),
@@ -1268,7 +1268,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_entry_interactants");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "entry_bases")),
@@ -1279,7 +1279,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_isoform_interactants");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "annotation_bases"), table, new Table(schema, "isoform_bases")),
@@ -1290,7 +1290,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "annotation_peptide_sets");
-            NodeMapping subject = config.createIriMapping("annotation", "iri");
+            TermMapping subject = config.createIriMapping("annotation", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "annotation_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("annotation"), "int4")), graph,
@@ -1306,7 +1306,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "evidence_bases");
-            NodeMapping subject = config.createIriMapping("evidence", "iri");
+            TermMapping subject = config.createIriMapping("evidence", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Evidence"));
@@ -1367,7 +1367,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "evidence_publication_references");
-            NodeMapping subject = config.createIriMapping("evidence", "iri");
+            TermMapping subject = config.createIriMapping("evidence", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "evidence_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("evidence"), "int4")), graph, subject,
@@ -1382,7 +1382,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_bases");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Entry"));
@@ -1399,7 +1399,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_classifiers");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "entry_bases"), table, new Table(schema, "terminology_bases")),
@@ -1411,7 +1411,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_genes");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table, new Table(schema, "gene_bases")),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4"),
@@ -1421,7 +1421,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "isoform_bases");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1430,7 +1430,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_publication_references");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1439,7 +1439,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_recommended_names");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1448,7 +1448,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_alternative_names");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1457,7 +1457,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_additional_names");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1467,7 +1467,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_cleaved_region_names");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1477,7 +1477,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "entry_functional_region_names");
-            NodeMapping subject = config.createIriMapping("entry", "iri");
+            TermMapping subject = config.createIriMapping("entry", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "entry_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("entry"), "int4")), graph, subject,
@@ -1493,7 +1493,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_bases");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Proteoform"));
@@ -1503,7 +1503,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_general_annotations");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1515,7 +1515,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_generic_phenotypes");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1527,7 +1527,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_modifications");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1539,7 +1539,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_phenotypic_variations");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1551,7 +1551,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_positional_annotations");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1563,7 +1563,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "proteoform_disease_related_variants");
-            NodeMapping subject = config.createIriMapping("proteoform", "iri");
+            TermMapping subject = config.createIriMapping("proteoform", "iri");
 
             config.addQuadMapping(
                     asList(new Table(schema, "proteoform_bases"), table, new Table(schema, "annotation_bases")),
@@ -1581,7 +1581,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "gene_bases");
-            NodeMapping subject = config.createIriMapping("gene", "iri");
+            TermMapping subject = config.createIriMapping("gene", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Gene"));
@@ -1601,7 +1601,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "gene_best_mappings");
-            NodeMapping subject = config.createIriMapping("gene", "iri");
+            TermMapping subject = config.createIriMapping("gene", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "gene_bases"), table, new Table(schema, "entry_bases")),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene"), "int4"),
@@ -1612,7 +1612,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "gene_names");
-            NodeMapping subject = config.createIriMapping("gene", "iri");
+            TermMapping subject = config.createIriMapping("gene", "iri");
 
             config.addQuadMapping(asList(new Table(schema, "gene_bases"), table),
                     asList(new JoinColumns(new TableColumn("id"), new TableColumn("gene"), "int4")), graph, subject,
@@ -1623,12 +1623,12 @@ public class Chromosome
 
     private static void addProteinSequenceQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass sequence = new UserIntBlankNodeClass();
+        BlankNodeClass sequence = new IntBlankNodeConstantSegmentClass(3);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "protein_sequence_bases");
-            NodeMapping subject = config.createBlankNodeMapping(sequence, "id");
+            TermMapping subject = config.createBlankNodeMapping(sequence, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":ProteinSequence"));
@@ -1650,12 +1650,12 @@ public class Chromosome
 
     private static void addProteinFamilyInfoQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass family = new UserIntBlankNodeClass();
+        BlankNodeClass family = new IntBlankNodeConstantSegmentClass(4);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "family_info_bases");
-            NodeMapping subject = config.createBlankNodeMapping(family, "id");
+            TermMapping subject = config.createBlankNodeMapping(family, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":FamilyInfo"));
@@ -1676,12 +1676,12 @@ public class Chromosome
 
     private static void addHistoryQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass history = new UserIntBlankNodeClass();
+        BlankNodeClass history = new IntBlankNodeConstantSegmentClass(5);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "history_bases");
-            NodeMapping subject = config.createBlankNodeMapping(history, "id");
+            TermMapping subject = config.createBlankNodeMapping(history, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":History"));
@@ -1707,12 +1707,12 @@ public class Chromosome
 
     private static void addIdentifierQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass identifier = new UserIntBlankNodeClass();
+        BlankNodeClass identifier = new IntBlankNodeConstantSegmentClass(6);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "identifier_bases");
-            NodeMapping subject = config.createBlankNodeMapping(identifier, "id");
+            TermMapping subject = config.createBlankNodeMapping(identifier, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Identifier"));
@@ -1731,12 +1731,12 @@ public class Chromosome
 
     private static void addEntryXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass();
+        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(7);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "entry_xref_bases");
-            NodeMapping subject = config.createBlankNodeMapping(xref, "id");
+            TermMapping subject = config.createBlankNodeMapping(xref, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
@@ -1755,12 +1755,12 @@ public class Chromosome
 
     private static void addEvidenceXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass();
+        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(8);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "evidence_xref_bases");
-            NodeMapping subject = config.createBlankNodeMapping(xref, "id");
+            TermMapping subject = config.createBlankNodeMapping(xref, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
@@ -1779,12 +1779,12 @@ public class Chromosome
 
     private static void addChebiXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass();
+        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(9);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "chebi_xref_bases");
-            NodeMapping subject = config.createBlankNodeMapping(xref, "id");
+            TermMapping subject = config.createBlankNodeMapping(xref, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
@@ -1808,12 +1808,12 @@ public class Chromosome
 
     private static void addDrugBankXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass();
+        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(10);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "drugbank_xref_bases");
-            NodeMapping subject = config.createBlankNodeMapping(xref, "id");
+            TermMapping subject = config.createBlankNodeMapping(xref, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
@@ -1835,12 +1835,12 @@ public class Chromosome
 
     private static void addUniProtXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new UserIntBlankNodeClass();
+        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(11);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
             Table table = new Table(schema, "uniprot_xref_bases");
-            NodeMapping subject = config.createBlankNodeMapping(xref, "id");
+            TermMapping subject = config.createBlankNodeMapping(xref, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Xref"));
@@ -1866,7 +1866,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_bases");
-            NodeMapping subject = config.createBlankNodeMapping(nameBlankNode, "id");
+            TermMapping subject = config.createBlankNodeMapping(nameBlankNode, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Name"));
@@ -1897,7 +1897,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_list_bases");
-            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "id");
+            TermMapping subject = config.createBlankNodeMapping(nameListBlankNode, "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":NameList"));
@@ -1905,7 +1905,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_list_recommended_names");
-            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
+            TermMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":recommendedName"),
                     config.createBlankNodeMapping(nameBlankNode, "name"));
@@ -1913,7 +1913,7 @@ public class Chromosome
 
         {
             Table table = new Table(schema, "name_list_alternative_names");
-            NodeMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
+            TermMapping subject = config.createBlankNodeMapping(nameListBlankNode, "list");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":alternativeName"),
                     config.createBlankNodeMapping(nameBlankNode, "name"));

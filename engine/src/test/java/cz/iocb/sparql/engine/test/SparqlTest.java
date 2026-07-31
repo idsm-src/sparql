@@ -67,29 +67,27 @@ import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
-import cz.iocb.sparql.engine.mapping.BlankNodeLiteral;
 import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
-import cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes;
-import cz.iocb.sparql.engine.mapping.classes.DataType;
 import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.mapping.classes.UserStrBlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes;
+import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
-import cz.iocb.sparql.engine.parser.model.IRI;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
-import cz.iocb.sparql.engine.request.BNode;
+import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.Iri;
+import cz.iocb.sparql.engine.rdf.LangStringLiteral;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
-import cz.iocb.sparql.engine.request.IriNode;
-import cz.iocb.sparql.engine.request.LanguageTaggedLiteral;
 import cz.iocb.sparql.engine.request.LimitExceedException;
-import cz.iocb.sparql.engine.request.RdfNode;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.request.Result;
-import cz.iocb.sparql.engine.request.TypedLiteral;
 import cz.iocb.sparql.engine.translator.ServiceException;
 import cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration;
 import cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration;
@@ -110,11 +108,11 @@ public class SparqlTest
     static String imageName = new ImageFromDockerfile("sparql-test").withFileFromPath(".", Paths.get(dockerPath)).get();
     static DockerImageName image = DockerImageName.parse(imageName).asCompatibleSubstituteFor("postgres");
 
-    @Container @SuppressWarnings("resource")
-    static PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image).withSharedMemorySize(1L << 30);
+    @Container
+    private static final PostgreSQLContainer<?> container = createContainer();
 
-    private static final UserStrBlankNodeClass bnodeClass = new UserStrBlankNodeClass();
-    private static final Map<LiteralClass, LiteralClass> literalClassMap = new HashMap<LiteralClass, LiteralClass>();
+    private static final StrBlankNodeConstantSegmentClass bnodeClass = new StrBlankNodeConstantSegmentClass(0);
+    private static final Map<LiteralClass, LiteralClass> literalClassMap = new HashMap<>();
 
     private static DataSource connectionPool = null;
     private static DatabaseSchema schema = null;
@@ -122,6 +120,14 @@ public class SparqlTest
     private static Engine stringEngine = null;
     private static Engine integerEngine = null;
     private static Engine combinedEngine = null;
+
+
+    private static PostgreSQLContainer<?> createContainer()
+    {
+        PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image);
+        container.setShmSize(1L << 30);
+        return container;
+    }
 
 
     @BeforeAll
@@ -240,7 +246,7 @@ public class SparqlTest
     @DisplayName("Query Evaluation Tests")
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationTests")
-    void doQueryEvaluationTests(String name, String query, List<Quad> quads, List<List<RdfNode>> expected)
+    void doQueryEvaluationTests(String name, String query, List<Quad> quads, List<List<RdfTerm>> expected)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
@@ -253,7 +259,7 @@ public class SparqlTest
 
         try(Request request = engine.getRequest())
         {
-            List<List<RdfNode>> result = getResult(request.execute(query));
+            List<List<RdfTerm>> result = getResult(request.execute(query));
 
             MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
         }
@@ -263,7 +269,7 @@ public class SparqlTest
     @DisplayName("Query Evaluation Tests (with subset literals)")
     @ParameterizedTest(name = "{0}")
     @MethodSource("getQueryEvaluationTests")
-    void doQueryEvaluationTestsWithLiteralMap(String name, String query, List<Quad> quads, List<List<RdfNode>> expected)
+    void doQueryEvaluationTestsWithLiteralMap(String name, String query, List<Quad> quads, List<List<RdfTerm>> expected)
             throws TranslateExceptions, LimitExceedException, SQLException, ServiceException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, false);
@@ -277,7 +283,7 @@ public class SparqlTest
 
         try(Request request = engine.getRequest())
         {
-            List<List<RdfNode>> result = getResult(request.execute(query));
+            List<List<RdfTerm>> result = getResult(request.execute(query));
 
             MatcherAssert.assertThat(result, Matchers.containsInAnyOrder(expected.toArray()));
         }
@@ -326,7 +332,7 @@ public class SparqlTest
 
     private static List<Arguments> getPositiveSyntaxTests() throws URISyntaxException, IOException
     {
-        List<Arguments> queries = new LinkedList<Arguments>();
+        List<Arguments> queries = new LinkedList<>();
 
         Query info = QueryFactory.create("""
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -362,7 +368,7 @@ public class SparqlTest
 
     private static List<Arguments> getNegativeSyntaxTests() throws URISyntaxException, IOException
     {
-        List<Arguments> queries = new LinkedList<Arguments>();
+        List<Arguments> queries = new LinkedList<>();
 
         Query info = QueryFactory.create("""
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -398,7 +404,7 @@ public class SparqlTest
 
     private static List<Arguments> getQueryEvaluationSyntaxTests() throws URISyntaxException, IOException
     {
-        List<Arguments> queries = new LinkedList<Arguments>();
+        List<Arguments> queries = new LinkedList<>();
 
         Query info = QueryFactory.create("""
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -436,7 +442,7 @@ public class SparqlTest
     private static List<Arguments> getQueryEvaluationTests()
             throws URISyntaxException, IOException, ParserConfigurationException, SAXException
     {
-        List<Arguments> queries = new LinkedList<Arguments>();
+        List<Arguments> queries = new LinkedList<>();
 
         Query info = QueryFactory.create("""
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -464,8 +470,8 @@ public class SparqlTest
                 Path queryPath = Paths.get(new URI(test.get("?QUERY").asResource().getURI()).getPath());
                 String query = new String(Files.readAllBytes(queryPath));
                 String name = test.get("?NAME").asLiteral().getLexicalForm();
-                List<Quad> data = new ArrayList<Quad>();
-                List<List<RdfNode>> expected = getResult(test.get("?RESULT"));
+                List<Quad> data = new ArrayList<>();
+                List<List<RdfTerm>> expected = getResult(test.get("?RESULT"));
 
                 if(test.get("DATA") != null)
                     data.addAll(getQuads(test.get("DATA"), true));
@@ -501,7 +507,7 @@ public class SparqlTest
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         InputStream in = cl.getResourceAsStream("nextprot/queryset.sparql");
 
-        List<Arguments> queries = new LinkedList<Arguments>();
+        List<Arguments> queries = new LinkedList<>();
 
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)))
         {
@@ -542,7 +548,7 @@ public class SparqlTest
         Model model = ModelFactory.createDefaultModel();
         model.read(data.asResource().getURI(), "TTL");
 
-        List<Quad> quads = new ArrayList<Quad>();
+        List<Quad> quads = new ArrayList<>();
 
         StmtIterator it = model.listStatements();
 
@@ -556,13 +562,13 @@ public class SparqlTest
     }
 
 
-    private static NodeMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
+    private static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
     {
         return getMapping(node, config, Map.of());
     }
 
 
-    private static NodeMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
+    private static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
             Map<LiteralClass, LiteralClass> map)
     {
         if(node == null)
@@ -571,22 +577,19 @@ public class SparqlTest
         }
         else if(node.isURIResource())
         {
-            return new ConstantIriMapping(new IRI(node.asResource().getURI().replaceFirst("file://.*/", "")));
+            return new ConstantIriMapping(new Iri(node.asResource().getURI().replaceFirst("file://.*/", "")));
         }
         else if(node.isLiteral() && node.asLiteral().getLanguage().isEmpty())
         {
-            IRI iri = new IRI(node.asLiteral().getDatatypeURI());
-            DataType datatype = config.getDataType(iri);
-            LiteralClass literalClass = datatype == null ? BuiltinClasses.unsupportedLiteral :
-                    datatype.getGeneralLiteralClass();
+            Iri iri = new Iri(node.asLiteral().getDatatypeURI());
 
-            Literal literal = new Literal(node.asLiteral().getLexicalForm(), datatype, iri);
+            Datatype datatype = config.getDatatype(iri);
 
-            if(literal.getValue() == null)
-                return new ConstantLiteralMapping(BuiltinClasses.unsupportedLiteral,
-                        new Literal(node.asLiteral().getLexicalForm(),
-                                config.getDataType(new IRI(node.asLiteral().getDatatypeURI())),
-                                new IRI(node.asLiteral().getDatatypeURI())));
+            //FIXME: unsupportedLiteral cannot be used in mapping
+            LiteralClass literalClass = (datatype == null || !datatype.isValidForm(node.asLiteral().getLexicalForm())) ?
+                    BuiltinClasses.unsupportedLiteral : datatype.getGeneralLiteralClass();
+
+            TypedLiteral literal = new TypedLiteral(node.asLiteral().getLexicalForm(), iri);
 
             return new ConstantLiteralMapping(map.getOrDefault(literalClass, literalClass), literal);
         }
@@ -595,19 +598,19 @@ public class SparqlTest
             LiteralClass literalClass = LangStringConstantTagClass.get(node.asLiteral().getLanguage());
 
             return new ConstantLiteralMapping(literalClass,
-                    new Literal(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage()));
+                    new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage()));
         }
         else if(node.isAnon())
         {
             return new ConstantBlankNodeMapping(
-                    new BlankNodeLiteral(node.asResource().getId().getLabelString(), bnodeClass));
+                    new StrBlankNode(node.asResource().getId().getLabelString(), bnodeClass.getSegment()), bnodeClass);
         }
 
         return null;
     }
 
 
-    private static List<List<RdfNode>> getResult(RDFNode result)
+    private static List<List<RdfTerm>> getResult(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
         if(result.toString().endsWith(".ttl"))
@@ -617,9 +620,9 @@ public class SparqlTest
     }
 
 
-    private static List<List<RdfNode>> getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
+    private static List<List<RdfTerm>> getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
     {
-        List<List<RdfNode>> results = new ArrayList<>();
+        List<List<RdfTerm>> results = new ArrayList<>();
 
         Model model = ModelFactory.createDefaultModel();
         model.read(result.asResource().getURI(), "TTL");
@@ -636,36 +639,36 @@ public class SparqlTest
     }
 
 
-    private static RdfNode getNode(RDFNode node)
+    private static RdfTerm getNode(RDFNode node)
     {
         if(node == null)
             return null;
         else if(node.isURIResource())
-            return new IriNode(node.asResource().getURI().replaceFirst("file://.*/", ""));
+            return new Iri(node.asResource().getURI().replaceFirst("file://.*/", ""));
         else if(node.isLiteral() && node.asLiteral().getLanguage().isEmpty())
-            return new TypedLiteral(node.asLiteral().getLexicalForm(), new IRI(node.asLiteral().getDatatypeURI()));
+            return new TypedLiteral(node.asLiteral().getLexicalForm(), new Iri(node.asLiteral().getDatatypeURI()));
         else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
-            return new LanguageTaggedLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage());
+            return new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage());
         else if(node.isAnon())
-            return new BNode("");
+            return new StrBlankNode("", 0);
 
         return null;
     }
 
 
-    private static List<List<RdfNode>> getResultFromXML(RDFNode result)
+    private static List<List<RdfTerm>> getResultFromXML(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
-        List<List<RdfNode>> results = new ArrayList<>();
+        List<List<RdfTerm>> results = new ArrayList<>();
 
-        List<String> variables = new LinkedList<String>();
+        List<String> variables = new LinkedList<>();
 
         SAXParserFactory factory = SAXParserFactory.newInstance();
         SAXParser saxParser = factory.newSAXParser();
 
         DefaultHandler handler = new DefaultHandler()
         {
-            ArrayList<RdfNode> result;
+            List<RdfTerm> result;
             int varIndex;
             StringBuilder data;
             String datatype;
@@ -681,7 +684,7 @@ public class SparqlTest
                 }
                 else if(qName.equalsIgnoreCase("result"))
                 {
-                    result = new ArrayList<RdfNode>(variables.size());
+                    result = new ArrayList<>(variables.size());
 
                     for(int i = 0; i < variables.size(); i++)
                         result.add(null);
@@ -708,7 +711,7 @@ public class SparqlTest
                 }
                 else if(qName.equalsIgnoreCase("boolean"))
                 {
-                    result = new ArrayList<RdfNode>(1);
+                    result = new ArrayList<>(1);
                     result.add(null);
                     results.add(result);
                     varIndex = 0;
@@ -722,19 +725,19 @@ public class SparqlTest
                 if(varIndex == -1)
                     return;
 
-                RdfNode node = null;
+                RdfTerm term = null;
 
                 if(qName.equalsIgnoreCase("boolean"))
                 {
-                    node = new TypedLiteral(data.toString(), BuiltinDataTypes.xsdBooleanType.getTypeIri());
+                    term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdBooleanType.getTypeIri());
                 }
                 else if(qName.equalsIgnoreCase("uri"))
                 {
-                    node = new IriNode(data.toString());
+                    term = new Iri(data.toString());
                 }
                 else if(qName.equalsIgnoreCase("bnode"))
                 {
-                    node = new BNode("" /*data.toString()*/);
+                    term = new StrBlankNode("" /*data.toString()*/, 0);
                 }
                 else if(!qName.equalsIgnoreCase("literal"))
                 {
@@ -742,7 +745,7 @@ public class SparqlTest
                 }
                 else if(lang != null)
                 {
-                    node = new LanguageTaggedLiteral(data.toString(), lang);
+                    term = new LangStringLiteral(data.toString(), lang);
                 }
                 else if(datatype != null)
                 {
@@ -761,14 +764,14 @@ public class SparqlTest
                     else if(datatype.equals("http://www.w3.org/2001/XMLSchema#boolean") && text.equals("0"))
                         text = "false";
 
-                    node = new TypedLiteral(text, datatype);
+                    term = new TypedLiteral(text, new Iri(datatype));
                 }
                 else
                 {
-                    node = new TypedLiteral(data.toString(), BuiltinDataTypes.xsdStringType.getTypeIri());
+                    term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdStringType.getTypeIri());
                 }
 
-                result.set(varIndex, node);
+                result.set(varIndex, term);
             }
 
             @Override
@@ -785,26 +788,26 @@ public class SparqlTest
     }
 
 
-    private List<List<RdfNode>> getResult(Result it) throws SQLException
+    private List<List<RdfTerm>> getResult(Result it) throws SQLException
     {
-        List<List<RdfNode>> result = new ArrayList<List<RdfNode>>();
+        List<List<RdfTerm>> result = new ArrayList<>();
 
         if(it.getHeads().isEmpty())
         {
             while(it.next())
             {
-                result.add(new ArrayList<RdfNode>());
+                result.add(new ArrayList<>());
             }
         }
         else
         {
             while(it.next())
             {
-                RdfNode[] row = it.getRow();
+                RdfTerm[] row = it.getRow();
 
                 for(int i = 0; i < row.length; i++)
-                    if(row[i] instanceof BNode)
-                        row[i] = new BNode("");
+                    if(row[i] instanceof BlankNode)
+                        row[i] = new StrBlankNode("", 0);
 
                 result.add(Arrays.asList(row));
             }

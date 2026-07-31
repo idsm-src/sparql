@@ -1,0 +1,47 @@
+package cz.iocb.sparql.engine.model;
+
+import cz.iocb.sparql.engine.model.base.BaseElement;
+import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
+
+
+
+/**
+ * A shortened form of IRI, represented using a prefix (see {@link PrefixDefinition}) and a local name.
+ *
+ * <p>
+ * In the final AST, it is expanded to the full {@link IriNode}.
+ */
+public class PrefixedName extends BaseElement
+{
+    private final String prefix;
+    private final String localName;
+
+
+    public PrefixedName(String prefix, String localName)
+    {
+        this.prefix = prefix;
+        this.localName = localName;
+    }
+
+
+    /**
+     * Prefix without the trailing ':'.
+     */
+    public String getPrefix()
+    {
+        return prefix;
+    }
+
+
+    public String getLocalName()
+    {
+        return localName;
+    }
+
+
+    @Override
+    public <T> T accept(ElementVisitor<T> visitor)
+    {
+        return visitor.visit(this);
+    }
+}

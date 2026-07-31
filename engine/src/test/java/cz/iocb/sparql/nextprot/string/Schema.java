@@ -3,15 +3,15 @@ package cz.iocb.sparql.nextprot.string;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdDateType;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypes.xsdIntegerType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
-import cz.iocb.sparql.engine.mapping.NodeMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.TypedLiteral;
 
 
 
@@ -39,7 +39,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "source_bases");
-            NodeMapping subject = config.createIriMapping("source", "id");
+            TermMapping subject = config.createIriMapping("source", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Source"));
@@ -57,7 +57,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "database_bases");
-            NodeMapping subject = config.createIriMapping("database", "id");
+            TermMapping subject = config.createIriMapping("database", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Database"));
@@ -67,7 +67,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "database_comments");
-            NodeMapping subject = config.createIriMapping("database", "db");
+            TermMapping subject = config.createIriMapping("database", "db");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:comment"),
                     config.createLiteralMapping(xsdString, "comment"));
@@ -75,7 +75,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "database_categories");
-            NodeMapping subject = config.createIriMapping("database", "db");
+            TermMapping subject = config.createIriMapping("database", "db");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":category"),
                     config.createLiteralMapping(xsdString, "category"));
@@ -89,7 +89,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_bases");
-            NodeMapping subject = config.createIriMapping("schema", "id");
+            TermMapping subject = config.createIriMapping("schema", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("schema", "type"));
@@ -103,7 +103,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_classes");
-            NodeMapping subject = config.createIriMapping("schema", "entity");
+            TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping("owl:Class"));
@@ -111,7 +111,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_thing_subclasses");
-            NodeMapping subject = config.createIriMapping("schema", "entity");
+            TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("owl:Thing"));
@@ -119,7 +119,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_restrictions");
-            NodeMapping subject = config.createIriMapping("schema", "entity");
+            TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":notIn"),
                     config.createIriMapping("schema", "notin"));
@@ -127,7 +127,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_related_terms");
-            NodeMapping subject = config.createIriMapping("schema", "entity");
+            TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":related"),
                     config.createIriMapping("terminology", "related"));
@@ -135,7 +135,7 @@ public class Schema
 
         {
             Table table = new Table(schema, "schema_parent_classes");
-            NodeMapping subject = config.createIriMapping("schema", "entity");
+            TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("schema", "parent"));
@@ -156,7 +156,7 @@ public class Schema
             // :Version
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":ttlGenerationDate"),
-                    config.createLiteralMapping(xsdCompositeDate, new Literal("2021-12-12", xsdDateType)));
+                    config.createLiteralMapping(xsdCompositeDate, new TypedLiteral("2021-12-12", xsdDateIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":databaseRelease"), config.createLiteralMapping("2021-11-19"));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
@@ -220,17 +220,17 @@ public class Schema
             // :level
             config.addQuadMapping(null, graph, config.createIriMapping(":Evidence_at_protein_level"),
                     config.createIriMapping(":level"),
-                    config.createLiteralMapping(xsdInteger, new Literal("1", xsdIntegerType)));
+                    config.createLiteralMapping(xsdInteger, new TypedLiteral("1", xsdIntegerIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Evidence_at_transcript_level"),
                     config.createIriMapping(":level"),
-                    config.createLiteralMapping(xsdInteger, new Literal("2", xsdIntegerType)));
+                    config.createLiteralMapping(xsdInteger, new TypedLiteral("2", xsdIntegerIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Inferred_from_homology"),
                     config.createIriMapping(":level"),
-                    config.createLiteralMapping(xsdInteger, new Literal("3", xsdIntegerType)));
+                    config.createLiteralMapping(xsdInteger, new TypedLiteral("3", xsdIntegerIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Predicted"), config.createIriMapping(":level"),
-                    config.createLiteralMapping(xsdInteger, new Literal("4", xsdIntegerType)));
+                    config.createLiteralMapping(xsdInteger, new TypedLiteral("4", xsdIntegerIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Uncertain"), config.createIriMapping(":level"),
-                    config.createLiteralMapping(xsdInteger, new Literal("5", xsdIntegerType)));
+                    config.createLiteralMapping(xsdInteger, new TypedLiteral("5", xsdIntegerIri)));
         }
     }
 }

@@ -2,13 +2,13 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinDataTypeIRIs.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeType;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.parser.model.expression.Literal;
+import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
@@ -16,7 +16,7 @@ public final class DateTimeScalarClass extends LiteralClass
 {
     protected DateTimeScalarClass()
     {
-        super("datetime", xsdDateTimeIri, List.of("sparql.zoneddatetime"), Set.of(box/*, xsdCompositeDateTime*/));
+        super("datetime", xsdDateTimeType, List.of("sparql.zoneddatetime"), Set.of(box/*, xsdCompositeDateTime*/));
     }
 
 
@@ -30,7 +30,8 @@ public final class DateTimeScalarClass extends LiteralClass
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), "sparql.zoneddatetime"));
+        //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
+        return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }
 
 

@@ -10,7 +10,7 @@ public class ColumnMap
     private static final int limit = 63;
     private static final int numpart = 8;
 
-    private Map<String, String> map = new HashMap<String, String>();
+    private Map<String, String> map = new HashMap<>();
 
 
     public String getSafeName(String name)

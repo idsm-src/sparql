@@ -20,14 +20,15 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.imcode.SqlNoSolution;
+import cz.iocb.sparql.engine.imcode.SqlTableAccess;
+import cz.iocb.sparql.engine.imcode.SqlValues;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.parser.model.triple.Node;
+import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode;
-import cz.iocb.sparql.engine.translator.imcode.SqlIntercode.Restrictions;
-import cz.iocb.sparql.engine.translator.imcode.SqlNoSolution;
-import cz.iocb.sparql.engine.translator.imcode.SqlTableAccess;
-import cz.iocb.sparql.engine.translator.imcode.SqlValues;
 
 
 
@@ -37,17 +38,17 @@ public class StoredResultHandler extends ResultHandler
     private static int batchSize = 1000;
     private static int minTableSize = 1000; // has to be less than or equal to batchSize
 
-    private final List<Future<Boolean>> futures = new ArrayList<Future<Boolean>>();
+    private final List<Future<Boolean>> futures = new ArrayList<>();
 
     private Table table;
-    private LinkedHashMap<Column, String> columns = new LinkedHashMap<Column, String>();
+    private LinkedHashMap<Column, String> columns = new LinkedHashMap<>();
 
-    private final UsedVariables variables = new UsedVariables();
-    private final Map<String, Integer> counts = new HashMap<String, Integer>();
-    private final Map<Column, Column> constants = new HashMap<Column, Column>();
+    private final VariableBindings bindings = new VariableBindings();
+    private final Map<Variable, Integer> counts = new HashMap<>();
+    private final Map<Column, Column> constants = new HashMap<>();
 
-    Map<String, List<ResourceClass>> resourceClasses = new HashMap<String, List<ResourceClass>>();
-    private final LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<Column, List<Column>>();
+    Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
+    private final LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<>();
     int rowCount;
     int batchCount;
 
@@ -61,21 +62,21 @@ public class StoredResultHandler extends ResultHandler
 
 
     @Override
-    public void add(Map<String, Node> row) throws SQLException
+    public void add(Map<Variable, RdfTerm> row) throws SQLException
     {
-        for(Entry<String, Node> entry : row.entrySet())
+        for(Entry<Variable, RdfTerm> entry : row.entrySet())
         {
             if(!restrictions.containsVar(entry.getKey()))
                 continue;
 
             counts.merge(entry.getKey(), 1, Integer::sum);
 
-            UsedVariable variable = variables.get(entry.getKey());
+            VariableBinding binding = bindings.get(entry.getKey());
 
-            if(variable == null)
+            if(binding == null)
             {
-                variable = new UsedVariable(entry.getKey(), true);
-                variables.add(variable);
+                binding = new VariableBinding(entry.getKey(), true);
+                bindings.add(binding);
             }
 
             ResourceClass resClass = getResourceClass(request, entry.getValue(), entry.getKey());
@@ -87,13 +88,13 @@ public class StoredResultHandler extends ResultHandler
                     .set(batchCount, resClass);
 
             List<Column> vals = getColumns(request, resClass, entry.getValue());
-            List<Column> cols = variable.getMapping(resClass);
+            List<Column> cols = binding.getMapping(resClass);
             List<String> types = resClass.getSqlTypes();
 
             if(cols == null)
             {
                 cols = resClass.createColumns(request.getColumnMap(), entry.getKey());
-                variable.addMapping(resClass, cols);
+                binding.addMapping(resClass, cols);
 
                 for(int i = 0; i < resClass.getColumnCount(); i++)
                     columns.put(cols.get(i), types.get(i));
@@ -139,16 +140,17 @@ public class StoredResultHandler extends ResultHandler
             return SqlNoSolution.get();
 
 
-        UsedVariables vars = new UsedVariables();
+        VariableBindings varBindings = new VariableBindings();
 
-        for(UsedVariable var : variables.getValues())
+        for(VariableBinding binding : bindings.getValues())
         {
-            UsedVariable v = new UsedVariable(var.getName(), counts.getOrDefault(var.getName(), 0) < rowCount);
+            VariableBinding v = new VariableBinding(binding.getVariable(),
+                    counts.getOrDefault(binding.getVariable(), 0) < rowCount);
 
-            for(Entry<ResourceClass, List<Column>> e : var.getMappings().entrySet())
+            for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
                 v.addMapping(e.getKey(), e.getValue().stream().map(c -> constants.getOrDefault(c, c)).toList());
 
-            vars.add(v);
+            varBindings.add(v);
         }
 
 
@@ -156,21 +158,21 @@ public class StoredResultHandler extends ResultHandler
         {
             Map<Column, String> sqlTypes = new HashMap<>();
 
-            for(UsedVariable v : vars.getValues())
+            for(VariableBinding v : varBindings.getValues())
                 for(Entry<ResourceClass, List<Column>> e : v.getMappings().entrySet())
                     for(int i = 0; i < e.getKey().getColumnCount(); i++)
                         sqlTypes.put(e.getValue().get(i), e.getKey().getSqlTypes().get(i));
 
 
-            Map<String, List<ResourceClass>> types = new HashMap<String, List<ResourceClass>>();
+            Map<Variable, List<ResourceClass>> types = new HashMap<>();
 
-            for(Entry<String, List<ResourceClass>> entry : resourceClasses.entrySet())
+            for(Entry<Variable, List<ResourceClass>> entry : resourceClasses.entrySet())
                 types.put(entry.getKey(), entry.getValue().subList(0, rowCount));
 
 
-            Set<Column> columns = vars.getNonConstantColumns();
+            Set<Column> columns = varBindings.getNonConstantColumns();
 
-            LinkedHashMap<Column, List<Column>> values = new LinkedHashMap<Column, List<Column>>();
+            LinkedHashMap<Column, List<Column>> values = new LinkedHashMap<>();
 
             for(Entry<Column, List<Column>> entry : data.entrySet())
             {
@@ -182,7 +184,7 @@ public class StoredResultHandler extends ResultHandler
             }
 
 
-            return SqlValues.create(vars, types, values, rowCount).optimize(request, restrictions, false, false);
+            return SqlValues.create(varBindings, types, values, rowCount).optimize(request, restrictions, false, false);
         }
 
 
@@ -209,7 +211,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        return SqlTableAccess.create(table, vars).optimize(request, restrictions, false, false);
+        return SqlTableAccess.create(table, varBindings).optimize(request, restrictions, false, false);
     }
 
 
@@ -248,7 +250,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
         if(data.isEmpty())
-            data.put(new TableColumn("__"), new ArrayList<Column>(Collections.nCopies(batchCount, null)));
+            data.put(new TableColumn("__"), new ArrayList<>(Collections.nCopies(batchCount, null)));
 
         String insert = "insert into " + table
                 + data.keySet().stream().map(c -> c.toString()).collect(joining(", ", "(", ") values "))
