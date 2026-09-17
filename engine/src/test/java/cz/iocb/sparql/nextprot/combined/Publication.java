@@ -6,7 +6,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 
 
@@ -64,7 +64,7 @@ public class Publication
 
         {
             Table table = new Table(schema, "publication_authors");
-            TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeConstantSegmentClass(12), "id");
+            TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeInSegmentClass(12), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Person"), config.createAreEqualCondition("person", "'true'::boolean"));
@@ -82,7 +82,7 @@ public class Publication
 
         {
             Table table = new Table(schema, "publication_editors");
-            TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeConstantSegmentClass(13), "id");
+            TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeInSegmentClass(13), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
                     config.createIriMapping(":Person"));

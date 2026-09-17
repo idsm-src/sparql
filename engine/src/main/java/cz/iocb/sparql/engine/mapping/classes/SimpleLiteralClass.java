@@ -11,13 +11,26 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public sealed abstract class SimpleLiteralClass extends LiteralClass implements ResultResourceClass
+public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass implements ResultResourceClass
         permits BooleanClass, ShortClass, IntClass, LongClass, IntegerClass, DecimalClass, FloatClass, DoubleClass,
         StringClass, DayTimeDurationClass
 {
+    private final LiteralClass base;
+
+
+    protected SimpleLiteralClass(String name, Datatype datatype, String sqlType, LiteralClass base)
+    {
+        super(name, datatype, List.of(sqlType), Set.of(box, base));
+
+        this.base = base;
+    }
+
+
     protected SimpleLiteralClass(String name, Datatype datatype, String sqlType)
     {
         super(name, datatype, List.of(sqlType), Set.of(box));
+
+        this.base = null;
     }
 
 
@@ -31,7 +44,8 @@ public sealed abstract class SimpleLiteralClass extends LiteralClass implements 
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
+        assert literal.getValue().equals(datatype.getCanonicalLexicalForm(literal.getValue()));
+
         return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }
 
@@ -51,12 +65,16 @@ public sealed abstract class SimpleLiteralClass extends LiteralClass implements 
         if(targetClass.equals(box))
             return List.of(expression("sparql.rdfbox_create_from_%s(%s)", name, value));
 
+        if(targetClass.equals(base))
+            return List.of(value, !canBeNull ? constant("", "varchar") :
+                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
+
         throw new IllegalArgumentException();
     }
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;
@@ -66,7 +84,13 @@ public sealed abstract class SimpleLiteralClass extends LiteralClass implements 
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_%s(%s)", name, columns.get(0)));
+            if(base == null)
+                return List.of(expression("sparql.rdfbox_get_%s(%s)", name, columns.get(0)));
+            else
+                return List.of(expression("sparql.rdfbox_get_%s(%s, false)", name, columns.get(0)));
+
+        if(sourceClass.equals(base))
+            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
 
         throw new IllegalArgumentException();
     }

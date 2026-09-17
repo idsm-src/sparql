@@ -39,8 +39,8 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryNegationExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnarySignedLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VarContext;
-import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.Prologue;
@@ -431,7 +431,7 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 
         //TODO: add support for casting to user literals
 
-        if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
+        if(datatype != null && !(datatype instanceof UserDatatype))
         {
             if(arguments.size() != 1)
                 messages.add(new TranslateMessage(MessageType.wrongCountOfParameters, iri.getRange(),

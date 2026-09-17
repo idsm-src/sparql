@@ -2,7 +2,6 @@ package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.stringLiteral;
 import static java.util.Collections.singletonMap;
-import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -117,7 +116,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
             if(argClass.equals(stringLiteral)) //FIXME: use different approach
                 builder.append(arguments.get(i).getStringLiteral());
             else
-                builder.append(arguments.get(i).get(argClass).stream().map(c -> c.toString()).collect(joining(", ")));
+                builder.append(arguments.get(i).get(argClass).get(0)); //NOTE: only first column is used
         }
 
         builder.append(")");

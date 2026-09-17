@@ -4,7 +4,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
-public abstract class TemporalDatatype extends Datatype
+public abstract sealed class TemporalDatatype extends Datatype permits DateTimeDatatype, DateDatatype
 {
     protected static final String YEAR = "([1-9][0-9]{3,}|0[0-9]{3})";
     protected static final String LEAP_YEAR_DIV100 = "(([1-9][0-9]*)?([02468][048]|[13579][26])00)";
@@ -16,12 +16,13 @@ public abstract class TemporalDatatype extends Datatype
     protected static final String FEBRUARY = "02-(0[1-9]|1[0-9]|2[0-8])";
     protected static final String MONTH_DAY = "(" + LONG_MONTH + "|" + SHORT_MONTH + "|" + FEBRUARY + ")";
 
-    public static final String TIME = "(([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?|(24:00:00(\\.0+)?))";
+    public static final String TIME = "(([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6}0*)?|(24:00:00(\\.0+)?))";
     public static final String DATE = "((-?" + YEAR + "-" + MONTH_DAY + ")|(-?" + LEAP_YEAR + "-02-29))";
+    public static final String DATETIME = DATE + "T" + TIME;
     public static final String ZONE = "(Z|(\\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))";
 
     public static final String XSD_DATE_PATTERN = WS + DATE + ZONE + "?" + WS;
-    public static final String XSD_DATETIME_PATTERN = WS + DATE + "T" + TIME + ZONE + "?" + WS;
+    public static final String XSD_DATETIME_PATTERN = WS + DATETIME + ZONE + "?" + WS;
 
 
     protected TemporalDatatype(Iri typeIri)

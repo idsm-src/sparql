@@ -13,15 +13,15 @@ import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
 
 
 
 public class Chromosome
 {
-    private static final BlankNodeClass nameBlankNode = new IntBlankNodeConstantSegmentClass(1);
-    private static final BlankNodeClass nameListBlankNode = new IntBlankNodeConstantSegmentClass(2);
+    private static final BlankNodeClass nameBlankNode = new IntBlankNodeInSegmentClass(1);
+    private static final BlankNodeClass nameListBlankNode = new IntBlankNodeInSegmentClass(2);
 
 
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
@@ -1623,7 +1623,7 @@ public class Chromosome
 
     private static void addProteinSequenceQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass sequence = new IntBlankNodeConstantSegmentClass(3);
+        BlankNodeClass sequence = new IntBlankNodeInSegmentClass(3);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1650,7 +1650,7 @@ public class Chromosome
 
     private static void addProteinFamilyInfoQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass family = new IntBlankNodeConstantSegmentClass(4);
+        BlankNodeClass family = new IntBlankNodeInSegmentClass(4);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1676,7 +1676,7 @@ public class Chromosome
 
     private static void addHistoryQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass history = new IntBlankNodeConstantSegmentClass(5);
+        BlankNodeClass history = new IntBlankNodeInSegmentClass(5);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1707,7 +1707,7 @@ public class Chromosome
 
     private static void addIdentifierQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass identifier = new IntBlankNodeConstantSegmentClass(6);
+        BlankNodeClass identifier = new IntBlankNodeInSegmentClass(6);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1731,7 +1731,7 @@ public class Chromosome
 
     private static void addEntryXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(7);
+        BlankNodeClass xref = new IntBlankNodeInSegmentClass(7);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1755,7 +1755,7 @@ public class Chromosome
 
     private static void addEvidenceXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(8);
+        BlankNodeClass xref = new IntBlankNodeInSegmentClass(8);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1779,7 +1779,7 @@ public class Chromosome
 
     private static void addChebiXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(9);
+        BlankNodeClass xref = new IntBlankNodeInSegmentClass(9);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1808,7 +1808,7 @@ public class Chromosome
 
     private static void addDrugBankXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(10);
+        BlankNodeClass xref = new IntBlankNodeInSegmentClass(10);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
@@ -1835,7 +1835,7 @@ public class Chromosome
 
     private static void addUniProtXrefQuadMapping(SparqlDatabaseConfiguration config)
     {
-        BlankNodeClass xref = new IntBlankNodeConstantSegmentClass(11);
+        BlankNodeClass xref = new IntBlankNodeInSegmentClass(11);
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {

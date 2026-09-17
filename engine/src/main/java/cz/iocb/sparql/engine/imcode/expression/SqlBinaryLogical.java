@@ -7,6 +7,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonCo
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.TRUE_OR_ERROR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static java.util.Collections.singletonMap;
 import java.util.List;
@@ -131,7 +132,7 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
             SqlExpressionIntercode right)
     {
         return List.of(new ExpressionColumn(
-                "(" + left.get(xsdBoolean).get(0) + " " + operator.getName() + " " + right.get(xsdBoolean).get(0) + ")",
+                "(" + left.get(genBoolean).get(0) + " " + operator.getName() + " " + right.get(genBoolean).get(0) + ")",
                 left.canBeNull() || right.canBeNull()));
     }
 
@@ -150,7 +151,7 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
         Restriction operandRestriction = new Restriction();
 
         if(restriction.contains(xsdBoolean))
-            operandRestriction.add(xsdBoolean);
+            operandRestriction.add(genBoolean);
 
         SqlExpressionIntercode optLeft = left.optimize(request, bindings, operandRestriction, evalServices);
         SqlExpressionIntercode optRight = getRight().optimize(request, bindings, operandRestriction, evalServices);

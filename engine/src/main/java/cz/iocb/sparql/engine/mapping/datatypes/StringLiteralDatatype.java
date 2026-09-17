@@ -4,7 +4,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
-public abstract class StringLiteralDatatype extends Datatype
+public abstract sealed class StringLiteralDatatype extends Datatype permits StringDatatype, LangStringDatatype
 {
     protected StringLiteralDatatype(Iri typeIri)
     {
@@ -20,9 +20,15 @@ public abstract class StringLiteralDatatype extends Datatype
 
 
     @Override
+    public boolean isCanonicalForm(String value)
+    {
+        return true;
+    }
+
+
+    @Override
     public String getCanonicalLexicalForm(String value)
     {
-        return value.replace("\\t", "\t").replace("\\n", "\n").replace("\\r", "\r").replace("\\b", "\b")
-                .replace("\\f", "\f").replace("\\\"", "\"").replace("\\'", "\'").replace("\\\\", "\\");
+        return value;
     }
 }

@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.database;
 
+import java.util.List;
+
 
 
 public class Table
@@ -31,6 +33,18 @@ public class Table
     public String getName()
     {
         return table;
+    }
+
+
+    public static List<Column> toTableColumns(Table table, List<Column> columns)
+    {
+        if(table == null)
+            return columns;
+
+        if(columns == null)
+            return null;
+
+        return columns.stream().map(c -> c.fromTable(table)).toList();
     }
 
 

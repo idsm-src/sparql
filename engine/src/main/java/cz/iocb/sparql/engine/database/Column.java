@@ -75,6 +75,6 @@ public abstract class Column implements Comparable<Column>
         if(list.get(0) instanceof ConstantColumn || list.size() == 1)
             return list.get(0);
 
-        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "coalesce(", ")")));
+        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "COALESCE(", ")")));
     }
 }

@@ -1086,7 +1086,7 @@ public final class SqlTableAccess extends SqlIntercode
                 if(e.getValue() != null)
                 {
                     builder.append(" ");
-                    builder.append(e.getKey().getName());
+                    builder.append(e.getKey().getResourceName());
                     builder.append(e.getValue().stream().map(c -> c.toString()).collect(joining(",", "(", ")")));
                 }
             }

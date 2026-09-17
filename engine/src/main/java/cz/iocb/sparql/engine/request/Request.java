@@ -24,13 +24,11 @@ import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.model.AskQuery;
@@ -526,9 +524,9 @@ public class Request implements AutoCloseable
     }
 
 
-    public IriClass getIriClass(Iri value)
+    public ResourceClass getIriClass(Iri value)
     {
-        IriClass iriClass = iriCache.getIriClass(value);
+        ResourceClass iriClass = iriCache.getIriClass(value);
 
         if(iriClass != null)
             return iriClass;
@@ -546,33 +544,31 @@ public class Request implements AutoCloseable
     }
 
 
-    public LiteralClass getLiteralClass(Literal literal)
+    public ResourceClass getLiteralClass(Literal literal)
     {
         Datatype datatype = getConfiguration().getDatatype(literal.getType());
 
-        //FIXME: language tags?
-
         if(datatype == null || !datatype.isValidForm(literal.getValue()))
-            return BuiltinClasses.unsupportedLiteral;
+            return BuiltinClasses.unsupportedType;
 
         return datatype.getResourceClass(literal);
     }
 
 
-    public BlankNodeClass getBlankNodeClass(BlankNode bnode)
+    public ResourceClass getBlankNodeClass(BlankNode bnode)
     {
         //TODO use cache
 
         return switch(bnode)
         {
-            case StrBlankNode s -> new StrBlankNodeConstantSegmentClass(s.getSegment());
-            case IntBlankNode i -> new IntBlankNodeConstantSegmentClass(i.getSegment());
+            case StrBlankNode s -> new StrBlankNodeInSegmentClass(s.getSegment());
+            case IntBlankNode i -> new IntBlankNodeInSegmentClass(i.getSegment());
             default -> throw new IllegalArgumentException();
         };
     }
 
 
-    private IriClass detectIriClass(Iri value)
+    private ResourceClass detectIriClass(Iri value)
     {
         for(UserIriClass iriClass : getConfiguration().getIriClasses())
             if(iriClass.match(getStatement(), value))
@@ -586,7 +582,7 @@ public class Request implements AutoCloseable
     {
         if(resClass instanceof IriClass iriClass && term instanceof Iri iri)
         {
-            IriClass cachedClass = iriCache.getIriClass(iri);
+            ResourceClass cachedClass = iriCache.getIriClass(iri);
 
             if(cachedClass != null)
                 return iriClass.equals(cachedClass);

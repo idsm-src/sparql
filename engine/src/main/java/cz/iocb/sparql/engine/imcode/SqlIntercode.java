@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getDisjunctClasses;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
 import static java.util.stream.Collectors.joining;
@@ -301,6 +303,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             result = nextResult;
         }
 
+        //FIXME: getDisjunctClasses is probably not needed
         return getDisjunctClasses(result.stream().map(s -> getIntersectionClass(s)).collect(toSet()));
     }
 
@@ -365,10 +368,10 @@ public abstract class SqlIntercode extends SqlBaseClass
                 {
                     VariableBinding binding = vars.get(i);
 
-                    if(binding == null || binding.canBeNull() || !binding.containsClass(resClass))
+                    if(binding == null || binding.canBeNull() || !binding.contains(resClass))
                         continue;
 
-                    mappings.add(toTableColumns(tables.get(i), binding.getMapping(resClass)));
+                    mappings.add(binding.deriveMapping(resClass, tables.get(i)));
                 }
 
                 if(mappings.stream().anyMatch(m -> m == null))
@@ -467,7 +470,7 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         return IntStream
                 .range(0, cols).mapToObj(i -> (Column) new ExpressionColumn(variants.stream()
-                        .map(l -> l.get(i).toString()).distinct().sorted().collect(joining(", ", "coalesce(", ")"))))
+                        .map(l -> l.get(i).toString()).distinct().sorted().collect(joining(", ", "COALESCE(", ")"))))
                 .toList();
     }
 
@@ -475,15 +478,6 @@ public abstract class SqlIntercode extends SqlBaseClass
     private static Set<ResourceClass> collectClasses(List<VariableBinding> variables)
     {
         return variables.stream().flatMap(v -> v.getClasses().stream()).collect(toSet());
-    }
-
-
-    private static List<Column> toTableColumns(Table table, List<Column> columns)
-    {
-        if(columns == null)
-            return null;
-
-        return columns.stream().map(c -> c.fromTable(table)).toList();
     }
 
 
@@ -592,7 +586,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                 if(leftClass == null || rightClass == null)
                     continue;
 
-                ResourceClass unionClass = ResourceClass.getUnionClass(leftClass, rightClass);
+                ResourceClass unionClass = unionize(leftClass, rightClass);
 
                 List<Column> leftCols = toTableColumns(leftTable, leftBinding.getMapping(leftClass));
                 List<Column> rightCols = toTableColumns(rightTable, rightBinding.getMapping(rightClass));
@@ -658,7 +652,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             if(leftClass == null || rightClass == null)
                 continue;
 
-            ResourceClass unionClass = ResourceClass.getUnionClass(leftClass, rightClass);
+            ResourceClass unionClass = unionize(leftClass, rightClass);
 
             List<Column> leftCols = toTableColumns(leftTable, leftBinding.getMapping(leftClass));
             List<Column> rightCols = toTableColumns(rightTable, rightBinding.getMapping(rightClass));

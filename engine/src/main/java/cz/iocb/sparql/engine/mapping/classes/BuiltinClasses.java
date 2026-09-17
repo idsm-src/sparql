@@ -1,29 +1,41 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
-import static java.util.stream.Collectors.toCollection;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Stream;
 
 
 
 public class BuiltinClasses
 {
-    /* built-in root of class hierarchy */
     public static final RdfBoxClass box = new RdfBoxClass();
 
-    /*built-in additional expression classes */
-    public static final CommonIntBlankNodeScalarClass intScalarBlankNode = new CommonIntBlankNodeScalarClass();
-    public static final CommonStrBlankNodeScalarClass strScalarBlankNode = new CommonStrBlankNodeScalarClass();
-    public static final DateTimeScalarClass xsdScalarDateTime = new DateTimeScalarClass();
-    public static final DateScalarClass xsdScalarDate = new DateScalarClass();
+    public static final IriScalarClass iri = new IriScalarClass();
+    public static final UnsupportedIriClass unsupportedIri = new UnsupportedIriClass();
 
-    /* built-in result classes */
-    public static final CommonIriClass iri = new CommonIriClass();
-    public static final CommonIntBlankNodeCompositeClass intCompositeBlankNode = new CommonIntBlankNodeCompositeClass();
-    public static final CommonStrBlankNodeCompositeClass strCompositeBlankNode = new CommonStrBlankNodeCompositeClass();
+    public static final IntBlankNodeScalarClass intScalarBlankNode = new IntBlankNodeScalarClass();
+    public static final IntBlankNodeCompositeClass intBlankNode = new IntBlankNodeCompositeClass();
+    public static final IntBlankNodeClass bnodeIntBlankNode = new IntBlankNodeInSegmentClass(Integer.MIN_VALUE);
+    public static final StrBlankNodeScalarClass strScalarBlankNode = new StrBlankNodeScalarClass();
+    public static final StrBlankNodeCompositeClass strBlankNode = new StrBlankNodeCompositeClass();
+    public static final StrBlankNodeClass bnodeStrBlankNode = new StrBlankNodeInSegmentClass(Integer.MIN_VALUE);
+
+    public static final BooleanBaseClass genBoolean = new BooleanBaseClass();
+    public static final ShortBaseClass genShort = new ShortBaseClass();
+    public static final IntBaseClass genInt = new IntBaseClass();
+    public static final LongBaseClass genLong = new LongBaseClass();
+    public static final IntegerBaseClass genInteger = new IntegerBaseClass();
+    public static final DecimalBaseClass genDecimal = new DecimalBaseClass();
+    public static final FloatBaseClass genFloat = new FloatBaseClass();
+    public static final DoubleBaseClass genDouble = new DoubleBaseClass();
+    public static final DateTimeScalarBaseClass genScalarDateTime = new DateTimeScalarBaseClass();
+    public static final DateTimeCompositeBaseClass genDateTime = new DateTimeCompositeBaseClass();
+    public static final DateScalarBaseClass genScalarDate = new DateScalarBaseClass();
+    public static final DateCompositeBaseClass genDate = new DateCompositeBaseClass();
+    public static final DayTimeDurationBaseClass genDayTimeDuration = new DayTimeDurationBaseClass();
+    public static final UserLiteralCompositeBaseClass genUserType = new UserLiteralCompositeBaseClass();
+
     public static final BooleanClass xsdBoolean = new BooleanClass();
     public static final ShortClass xsdShort = new ShortClass();
     public static final IntClass xsdInt = new IntClass();
@@ -33,65 +45,47 @@ public class BuiltinClasses
     public static final FloatClass xsdFloat = new FloatClass();
     public static final DoubleClass xsdDouble = new DoubleClass();
     public static final StringClass xsdString = new StringClass();
+    public static final DateTimeScalarClass xsdScalarDateTime = new DateTimeScalarClass();
+    public static final DateTimeCompositeClass xsdDateTime = new DateTimeCompositeClass();
+    public static final DateScalarClass xsdScalarDate = new DateScalarClass();
+    public static final DateCompositeClass xsdDate = new DateCompositeClass();
     public static final DayTimeDurationClass xsdDayTimeDuration = new DayTimeDurationClass();
-    public static final DateTimeCompositeClass xsdCompositeDateTime = new DateTimeCompositeClass();
-    public static final DateCompositeClass xsdCompositeDate = new DateCompositeClass();
+
     public static final LangStringClass rdfLangString = new LangStringClass();
-    public static final UnsupportedLiteralClass unsupportedLiteral = new UnsupportedLiteralClass();
+    public static final UserLiteralCompositeClass userType = new UserLiteralCompositeClass();
+    public static final UnsupportedLiteralClass unsupportedType = new UnsupportedLiteralClass();
 
-    /* built-in special classes */
-    public static final UnsupportedIriClass unsupportedIri = new UnsupportedIriClass();
-    public static final IntBlankNodeConstantSegmentClass bnodeIntBlankNode = new IntBlankNodeConstantSegmentClass(
-            Integer.MIN_VALUE);
-    public static final StrBlankNodeConstantSegmentClass bnodeStrBlankNode = new StrBlankNodeConstantSegmentClass(
-            Integer.MIN_VALUE);
+    public static final Set<ResultResourceClass> resultClasses = Set.of(iri, intBlankNode, strBlankNode, xsdBoolean,
+            genBoolean, xsdShort, genShort, xsdInt, genInt, xsdLong, genLong, xsdInteger, genInteger, xsdDecimal,
+            genDecimal, xsdFloat, genFloat, xsdDouble, genDouble, xsdString, xsdDayTimeDuration, genDayTimeDuration,
+            xsdDateTime, genDateTime, xsdDate, genDate, rdfLangString, unsupportedType);
 
-    /* built-in union classes */
-    public static final ResourceClass scalarBlankNode = getUnionClass(intScalarBlankNode, strScalarBlankNode);
+    public static final ResourceClass lexBoolean = subtract(genBoolean, xsdBoolean);
+    public static final ResourceClass lexShort = subtract(genShort, xsdShort);
+    public static final ResourceClass lexInt = subtract(genInt, xsdInt);
+    public static final ResourceClass lexLong = subtract(genLong, xsdLong);
+    public static final ResourceClass lexInteger = subtract(genInteger, xsdInteger);
+    public static final ResourceClass lexDecimal = subtract(genDecimal, xsdDecimal);
+    public static final ResourceClass lexFloat = subtract(genFloat, xsdFloat);
+    public static final ResourceClass lexDouble = subtract(genDouble, xsdDouble);
+    public static final ResourceClass lexDateTime = subtract(genScalarDateTime, xsdScalarDateTime);
+    public static final ResourceClass lexDate = subtract(genScalarDate, xsdScalarDate);
+    public static final ResourceClass lexDayTimeDuration = subtract(genDayTimeDuration, xsdDayTimeDuration);
 
-    public static final ResourceClass stringLiteral = getUnionClass(xsdString, rdfLangString);
-
-    public static final ResourceClass integerNumeric = getUnionClass(xsdShort, xsdInt, xsdLong, xsdInteger);
-
-    public static final ResourceClass floatPoint = getUnionClass(xsdFloat, xsdDouble);
-
-
-    public static final ResourceClass numeric = getUnionClass(integerNumeric, xsdDecimal, xsdFloat, xsdDouble);
-
-    public static final ResourceClass temporal = getUnionClass(xsdScalarDate, xsdScalarDateTime, xsdDayTimeDuration);
-
-    public static final ResourceClass dateOrDateTime = getUnionClass(xsdScalarDateTime, xsdScalarDate);
-
-    public static final ResourceClass literal = getUnionClass(xsdBoolean, numeric, stringLiteral, xsdDayTimeDuration,
-            xsdScalarDateTime, xsdScalarDate, unsupportedLiteral);
-
-    public static final Set<ResultResourceClass> resultClasses = Set.of(iri, intCompositeBlankNode,
-            strCompositeBlankNode, xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble,
-            xsdString, xsdDayTimeDuration, xsdCompositeDateTime, xsdCompositeDate, rdfLangString, unsupportedLiteral);
+    public static final ResourceClass scalarBlankNode = unionize(intScalarBlankNode, strScalarBlankNode);
+    public static final ResourceClass stringLiteral = unionize(xsdString, rdfLangString);
+    public static final ResourceClass integerNumeric = unionize(genShort, genInt, genLong, genInteger);
+    public static final ResourceClass floatPoint = unionize(genFloat, genDouble);
+    public static final ResourceClass reference = unionize(iri, scalarBlankNode);
+    public static final ResourceClass numeric = unionize(integerNumeric, genDecimal, genFloat, genDouble);
+    public static final ResourceClass temporal = unionize(genScalarDate, genScalarDateTime, genDayTimeDuration);
+    public static final ResourceClass dateOrDateTime = unionize(genScalarDateTime, genScalarDate);
+    public static final ResourceClass literal = unionize(genBoolean, numeric, stringLiteral, temporal, unsupportedType);
 
 
-
-    public static Set<ResourceClass> getNumericClasses(ResourceClass resClass)
+    public static boolean isReference(ResourceClass resClass)
     {
-        return Stream.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble)
-                .filter(r -> !areDisjunct(r, resClass)).collect(toCollection(HashSet::new));
-    }
-
-
-    public static ResourceClass getBaseNumericClass(ResourceClass source)
-    {
-        return Stream.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble, box)
-                .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
-    }
-
-
-    public static ResourceClass getBaseExpressionClass(ResourceClass source)
-    {
-        return Stream
-                .of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble, xsdString,
-                        xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration, unsupportedLiteral, iri,
-                        intScalarBlankNode, strScalarBlankNode, box)
-                .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
+        return resClass.isSubclassOf(reference);
     }
 
 
@@ -127,7 +121,7 @@ public class BuiltinClasses
 
     public static boolean isBoolean(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdBoolean);
+        return resClass.isSubclassOf(genBoolean);
     }
 
 
@@ -145,31 +139,31 @@ public class BuiltinClasses
 
     public static boolean isShort(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdShort);
+        return resClass.isSubclassOf(genShort);
     }
 
 
     public static boolean isInt(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdInt);
+        return resClass.isSubclassOf(genInt);
     }
 
 
     public static boolean isLong(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdLong);
+        return resClass.isSubclassOf(genLong);
     }
 
 
     public static boolean isInteger(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdInteger);
+        return resClass.isSubclassOf(genInteger);
     }
 
 
     public static boolean isDecimal(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdDecimal);
+        return resClass.isSubclassOf(genDecimal);
     }
 
 
@@ -181,13 +175,13 @@ public class BuiltinClasses
 
     public static boolean isFloat(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdFloat);
+        return resClass.isSubclassOf(genFloat);
     }
 
 
     public static boolean isDouble(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdDouble);
+        return resClass.isSubclassOf(genDouble);
     }
 
 
@@ -199,19 +193,19 @@ public class BuiltinClasses
 
     public static boolean isDate(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdScalarDate);
+        return resClass.isSubclassOf(genScalarDate);
     }
 
 
     public static boolean isDateTime(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdScalarDateTime);
+        return resClass.isSubclassOf(genScalarDateTime);
     }
 
 
     public static boolean isDayTimeDuration(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(xsdDayTimeDuration);
+        return resClass.isSubclassOf(genDayTimeDuration);
     }
 
 
@@ -235,7 +229,13 @@ public class BuiltinClasses
 
     public static boolean isUnsupportedLiteral(ResourceClass resClass)
     {
-        return resClass.isSubclassOf(unsupportedLiteral);
+        return resClass.isSubclassOf(unsupportedType);
+    }
+
+
+    public static boolean hasReference(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, reference);
     }
 
 
@@ -271,7 +271,7 @@ public class BuiltinClasses
 
     public static boolean hasBoolean(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdBoolean);
+        return !areDisjunct(resClass, genBoolean);
     }
 
 
@@ -289,31 +289,31 @@ public class BuiltinClasses
 
     public static boolean hasShort(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdShort);
+        return !areDisjunct(resClass, genShort);
     }
 
 
     public static boolean hasInt(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdInt);
+        return !areDisjunct(resClass, genInt);
     }
 
 
     public static boolean hasLong(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdLong);
+        return !areDisjunct(resClass, genLong);
     }
 
 
     public static boolean hasInteger(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdInteger);
+        return !areDisjunct(resClass, genInteger);
     }
 
 
     public static boolean hasDecimal(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdDecimal);
+        return !areDisjunct(resClass, genDecimal);
     }
 
 
@@ -325,13 +325,13 @@ public class BuiltinClasses
 
     public static boolean hasFloat(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdFloat);
+        return !areDisjunct(resClass, genFloat);
     }
 
 
     public static boolean hasDouble(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdDouble);
+        return !areDisjunct(resClass, genDouble);
     }
 
 
@@ -343,19 +343,19 @@ public class BuiltinClasses
 
     public static boolean hasDate(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdScalarDate);
+        return !areDisjunct(resClass, genScalarDate);
     }
 
 
     public static boolean hasDateTime(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdScalarDateTime);
+        return !areDisjunct(resClass, genScalarDateTime);
     }
 
 
     public static boolean hasDayTimeDuration(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, xsdDayTimeDuration);
+        return !areDisjunct(resClass, genDayTimeDuration);
     }
 
 

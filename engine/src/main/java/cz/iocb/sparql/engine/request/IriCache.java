@@ -5,14 +5,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
 public class IriCache
 {
-    private static record CacheItem(IriClass iriClass, List<Column> columns)
+    private static record CacheItem(ResourceClass iriClass, List<Column> columns)
     {
     }
 
@@ -26,7 +26,7 @@ public class IriCache
     }
 
 
-    public IriClass getIriClass(Iri iri)
+    public ResourceClass getIriClass(Iri iri)
     {
         CacheItem items = cache.get(iri);
 
@@ -48,7 +48,7 @@ public class IriCache
     }
 
 
-    public Iri getIri(IriClass iriClass, List<Column> columns)
+    public Iri getIri(ResourceClass iriClass, List<Column> columns)
     {
         CacheItem item = new CacheItem(iriClass, columns);
 
@@ -60,7 +60,7 @@ public class IriCache
     }
 
 
-    public void storeToCache(Iri iri, IriClass iriClass, List<Column> columns)
+    public void storeToCache(Iri iri, ResourceClass iriClass, List<Column> columns)
     {
         CacheItem item = new CacheItem(iriClass, columns);
         cache.put(iri, item);

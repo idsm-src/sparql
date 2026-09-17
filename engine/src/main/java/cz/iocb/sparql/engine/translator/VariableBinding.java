@@ -1,8 +1,16 @@
 package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.database.Column.coalesce;
+import static cz.iocb.sparql.engine.database.Table.toTableColumns;
+import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getLiteralClassName;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getBaseNumericClass;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
@@ -19,9 +27,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -77,15 +87,21 @@ public class VariableBinding
 
     public void addMapping(ResourceClass resClass, List<Column> columns)
     {
-        assert !this.mappings.containsKey(resClass);
+        assert !mappings.containsKey(resClass);
 
-        this.mappings.put(resClass, columns);
+        mappings.put(resClass, columns);
     }
 
 
     public boolean containsClass(ResourceClass resClass)
     {
-        return this.mappings.containsKey(resClass);
+        return mappings.containsKey(resClass);
+    }
+
+
+    public boolean contains(ResourceClass resClass)
+    {
+        return mappings.keySet().stream().anyMatch(r -> !ResourceClass.areDisjunct(r, resClass));
     }
 
 
@@ -113,10 +129,10 @@ public class VariableBinding
     }
 
 
-    public List<Column> deriveMapping(ResourceClass targetClass)
+    public List<Column> deriveMapping(ResourceClass targetClass, Table table)
     {
         if(mappings.containsKey(targetClass))
-            return mappings.get(targetClass);
+            return toTableColumns(table, mappings.get(targetClass));
 
         List<List<Column>> variants = new ArrayList<>();
         boolean canBeNull = canBeNull() || mappings.size() > 1;
@@ -126,14 +142,15 @@ public class VariableBinding
             if(!ResourceClass.areDisjunct(targetClass, map.getKey()))
             {
                 ResourceClass sourceClass = map.getKey();
+                List<Column> cols = toTableColumns(table, map.getValue());
 
-                if(map.getValue() == null)
+                if(cols == null)
                     return null;
 
                 if(sourceClass.isSubclassOf(targetClass))
-                    variants.add(sourceClass.toGeneralClass(targetClass, map.getValue(), canBeNull));
+                    variants.add(sourceClass.toGeneralClass(targetClass, cols, canBeNull));
                 else if(targetClass.isSubclassOf(sourceClass.getEffectiveClass()))
-                    variants.add(targetClass.fromGeneralClass(sourceClass, map.getValue()));
+                    variants.add(targetClass.fromGeneralClass(sourceClass, cols, false));
                 else
                     throw new UnsupportedOperationException();
             }
@@ -161,10 +178,16 @@ public class VariableBinding
                 columns.add(variants.get(0).get(i));
             else
                 columns.add(new ExpressionColumn(
-                        set.stream().map(Object::toString).collect(joining(",", "coalesce(", ")"))));
+                        set.stream().sorted().map(Object::toString).collect(joining(",", "COALESCE(", ")"))));
         }
 
         return columns;
+    }
+
+
+    public List<Column> deriveMapping(ResourceClass targetClass)
+    {
+        return deriveMapping(targetClass, null);
     }
 
 
@@ -254,17 +277,18 @@ public class VariableBinding
 
     public Column promoteNumericAs(ResourceClass source, ResourceClass target)
     {
-        ResourceClass base = getBaseNumericClass(source);
+        ResourceClass base = Stream.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble, box)
+                .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
 
         Column value = deriveMapping(base).get(0);
 
-        if(base.equals(target))
+        if(base.equals(box))
+            return new ExpressionColumn("sparql.rdfbox_promote_to_" + getLiteralClassName(target) + "(" + value + ")");
+        else if(target.isSubclassOf(base))
             return value;
-        else if(base.equals(box))
-            return new ExpressionColumn("sparql.rdfbox_promote_to_" + target.getName() + "(" + value + ")");
         else
-            return new ExpressionColumn(
-                    "sparql.cast_as_" + target.getName() + "_from_" + base.getName() + "(" + value + ")");
+            return new ExpressionColumn("sparql.cast_as_" + target.getResourceName() + "_from_"
+                    + getLiteralClassName(base) + "(" + value + ")");
     }
 
 

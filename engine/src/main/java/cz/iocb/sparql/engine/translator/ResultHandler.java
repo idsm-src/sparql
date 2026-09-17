@@ -65,7 +65,7 @@ public abstract class ResultHandler implements AutoCloseable
 
     private ResourceClass getIriClass(Request request, Iri iri, Variable variable)
     {
-        IriClass iriClass = iriCache.getIriClass(iri);
+        ResourceClass iriClass = iriCache.getIriClass(iri);
 
         if(iriClass != null)
             return iriClass;

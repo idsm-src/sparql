@@ -17,26 +17,18 @@ public abstract class LiteralClass extends PrimitiveResourceClass
     final protected Datatype datatype;
 
 
-    protected LiteralClass(String name, Datatype datatype, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected LiteralClass(String name, Datatype datatype, List<String> sqlTypes,
+            Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
         this.datatype = datatype;
     }
 
 
+    public abstract boolean match(Statement statement, Literal literal);
+
+
     public abstract List<Column> toColumns(Literal literal);
-
-
-    public boolean match(Statement statement, Literal literal)
-    {
-        if(!datatype.getTypeIri().equals(literal.getType()))
-            return false;
-
-        if(!datatype.isValidForm(literal.getValue()))
-            return false;
-
-        return true;
-    }
 
 
     @Override

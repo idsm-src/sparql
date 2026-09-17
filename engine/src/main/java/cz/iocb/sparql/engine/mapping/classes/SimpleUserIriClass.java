@@ -46,7 +46,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;
@@ -55,7 +55,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
 
         assert isSubclassOf(sourceClass);
 
-        boolean check = !getIntersectionClass(Set.of(superClass, iri)).equals(this);
+        boolean check = !checkOptional && !getIntersectionClass(Set.of(superClass, iri)).equals(this);
 
         if(sourceClass.equals(box))
             List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));

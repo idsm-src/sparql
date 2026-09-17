@@ -53,7 +53,7 @@ public class RdfBoxClass extends PrimitiveResourceClass
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;

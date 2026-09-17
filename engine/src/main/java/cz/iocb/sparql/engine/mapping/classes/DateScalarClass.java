@@ -1,7 +1,9 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateType;
@@ -12,26 +14,25 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public final class DateScalarClass extends LiteralClass
+public final class DateScalarClass extends CanonicalLiteralClass
 {
     protected DateScalarClass()
     {
-        super("date", xsdDateType, List.of("sparql.zoneddate"), Set.of(box/*, xsdCompositeDate*/));
+        super("date@1c", xsdDateType, List.of("sparql.zoneddate"), Set.of(box, genScalarDate, genDate /*, xsdDate*/));
     }
 
 
     @Override
     public Set<ResultResourceClass> getResultResourceClasses()
     {
-        return Set.of(xsdCompositeDate);
+        return Set.of(xsdDate);
     }
 
 
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        //TODO: canonization will not be needed when special resource classes for canonical literals are introduced
-        return List.of(constant(datatype.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
+        return List.of(constant(xsdDateType.getCanonicalLexicalForm(literal.getValue()), sqlTypes.get(0)));
     }
 
 
@@ -50,7 +51,16 @@ public final class DateScalarClass extends LiteralClass
         if(targetClass.equals(box))
             return List.of(expression("sparql.rdfbox_create_from_date(%s)", date));
 
-        //if(targetClass.equals(xsdCompositeDate))
+        if(targetClass.equals(genScalarDate))
+            return List.of(date, !canBeNull ? constant("", "varchar") :
+                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+
+        if(targetClass.equals(genDate))
+            return List.of(expression("sparql.zoneddate_get_value(%s)", date),
+                    expression("sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", "varchar") :
+                            expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+
+        //if(targetClass.equals(xsdDate))
         //    return List.of(expression("sparql.zoneddate_get_value(%s)", date),
         //           expression("sparql.zoneddate_get_zone(%s)", date));
 
@@ -59,7 +69,7 @@ public final class DateScalarClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;
@@ -69,9 +79,16 @@ public final class DateScalarClass extends LiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_date(%s)", columns.get(0)));
+            return List.of(expression("sparql.rdfbox_get_date(%s, false)", columns.get(0)));
 
-        //if(sourceClass.equals(xsdCompositeDate))
+        if(sourceClass.equals(genScalarDate))
+            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
+
+        if(sourceClass.equals(genDate))
+            return List.of(expression("(CASE %s WHEN '' THEN sparql.zoneddate_create(%s, %s) END)", columns.get(2),
+                    columns.get(0), columns.get(1)));
+
+        //if(sourceClass.equals(xsdDate))
         //    return List.of(expression("sparql.zoneddate_create(%s, %s)", columns.get(0), columns.get(1)));
 
         throw new IllegalArgumentException();

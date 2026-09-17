@@ -12,6 +12,10 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonCo
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
@@ -21,24 +25,29 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.expandUnionClasses;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getExpressionClass;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.HashMap;
@@ -52,7 +61,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.DateInZone;
+import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -224,7 +234,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     {
         boolean equalityComparison = (operator == EQUAL || operator == NOT_EQUAL);
 
-        if(equalityComparison && l instanceof DateConstantZoneClass ld && r instanceof DateConstantZoneClass rd
+        if(equalityComparison && l instanceof DateInZoneClass ld && r instanceof DateInZoneClass rd
                 && getTimezoneDiff(ld, rd) % SECS_PER_DAY != 0)
             return ComparisonType.DIFFERENT;
 
@@ -279,8 +289,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     {
         ComparisonMode result = null;
 
-        for(ResourceClass l : expandUnionClasses(left))
-            for(ResourceClass r : expandUnionClasses(right))
+        for(ResourceClass l : estimateAsUnion(left))
+            for(ResourceClass r : estimateAsUnion(right))
                 result = mergeComparisonTypes(result, determineComparisonMode(operator, l, r));
 
         return result;
@@ -292,7 +302,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     {
         // special treatment for dates with constant timezones
 
-        if(left instanceof DateConstantZoneClass l && right instanceof DateConstantZoneClass r)
+        if(left instanceof DateInZone l && right instanceof DateInZone r)
         {
             int diff = getTimezoneDiff(l, r);
 
@@ -303,7 +313,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             else if(diff < 0 && diff > -SECS_PER_DAY)
                 return ComparisonMode.DATE_EARLIER_TZ;
             else if(diff > 0 && diff < SECS_PER_DAY)
-                return ComparisonMode.DATE;
+                return ComparisonMode.DATE_LATER_TZ;
         }
 
 
@@ -382,8 +392,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         {
             case BOOLEAN ->
             {
-                Column cl = left.get(xsdBoolean).get(0);
-                Column cr = right.get(xsdBoolean).get(0);
+                Column cl = left.get(genBoolean).get(0);
+                Column cr = right.get(genBoolean).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
@@ -405,22 +415,23 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case DATETIME ->
             {
-                Column cl = left.get(xsdCompositeDateTime).get(0);
-                Column cr = right.get(xsdCompositeDateTime).get(0);
+                //FIXME: we assume that genScalarDateTime is equivalent to genDateTime
+                Column cl = left.get(genDateTime).get(0);
+                Column cr = right.get(genDateTime).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
             case DATE ->
             {
-                Column cl = left.get(xsdScalarDate).get(0);
-                Column cr = right.get(xsdScalarDate).get(0);
+                Column cl = left.get(genScalarDate).get(0);
+                Column cr = right.get(genScalarDate).get(0);
                 yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
             }
 
             case DATE_SAME_TZ ->
             {
-                Column cl = left.get(xsdCompositeDate).get(0);
-                Column cr = right.get(xsdCompositeDate).get(0);
+                Column cl = left.get(genDate).get(0);
+                Column cr = right.get(genDate).get(0);
                 yield "(" + cl + " " + operator.getText() + " " + cr + ")";
             }
 
@@ -435,8 +446,8 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     default -> operator;
                 };
 
-                Column cl = left.get(xsdCompositeDate).get(0);
-                Column cr = right.get(xsdCompositeDate).get(0);
+                Column cl = left.get(genDate).get(0);
+                Column cr = right.get(genDate).get(0);
                 yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
             }
 
@@ -451,16 +462,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                     default -> operator;
                 };
 
-                Column cl = left.get(xsdCompositeDate).get(0);
-                Column cr = right.get(xsdCompositeDate).get(0);
+                Column cl = left.get(genDate).get(0);
+                Column cr = right.get(genDate).get(0);
                 yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
             }
 
             case BOX ->
             {
-                Column cl = left.get(getUnionClass(lset, box)).get(0);
-                Column cr = right.get(getUnionClass(rset, box)).get(0);
-
+                Column cl = left.get(unionize(lset, box)).get(0);
+                Column cr = right.get(unionize(rset, box)).get(0);
                 yield "(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")";
             }
 
@@ -476,7 +486,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case DIRECT ->
             {
-                ResourceClass cmp = getUnionClass(Stream.concat(lset.stream(), rset.stream()).collect(toSet()));
+                Set<ResourceClass> classes = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
+                ResourceClass cmp = unionize(classes);
+
+                //NOTE: to ensure that the expression column is not used more than once during conversion
+                if(left.hasExpressionColumn(lset) || right.hasExpressionColumn(rset))
+                    cmp = getExpressionClass(classes);
+
+                //FIXME: use correct compare operator, when unionClass is rdfbox
+
                 List<Column> cl = left.get(cmp);
                 List<Column> cr = right.get(cmp);
 
@@ -487,7 +505,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case LITERAL ->
             {
-                ResourceClass cmp = getUnionClass(Stream.concat(lset.stream(), rset.stream()).collect(toSet()));
+                Set<ResourceClass> classes = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
+                ResourceClass cmp = unionize(classes);
+
+                //NOTE: to ensure that the expression column is not used more than once during conversion
+                if(left.hasExpressionColumn(lset) || right.hasExpressionColumn(rset))
+                    cmp = getExpressionClass(classes);
+
+                //FIXME: use correct compare operator, when unionClass is rdfbox or user type
+
                 List<Column> cl = left.get(cmp);
                 List<Column> cr = right.get(cmp);
 
@@ -512,32 +538,32 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     {
         Set<ResourceClass> all = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdDouble)))
+        if(all.stream().anyMatch(c -> isDouble(c)))
             return xsdDouble;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdFloat)))
+        if(all.stream().anyMatch(c -> isFloat(c)))
             return xsdFloat;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdDecimal)))
+        if(all.stream().anyMatch(c -> isDecimal(c)))
             return xsdDecimal;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdInteger)))
+        if(all.stream().anyMatch(c -> isInteger(c)))
             return xsdInteger;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdLong)))
+        if(all.stream().anyMatch(c -> isLong(c)))
             return xsdLong;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdInt)))
+        if(all.stream().anyMatch(c -> isInt(c)))
             return xsdInt;
 
-        if(all.stream().anyMatch(c -> c.isSubclassOf(xsdShort)))
+        if(all.stream().anyMatch(c -> isShort(c)))
             return xsdShort;
 
         throw new IllegalArgumentException();
     }
 
 
-    private static int getTimezoneDiff(DateConstantZoneClass left, DateConstantZoneClass right)
+    private static int getTimezoneDiff(DateInZone left, DateInZone right)
     {
         int leftZone = left.getZone();
         int rightZone = right.getZone();

@@ -11,7 +11,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 public abstract class BlankNodeClass extends PrimitiveResourceClass
 {
-    protected BlankNodeClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected BlankNodeClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

@@ -1,5 +1,12 @@
 package cz.iocb.sparql.engine.config;
 
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanType;
@@ -50,7 +57,6 @@ import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
@@ -63,6 +69,8 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.IriCache;
+import info.adams.ryu.RyuDouble;
+import info.adams.ryu.RyuFloat;
 
 
 
@@ -170,18 +178,18 @@ public class SparqlDatabaseConfiguration
 
     public void addIriClass(UserIriClass iriClass)
     {
-        UserIriClass previous = iriClassMap.get(iriClass.getName());
+        UserIriClass previous = iriClassMap.get(iriClass.getResourceName());
 
         if(previous == null)
         {
             int possition = (int) iriClasses.stream().filter(c -> c.getCheckCost() <= iriClass.getCheckCost()).count();
             iriClasses.add(possition, iriClass);
-            iriClassMap.put(iriClass.getName(), iriClass);
+            iriClassMap.put(iriClass.getResourceName(), iriClass);
         }
         else if(!previous.equals(iriClass))
         {
             throw new IllegalArgumentException(
-                    "resource class definition conflict for iri class '" + iriClass.getName() + "'");
+                    "resource class definition conflict for iri class '" + iriClass.getResourceName() + "'");
         }
     }
 
@@ -263,47 +271,43 @@ public class SparqlDatabaseConfiguration
 
     public TermMapping createLiteralMapping(String value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdString, new TypedLiteral(value, xsdStringIri));
+        return new ConstantLiteralMapping(xsdString, new TypedLiteral(value, xsdStringIri));
     }
 
 
     public TermMapping createLiteralMapping(boolean value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdBoolean,
-                new TypedLiteral(Boolean.toString(value), xsdBooleanIri));
+        return new ConstantLiteralMapping(xsdBoolean, new TypedLiteral(Boolean.toString(value), xsdBooleanIri));
     }
 
 
     public TermMapping createLiteralMapping(short value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdShort,
-                new TypedLiteral(Short.toString(value), xsdShortIri));
+        return new ConstantLiteralMapping(xsdShort, new TypedLiteral(Short.toString(value), xsdShortIri));
     }
 
 
     public TermMapping createLiteralMapping(int value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdInt, new TypedLiteral(Integer.toString(value), xsdIntIri));
+        return new ConstantLiteralMapping(xsdInt, new TypedLiteral(Integer.toString(value), xsdIntIri));
     }
 
 
     public TermMapping createLiteralMapping(long value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdLong, new TypedLiteral(Long.toString(value), xsdLongIri));
+        return new ConstantLiteralMapping(xsdLong, new TypedLiteral(Long.toString(value), xsdLongIri));
     }
 
 
     public TermMapping createLiteralMapping(float value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdFloat,
-                new TypedLiteral(Float.toString(value), xsdFloatIri));
+        return new ConstantLiteralMapping(xsdFloat, new TypedLiteral(RyuFloat.floatToString(value), xsdFloatIri));
     }
 
 
     public TermMapping createLiteralMapping(double value)
     {
-        return new ConstantLiteralMapping(BuiltinClasses.xsdDouble,
-                new TypedLiteral(Double.toString(value), xsdDoubleIri));
+        return new ConstantLiteralMapping(xsdDouble, new TypedLiteral(RyuDouble.doubleToString(value), xsdDoubleIri));
     }
 
 

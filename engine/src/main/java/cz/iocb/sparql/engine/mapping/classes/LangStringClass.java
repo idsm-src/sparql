@@ -13,7 +13,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public final class LangStringClass extends LiteralClass implements ResultResourceClass
+public final class LangStringClass extends CanonicalLiteralClass implements ResultResourceClass
 {
     protected LangStringClass()
     {
@@ -68,7 +68,7 @@ public final class LangStringClass extends LiteralClass implements ResultResourc
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;

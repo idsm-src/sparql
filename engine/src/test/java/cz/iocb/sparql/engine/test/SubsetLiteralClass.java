@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
@@ -13,18 +13,18 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public class SubsetLiteralClass extends LiteralClass
+public class SubsetLiteralClass extends CanonicalLiteralClass
 {
     private final SimpleLiteralClass original;
 
 
     public SubsetLiteralClass(SimpleLiteralClass org)
     {
-        Set<ResourceClass> superClasses = new HashSet<>();
+        Set<PrimitiveResourceClass> superClasses = new HashSet<>();
         superClasses.addAll(org.getSuperClasses());
         superClasses.add(org);
 
-        super(org.getName() + "_sub", org.getDatatype(), org.getSqlTypes(), superClasses);
+        super(org.getResourceName() + "_sub", org.getDatatype(), org.getSqlTypes(), superClasses);
 
         original = org;
     }
@@ -64,13 +64,13 @@ public class SubsetLiteralClass extends LiteralClass
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         ResourceClass sourceClass = superClass.getEffectiveClass();
 
         if(sourceClass.equals(this))
             return columns;
 
-        return original.fromGeneralClass(superClass, columns);
+        return original.fromGeneralClass(superClass, columns, checkOptional);
     }
 }

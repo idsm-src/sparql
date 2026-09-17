@@ -1,48 +1,39 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
-import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
-public class IntDatatype extends NumericDatatype
+public final class IntDatatype extends FixedSizeIntegerDatatype
 {
-    private static final Pattern validFormPattern = generateFixedSizePattern(Integer.toString(Integer.MAX_VALUE), false,
-            false);
-
-
     public IntDatatype()
     {
-        super(xsdIntIri);
+        super(xsdIntIri, Integer.toString(Integer.MAX_VALUE));
     }
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return genInt;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdInt;
     }
 
 
     @Override
-    public LiteralClass getResourceClass(Literal literal)
+    public ResourceClass getNonCanonicalLiteralClass()
     {
-        assert typeIri.equals(literal.getType());
-
-        if(!isValidForm(literal.getValue()))
-            return unsupportedLiteral;
-
-        return xsdInt;
-    }
-
-
-    @Override
-    public boolean isValidForm(String value)
-    {
-        return validFormPattern.matcher(value).matches();
+        return lexInt;
     }
 }

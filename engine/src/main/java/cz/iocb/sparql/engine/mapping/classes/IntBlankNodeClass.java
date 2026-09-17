@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intCompositeBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
@@ -14,7 +14,7 @@ import cz.iocb.sparql.engine.rdf.Variable;
 
 public abstract class IntBlankNodeClass extends BlankNodeClass
 {
-    protected IntBlankNodeClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected IntBlankNodeClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }
@@ -29,7 +29,7 @@ public abstract class IntBlankNodeClass extends BlankNodeClass
     @Override
     public Set<ResultResourceClass> getResultResourceClasses()
     {
-        return Set.of(intCompositeBlankNode);
+        return Set.of(intBlankNode);
     }
 
 

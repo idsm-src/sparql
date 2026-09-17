@@ -9,6 +9,7 @@
   <modules>
   	<module>engine</module>
   	<module>endpoint</module>
+  	<module>ryu</module>
   </modules>
 
   <properties>

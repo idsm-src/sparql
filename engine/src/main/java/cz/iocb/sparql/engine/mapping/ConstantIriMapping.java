@@ -11,7 +11,7 @@ import cz.iocb.sparql.engine.request.Request;
 
 public class ConstantIriMapping extends ConstantMapping
 {
-    public ConstantIriMapping(Iri iri, IriClass iriClass, List<Column> columns)
+    public ConstantIriMapping(Iri iri, ResourceClass iriClass, List<Column> columns)
     {
         super(iri, iriClass, columns);
     }

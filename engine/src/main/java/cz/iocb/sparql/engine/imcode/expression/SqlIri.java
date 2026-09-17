@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -35,7 +34,7 @@ public final class SqlIri extends SqlExpressionIntercode
 
     private static SqlExpressionIntercode create(Request request, Iri iri, Restriction restriction)
     {
-        IriClass resClass = request.getIriClass(iri);
+        ResourceClass resClass = request.getIriClass(iri);
 
         List<Column> columns = restriction.contains(resClass) ? request.getColumns(resClass, iri) : null;
 

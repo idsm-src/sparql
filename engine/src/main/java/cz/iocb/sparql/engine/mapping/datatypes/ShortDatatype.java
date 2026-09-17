@@ -1,48 +1,39 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
-import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
-public class ShortDatatype extends NumericDatatype
+public final class ShortDatatype extends FixedSizeIntegerDatatype
 {
-    private static final Pattern validFormPattern = generateFixedSizePattern(Short.toString(Short.MAX_VALUE), false,
-            false);
-
-
     public ShortDatatype()
     {
-        super(xsdShortIri);
+        super(xsdShortIri, Short.toString(Short.MAX_VALUE));
     }
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return genShort;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdShort;
     }
 
 
     @Override
-    public LiteralClass getResourceClass(Literal literal)
+    public ResourceClass getNonCanonicalLiteralClass()
     {
-        assert typeIri.equals(literal.getType());
-
-        if(!isValidForm(literal.getValue()))
-            return unsupportedLiteral;
-
-        return xsdShort;
-    }
-
-
-    @Override
-    public boolean isValidForm(String value)
-    {
-        return validFormPattern.matcher(value).matches();
+        return lexShort;
     }
 }

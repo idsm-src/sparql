@@ -33,8 +33,8 @@ import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
-import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.Prologue;
@@ -189,8 +189,8 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
 
         //TODO: add support for casting to user literals
 
-        if(datatype != null && !(datatype.getGeneralLiteralClass() instanceof UserLiteralClass))
-            return SqlCast.create(datatype.getGeneralLiteralClass(), arguemnts.get(0));
+        if(datatype != null && !(datatype instanceof UserDatatype))
+            return SqlCast.create(datatype.getCanonicalLiteralClass(), arguemnts.get(0));
 
         FunctionDefinition definition = request.getConfiguration().getFunctions(parent.getService())
                 .get(iri.getValue());

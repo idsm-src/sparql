@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
+import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
@@ -53,10 +55,11 @@ import cz.iocb.sparql.engine.imcode.expression.SqlExists;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
+import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
@@ -246,8 +249,17 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     createTemplate((Node) triple.getPredicate()), createTemplate(triple.getObject())));
         }
 
-        return SqlSelect.createTopLevel(request, SqlConstruct.getColumns(), SqlDistinct.create(request,
-                SqlConstruct.construct(request, templates, source), new HashSet<>(SqlConstruct.getColumns())));
+        SqlIntercode construct = SqlConstruct.construct(request, templates, source);
+
+        SqlIntercode filter = SqlFilter.filter(request,
+                List.of(SqlBuiltinCall.create(request, "isiri", false,
+                        List.of(SqlVariable.create(construct.getVariable(PREDICATE.getVariable())))),
+                        SqlUnaryLogical.create(SqlBuiltinCall.create(request, "isliteral", false,
+                                List.of(SqlVariable.create(construct.getVariable(SUBJECT.getVariable())))))),
+                construct);
+
+        return SqlSelect.createTopLevel(request, SqlConstruct.getColumns(),
+                SqlDistinct.create(request, filter, new HashSet<>(SqlConstruct.getColumns())));
     }
 
 
@@ -1066,14 +1078,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         if(request.isServiceReorderEnabled())
         {
             SqlIntercode call = SqlServiceStub.create(request, name, serviceCode, serviceVariables,
-                    SqlEmptySolution.get(), new StrBlankNodeConstantSegmentClass(--serviceId), service.isSilent());
+                    SqlEmptySolution.get(), new StrBlankNodeInSegmentClass(--serviceId), service.isSilent());
 
             return SqlJoin.join(request, call, context);
         }
         else
         {
             return SqlServiceStub.create(request, name, serviceCode, serviceVariables, context,
-                    new StrBlankNodeConstantSegmentClass(--serviceId), service.isSilent());
+                    new StrBlankNodeInSegmentClass(--serviceId), service.isSilent());
         }
     }
 

@@ -1,17 +1,25 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public class DecimalDatatype extends NumericDatatype
+public final class DecimalDatatype extends Datatype
 {
-    private static final Pattern validFormPattern = generateDecimalPattern(false);
+    private static final Pattern validDecimalPattern = Pattern
+            .compile(WS + "([+-]?)(?=\\.?[0-9])0*([0-9]{0,131072})(?:\\.([0-9]{0,16383}?)0*)?" + WS);
+
+    private static final Pattern canonicalDecimalPattern = Pattern
+            .compile("(?!-0\\.0$)-?(?:0|[1-9][0-9]*)\\.(?:0|[0-9]*[1-9])");
 
 
     public DecimalDatatype()
@@ -21,19 +29,29 @@ public class DecimalDatatype extends NumericDatatype
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return genDecimal;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdDecimal;
     }
 
 
     @Override
-    public LiteralClass getResourceClass(Literal literal)
+    public ResourceClass getResourceClass(Literal literal)
     {
         assert typeIri.equals(literal.getType());
 
         if(!isValidForm(literal.getValue()))
-            return unsupportedLiteral;
+            return unsupportedType;
+
+        if(!isCanonicalForm(literal.getValue()))
+            return lexDecimal;
 
         return xsdDecimal;
     }
@@ -42,6 +60,33 @@ public class DecimalDatatype extends NumericDatatype
     @Override
     public boolean isValidForm(String value)
     {
-        return validFormPattern.matcher(value).matches();
+        return validDecimalPattern.matcher(value).matches();
+    }
+
+
+    @Override
+    public boolean isCanonicalForm(String value)
+    {
+        assert isValidForm(value);
+
+        return canonicalDecimalPattern.matcher(value).matches();
+    }
+
+
+    @Override
+    public String getCanonicalLexicalForm(String value)
+    {
+        assert isValidForm(value);
+
+        Matcher m = validDecimalPattern.matcher(value);
+
+        if(!m.matches())
+            throw new IllegalArgumentException();
+
+        String intPart = m.group(2).isEmpty() ? "0" : m.group(2);
+        String fracPart = m.group(3) == null || m.group(3).isEmpty() ? "0" : m.group(3);
+        String sign = "-".equals(m.group(1)) && !(intPart.equals("0") && fracPart.equals("0")) ? "-" : "";
+
+        return sign + intPart + "." + fracPart;
     }
 }

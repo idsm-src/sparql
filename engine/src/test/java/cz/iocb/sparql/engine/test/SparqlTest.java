@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.error.MessageCategory.ERROR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
@@ -45,7 +46,6 @@ import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.tomcat.jdbc.pool.DataSource;
-import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterAll;
@@ -55,15 +55,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.postgresql.Driver;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.images.builder.ImageFromDockerfile;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
@@ -71,10 +66,10 @@ import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
-import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
-import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -96,7 +91,6 @@ import cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration;
 
 
 @DisplayName("SPARQL 1.1 Tests")
-@Testcontainers
 public class SparqlTest
 {
     public record Quad(RDFNode graph, RDFNode subject, RDFNode predicate, RDFNode object)
@@ -104,15 +98,8 @@ public class SparqlTest
     }
 
 
-    static String dockerPath = "src/test/resources/docker";
-    static String imageName = new ImageFromDockerfile("sparql-test").withFileFromPath(".", Paths.get(dockerPath)).get();
-    static DockerImageName image = DockerImageName.parse(imageName).asCompatibleSubstituteFor("postgres");
-
-    @Container
-    private static final PostgreSQLContainer<?> container = createContainer();
-
-    private static final StrBlankNodeConstantSegmentClass bnodeClass = new StrBlankNodeConstantSegmentClass(0);
-    private static final Map<LiteralClass, LiteralClass> literalClassMap = new HashMap<>();
+    private static final StrBlankNodeInSegmentClass bnodeClass = new StrBlankNodeInSegmentClass(0);
+    private static final Map<ResourceClass, ResourceClass> literalClassMap = new HashMap<>();
 
     private static DataSource connectionPool = null;
     private static DatabaseSchema schema = null;
@@ -122,26 +109,10 @@ public class SparqlTest
     private static Engine combinedEngine = null;
 
 
-    private static PostgreSQLContainer<?> createContainer()
-    {
-        PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image);
-        container.setShmSize(1L << 30);
-        return container;
-    }
-
-
     @BeforeAll
     static void init() throws FileNotFoundException, IOException, SQLException
     {
-        PoolProperties p = new PoolProperties();
-        p.setUrl(container.getJdbcUrl());
-        p.setUsername(container.getUsername());
-        p.setPassword(container.getPassword());
-        connectionPool = new DataSource();
-        connectionPool.setPoolProperties(p);
-        connectionPool.setTestOnBorrow(true);
-        connectionPool.setDriverClassName(Driver.class.getCanonicalName());
-
+        connectionPool = Database.getPool();
         schema = new DatabaseSchema(connectionPool);
 
         SparqlDatabaseConfiguration stringConfig = new NeXtProtStringConfiguration(null, connectionPool, schema);
@@ -569,7 +540,7 @@ public class SparqlTest
 
 
     private static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
-            Map<LiteralClass, LiteralClass> map)
+            Map<ResourceClass, ResourceClass> map)
     {
         if(node == null)
         {
@@ -585,17 +556,14 @@ public class SparqlTest
 
             Datatype datatype = config.getDatatype(iri);
 
-            //FIXME: unsupportedLiteral cannot be used in mapping
-            LiteralClass literalClass = (datatype == null || !datatype.isValidForm(node.asLiteral().getLexicalForm())) ?
-                    BuiltinClasses.unsupportedLiteral : datatype.getGeneralLiteralClass();
-
             TypedLiteral literal = new TypedLiteral(node.asLiteral().getLexicalForm(), iri);
+            ResourceClass literalClass = datatype == null ? unsupportedType : datatype.getResourceClass(literal);
 
             return new ConstantLiteralMapping(map.getOrDefault(literalClass, literalClass), literal);
         }
         else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
         {
-            LiteralClass literalClass = LangStringConstantTagClass.get(node.asLiteral().getLanguage());
+            LiteralClass literalClass = LangStringWithTagClass.get(node.asLiteral().getLanguage());
 
             return new ConstantLiteralMapping(literalClass,
                     new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage()));
@@ -728,48 +696,19 @@ public class SparqlTest
                 RdfTerm term = null;
 
                 if(qName.equalsIgnoreCase("boolean"))
-                {
                     term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdBooleanType.getTypeIri());
-                }
                 else if(qName.equalsIgnoreCase("uri"))
-                {
                     term = new Iri(data.toString());
-                }
                 else if(qName.equalsIgnoreCase("bnode"))
-                {
                     term = new StrBlankNode("" /*data.toString()*/, 0);
-                }
                 else if(!qName.equalsIgnoreCase("literal"))
-                {
                     return;
-                }
                 else if(lang != null)
-                {
                     term = new LangStringLiteral(data.toString(), lang);
-                }
                 else if(datatype != null)
-                {
-                    String text = data.toString();
-
-                    if(datatype.equals("http://www.w3.org/2001/XMLSchema#date"))
-                        text = text.replaceAll("\\+00:00$", "Z");
-                    else if(datatype.equals("http://www.w3.org/2001/XMLSchema#decimal"))
-                        text = text.replaceAll("\\.0*$", "");
-                    else if(datatype.equals("http://www.w3.org/2001/XMLSchema#double"))
-                        text = Double.valueOf(text).toString();
-                    else if(datatype.equals("http://www.w3.org/2001/XMLSchema#float"))
-                        text = Float.valueOf(text).toString();
-                    else if(datatype.equals("http://www.w3.org/2001/XMLSchema#boolean") && text.equals("1"))
-                        text = "true";
-                    else if(datatype.equals("http://www.w3.org/2001/XMLSchema#boolean") && text.equals("0"))
-                        text = "false";
-
-                    term = new TypedLiteral(text, new Iri(datatype));
-                }
+                    term = new TypedLiteral(data.toString(), new Iri(datatype));
                 else
-                {
                     term = new TypedLiteral(data.toString(), BuiltinDatatypes.xsdStringType.getTypeIri());
-                }
 
                 result.set(varIndex, term);
             }

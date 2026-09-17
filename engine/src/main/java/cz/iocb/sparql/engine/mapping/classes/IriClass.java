@@ -13,7 +13,7 @@ import cz.iocb.sparql.engine.rdf.Variable;
 
 public abstract class IriClass extends PrimitiveResourceClass
 {
-    protected IriClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected IriClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

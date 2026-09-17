@@ -1,16 +1,19 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getNumericClasses;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -99,7 +102,7 @@ public final class SqlUnaryArithmetic extends SqlUnary
         {
             for(List<Set<ResourceClass>> variant : variants)
             {
-                Column op = operand.get(getUnionClass(variant.get(0), box)).get(0);
+                Column op = operand.get(unionize(variant.get(0), box)).get(0);
                 cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")"));
             }
         }
@@ -112,12 +115,14 @@ public final class SqlUnaryArithmetic extends SqlUnary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        List<ResourceClass> numbers = List.of(xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble);
+        List<ResourceClass> numbers = List.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble);
+        List<ResourceClass> results = List.of(xsdDouble, xsdFloat, xsdDecimal, xsdInteger);
+
         Restriction operandRestriction = new Restriction();
 
-        for(ResourceClass number : List.of(xsdInteger, xsdDecimal, xsdFloat, xsdDouble))
-            if(restriction.contains(number))
-                operandRestriction.add(numbers.subList(0, numbers.indexOf(number) + 1));
+        for(int i = 0; i < results.size(); i++)
+            if(restriction.contains(results.get(i)))
+                operandRestriction.add(numbers.subList(0, numbers.size() - i));
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
 

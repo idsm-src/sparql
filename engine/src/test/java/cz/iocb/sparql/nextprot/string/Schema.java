@@ -1,6 +1,6 @@
 package cz.iocb.sparql.nextprot.string;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIri;
@@ -156,7 +156,7 @@ public class Schema
             // :Version
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":ttlGenerationDate"),
-                    config.createLiteralMapping(xsdCompositeDate, new TypedLiteral("2021-12-12", xsdDateIri)));
+                    config.createLiteralMapping(xsdDate, new TypedLiteral("2021-12-12", xsdDateIri)));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),
                     config.createIriMapping(":databaseRelease"), config.createLiteralMapping("2021-11-19"));
             config.addQuadMapping(null, graph, config.createIriMapping(":Version"),

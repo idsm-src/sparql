@@ -1,6 +1,13 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
@@ -8,8 +15,9 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static java.util.stream.Collectors.toCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -20,13 +28,37 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
+import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
+import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateScalarClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeScalarClass;
+import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationClass;
+import cz.iocb.sparql.engine.mapping.classes.DecimalBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.DecimalClass;
+import cz.iocb.sparql.engine.mapping.classes.DoubleBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.DoubleClass;
+import cz.iocb.sparql.engine.mapping.classes.FloatBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.FloatClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.IntClass;
+import cz.iocb.sparql.engine.mapping.classes.IntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.IntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.LongBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.LongClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.ShortClass;
+import cz.iocb.sparql.engine.mapping.classes.StringClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -140,8 +172,8 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public boolean canSafelyGeneralize(ResourceClass sourceClass, ResourceClass targetClass)
     {
-        return sourceClass.getEffectiveClass().equals(targetClass)
-                || sourceClass.isSubclassOf(targetClass) && !hasExpressionColumn(sourceClass);
+        return sourceClass.getEffectiveClass().equals(targetClass) || sourceClass.isSubclassOf(targetClass)
+                && (!hasExpressionColumn(sourceClass) || targetClass.getColumnCount() == 1);
     }
 
 
@@ -160,14 +192,54 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public static ResourceClass determineResultClass(ResourceClass leftClass, ResourceClass rightClass)
     {
-        if(leftClass.equals(xsdDouble) || rightClass.equals(xsdDouble))
+        if(isDouble(leftClass) || isDouble(rightClass))
             return xsdDouble;
-        else if(leftClass.equals(xsdFloat) || rightClass.equals(xsdFloat))
+        else if(isFloat(leftClass) || isFloat(rightClass))
             return xsdFloat;
-        else if(leftClass.equals(xsdDecimal) || rightClass.equals(xsdDecimal))
+        else if(isDecimal(leftClass) || isDecimal(rightClass))
             return xsdDecimal;
         else
             return xsdInteger;
+    }
+
+
+    public static Set<ResourceClass> getNumericClasses(ResourceClass resClass)
+    {
+        return Stream.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble)
+                .filter(r -> !areDisjunct(r, resClass)).collect(toCollection(HashSet::new));
+    }
+
+
+    public static String getLiteralClassName(ResourceClass resClass)
+    {
+        return switch(resClass.getEffectiveClass())
+        {
+            case BooleanBaseClass _ -> "boolean";
+            case BooleanClass _ -> "boolean";
+            case ShortBaseClass _ -> "short";
+            case ShortClass _ -> "short";
+            case IntBaseClass _ -> "int";
+            case IntClass _ -> "int";
+            case LongBaseClass _ -> "long";
+            case LongClass _ -> "long";
+            case IntegerBaseClass _ -> "integer";
+            case IntegerClass _ -> "integer";
+            case DecimalBaseClass _ -> "decimal";
+            case DecimalClass _ -> "decimal";
+            case FloatBaseClass _ -> "float";
+            case FloatClass _ -> "float";
+            case DoubleBaseClass _ -> "double";
+            case DoubleClass _ -> "double";
+            case StringClass _ -> "string";
+            case DayTimeDurationBaseClass _ -> "daytimeduration";
+            case DayTimeDurationClass _ -> "daytimeduration";
+            case DateTimeScalarClass _ -> "datetime";
+            case DateTimeCompositeClass _ -> "datetime";
+            case DateScalarClass _ -> "date";
+            case DateCompositeClass _ -> "date";
+
+            default -> throw new IllegalArgumentException();
+        };
     }
 
 
@@ -256,9 +328,9 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             if(result.size() == 1)
                 output.put(result.iterator().next(), params);
             else if(unionClass != null)
-                output.put(getUnionClass(result, unionClass), params);
+                output.put(unionize(result, unionClass), params);
             else
-                output.put(getUnionClass(result), params);
+                output.put(unionize(result), params);
         }
 
         return output;

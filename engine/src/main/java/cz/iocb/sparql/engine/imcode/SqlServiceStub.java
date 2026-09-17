@@ -3,7 +3,7 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +31,7 @@ import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeConstantSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -71,7 +71,7 @@ public final class SqlServiceStub extends SqlIntercode
     private final Map<String, Variable> serviceVariables;
     private final String serviceCode;
     private final boolean silent;
-    private final StrBlankNodeConstantSegmentClass blankNodeClass;
+    private final StrBlankNodeInSegmentClass blankNodeClass;
     private final SharedState state;
 
 
@@ -88,8 +88,8 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     protected SqlServiceStub(VariableBindings bindings, RdfTerm name, String serviceCode,
-            Map<String, Variable> serviceVariables, SqlIntercode context,
-            StrBlankNodeConstantSegmentClass blankNodeClass, boolean silent, SharedState state)
+            Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
+            boolean silent, SharedState state)
     {
         super(bindings, false);
 
@@ -104,8 +104,8 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     public static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
-            Map<String, Variable> serviceVariables, SqlIntercode context,
-            StrBlankNodeConstantSegmentClass blankNodeClass, boolean silent)
+            Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
+            boolean silent)
     {
         return create(request, name, serviceCode, serviceVariables, context, blankNodeClass, silent, null,
                 new SharedState());
@@ -113,18 +113,17 @@ public final class SqlServiceStub extends SqlIntercode
 
 
     protected static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
-            Map<String, Variable> serviceVariables, SqlIntercode context,
-            StrBlankNodeConstantSegmentClass blankNodeClass, boolean silent, Restrictions restrictions,
-            SharedState state)
+            Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
+            boolean silent, Restrictions restrictions, SharedState state)
     {
         Set<ResourceClass> resourceClasses = new HashSet<>();
         resourceClasses.add(unsupportedIri);
-        resourceClasses.add(unsupportedLiteral);
+        resourceClasses.add(unsupportedType);
         resourceClasses.add(rdfLangString);
         resourceClasses.add(blankNodeClass);
 
         request.getConfiguration().getIriClasses().forEach(c -> resourceClasses.add(c));
-        request.getConfiguration().getDatatypes().forEach(d -> resourceClasses.add(d.getGeneralLiteralClass()));
+        request.getConfiguration().getDatatypes().forEach(d -> resourceClasses.add(d.getBaseLiteralClass()));
 
         VariableBindings bindings = new VariableBindings();
 

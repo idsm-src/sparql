@@ -91,7 +91,7 @@
     <result>
       <binding name="a"><uri>http://example.org/n01</uri></binding>
       <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#integer">0</literal></binding>
-      <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0</literal></binding>
+      <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.0</literal></binding>
     </result>
     <result>
       <binding name="a"><uri>http://example.org/n02</uri></binding>
@@ -120,22 +120,22 @@
     </result>
     <result>
       <binding name="a"><uri>http://example.org/n07</uri></binding>
-      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#double">0.0</literal></binding>
+      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#double">0E1</literal></binding>
       <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.0</literal></binding>
     </result>
     <result>
       <binding name="a"><uri>http://example.org/n08</uri></binding>
-      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#double">1.0</literal></binding>
+      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#double">1E0</literal></binding>
       <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">1.0</literal></binding>
     </result>
     <result>
       <binding name="a"><uri>http://example.org/n09</uri></binding>
-      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#float">0.0</literal></binding>
+      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#float">0E1</literal></binding>
       <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.0</literal></binding>
     </result>
     <result>
       <binding name="a"><uri>http://example.org/n10</uri></binding>
-      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#float">1.0</literal></binding>
+      <binding name="v"><literal datatype="http://www.w3.org/2001/XMLSchema#float">1E0</literal></binding>
       <binding name="decimal"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">1.0</literal></binding>
     </result>
     <result>

@@ -1,14 +1,16 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import info.adams.ryu.RyuFloat;
 
 
 
-public class FloatDatatype extends FloatPointDatatype
+public final class FloatDatatype extends FloatPointDatatype
 {
     protected FloatDatatype()
     {
@@ -17,21 +19,23 @@ public class FloatDatatype extends FloatPointDatatype
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return genFloat;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdFloat;
     }
 
 
     @Override
-    public LiteralClass getResourceClass(Literal literal)
+    public ResourceClass getNonCanonicalLiteralClass()
     {
-        assert typeIri.equals(literal.getType());
-
-        if(!isValidForm(literal.getValue()))
-            return unsupportedLiteral;
-
-        return xsdFloat;
+        return lexFloat;
     }
 
 
@@ -40,7 +44,20 @@ public class FloatDatatype extends FloatPointDatatype
     {
         assert isValidForm(value);
 
-        //FIXME: use a proper implementation
-        return Float.toString(Float.parseFloat(value));
+        value = getCollapsedForm(value);
+
+        if(value.equals("INF"))
+            return "INF";
+        else if(value.equals("-INF"))
+            return "-INF";
+
+        return RyuFloat.floatToString(Float.parseFloat(value));
+    }
+
+
+    @Override
+    public boolean isCanonicalForm(String value)
+    {
+        return value.equals(getCanonicalLexicalForm(value));
     }
 }

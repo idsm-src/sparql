@@ -3,8 +3,8 @@ package cz.iocb.sparql.engine.imcode;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.OBJECT;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasReference;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.joining;
@@ -26,10 +26,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.Table;
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
-import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeConstantSegmentClass;
-import cz.iocb.sparql.engine.mapping.classes.IriClass;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -45,34 +42,18 @@ public final class SqlConstruct extends SqlIntercode
 {
     public static enum ConstructColumn
     {
-        SUBJECT(new Variable("subject"), true, false),
-        PREDICATE(new Variable("predicate"), false, false),
-        OBJECT(new Variable("object"), true, true);
+        SUBJECT(new Variable("subject")), PREDICATE(new Variable("predicate")), OBJECT(new Variable("object"));
 
         final Variable variable;
-        final boolean allowBlankNode;
-        final boolean allowLiteral;
 
-        private ConstructColumn(Variable variable, boolean allowBlankNode, boolean allowLiteral)
+        private ConstructColumn(Variable variable)
         {
             this.variable = variable;
-            this.allowBlankNode = allowBlankNode;
-            this.allowLiteral = allowLiteral;
         }
 
         public Variable getVariable()
         {
             return variable;
-        }
-
-        public boolean isBlankNodeAllowed()
-        {
-            return allowBlankNode;
-        }
-
-        public boolean isLiteralAllowed()
-        {
-            return allowLiteral;
         }
     }
 
@@ -199,16 +180,13 @@ public final class SqlConstruct extends SqlIntercode
 
         for(Template template : templates)
         {
+            if(!isValidTemplate(template, child))
+                continue;
+
             VariableBindings bindings = new VariableBindings();
 
             for(ConstructColumn column : ConstructColumn.values())
-            {
-                VariableBinding binding = getVariableBinding(request, column, template.get(column), bnOffset, bnClasses,
-                        child);
-
-                if(binding != null)
-                    bindings.add(binding);
-            }
+                bindings.add(getVariableBinding(request, column, template.get(column), bnOffset, bnClasses, child));
 
             branches.add(bindings);
         }
@@ -504,8 +482,7 @@ public final class SqlConstruct extends SqlIntercode
         if(binding != null)
         {
             for(ResourceClass resClass : binding.getMappings().keySet())
-                if((column.isLiteralAllowed() || !(resClass instanceof LiteralClass))
-                        && (column.isBlankNodeAllowed() || !(resClass instanceof BlankNodeClass)))
+                if((column != SUBJECT || hasReference(resClass)) && (column != PREDICATE || hasIri(resClass)))
                     result.add(resClass);
         }
 
@@ -541,12 +518,12 @@ public final class SqlConstruct extends SqlIntercode
 
             case LiteralTemplate _ ->
             {
-                return column.isLiteralAllowed();
+                return column == OBJECT;
             }
 
             case BlankNodeTemplate _ ->
             {
-                return column.isBlankNodeAllowed();
+                return column != PREDICATE;
             }
 
             case VariableTemplate variable ->
@@ -556,9 +533,8 @@ public final class SqlConstruct extends SqlIntercode
                 if(binding == null)
                     return false;
 
-                for(Entry<ResourceClass, List<Column>> map : binding.getMappings().entrySet())
-                    if((column.isLiteralAllowed() || !isLiteral(map.getKey()))
-                            && (column.isBlankNodeAllowed() || !isBlankNode(map.getKey())))
+                for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
+                    if((column != SUBJECT || hasReference(e.getKey())) && (column != PREDICATE || hasIri(e.getKey())))
                         return true;
 
                 return false;
@@ -581,29 +557,29 @@ public final class SqlConstruct extends SqlIntercode
             case IriTemplate template ->
             {
                 Iri iri = template.getValue();
-                IriClass iriClass = request.getIriClass(iri);
+                ResourceClass iriClass = request.getIriClass(iri);
                 List<Column> columns = request.getColumns(iriClass, iri);
                 return new VariableBinding(column.getVariable(), iriClass, columns, false);
             }
 
             case LiteralTemplate template ->
             {
-                if(!column.isLiteralAllowed())
+                if(column != OBJECT)
                     return null;
 
                 Literal literal = template.getValue();
-                LiteralClass resClass = request.getLiteralClass(literal);
+                ResourceClass resClass = request.getLiteralClass(literal);
                 List<Column> columns = request.getColumns(resClass, literal);
                 return new VariableBinding(column.getVariable(), resClass, columns, false);
             }
 
             case BlankNodeTemplate bnode ->
             {
-                if(!column.isBlankNodeAllowed())
+                if(column == PREDICATE)
                     return null;
 
                 ResourceClass resClass = bnResourceClasses.computeIfAbsent(bnode,
-                        _ -> new IntBlankNodeConstantSegmentClass(bnOffset.decrementAndGet()));
+                        _ -> new IntBlankNodeInSegmentClass(bnOffset.decrementAndGet()));
 
                 List<Column> columns = List.of(new ExpressionColumn("(row_number() OVER ())::int4"));
                 return new VariableBinding(column.getVariable(), resClass, columns, false);
@@ -618,16 +594,9 @@ public final class SqlConstruct extends SqlIntercode
                 if(binding == null)
                     return null;
 
-                for(Entry<ResourceClass, List<Column>> map : binding.getMappings().entrySet())
-                {
-                    if(!column.isLiteralAllowed() && map.getKey() instanceof LiteralClass)
-                        continue;
-
-                    if(!column.isBlankNodeAllowed() && map.getKey() instanceof BlankNodeClass)
-                        continue;
-
-                    mappings.put(map.getKey(), map.getValue());
-                }
+                for(Entry<ResourceClass, List<Column>> e : binding.getMappings().entrySet())
+                    if((column != SUBJECT || hasReference(e.getKey())) && (column != PREDICATE || hasIri(e.getKey())))
+                        mappings.put(e.getKey(), e.getValue());
 
                 if(mappings.isEmpty())
                     return null;
@@ -649,16 +618,9 @@ public final class SqlConstruct extends SqlIntercode
     {
         Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
-        for(Entry<ResourceClass, List<Column>> map : original.entrySet())
-        {
-            if(!column.isLiteralAllowed() && map.getKey() instanceof LiteralClass)
-                continue;
-
-            if(!column.isBlankNodeAllowed() && map.getKey() instanceof BlankNodeClass)
-                continue;
-
-            mappings.put(map.getKey(), map.getValue());
-        }
+        for(Entry<ResourceClass, List<Column>> e : original.entrySet())
+            if((column != SUBJECT || hasReference(e.getKey())) && (column != PREDICATE || hasIri(e.getKey())))
+                mappings.put(e.getKey(), e.getValue());
 
         return new VariableBinding(column.getVariable(), mappings, false);
     }

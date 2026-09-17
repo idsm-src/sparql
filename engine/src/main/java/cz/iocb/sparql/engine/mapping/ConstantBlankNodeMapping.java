@@ -1,14 +1,14 @@
 package cz.iocb.sparql.engine.mapping;
 
-import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.BlankNode;
 
 
 
 public class ConstantBlankNodeMapping extends ConstantMapping
 {
-    public ConstantBlankNodeMapping(BlankNode bnode, BlankNodeClass bnodeClass)
+    public ConstantBlankNodeMapping(BlankNode bnode, ResourceClass bnodeClass)
     {
-        super(bnode, bnodeClass, bnodeClass.toColumns(bnode));
+        super(bnode, bnodeClass, bnodeClass.toColumns(null, bnode));
     }
 }

@@ -1,14 +1,16 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
-import cz.iocb.sparql.engine.rdf.Literal;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import info.adams.ryu.RyuDouble;
 
 
 
-public class DoubleDatatype extends FloatPointDatatype
+public final class DoubleDatatype extends FloatPointDatatype
 {
     protected DoubleDatatype()
     {
@@ -17,21 +19,23 @@ public class DoubleDatatype extends FloatPointDatatype
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return genDouble;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdDouble;
     }
 
 
     @Override
-    public LiteralClass getResourceClass(Literal literal)
+    public ResourceClass getNonCanonicalLiteralClass()
     {
-        assert typeIri.equals(literal.getType());
-
-        if(!isValidForm(literal.getValue()))
-            return unsupportedLiteral;
-
-        return xsdDouble;
+        return lexDouble;
     }
 
 
@@ -40,7 +44,20 @@ public class DoubleDatatype extends FloatPointDatatype
     {
         assert isValidForm(value);
 
-        //FIXME: use a proper implementation
-        return Double.toString(Double.parseDouble(value));
+        value = getCollapsedForm(value);
+
+        if(value.equals("INF"))
+            return "INF";
+        else if(value.equals("-INF"))
+            return "-INF";
+
+        return RyuDouble.doubleToString(Double.parseDouble(value));
+    }
+
+
+    @Override
+    public boolean isCanonicalForm(String value)
+    {
+        return value.equals(getCanonicalLexicalForm(value));
     }
 }

@@ -5,6 +5,14 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonCo
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
@@ -15,18 +23,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
@@ -55,10 +56,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 public final class SqlEffectiveBooleanValue extends SqlUnary
 {
-    private static final Set<ResourceClass> operandClasses = Set.of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger,
-            xsdDecimal, xsdFloat, xsdDouble, xsdString, unsupportedLiteral);
+    private static final Set<ResourceClass> operandClasses = Set.of(genBoolean, genShort, genInt, genLong, genInteger,
+            genDecimal, genFloat, genDouble, xsdString, unsupportedType);
 
-    private static final ResourceClass operandClass = getUnionClass(operandClasses);
+    private static final ResourceClass operandClass = unionize(operandClasses);
 
 
     private SqlEffectiveBooleanValue(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings,
@@ -91,7 +92,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
         boolean canBeNull = operand.canBeNull() || classes.stream().anyMatch(r -> !r.isSubclassOf(operandClass));
 
-        NonConstantBooleanValue value = classes.stream().allMatch(r -> r.isSubclassOf(unsupportedLiteral)) ?
+        NonConstantBooleanValue value = classes.stream().allMatch(r -> r.isSubclassOf(unsupportedType)) ?
                 FALSE_OR_ERROR : ANY;
 
 
@@ -113,7 +114,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
 
-        if(optOperand.getResourceClasses().stream().allMatch(r -> isBoolean(r)))
+        if(optOperand.getResourceClasses().stream().allMatch(r -> r.isSubclassOf(xsdBoolean)))
             return optOperand;
 
         if(optOperand == operand)
@@ -131,40 +132,40 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
         {
             if(isShort(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdShort, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdShort.getSqlTypes().get(0) + ")"));
+                Column col = e.getKey().toGeneralClass(genShort, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genShort.getSqlTypes().get(0) + ")"));
             }
             else if(isInt(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdInt, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdInt.getSqlTypes().get(0) + ")"));
+                Column col = e.getKey().toGeneralClass(genInt, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genInt.getSqlTypes().get(0) + ")"));
             }
             else if(isLong(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdLong, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdLong.getSqlTypes().get(0) + ")"));
+                Column col = e.getKey().toGeneralClass(genLong, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genLong.getSqlTypes().get(0) + ")"));
             }
 
             else if(isInteger(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdInteger, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdInteger.getSqlTypes().get(0) + ")"));
+                Column col = e.getKey().toGeneralClass(genInteger, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genInteger.getSqlTypes().get(0) + ")"));
             }
             else if(isDecimal(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdDecimal, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + xsdDecimal.getSqlTypes().get(0) + ")"));
+                Column col = e.getKey().toGeneralClass(genDecimal, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genDecimal.getSqlTypes().get(0) + ")"));
             }
             else if(isFloat(e.getKey()))
             {
-                String type = xsdFloat.getSqlTypes().get(0);
-                Column col = e.getKey().toGeneralClass(xsdFloat, e.getValue(), true).get(0);
+                String type = genFloat.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(genFloat, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
             }
             else if(isDouble(e.getKey()))
             {
-                String type = xsdDouble.getSqlTypes().get(0);
-                Column col = e.getKey().toGeneralClass(xsdDouble, e.getValue(), true).get(0);
+                String type = genDouble.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(genDouble, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
             }
             else if(isString(e.getKey()))
@@ -174,7 +175,7 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             }
             else if(isBoolean(e.getKey()))
             {
-                Column col = e.getKey().toGeneralClass(xsdBoolean, e.getValue(), true).get(0);
+                Column col = e.getKey().toGeneralClass(genBoolean, e.getValue(), true).get(0);
                 cols.add(col);
             }
             else if(isUnsupportedLiteral(e.getKey()))
@@ -184,12 +185,12 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
                                 xsdFloatIri, xsdDoubleIri)
                         .map(i -> "'" + i.getValue().replaceAll("'", "''") + "'").collect(joining(", ", "(", ")"));
 
-                Column col = e.getKey().toGeneralClass(unsupportedLiteral, e.getValue(), true).get(1);
+                Column col = e.getKey().toGeneralClass(unsupportedType, e.getValue(), true).get(1);
                 cols.add(new ExpressionColumn("NULLIF(" + col + " NOT IN " + types + ", true)"));
             }
             else if(!areDisjunct(e.getKey(), operandClass))
             {
-                Column col = operand.get(getUnionClass(operandClasses, box)).get(0);
+                Column col = operand.get(unionize(operandClasses, box)).get(0);
                 cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")"));
             }
         }

@@ -68,7 +68,7 @@ public class UnsupportedIriClass extends IriClass
 
 
     @Override
-    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns)
+    public List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns, boolean checkOptional)
     {
         if(superClass.equals(this))
             return columns;
@@ -78,10 +78,20 @@ public class UnsupportedIriClass extends IriClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            throw new UnsupportedOperationException();
+        {
+            if(checkOptional)
+                return List.of(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)));
+            else
+                throw new UnsupportedOperationException();
+        }
 
         if(sourceClass.equals(iri))
-            throw new UnsupportedOperationException();
+        {
+            if(checkOptional)
+                return columns;
+            else
+                throw new UnsupportedOperationException();
+        }
 
         throw new IllegalArgumentException();
     }

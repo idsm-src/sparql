@@ -8,8 +8,19 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeIntBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeStrBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getBaseExpressionClass;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.getNumericClasses;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
@@ -34,25 +45,38 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDayTimeDuration;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDouble;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.literal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.expandUnionClass;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getExpressionClass;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static java.util.Collections.singletonMap;
@@ -77,13 +101,20 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
-import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.DateTimeConstantZoneClass;
-import cz.iocb.sparql.engine.mapping.classes.LangStringConstantTagClass;
+import cz.iocb.sparql.engine.mapping.classes.DateInZone;
+import cz.iocb.sparql.engine.mapping.classes.DateInZoneBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeInZone;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
@@ -259,7 +290,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     resultClasses.add(xsdDecimal);
 
                 ResourceClass resultClass = resultClasses.size() == 1 ? resultClasses.iterator().next() :
-                        getUnionClass(resultClasses, box);
+                        unionize(resultClasses, box);
 
 
                 if(!restriction.contains(resultClass))
@@ -276,7 +307,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append("sparql.");
                     builder.append(function);
                     builder.append("_");
-                    builder.append(promotedClass.getName());
+                    builder.append(getLiteralClassName(promotedClass));
                     builder.append("(");
 
                     if(distinct)
@@ -439,7 +470,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
                 if(!classes.get(false).isEmpty())
-                    mappings.put(ResourceClass.getUnionClass(classes.get(false)), null);
+                    mappings.put(unionize(classes.get(false)), null);
 
                 if(!classes.get(true).isEmpty())
                 {
@@ -491,7 +522,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
                 if(!classes.get(false).isEmpty())
-                    mappings.put(getUnionClass(classes.get(false)), null);
+                    mappings.put(unionize(classes.get(false)), null);
 
                 if(!classes.get(true).isEmpty())
                 {
@@ -500,7 +531,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     List<Column> cols = realArguments.stream().map(a -> a.get(unionClass).get(0)).collect(toList());
 
                     Column col = new ExpressionColumn(
-                            cols.stream().map(Object::toString).collect(joining(",", "coalesce(", ")")));
+                            cols.stream().map(Object::toString).collect(joining(",", "COALESCE(", ")")));
 
                     mappings.put(unionClass, List.of(col));
                 }
@@ -546,7 +577,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     classes.addAll(v.get(0));
                     classes.addAll(v.get(1));
 
-                    ResourceClass unionClass = getUnionClass(classes);
+                    ResourceClass unionClass = unionize(classes);
 
                     //TODO: optimize for special combinations
 
@@ -556,6 +587,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     List<Column> lcols = left.get(unionClass);
                     List<Column> rcols = right.get(unionClass);
+
+                    //FIXME: use correct compare operator, when unionClass is rdfbox
 
                     variants.add(IntStream.range(0, unionClass.getColumnCount())
                             .mapToObj(i -> lcols.get(i) + " = " + rcols.get(i)).collect(joining(" AND ", "(", ")")));
@@ -606,7 +639,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else
                         variants.add(
                                 new ExpressionColumn("sparql.is_" + function.substring(2).replaceFirst("uri", "iri")
-                                        + "_rdfbox(" + argument.get(getUnionClass(Set.of(r), box)).get(0) + ")"));
+                                        + "_rdfbox(" + argument.get(unionize(Set.of(r), box)).get(0) + ")"));
                 }
 
                 List<Column> result = List.of(coalesce(variants));
@@ -638,47 +671,81 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof DateTimeConstantZoneClass constantZoneClass)
+                    if(argumentClass instanceof DateTimeInZoneClass constantZoneClass)
                     {
-                        builder.append("sparql.cast_as_string_from_datetime(");
+                        builder.append("sparql.str_datetime(");
                         builder.append(argument.getMapping(argumentClass).get(0));
                         builder.append(", '");
                         builder.append(constantZoneClass.getZone());
                         builder.append("'::int4)");
                     }
-                    else if(argumentClass instanceof DateConstantZoneClass constantZoneClass)
+                    else if(argumentClass instanceof DateTimeInZoneBaseClass)
                     {
-                        builder.append("sparql.cast_as_string_from_date(");
+                        builder.append(argument.getMapping(argumentClass).get(1));
+                    }
+                    else if(argumentClass instanceof DateInZoneClass constantZoneClass)
+                    {
+                        builder.append("sparql.str_date(");
                         builder.append(argument.getMapping(argumentClass).get(0));
                         builder.append(", '");
                         builder.append(constantZoneClass.getZone());
                         builder.append("'::int4)");
                     }
-                    else if(argumentClass instanceof LangStringConstantTagClass)
+                    else if(argumentClass instanceof DateInZoneBaseClass)
+                    {
+                        builder.append(argument.getMapping(argumentClass).get(1));
+                    }
+                    else if(argumentClass instanceof LangStringWithTagClass)
                     {
                         builder.append(argument.getMapping(argumentClass).get(0));
                     }
-                    else if(argument.canSafelyGeneralize(argumentClass, xsdCompositeDateTime))
+                    else if(argument.canSafelyGeneralize(argumentClass, xsdDateTime))
                     {
-                        List<Column> columns = argumentClass.toGeneralClass(xsdCompositeDateTime,
-                                argument.get(argumentClass), true);
+                        List<Column> columns = argumentClass.toGeneralClass(xsdDateTime, argument.get(argumentClass),
+                                true);
 
-                        builder.append("sparql.cast_as_string_from_datetime(");
+                        builder.append("sparql.str_datetime(");
                         builder.append(columns.get(0));
                         builder.append(", ");
                         builder.append(columns.get(1));
                         builder.append(")");
                     }
-                    else if(argument.canSafelyGeneralize(argumentClass, xsdCompositeDate))
+                    else if(argument.canSafelyGeneralize(argumentClass, genDateTime))
                     {
-                        List<Column> columns = argumentClass.toGeneralClass(xsdCompositeDate,
-                                argument.get(argumentClass), true);
+                        List<Column> columns = argumentClass.toGeneralClass(xsdDateTime, argument.get(argumentClass),
+                                true);
 
-                        builder.append("sparql.cast_as_string_from_date(");
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(2));
+                        builder.append(", ''::varchar), sparql.str_datetime");
+                        builder.append("(");
+                        builder.append(columns.get(0));
+                        builder.append(", ");
+                        builder.append(columns.get(1));
+                        builder.append("))");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, xsdDate))
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(xsdDate, argument.get(argumentClass), true);
+
+                        builder.append("sparql.str_date(");
                         builder.append(columns.get(0));
                         builder.append(", ");
                         builder.append(columns.get(1));
                         builder.append(")");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, genDate))
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(xsdDate, argument.get(argumentClass), true);
+
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(2));
+                        builder.append(", ''::varchar), sparql.str_date");
+                        builder.append("(");
+                        builder.append(columns.get(0));
+                        builder.append(", ");
+                        builder.append(columns.get(1));
+                        builder.append("))");
                     }
                     else if(argument.canSafelyGeneralize(argumentClass, rdfLangString))
                     {
@@ -691,6 +758,33 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append("(" + argument.getMapping(argumentClass).get(0) + ")::varchar");
                     }
+                    else if(argumentClass instanceof UserLiteralBaseClass)
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(argumentClass, argument.get(argumentClass),
+                                true);
+
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(1));
+                        builder.append(", ''::varchar), ");
+                        builder.append("(");
+                        builder.append(columns.get(0));
+                        builder.append(")::varchar)");
+                    }
+                    else if(argumentClass instanceof UserLiteralCompositeClass)
+                    {
+                        builder.append(argument.getMapping(argumentClass).get(0));
+                    }
+                    else if(argumentClass instanceof UserLiteralCompositeBaseClass)
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(argumentClass, argument.get(argumentClass),
+                                true);
+
+                        builder.append("COALESCE(NULLIF(");
+                        builder.append(columns.get(2));
+                        builder.append(", ''::varchar), ");
+                        builder.append(columns.get(0));
+                        builder.append(")");
+                    }
                     else if(isString(argumentClass))
                     {
                         builder.append(
@@ -700,28 +794,67 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append(argumentClass.toGeneralClass(iri, argument.get(argumentClass), true).get(0));
                     }
-                    else if(argument.canSafelyGeneralize(argumentClass, unsupportedLiteral))
+                    else if(argument.canSafelyGeneralize(argumentClass, unsupportedType))
                     {
-                        List<Column> columns = argumentClass.toGeneralClass(unsupportedLiteral,
+                        List<Column> columns = argumentClass.toGeneralClass(unsupportedType,
                                 argument.get(argumentClass), true);
 
                         builder.append(columns.get(0));
                     }
-                    else
+                    else if(!isBlankNode(argumentClass))
                     {
-                        ResourceClass expressionClass = getBaseExpressionClass(argumentClass);
+                        LiteralClass canonicalClass = Stream
+                                .of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble,
+                                        xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration)
+                                .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
 
-                        if(expressionClass.equals(box))
+                        ResourceClass nonCanonicalClass = Stream
+                                .of(lexBoolean, lexShort, lexInt, lexLong, lexInteger, lexDecimal, lexFloat, lexDouble,
+                                        lexDateTime, lexDate, lexDayTimeDuration)
+                                .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
+
+                        LiteralClass baseClass = Stream
+                                .of(genBoolean, genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble,
+                                        genScalarDateTime, genScalarDate, genDayTimeDuration)
+                                .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
+
+                        if(canonicalClass != null)
+                        {
+                            List<Column> columns = argumentClass.toGeneralClass(canonicalClass,
+                                    argument.get(argumentClass), true);
+
+                            builder.append("sparql.str_").append(getLiteralClassName(canonicalClass));
+                            builder.append("(");
+                            builder.append(columns.get(0));
+                            builder.append(")");
+                        }
+                        else if(nonCanonicalClass != null)
+                        {
+                            List<Column> columns = argumentClass.toGeneralClass(nonCanonicalClass,
+                                    argument.get(argumentClass), true);
+                            builder.append(columns.get(1));
+                        }
+                        else if(baseClass != null)
+                        {
+                            List<Column> columns = argumentClass.toGeneralClass(baseClass, argument.get(argumentClass),
+                                    true);
+
+                            builder.append("COALESCE(NULLIF(");
+                            builder.append(columns.get(1));
+                            builder.append(", ''::varchar), sparql.str_").append(getLiteralClassName(baseClass));
+                            builder.append("(");
+                            builder.append(columns.get(0));
+                            builder.append("))");
+                        }
+                        else
+                        {
+                            List<Column> columns = argumentClass.toGeneralClass(box, argument.get(argumentClass), true);
+
                             builder.append("sparql.str_rdfbox");
-                        else if(!isBlankNode(expressionClass))
-                            builder.append("sparql.cast_as_string_from_").append(expressionClass.getName());
-
-                        List<Column> columns = argumentClass.toGeneralClass(expressionClass,
-                                argument.get(argumentClass), true);
-
-                        builder.append("(");
-                        builder.append(columns.get(0));
-                        builder.append(")");
+                            builder.append("(");
+                            builder.append(columns.get(0));
+                            builder.append(")");
+                        }
                     }
 
                     if(!builder.isEmpty())
@@ -756,7 +889,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LangStringConstantTagClass langClass)
+                    if(argumentClass instanceof LangStringWithTagClass langClass)
                     {
                         if(partCanBeBull)
                             builder.append("CASE WHEN " + argument.getIsNotNull(argumentClass) + " THEN '"
@@ -778,7 +911,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(hasLiteral(argumentClass))
                     {
-                        Column col = argument.get(getUnionClass(Set.of(argumentClass), box)).get(0);
+                        Column col = argument.get(unionize(Set.of(argumentClass), box)).get(0);
                         builder.append("sparql.lang_rdfbox(" + col + ")");
                     }
 
@@ -818,7 +951,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LiteralClass literalClass && literalClass.getTypeIri() != null)
+                    if(argumentClass.getEffectiveClass() instanceof LiteralClass literalClass
+                            && literalClass.getTypeIri() != null)
                     {
                         String iriValue = literalClass.getTypeIri().getValue();
 
@@ -828,14 +962,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         else
                             builder.append("'" + iriValue + "'");
                     }
-                    else if(argument.canSafelyGeneralize(argumentClass, unsupportedLiteral))
+                    else if(argument.canSafelyGeneralize(argumentClass, unsupportedType))
                     {
                         builder.append(argumentClass
-                                .toGeneralClass(unsupportedLiteral, argument.get(argumentClass), partCanBeBull).get(1));
+                                .toGeneralClass(unsupportedType, argument.get(argumentClass), partCanBeBull).get(1));
                     }
                     else if(hasLiteral(argumentClass))
                     {
-                        Column col = argument.get(getUnionClass(Set.of(argumentClass), box)).get(0);
+                        Column col = argument.get(unionize(Set.of(argumentClass), box)).get(0);
                         builder.append("sparql.datatype_rdfbox(" + col + ")");
                     }
 
@@ -852,7 +986,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             case "iri":
             case "uri":
             {
-                final ResourceClass argClasses = getUnionClass(xsdString, iri);
+                final ResourceClass argClasses = unionize(xsdString, iri);
 
                 SqlExpressionIntercode argument = arguments.get(0);
 
@@ -889,14 +1023,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(hasIri(argClass) && !hasString(argClass))
                     {
-                        ResourceClass boxClass = getUnionClass(Set.of(argClass), box);
+                        ResourceClass boxClass = unionize(Set.of(argClass), box);
                         Column col = argClass.toGeneralClass(boxClass, argument.get(argClass), partCanBeBull).get(0);
 
                         builder.append("sparql.rdfbox_get_iri(" + col + ")");
                     }
                     else if(hasIri(argClass) || hasString(argClass))
                     {
-                        ResourceClass boxClass = getUnionClass(Set.of(argClass), box);
+                        ResourceClass boxClass = unionize(Set.of(argClass), box);
                         Column col = argClass.toGeneralClass(boxClass, argument.get(argClass), partCanBeBull).get(0);
 
                         builder.append("sparql.iri_rdfbox(" + base + ", " + col + ")");
@@ -967,7 +1101,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     // TODO: add a variant for case the argument is a constant
 
                     Datatype datatype = request.getConfiguration().getDatatype(iri.getIri());
-                    ResourceClass resourceClass = datatype == null ? null : datatype.getGeneralLiteralClass();
+                    ResourceClass resourceClass = datatype == null ? null : datatype.getBaseLiteralClass();
 
                     boolean argumentIsString = argument.getResourceClasses().stream().allMatch(r -> isString(r));
 
@@ -982,19 +1116,19 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(resourceClass == null && argumentIsString && !argument.canBeNull())
                     {
-                        List<Column> result = !restriction.contains(unsupportedLiteral) ? null : List.of(
+                        List<Column> result = !restriction.contains(unsupportedType) ? null : List.of(
                                 argument.get(xsdString).get(0), new ConstantColumn(iri.getIri().getValue(), "varchar"));
 
-                        return new SqlBuiltinCall(function, arguments, singletonMap(unsupportedLiteral, result),
+                        return new SqlBuiltinCall(function, arguments, singletonMap(unsupportedType, result),
                                 canBeNull);
                     }
                     else if(resourceClass != null)
                     {
-                        resultClass = getUnionClass(Set.of(unsupportedLiteral, resourceClass), box);
+                        resultClass = unionize(Set.of(unsupportedType, resourceClass), box);
                     }
                     else
                     {
-                        resultClass = getUnionClass(Set.of(unsupportedLiteral), box);
+                        resultClass = unionize(Set.of(unsupportedType), box);
                     }
                 }
 
@@ -1035,7 +1169,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     boolean canBeNull = argument.canBeNull()
                             || argument.getResourceClasses().stream().anyMatch(r -> !isString(r));
-                    LangStringConstantTagClass resultClass = LangStringConstantTagClass.get(tag);
+                    LangStringWithTagClass resultClass = LangStringWithTagClass.get(tag);
 
                     if(!restriction.contains(resultClass))
                         return new SqlBuiltinCall(function, arguments, singletonMap(resultClass, null), canBeNull);
@@ -1048,7 +1182,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(!restriction.contains(rdfLangString))
                     return new SqlBuiltinCall(function, arguments, singletonMap(rdfLangString, null), true);
 
-                ResourceClass resultClass = getUnionClass(Set.of(rdfLangString), box);
+                ResourceClass resultClass = unionize(Set.of(rdfLangString), box);
 
                 List<Column> result = List.of(new ExpressionColumn("sparql.rdfbox_create_from_langstring("
                         + argument.get(xsdString).get(0) + ", " + lang.get(xsdString).get(0) + ")"));
@@ -1102,7 +1236,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LangStringConstantTagClass)
+                    if(argumentClass instanceof LangStringWithTagClass)
                     {
                         builder.append("length(");
                         builder.append(argument.getMapping(argumentClass).get(0));
@@ -1125,7 +1259,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(hasStringLiteral(argumentClass))
                     {
                         builder.append("sparql.strlen_rdfbox(");
-                        builder.append(argument.get(getUnionClass(Set.of(argumentClass), box)).get(0));
+                        builder.append(argument.get(unionize(Set.of(argumentClass), box)).get(0));
                         builder.append(")");
                     }
 
@@ -1174,8 +1308,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 Column lengthCol = length == null ? null : length.promoteNumericAs(lengthClasses, xsdInteger);
 
 
-
-
                 Map<ResourceClass, Set<List<ResourceClass>>> map = new HashMap<>();
 
                 for(ResourceClass resClass : argument.getResourceClasses())
@@ -1186,7 +1318,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     ResourceClass resultClass = getStringLiteralResultClass(resClass);
 
                     if(resultClass.equals(rdfLangString) && additionalCanBeNull)
-                        resultClass = getUnionClass(Set.of(rdfLangString), box);
+                        resultClass = unionize(Set.of(rdfLangString), box);
 
                     List<ResourceClass> list = new ArrayList<>();
 
@@ -1213,7 +1345,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringConstantTagClass)
+                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
                         {
                             Column col = argument.getStringLiteral(resClasses);
 
@@ -1238,8 +1370,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(rdfLangString.equals(e.getKey()))
                         {
-                            List<Column> cols = argument
-                                    .get(getUnionClass(resClasses, (PrimitiveResourceClass) e.getKey()));
+                            List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1262,7 +1393,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(e.getKey() != null)
                         {
-                            List<Column> cols = argument.get(getUnionClass(resClasses, box));
+                            List<Column> cols = argument.get(unionize(resClasses, box));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1327,10 +1458,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringConstantTagClass)
+                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
                         {
-                            List<Column> cols = argument
-                                    .get(getUnionClass(resClasses, (PrimitiveResourceClass) e.getKey()));
+                            List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1342,8 +1472,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(rdfLangString.equals(e.getKey()))
                         {
-                            List<Column> cols = argument
-                                    .get(getUnionClass(resClasses, (PrimitiveResourceClass) e.getKey()));
+                            List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1355,7 +1484,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(e.getKey() != null)
                         {
-                            List<Column> cols = argument.get(getUnionClass(resClasses, box));
+                            List<Column> cols = argument.get(unionize(resClasses, box));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1408,8 +1537,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     Set<ResourceClass> leftClasses = variant.get(0);
                     Set<ResourceClass> rightClasses = variant.get(1);
 
-                    ResourceClass leftUnionClass = getUnionClass(leftClasses).getEffectiveClass();
-                    ResourceClass rightUnionClass = getUnionClass(rightClasses).getEffectiveClass();
+                    ResourceClass leftUnionClass = unionize(leftClasses).getEffectiveClass();
+                    ResourceClass rightUnionClass = unionize(rightClasses).getEffectiveClass();
 
 
                     if(leftUnionClass.equals(box) && rightUnionClass.isSubclassOf(xsdString))
@@ -1417,14 +1546,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append("sparql.");
                         builder.append(function);
                         builder.append("_rdfbox_string(");
-                        builder.append(left.get(getUnionClass(leftClasses, box)).get(0));
+                        builder.append(left.get(unionize(leftClasses, box)).get(0));
                         builder.append(", ");
-                        builder.append(right.get(getUnionClass(rightClasses, xsdString)).get(0));
+                        builder.append(right.get(unionize(rightClasses, xsdString)).get(0));
                         builder.append(")");
                     }
-                    else if(rightUnionClass.isSubclassOf(xsdString)
-                            || leftUnionClass instanceof LangStringConstantTagClass
-                                    && rightUnionClass instanceof LangStringConstantTagClass)
+                    else if(rightUnionClass.isSubclassOf(xsdString) || leftUnionClass instanceof LangStringWithTagClass
+                            && rightUnionClass instanceof LangStringWithTagClass)
                     {
                         builder.append("sparql.");
                         builder.append(function);
@@ -1437,8 +1565,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(leftClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString))
                             && rightClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString)))
                     {
-                        List<Column> leftCols = left.get(getUnionClass(leftClasses, rdfLangString));
-                        List<Column> rightCols = right.get(getUnionClass(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, rdfLangString));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
 
                         builder.append("CASE WHEN ");
                         builder.append(leftCols.get(1));
@@ -1452,11 +1580,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(rightCols.get(0));
                         builder.append(") END");
                     }
-                    else if(leftUnionClass instanceof LangStringConstantTagClass leftConstantTagClass
+                    else if(leftUnionClass instanceof LangStringWithTagClass leftConstantTagClass
                             && rightClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString)))
                     {
-                        List<Column> leftCols = left.get(getUnionClass(leftClasses, leftConstantTagClass));
-                        List<Column> rightCols = right.get(getUnionClass(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, leftConstantTagClass));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
 
                         builder.append("CASE WHEN '");
                         builder.append(leftConstantTagClass.getTag());
@@ -1471,10 +1599,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(") END");
                     }
                     else if(leftClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString))
-                            && rightUnionClass instanceof LangStringConstantTagClass rightConstantTagClass)
+                            && rightUnionClass instanceof LangStringWithTagClass rightConstantTagClass)
                     {
-                        List<Column> leftCols = left.get(getUnionClass(leftClasses, rightConstantTagClass));
-                        List<Column> rightCols = right.get(getUnionClass(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, rightConstantTagClass));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
 
                         builder.append("CASE WHEN ");
                         builder.append(leftCols.get(1));
@@ -1493,9 +1621,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append("sparql.");
                         builder.append(function);
                         builder.append("_rdfbox_rdfbox(");
-                        builder.append(left.get(getUnionClass(leftClasses, box)).get(0));
+                        builder.append(left.get(unionize(leftClasses, box)).get(0));
                         builder.append(", ");
-                        builder.append(right.get(getUnionClass(rightClasses, box)).get(0));
+                        builder.append(right.get(unionize(rightClasses, box)).get(0));
                         builder.append(")");
                     }
 
@@ -1556,9 +1684,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             builder.append("sparql.");
                             builder.append(function);
                             builder.append("_string_string(");
-                            builder.append(left.get(getUnionClass(leftClasses, xsdString)).get(0));
+                            builder.append(left.get(unionize(leftClasses, xsdString)).get(0));
                             builder.append(", ");
-                            builder.append(right.get(getUnionClass(rightClasses, xsdString)).get(0));
+                            builder.append(right.get(unionize(rightClasses, xsdString)).get(0));
                             builder.append(")");
                         }
                         else if(rightClasses.stream().allMatch(r -> isString(r)))
@@ -1566,9 +1694,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             builder.append("sparql.");
                             builder.append(function);
                             builder.append("_rdfbox_string(");
-                            builder.append(left.get(getUnionClass(leftClasses, box)).get(0));
+                            builder.append(left.get(unionize(leftClasses, box)).get(0));
                             builder.append(", ");
-                            builder.append(right.get(getUnionClass(rightClasses, xsdString)).get(0));
+                            builder.append(right.get(unionize(rightClasses, xsdString)).get(0));
                             builder.append(")");
                         }
                         else
@@ -1576,9 +1704,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             builder.append("sparql.");
                             builder.append(function);
                             builder.append("_rdfbox_rdfbox(");
-                            builder.append(left.get(getUnionClass(leftClasses, box)).get(0));
+                            builder.append(left.get(unionize(leftClasses, box)).get(0));
                             builder.append(", ");
-                            builder.append(right.get(getUnionClass(rightClasses, box)).get(0));
+                            builder.append(right.get(unionize(rightClasses, box)).get(0));
                             builder.append(")");
                         }
 
@@ -1614,7 +1742,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     ResourceClass ec = argumentClass.getEffectiveClass();
 
-                    if(ec.equals(xsdString) || ec.equals(rdfLangString) || ec instanceof LangStringConstantTagClass)
+                    if(ec.equals(xsdString) || ec.equals(rdfLangString) || ec instanceof LangStringWithTagClass)
                     {
                         List<Column> cols = argument.get(argumentClass);
 
@@ -1624,7 +1752,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(hasStringLiteral(argumentClass))
                     {
-                        List<Column> cols = argument.get(getUnionClass(Set.of(argumentClass), box));
+                        List<Column> cols = argument.get(unionize(Set.of(argumentClass), box));
 
                         builder.append("sparql.encode_for_uri_rdfbox(");
                         builder.append(cols.get(0));
@@ -1675,9 +1803,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             if(isString(x) || isString(y))
                                 newClasses.add(xsdString);
-                            else if(x instanceof LangStringConstantTagClass && x.equals(y))
+                            else if(x instanceof LangStringWithTagClass && x.equals(y))
                                 newClasses.add(x);
-                            else if(x instanceof LangStringConstantTagClass && y instanceof LangStringConstantTagClass)
+                            else if(x instanceof LangStringWithTagClass && y instanceof LangStringWithTagClass)
                                 newClasses.add(xsdString);
                             else if(hasStringLiteral(x) && hasStringLiteral(y))
                                 newClasses.addAll(Set.of(rdfLangString, xsdString));
@@ -1688,7 +1816,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 }
 
                 ResourceClass resultClass = resClasses.size() == 1 ? resClasses.iterator().next() :
-                        getUnionClass(Set.of(rdfLangString, xsdString), box);
+                        unionize(Set.of(rdfLangString, xsdString), box);
 
                 if(!restriction.contains(resultClass))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null),
@@ -1701,7 +1829,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 StringBuilder builder = new StringBuilder();
 
-                if(resultClass.equals(xsdString) || resultClass instanceof LangStringConstantTagClass)
+                if(resultClass.equals(xsdString) || resultClass instanceof LangStringWithTagClass)
                 {
                     builder.append("concat(");
                     builder.append(arguments.get(0).getStringLiteral());
@@ -1716,13 +1844,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     for(int i = 1; i < arguments.size(); i++)
                         builder.append("sparql.concat_rdfbox_rdfbox(");
 
-                    builder.append(arguments.get(0).get(getUnionClass(Set.of(rdfLangString, xsdString), box)).get(0));
+                    builder.append(arguments.get(0).get(unionize(Set.of(rdfLangString, xsdString), box)).get(0));
 
                     for(int i = 1; i < arguments.size(); i++)
                     {
                         builder.append(", ");
-                        builder.append(
-                                arguments.get(i).get(getUnionClass(Set.of(rdfLangString, xsdString), box)).get(0));
+                        builder.append(arguments.get(i).get(unionize(Set.of(rdfLangString, xsdString), box)).get(0));
                         builder.append(")");
                     }
                 }
@@ -1752,8 +1879,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 if(lang.getResourceClasses().stream().anyMatch(r -> hasString(r) && !isString(r)))
                 {
-                    Column lcol = lang.get(getUnionClass(Set.of(xsdString), box)).get(0);
-                    Column pcol = pattern.get(getUnionClass(Set.of(xsdString), box)).get(0);
+                    Column lcol = lang.get(unionize(Set.of(xsdString), box)).get(0);
+                    Column pcol = pattern.get(unionize(Set.of(xsdString), box)).get(0);
 
                     List<Column> result = List.of(new ExpressionColumn(
                             "sparql.langmatches_rdfbox_rdfbox(" + lcol + ", " + pcol + ")", canBeNull));
@@ -1827,7 +1954,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     if(variant.get(0).stream().anyMatch(r -> r.getEffectiveClass().equals(box)))
                     {
-                        Column col = argument.get(getUnionClass(variant.get(0), box)).get(0);
+                        Column col = argument.get(unionize(variant.get(0), box)).get(0);
 
                         builder.append("sparql.regex_rdfbox(");
                         builder.append(col);
@@ -1895,7 +2022,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     ResourceClass resultClass = getStringLiteralResultClass(resClass);
 
                     if(resultClass.equals(rdfLangString) && additionalCanBeNull)
-                        resultClass = getUnionClass(Set.of(rdfLangString), box);
+                        resultClass = unionize(Set.of(rdfLangString), box);
 
                     List<ResourceClass> list = new ArrayList<>();
 
@@ -1923,7 +2050,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringConstantTagClass)
+                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
                         {
                             Column col = argument.getStringLiteral(resClasses);
 
@@ -1945,8 +2072,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(rdfLangString.equals(e.getKey()))
                         {
-                            List<Column> cols = argument
-                                    .get(getUnionClass(resClasses, (PrimitiveResourceClass) e.getKey()));
+                            List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -1966,7 +2092,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         }
                         else if(e.getKey() != null)
                         {
-                            List<Column> cols = argument.get(getUnionClass(resClasses, box));
+                            List<Column> cols = argument.get(unionize(resClasses, box));
 
                             StringBuilder builder = new StringBuilder();
 
@@ -2062,7 +2188,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         {
                             for(List<Set<ResourceClass>> variant : e.getValue())
                             {
-                                Column op = argument.get(getUnionClass(variant.get(0), box)).get(0);
+                                Column op = argument.get(unionize(variant.get(0), box)).get(0);
                                 cols.add(new ExpressionColumn("sparql." + function + "_rdfbox(" + op + ")"));
                             }
                         }
@@ -2079,7 +2205,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
             case "now":
             {
-                DateTimeConstantZoneClass resultClass = DateTimeConstantZoneClass.get(0);
+                DateTimeInZoneClass resultClass = DateTimeInZoneClass.get(0);
 
                 if(!restriction.contains(resultClass))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null), false);
@@ -2106,6 +2232,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     return SqlNull.get();
 
                 if(!timeFunc && argument.getResourceClasses().stream().noneMatch(r -> hasDate(r) || hasDateTime(r)))
+                    return SqlNull.get();
+
+                if(function.equals("timezone") && argument.getResourceClasses().stream().noneMatch(r -> hasDate(r)
+                        && !(r instanceof DateInZoneClass d && d.getZone() == Integer.MIN_VALUE)
+                        || hasDateTime(r) && !(r instanceof DateTimeInZoneClass t && t.getZone() == Integer.MIN_VALUE)))
                     return SqlNull.get();
 
                 boolean canBeNull = argument.canBeNull()
@@ -2137,24 +2268,28 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(!timeFunc && argumentClass instanceof DateConstantZoneClass dateClass)
+                    if(!timeFunc && argumentClass instanceof DateInZone dateClass)
                     {
                         // as date
 
-                        builder.append("sparql.");
-                        builder.append(function);
-                        builder.append("_date(");
-                        builder.append(argument.get(argumentClass).get(0));
-                        builder.append(", '");
-                        builder.append(dateClass.getZone());
-                        builder.append("'::int4)");
+                        if(!function.equals("timezone") || dateClass.getZone() != Integer.MIN_VALUE)
+                        {
+                            builder.append("sparql.");
+                            builder.append(function);
+                            builder.append("_date(");
+                            builder.append(argument.get(argumentClass).get(0));
+                            builder.append(", '");
+                            builder.append(dateClass.getZone());
+                            builder.append("'::int4)");
+                        }
                     }
-                    else if(!timeFunc && argument.canSafelyGeneralize(argumentClass, xsdCompositeDate))
+                    else if(!timeFunc && (argument.canSafelyGeneralize(argumentClass, xsdDate)
+                            || argument.canSafelyGeneralize(argumentClass, genDate)))
                     {
                         // as date+int4
 
-                        List<Column> columns = argumentClass.toGeneralClass(xsdCompositeDate,
-                                argument.get(argumentClass), partCanBeBull);
+                        List<Column> columns = argumentClass.toGeneralClass(genDate, argument.get(argumentClass),
+                                partCanBeBull);
 
                         builder.append("sparql.");
                         builder.append(function);
@@ -2168,7 +2303,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         // as zoneddate
 
-                        List<Column> columns = argumentClass.toGeneralClass(xsdScalarDate, argument.get(argumentClass),
+                        List<Column> columns = argumentClass.toGeneralClass(genScalarDate, argument.get(argumentClass),
                                 partCanBeBull);
 
                         builder.append("sparql.");
@@ -2178,24 +2313,28 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(columns.get(0));
                         builder.append(")");
                     }
-                    else if(argumentClass instanceof DateTimeConstantZoneClass dateTimeClass)
+                    else if(argumentClass instanceof DateTimeInZone dateTimeClass)
                     {
                         // as timestamptz
 
-                        builder.append("sparql.");
-                        builder.append(function);
-                        builder.append("_datetime(");
-                        builder.append(argument.get(argumentClass).get(0));
-                        builder.append(", '");
-                        builder.append(dateTimeClass.getZone());
-                        builder.append("'::int4)");
+                        if(!function.equals("timezone") || dateTimeClass.getZone() != Integer.MIN_VALUE)
+                        {
+                            builder.append("sparql.");
+                            builder.append(function);
+                            builder.append("_datetime(");
+                            builder.append(argument.get(argumentClass).get(0));
+                            builder.append(", '");
+                            builder.append(dateTimeClass.getZone());
+                            builder.append("'::int4)");
+                        }
                     }
-                    else if(argument.canSafelyGeneralize(argumentClass, xsdCompositeDateTime))
+                    else if(argument.canSafelyGeneralize(argumentClass, xsdDateTime)
+                            || argument.canSafelyGeneralize(argumentClass, genDateTime))
                     {
                         // as timestamptz+int4
 
-                        List<Column> columns = argumentClass.toGeneralClass(xsdCompositeDateTime,
-                                argument.get(argumentClass), partCanBeBull);
+                        List<Column> columns = argumentClass.toGeneralClass(genDateTime, argument.get(argumentClass),
+                                partCanBeBull);
 
                         builder.append("sparql.");
                         builder.append(function);
@@ -2209,7 +2348,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         // as zoneddatetime
 
-                        List<Column> columns = argumentClass.toGeneralClass(xsdScalarDateTime,
+                        List<Column> columns = argumentClass.toGeneralClass(genScalarDateTime,
                                 argument.get(argumentClass), partCanBeBull);
 
                         builder.append("sparql.");
@@ -2223,7 +2362,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         // as rdfbox
 
-                        List<Column> columns = argument.get(getUnionClass(Set.of(argumentClass), box));
+                        List<Column> columns = argument.get(unionize(Set.of(argumentClass), box));
 
                         builder.append("sparql.");
                         builder.append(function);
@@ -2292,7 +2431,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LangStringConstantTagClass)
+                    if(argumentClass instanceof LangStringWithTagClass)
                     {
                         builder.append("hashtextextended(");
                         builder.append(argument.getMapping(argumentClass).get(0));
@@ -2315,7 +2454,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(hasStringLiteral(argumentClass))
                     {
                         builder.append("hashtextextended(sparql.rdfbox_get_string_literal(");
-                        builder.append(argument.get(getUnionClass(Set.of(argumentClass), box)).get(0));
+                        builder.append(argument.get(unionize(Set.of(argumentClass), box)).get(0));
                         builder.append("), 0)::int8");
                     }
 
@@ -2340,13 +2479,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         if(isString(resClass))
             return xsdString;
 
-        if(resClass.getEffectiveClass() instanceof LangStringConstantTagClass)
+        if(resClass.getEffectiveClass() instanceof LangStringWithTagClass)
             return resClass.getEffectiveClass();
 
         if(isLangString(resClass))
             return rdfLangString;
 
-        return getUnionClass(Set.of(xsdString, rdfLangString), box);
+        return unionize(Set.of(xsdString, rdfLangString), box);
     }
 
 
@@ -2355,15 +2494,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         Set<ResourceClass> resClasses = new HashSet<>();
         resClasses.add(xsdString);
 
-        for(ResourceClass r : expandUnionClass(left))
+        for(ResourceClass r : estimateAsUnion(left))
         {
-            if(r.getEffectiveClass() instanceof LangStringConstantTagClass)
+            if(r.getEffectiveClass() instanceof LangStringWithTagClass)
                 resClasses.add(r.getEffectiveClass());
             else if(hasLangString(r))
                 resClasses.add(rdfLangString);
         }
 
-        return getUnionClass(resClasses);
+        return unionize(resClasses);
     }
 
 
@@ -2507,7 +2646,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        List<SqlExpressionIntercode> optimized = !restriction.contains(getUnionClass(getResourceClasses())) ?
+        List<SqlExpressionIntercode> optimized = !restriction.contains(unionize(getResourceClasses())) ?
                 arguments.stream().map(a -> a.optimize(request, bindings, NONE, evalServices)).toList() :
                 switch(function)
                 {
@@ -2692,13 +2831,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> set = new HashSet<>();
 
                         if(restriction.contains(xsdDouble))
-                            set.add(xsdDouble);
+                            set.add(genDouble);
 
                         if(restriction.contains(xsdFloat))
-                            set.add(xsdFloat);
+                            set.add(genFloat);
 
                         if(restriction.contains(xsdDecimal))
-                            set.add(xsdDecimal);
+                            set.add(genDecimal);
 
                         if(restriction.contains(xsdInteger))
                             set.add(integerNumeric);
@@ -2709,17 +2848,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "year", "month", "day", "tz" ->
                     {
                         yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(xsdScalarDate, xsdScalarDateTime), evalServices));
+                                new Restriction(genScalarDate, genScalarDateTime), evalServices));
                     }
 
                     case "timezone" ->
                     {
                         Set<ResourceClass> set = arguments.get(0).getResourceClasses().stream()
                                 .filter(r -> isDateOrDateTime(r)
-                                        && (!(r instanceof DateTimeConstantZoneClass z)
-                                                || z.getZone() != Integer.MIN_VALUE)
-                                        && (!(r instanceof DateConstantZoneClass z)
-                                                || z.getZone() != Integer.MIN_VALUE))
+                                        && (!(r instanceof DateTimeInZoneClass z) || z.getZone() != Integer.MIN_VALUE)
+                                        && (!(r instanceof DateInZoneClass z) || z.getZone() != Integer.MIN_VALUE))
                                 .collect(toSet());
 
                         yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(set), evalServices));
@@ -2727,7 +2864,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     case "hours", "minutes", "seconds" ->
                     {
-                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(xsdScalarDateTime),
+                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(genScalarDateTime),
                                 evalServices));
                     }
 
@@ -2767,8 +2904,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
     private static boolean areStringLiteralsCompatible(ResourceClass left, ResourceClass right)
     {
-        for(ResourceClass l : expandUnionClass(left))
-            for(ResourceClass r : expandUnionClass(right))
+        for(ResourceClass l : estimateAsUnion(left))
+            for(ResourceClass r : estimateAsUnion(right))
                 if(areStringLiteralsCompatibleBase(l, r))
                     return true;
 
@@ -2778,8 +2915,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
     private static boolean areStringLiteralsCompatibleBase(ResourceClass left, ResourceClass right)
     {
-        if(left.getEffectiveClass() instanceof LangStringConstantTagClass l
-                && right.getEffectiveClass() instanceof LangStringConstantTagClass r)
+        if(left.getEffectiveClass() instanceof LangStringWithTagClass l
+                && right.getEffectiveClass() instanceof LangStringWithTagClass r)
             return l.equals(r);
 
         if(hasString(right))
@@ -2808,8 +2945,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
     private static boolean areStringLiteralsIncompatible(ResourceClass left, ResourceClass right)
     {
-        for(ResourceClass l : expandUnionClass(left))
-            for(ResourceClass r : expandUnionClass(right))
+        for(ResourceClass l : estimateAsUnion(left))
+            for(ResourceClass r : estimateAsUnion(right))
                 if(areStringLiteralsIncompatibleBase(l, r))
                     return true;
 
@@ -2822,7 +2959,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         ResourceClass l = left.getEffectiveClass();
         ResourceClass r = right.getEffectiveClass();
 
-        return !(isLangString(l) && isString(r) || l instanceof LangStringConstantTagClass && l.equals(r));
+        return !(isLangString(l) && isString(r) || l instanceof LangStringWithTagClass && l.equals(r));
     }
 
 

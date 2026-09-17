@@ -10,10 +10,10 @@ import java.util.Set;
 public abstract class PrimitiveResourceClass extends ResourceClass
 {
     protected final List<String> sqlTypes;
-    protected final Set<ResourceClass> superClasses;
+    protected final Set<PrimitiveResourceClass> superClasses;
 
 
-    protected PrimitiveResourceClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected PrimitiveResourceClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name);
 
@@ -35,7 +35,7 @@ public abstract class PrimitiveResourceClass extends ResourceClass
     }
 
 
-    public Set<ResourceClass> getSuperClasses()
+    public Set<PrimitiveResourceClass> getSuperClasses()
     {
         return superClasses;
     }
@@ -50,13 +50,6 @@ public abstract class PrimitiveResourceClass extends ResourceClass
 
     @Override
     public PrimitiveResourceClass getEffectiveClass()
-    {
-        return this;
-    }
-
-
-    @Override
-    public ResourceClass getBuiltinClass()
     {
         return this;
     }

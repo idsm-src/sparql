@@ -1,22 +1,20 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
-import cz.iocb.sparql.engine.request.ColumnMap;;
+import cz.iocb.sparql.engine.request.ColumnMap;
 
 
 
@@ -75,9 +73,11 @@ public abstract class ResourceClass
      *
      * @param superClass the resource class from which is converted
      * @param columns the columns representing values of the superclass
+     * @param checkOptional indicates whether the representability check may be skipped
      * @return the columns representing values this resource class
      */
-    public abstract List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns);
+    public abstract List<Column> fromGeneralClass(ResourceClass superClass, List<Column> columns,
+            boolean checkOptional);
 
 
     /**
@@ -86,14 +86,6 @@ public abstract class ResourceClass
      * @return the base class that effectively represents this resource class
      */
     public abstract PrimitiveResourceClass getEffectiveClass();
-
-
-    /**
-     * Returns a built-in class, i.e. one supported by built-in expressions, that is closest to this resource class.
-     *
-     * @return the built-in class that is closest to this resource class
-     */
-    public abstract ResourceClass getBuiltinClass();
 
 
     public abstract List<String> getSqlTypes();
@@ -118,7 +110,7 @@ public abstract class ResourceClass
         if(this.isSubclassOf(targetClass))
             return toGeneralClass(targetClass, columns, canBeNull);
         else if(targetClass.isSubclassOf(this))
-            return targetClass.fromGeneralClass(this, columns);
+            return targetClass.fromGeneralClass(this, columns, false);
         else
             throw new IllegalArgumentException();
     }
@@ -132,28 +124,19 @@ public abstract class ResourceClass
 
     private boolean isSubclassOf(ResourceClass a, ResourceClass b)
     {
-        //TODO: take into account that a primitive class can be composed of (finitely many) other primitive classes
+        if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
+            return pa.isSubclassOf(pb);
 
-        if(a instanceof UnionResourceClass ua)
-            return ua.getClasses().stream().allMatch(c -> isSubclassOf(c, b));
-        else if(b instanceof UnionResourceClass ub)
-            return ub.getClasses().stream().anyMatch(c -> isSubclassOf(a, c));
-        else
-            return ((PrimitiveResourceClass) a).isSubclassOf((PrimitiveResourceClass) b);
+        return DerivedClass.isSubclassOf(a, b);
     }
 
 
-    public static boolean areDisjunct(ResourceClass class1, ResourceClass class2)
+    public static boolean areDisjunct(ResourceClass a, ResourceClass b)
     {
-        //TODO: take into account that a primitive class can be composed of (finitely many) other primitive classes
-        //TODO: two classes can be non-disjunct even though one is not a subset of the other
+        if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
+            return !pa.isSubclassOf(pb) && !pb.isSubclassOf(pa);
 
-        for(ResourceClass c1 : expandUnionClass(class1))
-            for(ResourceClass c2 : expandUnionClass(class2))
-                if(c1.isSubclassOf(c2) || c2.isSubclassOf(c1))
-                    return false;
-
-        return true;
+        return DerivedClass.areDisjunct(a, b);
     }
 
 
@@ -185,7 +168,7 @@ public abstract class ResourceClass
     }
 
 
-    public final String getName()
+    public final String getResourceName()
     {
         return name;
     }
@@ -193,14 +176,14 @@ public abstract class ResourceClass
 
     public static ResourceClass getExpressionClass(Set<ResourceClass> resClasses)
     {
-        return getUnionClass(resClasses, (PrimitiveResourceClass) getExpressionClass(getUnionClass(resClasses)));
+        return unionize(resClasses, (PrimitiveResourceClass) getExpressionClass(unionize(resClasses)));
     }
 
 
     public static ResourceClass getExpressionClass(ResourceClass resClass)
     {
-        if(resClass instanceof UnionResourceClass u)
-            resClass = u.getEffectiveClass();
+        if(resClass instanceof DerivedClass c)
+            resClass = c.getEffectiveClass();
 
         if(resClass.getColumnCount() == 1)
             return resClass;
@@ -216,110 +199,6 @@ public abstract class ResourceClass
         while(it.hasNext())
         {
             ResourceClass next = it.next();
-
-            if(next.isSubclassOf(effectiveClass))
-                effectiveClass = next;
-        }
-
-        return effectiveClass;
-    }
-
-
-    public static ResourceClass getUnionClass(Set<ResourceClass> classes, PrimitiveResourceClass effectiveClass)
-    {
-        Set<ResourceClass> reduced = reduceClasses(classes);
-
-        if(reduced.size() == 1 && reduced.iterator().next().equals(effectiveClass))
-            return effectiveClass;
-
-        return new UnionResourceClass(reduced, effectiveClass);
-    }
-
-
-    public static ResourceClass getUnionClass(Set<ResourceClass> classes)
-    {
-        Set<ResourceClass> reduced = reduceClasses(classes);
-
-        if(reduced.size() == 1)
-            return reduced.iterator().next();
-
-        PrimitiveResourceClass effectiveClass = findEfectiveClass(reduced);
-
-        return new UnionResourceClass(reduced, effectiveClass);
-    }
-
-
-    public static ResourceClass getUnionClass(ResourceClass... classes)
-    {
-        return getUnionClass(new HashSet<>(Arrays.asList(classes)));
-    }
-
-
-    public static Set<ResourceClass> expandUnionClasses(Set<ResourceClass> resClasses)
-    {
-        return resClasses.stream().flatMap(c -> expandUnionClass(c).stream()).collect(toSet());
-    }
-
-
-    public static Set<ResourceClass> expandUnionClass(ResourceClass resClass)
-    {
-        if(resClass instanceof UnionResourceClass union)
-            return expandUnionClasses(union.getClasses());
-
-        return Set.of(resClass);
-    }
-
-
-    protected static Set<ResourceClass> reduceClasses(Set<ResourceClass> classes)
-    {
-        Set<ResourceClass> bases = classes.stream()
-                .flatMap(r -> r instanceof UnionResourceClass u ? u.getClasses().stream() : Stream.of(r))
-                .collect(toSet());
-
-        return bases.stream().filter(r -> bases.stream().noneMatch(c -> !r.equals(c) && r.isSubclassOf(c)))
-                .collect(toSet());
-    }
-
-
-    private static Set<PrimitiveResourceClass> getEfectiveClassCandidates(Set<ResourceClass> classes)
-    {
-        Iterator<ResourceClass> it = classes.iterator();
-
-        Set<PrimitiveResourceClass> candidates = new HashSet<>();
-
-        PrimitiveResourceClass first = (PrimitiveResourceClass) it.next();
-
-        for(ResourceClass r : first.getSuperClasses())
-            candidates.add((PrimitiveResourceClass) r);
-
-        candidates.add(first);
-
-        while(it.hasNext())
-        {
-            Set<ResourceClass> set = new HashSet<>();
-
-            PrimitiveResourceClass other = (PrimitiveResourceClass) it.next();
-
-            set.addAll(other.getSuperClasses());
-            set.add(other);
-
-            candidates.retainAll(set);
-        }
-
-        return candidates;
-    }
-
-
-    private static PrimitiveResourceClass findEfectiveClass(Set<ResourceClass> classes)
-    {
-        Set<PrimitiveResourceClass> candidates = getEfectiveClassCandidates(classes);
-
-        Iterator<PrimitiveResourceClass> it = candidates.iterator();
-        PrimitiveResourceClass effectiveClass = it.next();
-
-        while(it.hasNext())
-        {
-            PrimitiveResourceClass next = it.next();
 
             if(next.isSubclassOf(effectiveClass))
                 effectiveClass = next;
@@ -348,7 +227,14 @@ public abstract class ResourceClass
     {
         Collection<Set<ResourceClass>> out = UnionFind.getDisjunctEntries(classes, (l, r) -> !areDisjunct(l, r));
 
-        return out.stream().map(s -> getUnionClass(s)).collect(toSet());
+        return out.stream().map(s -> unionize(s)).collect(toSet());
+    }
+
+
+    @Override
+    public String toString()
+    {
+        return name;
     }
 
 

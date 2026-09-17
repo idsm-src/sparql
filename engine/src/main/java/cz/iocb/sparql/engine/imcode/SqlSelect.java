@@ -2,6 +2,9 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.determineResultClass;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
@@ -20,14 +23,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.scalarBlankNode;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdCompositeDateTime;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getUnionClass;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
@@ -41,7 +41,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.mapping.classes.DateConstantZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
@@ -466,13 +466,13 @@ public final class SqlSelect extends SqlIntercode
                 else if(isNumeric(r))
                     sortSet.computeIfAbsent(numeric, _ -> new HashSet<>()).add(r);
                 else if(isBoolean(r))
-                    sortSet.computeIfAbsent(xsdBoolean, _ -> new HashSet<>()).add(r);
+                    sortSet.computeIfAbsent(genBoolean, _ -> new HashSet<>()).add(r);
                 else if(isString(r))
                     sortSet.computeIfAbsent(xsdString, _ -> new HashSet<>()).add(r);
                 else if(isDate(r))
-                    sortSet.computeIfAbsent(xsdScalarDate, _ -> new HashSet<>()).add(r);
+                    sortSet.computeIfAbsent(genScalarDate, _ -> new HashSet<>()).add(r);
                 else if(isDateTime(r))
-                    sortSet.computeIfAbsent(xsdScalarDateTime, _ -> new HashSet<>()).add(r);
+                    sortSet.computeIfAbsent(genScalarDateTime, _ -> new HashSet<>()).add(r);
                 else if(hasBlankNode(r) || hasIri(r) || hasNumeric(r) || hasBoolean(r) || hasString(r) || hasDate(r)
                         || hasDateTime(r))
                     sortSet.computeIfAbsent(box, _ -> new HashSet<>()).add(r);
@@ -500,7 +500,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.getIsNull(getUnionClass(sortSet.get(scalarBlankNode))));
+                builder.append(binding.getIsNull(unionize(sortSet.get(scalarBlankNode))));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -564,7 +564,7 @@ public final class SqlSelect extends SqlIntercode
                 }
                 else
                 {
-                    builder.append(binding.deriveMapping(getUnionClass(numerics, box)));
+                    builder.append(binding.deriveMapping(unionize(numerics, box)));
                 }
 
                 if(order.getValue() == Direction.Descending)
@@ -572,12 +572,12 @@ public final class SqlSelect extends SqlIntercode
             }
 
             // order xsd:booleans
-            if(sortSet.get(xsdBoolean) != null)
+            if(sortSet.get(genBoolean) != null)
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(xsdBoolean).get(0));
+                builder.append(binding.deriveMapping(genBoolean).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -596,12 +596,13 @@ public final class SqlSelect extends SqlIntercode
             }
 
             // order xsd:dateTimes
-            if(sortSet.get(xsdScalarDateTime) != null)
+            if(sortSet.get(genScalarDateTime) != null)
             {
-                Set<ResourceClass> dateTimes = sortSet.get(xsdScalarDateTime);
+                Set<ResourceClass> dateTimes = sortSet.get(genScalarDateTime);
 
-                ResourceClass sortClass = dateTimes.stream().allMatch(r -> r.isSubclassOf(xsdCompositeDateTime)) ?
-                        xsdCompositeDateTime : xsdScalarDateTime;
+                //FIXME: should be optimized
+                ResourceClass sortClass = dateTimes.stream().allMatch(r -> r.isSubclassOf(xsdDateTime)) ? xsdDateTime :
+                        genScalarDateTime;
 
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
@@ -613,17 +614,17 @@ public final class SqlSelect extends SqlIntercode
             }
 
             // order xsd:dates
-            if(sortSet.get(xsdScalarDate) != null)
+            if(sortSet.get(genScalarDate) != null)
             {
-                Set<ResourceClass> dates = sortSet.get(xsdScalarDate);
+                Set<ResourceClass> dates = sortSet.get(genScalarDate);
 
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateConstantZoneClass c)
-                    builder.append(binding.deriveMapping(c).get(0));
+                if(dates.size() == 1 && dates.iterator().next().getEffectiveClass() instanceof DateInZone)
+                    builder.append(binding.deriveMapping(dates.iterator().next()).get(0));
                 else
-                    builder.append(binding.deriveMapping(xsdScalarDate).get(0));
+                    builder.append(binding.deriveMapping(genScalarDate).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");
@@ -635,7 +636,7 @@ public final class SqlSelect extends SqlIntercode
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
 
-                builder.append(binding.deriveMapping(getUnionClass(sortSet.get(box), box)).get(0));
+                builder.append(binding.deriveMapping(unionize(sortSet.get(box), box)).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");

@@ -14,7 +14,7 @@
 		<result>
 			<binding name="s"><uri>http://example.org/n5</uri></binding>
 			<binding name="num"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">2.5</literal></binding>
-			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">2</literal></binding>
+			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">2.0</literal></binding>
 		</result>
 		<result>
 			<binding name="s"><uri>http://example.org/n4</uri></binding>
@@ -24,12 +24,12 @@
 		<result>
 			<binding name="s"><uri>http://example.org/n3</uri></binding>
 			<binding name="num"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">1.1</literal></binding>
-			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">1</literal></binding>
+			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">1.0</literal></binding>
 		</result>
 		<result>
 			<binding name="s"><uri>http://example.org/n2</uri></binding>
 			<binding name="num"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">-1.6</literal></binding>
-			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">-2</literal></binding>
+			<binding name="floor"><literal datatype="http://www.w3.org/2001/XMLSchema#decimal">-2.0</literal></binding>
 		</result>
 </results>
 </sparql>

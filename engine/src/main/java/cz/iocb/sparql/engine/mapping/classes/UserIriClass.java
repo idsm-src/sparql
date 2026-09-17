@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.database.Column;
 
 public abstract class UserIriClass extends IriClass
 {
-    protected UserIriClass(String name, List<String> sqlTypes, Set<ResourceClass> superClasses)
+    protected UserIriClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

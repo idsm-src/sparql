@@ -52,8 +52,8 @@ public final class SqlLiteral extends SqlExpressionIntercode
         if(literal.equals(falseLiteral))
             return falseValue;
 
-        LiteralClass resClass = request.getLiteralClass(literal);
-        List<Column> columns = resClass.toColumns(literal);
+        ResourceClass resClass = request.getLiteralClass(literal);
+        List<Column> columns = resClass.toColumns(request.getStatement(), literal);
 
         return new SqlLiteral(literal, singletonMap(resClass, columns));
     }

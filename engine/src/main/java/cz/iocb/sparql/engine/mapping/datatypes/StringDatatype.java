@@ -7,7 +7,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
-public class StringDatatype extends StringLiteralDatatype
+public final class StringDatatype extends StringLiteralDatatype
 {
     protected StringDatatype()
     {
@@ -16,7 +16,14 @@ public class StringDatatype extends StringLiteralDatatype
 
 
     @Override
-    public LiteralClass getGeneralLiteralClass()
+    public LiteralClass getBaseLiteralClass()
+    {
+        return xsdString;
+    }
+
+
+    @Override
+    public LiteralClass getCanonicalLiteralClass()
     {
         return xsdString;
     }

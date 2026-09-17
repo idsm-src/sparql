@@ -1,17 +1,17 @@
 package cz.iocb.sparql.engine.request;
 
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeType;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateType;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationType;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalType;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleType;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
-import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE;
@@ -20,8 +20,6 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -36,25 +34,38 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
-import cz.iocb.sparql.engine.mapping.classes.CommonIriClass;
+import cz.iocb.sparql.engine.mapping.classes.DateCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
+import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationClass;
+import cz.iocb.sparql.engine.mapping.classes.DecimalBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DecimalClass;
+import cz.iocb.sparql.engine.mapping.classes.DoubleBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DoubleClass;
+import cz.iocb.sparql.engine.mapping.classes.FloatBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.FloatClass;
+import cz.iocb.sparql.engine.mapping.classes.IntBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.IntClass;
+import cz.iocb.sparql.engine.mapping.classes.IntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.IriScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringClass;
+import cz.iocb.sparql.engine.mapping.classes.LongBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.LongClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.StringClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedLiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -62,6 +73,8 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
+import info.adams.ryu.RyuDouble;
+import info.adams.ryu.RyuFloat;
 
 
 
@@ -75,7 +88,6 @@ public class Result implements AutoCloseable
 
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
-    private static final DecimalFormat decimalFormat;
     private static final long USECS_PER_DAY = 86400000000l;
     private static final long USECS_PER_HOUR = 3600000000l;
     private static final long USECS_PER_MINUTE = 60000000l;
@@ -99,17 +111,6 @@ public class Result implements AutoCloseable
     private final long timeout;
     private final int checkSize;
     private int count = 0;
-
-
-    static
-    {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols();
-        symbols.setDecimalSeparator('.');
-        symbols.setExponentSeparator("E");
-        symbols.setInfinity("INF");
-        symbols.setNaN("NaN");
-        decimalFormat = new DecimalFormat("################0.0################", symbols);
-    }
 
 
     public Result(ResultType type, Map<Variable, List<ResultResourceClass>> description, ResultSet rs, long begin,
@@ -152,9 +153,6 @@ public class Result implements AutoCloseable
         {
             for(ResultResourceClass rc : entry.getValue())
             {
-                if(typeMap.get(((ResourceClass) rc).getSqlTypes().get(0)) == null)
-                    System.err.println(((ResourceClass) rc).getSqlTypes().get(0));
-
                 Object value = rs.getObject(i++, typeMap.get(((ResourceClass) rc).getSqlTypes().get(0)));
 
                 if(value == null)
@@ -165,53 +163,194 @@ public class Result implements AutoCloseable
 
                 rowData[idx] = switch(rc)
                 {
-                    case IntBlankNodeClass _ -> new IntBlankNode((Integer) value, rs.getInt(i++));
+                    case IntBlankNodeClass _ ->
+                    {
+                        int segment = rs.getInt(i++);
+                        yield new IntBlankNode((Integer) value, segment);
+                    }
 
-                    case StrBlankNodeClass _ -> new StrBlankNode((String) value, rs.getInt(i++));
+                    case StrBlankNodeClass _ ->
+                    {
+                        int segment = rs.getInt(i++);
+                        yield new StrBlankNode((String) value, segment);
+                    }
 
-                    case CommonIriClass _ -> new Iri((String) value);
+                    case IriScalarClass _ ->
+                    {
+                        yield new Iri((String) value);
+                    }
 
-                    case BooleanClass _ -> new TypedLiteral(value.toString(), xsdBooleanIri);
+                    case BooleanClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdBooleanIri);
+                    }
 
-                    case ShortClass _ -> new TypedLiteral(value.toString(), xsdShortIri);
+                    case BooleanBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdBooleanIri);
+                    }
 
-                    case IntClass _ -> new TypedLiteral(value.toString(), xsdIntIri);
+                    case ShortClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdShortIri);
+                    }
 
-                    case LongClass _ -> new TypedLiteral(value.toString(), xsdLongIri);
+                    case ShortBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdShortIri);
+                    }
+
+                    case IntClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdIntIri);
+                    }
+
+                    case IntBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdIntIri);
+                    }
+
+                    case LongClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdLongIri);
+                    }
+
+                    case LongBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? value.toString() : lexical;
+                        yield new TypedLiteral(str, xsdLongIri);
+                    }
+
+                    case IntegerClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdIntegerIri);
+                    }
+
+                    case IntegerBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdIntegerIri);
+                    }
+
+                    case DecimalClass _ ->
+                    {
+                        BigDecimal bn = ((BigDecimal) value).stripTrailingZeros();
+                        yield new TypedLiteral((bn.scale() < 1 ? bn.setScale(1) : bn).toPlainString(), xsdDecimalIri);
+                    }
+
+                    case DecimalBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdDecimalIri);
+                    }
 
                     case FloatClass _ ->
                     {
-                        Object data = Float.isFinite((float) value) ? new BigDecimal(value.toString()) : value;
-                        yield new TypedLiteral(decimalFormat.format(data), xsdFloatType.getTypeIri());
+                        yield new TypedLiteral(RyuFloat.floatToString((float) value), xsdFloatIri);
                     }
 
-                    case DoubleClass _ -> new TypedLiteral(decimalFormat.format(value), xsdDoubleType.getTypeIri());
+                    case FloatBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? RyuFloat.floatToString((float) value) : lexical;
+                        yield new TypedLiteral(str, xsdFloatIri);
+                    }
 
-                    case IntegerClass _ -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                            xsdIntegerType.getTypeIri());
+                    case DoubleClass _ ->
+                    {
+                        yield new TypedLiteral(RyuDouble.doubleToString((double) value), xsdDoubleIri);
+                    }
 
-                    case DecimalClass _ -> new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                            xsdDecimalType.getTypeIri());
+                    case DoubleBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? RyuDouble.doubleToString((double) value) : lexical;
+                        yield new TypedLiteral(str, xsdDoubleIri);
+                    }
 
-                    case DateTimeCompositeClass _ -> new TypedLiteral(
-                            dateTimeToString((LocalDateTime) value, rs.getInt(i++)), xsdDateTimeType.getTypeIri());
+                    case DateTimeCompositeClass _ ->
+                    {
+                        int zone = rs.getInt(i++);
+                        yield new TypedLiteral(dateTimeToString((LocalDateTime) value, zone), xsdDateTimeIri);
+                    }
 
-                    case DateCompositeClass _ -> new TypedLiteral(dateToString((LocalDate) value, rs.getInt(i++)),
-                            xsdDateType.getTypeIri());
+                    case DateTimeCompositeBaseClass _ ->
+                    {
+                        int zone = rs.getInt(i++);
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? dateTimeToString((LocalDateTime) value, zone) : lexical;
+                        yield new TypedLiteral(str, xsdDateTimeIri);
+                    }
 
-                    case DayTimeDurationClass _ -> new TypedLiteral(durationToString((Long) value),
-                            xsdDayTimeDurationType.getTypeIri());
+                    case DateCompositeClass _ ->
+                    {
+                        int zone = rs.getInt(i++);
+                        yield new TypedLiteral(dateToString((LocalDate) value, zone), xsdDateIri);
+                    }
 
-                    case StringClass _ -> new TypedLiteral(value.toString(), xsdStringType.getTypeIri());
+                    case DateCompositeBaseClass _ ->
+                    {
+                        int zone = rs.getInt(i++);
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? dateToString((LocalDate) value, zone) : lexical;
+                        yield new TypedLiteral(str, xsdDateIri);
+                    }
 
-                    case LangStringClass _ -> new LangStringLiteral(value.toString(), rs.getString(i++));
+                    case DayTimeDurationClass _ ->
+                    {
+                        yield new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
+                    }
 
-                    case UnsupportedLiteralClass _ -> new TypedLiteral(value.toString(), new Iri(rs.getString(i++)));
+                    case DayTimeDurationBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? durationToString((Long) value) : lexical;
+                        yield new TypedLiteral(str, xsdDayTimeDurationIri);
+                    }
+
+                    case StringClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdStringIri);
+                    }
+
+                    case LangStringClass _ ->
+                    {
+                        String lang = rs.getString(i++);
+                        yield new LangStringLiteral(value.toString(), lang);
+                    }
+
+                    case UserLiteralCompositeClass _ ->
+                    {
+                        String type = rs.getString(i++);
+                        yield new TypedLiteral(value.toString(), new Iri(type));
+                    }
+
+                    case UserLiteralCompositeBaseClass _ ->
+                    {
+                        String type = rs.getString(i++);
+                        String lexical = rs.getString(i++);
+                        String str = lexical.isEmpty() ? value.toString() : lexical;
+                        yield new TypedLiteral(str, new Iri(type));
+                    }
+
+                    case UnsupportedLiteralClass _ ->
+                    {
+                        String type = rs.getString(i++);
+                        yield new TypedLiteral(value.toString(), new Iri(type));
+                    }
 
                     default ->
                     {
-                        System.err.println(rc.getClass().getCanonicalName());
-                        yield null;
+                        throw new UnsupportedOperationException();
                     }
                 };
             }
