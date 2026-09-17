@@ -129,7 +129,7 @@
             </goals>
             <configuration>
               <sourceDirectory>${project.basedir}/src/main/antlr4</sourceDirectory>
-              <outputDirectory>${project.build.directory}/generated-sources/antlr4/cz/iocb/sparql/engine/grammar</outputDirectory>
+              <outputDirectory>${project.build.directory}/generated-sources/antlr4</outputDirectory>
               <visitor>true</visitor>
               <listener>false</listener>
             </configuration>
@@ -149,27 +149,5 @@
         </configuration>
       </plugin>
     </plugins>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.6.0</version>
-          <executions>
-            <execution>
-              <phase>generate-sources</phase>
-              <goals>
-                <goal>add-source</goal>
-              </goals>
-              <configuration>
-                <sources>
-                  <source>${project.build.directory}/generated-sources/antlr4</source>
-                </sources>
-              </configuration>
-            </execution>
-          </executions>
-        </plugin>
-      </plugins>
-    </pluginManagement>
   </build>
 </project>

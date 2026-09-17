@@ -22,8 +22,6 @@
  */
 lexer grammar SparqlLexer;
 
-@header { package cz.iocb.sparql.engine.grammar; }
-
 // $<Lexer
 
 WS : (' '| '\t'| EOL)+ -> channel(99);

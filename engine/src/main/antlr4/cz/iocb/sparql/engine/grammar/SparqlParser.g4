@@ -22,8 +22,6 @@
  */
 parser grammar SparqlParser;
 
-@header { package cz.iocb.sparql.engine.grammar; }
-
 options{
 tokenVocab=SparqlLexer;
 }
