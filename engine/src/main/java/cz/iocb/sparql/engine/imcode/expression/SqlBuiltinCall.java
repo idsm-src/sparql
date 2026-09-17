@@ -353,13 +353,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 StringBuilder builder = new StringBuilder();
 
-                if(resultClass.getEffectiveClass().equals(box) || function.equals("sample"))
-                    builder.append("sparql.");
-
-                builder.append(function);
-
-                if(resultClass.getEffectiveClass().equals(box) && !function.equals("sample"))
-                    builder.append("_rdfbox");
+                if(function.equals("sample"))
+                    builder.append("sparql.sample");
+                else if(function.equals("min"))
+                    builder.append("sparql.min");
+                else if(resultClass.getEffectiveClass().equals(box))
+                    builder.append("sparql.max_rdfbox");
+                else
+                    builder.append("max");
 
                 builder.append("(");
 
@@ -394,9 +395,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 StringBuilder builder = new StringBuilder();
 
-                if(!simple)
-                    builder.append("sparql.rdfbox_get_string_literal("); //TODO: fix in pgsparql
-
                 builder.append("sparql.group_concat_");
                 builder.append(simple ? "string" : "rdfbox");
                 builder.append("(");
@@ -414,9 +412,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append(arguments.get(1).get(xsdString).get(0));
 
                 builder.append(")");
-
-                if(!simple)
-                    builder.append(")");
 
 
                 List<Column> result = List.of(new ExpressionColumn(builder.toString()));

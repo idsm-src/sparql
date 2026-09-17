@@ -102,8 +102,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
                         if(operator == DIVIDE && res.equals(xsdInteger))
                             res = xsdDecimal;
 
-                        if(operator == DIVIDE && res.equals(xsdDecimal) && canBeDecimalZero(right))
-                            canBeNull = true;
+                        if(res.equals(xsdDecimal) || res.equals(xsdInteger))
+                            canBeNull = true; // because integer/decimal operations can overflow
 
                         resultClasses.add(res);
                     }
@@ -130,18 +130,6 @@ public final class SqlBinaryArithmetic extends SqlBinary
                     e.getValue() == null ? null : translate(operator, e.getKey(), e.getValue(), left, right));
 
         return new SqlBinaryArithmetic(operator, left, right, mappings, canBeNull);
-    }
-
-
-    private static boolean canBeDecimalZero(SqlExpressionIntercode operand)
-    {
-        if(!(operand instanceof SqlLiteral literal))
-            return true;
-
-        //NOTE: the caller has already verified that operand is numeric
-
-        return literal.getLiteral().getValue()
-                .matches("[\\x20\\t\\r\\n]*[+-]?(?:0+(?:\\.0*)?|\\.[0]+)[\\x20\\t\\r\\n]*");
     }
 
 
