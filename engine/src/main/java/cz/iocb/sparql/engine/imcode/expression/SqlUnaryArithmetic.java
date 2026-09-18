@@ -1,14 +1,8 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
@@ -115,14 +109,14 @@ public final class SqlUnaryArithmetic extends SqlUnary
     public SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices)
     {
-        List<ResourceClass> numbers = List.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble);
         List<ResourceClass> results = List.of(xsdDouble, xsdFloat, xsdDecimal, xsdInteger);
 
         Restriction operandRestriction = new Restriction();
 
+        // the operands promoted to a result class are all the classes not following it in the promotion order
         for(int i = 0; i < results.size(); i++)
             if(restriction.contains(results.get(i)))
-                operandRestriction.add(numbers.subList(0, numbers.size() - i));
+                operandRestriction.add(numericBaseClasses.subList(0, numericBaseClasses.size() - i));
 
         SqlExpressionIntercode optOperand = operand.optimize(request, bindings, operandRestriction, evalServices);
 

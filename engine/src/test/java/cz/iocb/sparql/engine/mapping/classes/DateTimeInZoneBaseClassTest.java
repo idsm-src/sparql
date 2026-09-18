@@ -115,7 +115,7 @@ public class DateTimeInZoneBaseClassTest
         {
             String strZone = Integer.toString(zone);
 
-            Map<String, List<String>> result = new HashMap<String, List<String>>();
+            Map<String, List<String>> result = new HashMap<>();
 
             for(Entry<String, List<String>> e : values.entrySet())
             {

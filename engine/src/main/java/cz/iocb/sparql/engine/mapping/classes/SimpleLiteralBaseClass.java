@@ -12,8 +12,10 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass implements ResultResourceClass
-        permits BooleanBaseClass, ShortBaseClass, IntBaseClass, LongBaseClass, IntegerBaseClass, DecimalBaseClass,
-        FloatBaseClass, DoubleBaseClass, DayTimeDurationBaseClass
+        permits BooleanBaseClass, ByteBaseClass, UnsignedByteBaseClass, ShortBaseClass, UnsignedShortBaseClass,
+        IntBaseClass, UnsignedIntBaseClass, LongBaseClass, UnsignedLongBaseClass, IntegerBaseClass,
+        NonPositiveIntegerBaseClass, NegativeIntegerBaseClass, NonNegativeIntegerBaseClass, PositiveIntegerBaseClass,
+        DecimalBaseClass, FloatBaseClass, DoubleBaseClass, DayTimeDurationBaseClass
 {
     private final String fname;
 

@@ -93,7 +93,7 @@ public abstract class AbstractResourceClassTest
 
     protected Stream<Arguments> toGeneralArguments()
     {
-        List<Arguments> data = new ArrayList<Arguments>();
+        List<Arguments> data = new ArrayList<>();
 
         for(PrimitiveResourceClass superClass : literalClass.getSuperClasses())
             for(Entry<String, List<Column>> e : values.entrySet())

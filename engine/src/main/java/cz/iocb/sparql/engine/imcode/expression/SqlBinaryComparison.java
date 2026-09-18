@@ -26,15 +26,15 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivatedFromInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRepresentableAsShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
@@ -547,17 +547,17 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(all.stream().anyMatch(c -> isDecimal(c)))
             return xsdDecimal;
 
-        if(all.stream().anyMatch(c -> isInteger(c)))
-            return xsdInteger;
+        if(all.stream().allMatch(c -> isRepresentableAsShort(c)))
+            return xsdShort;
 
-        if(all.stream().anyMatch(c -> isLong(c)))
-            return xsdLong;
-
-        if(all.stream().anyMatch(c -> isInt(c)))
+        if(all.stream().allMatch(c -> isRepresentableAsInt(c)))
             return xsdInt;
 
-        if(all.stream().anyMatch(c -> isShort(c)))
-            return xsdShort;
+        if(all.stream().allMatch(c -> isRepresentableAsLong(c)))
+            return xsdLong;
+
+        if(all.stream().allMatch(c -> isDerivatedFromInteger(c)))
+            return xsdInteger;
 
         throw new IllegalArgumentException();
     }

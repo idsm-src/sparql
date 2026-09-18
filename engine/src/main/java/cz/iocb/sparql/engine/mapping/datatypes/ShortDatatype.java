@@ -13,7 +13,7 @@ public final class ShortDatatype extends FixedSizeIntegerDatatype
 {
     public ShortDatatype()
     {
-        super(xsdShortIri, Short.toString(Short.MAX_VALUE));
+        super(xsdShortIri, Short.toString(Short.MIN_VALUE), Short.toString(Short.MAX_VALUE));
     }
 
 

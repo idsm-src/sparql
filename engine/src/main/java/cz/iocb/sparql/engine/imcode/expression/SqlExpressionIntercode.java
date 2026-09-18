@@ -1,16 +1,10 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
@@ -28,7 +22,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
@@ -36,6 +29,8 @@ import cz.iocb.sparql.engine.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
+import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.ByteClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
 import cz.iocb.sparql.engine.mapping.classes.DateScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeClass;
@@ -54,11 +49,27 @@ import cz.iocb.sparql.engine.mapping.classes.IntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.IntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.LongBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.LongClass;
+import cz.iocb.sparql.engine.mapping.classes.NegativeIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NegativeIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.NonNegativeIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NonNegativeIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortClass;
 import cz.iocb.sparql.engine.mapping.classes.StringClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedByteBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedByteClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedIntBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedIntClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedLongBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedLongClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedShortBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedShortClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -205,8 +216,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
     public static Set<ResourceClass> getNumericClasses(ResourceClass resClass)
     {
-        return Stream.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble)
-                .filter(r -> !areDisjunct(r, resClass)).collect(toCollection(HashSet::new));
+        return numericBaseClasses.stream().filter(r -> !areDisjunct(r, resClass)).collect(toCollection(HashSet::new));
     }
 
 
@@ -216,27 +226,45 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
         {
             case BooleanBaseClass _ -> "boolean";
             case BooleanClass _ -> "boolean";
+            case ByteBaseClass _ -> "byte";
+            case ByteClass _ -> "byte";
+            case UnsignedByteBaseClass _ -> "unsignedbyte";
+            case UnsignedByteClass _ -> "unsignedbyte";
             case ShortBaseClass _ -> "short";
             case ShortClass _ -> "short";
+            case UnsignedShortBaseClass _ -> "unsignedshort";
+            case UnsignedShortClass _ -> "unsignedshort";
             case IntBaseClass _ -> "int";
             case IntClass _ -> "int";
+            case UnsignedIntBaseClass _ -> "unsignedint";
+            case UnsignedIntClass _ -> "unsignedint";
             case LongBaseClass _ -> "long";
             case LongClass _ -> "long";
+            case UnsignedLongBaseClass _ -> "unsignedlong";
+            case UnsignedLongClass _ -> "unsignedlong";
             case IntegerBaseClass _ -> "integer";
             case IntegerClass _ -> "integer";
+            case NonPositiveIntegerBaseClass _ -> "nonpositiveinteger";
+            case NonPositiveIntegerClass _ -> "nonpositiveinteger";
+            case NegativeIntegerBaseClass _ -> "negativeinteger";
+            case NegativeIntegerClass _ -> "negativeinteger";
+            case NonNegativeIntegerBaseClass _ -> "nonnegativeinteger";
+            case NonNegativeIntegerClass _ -> "nonnegativeinteger";
+            case PositiveIntegerBaseClass _ -> "positiveinteger";
+            case PositiveIntegerClass _ -> "positiveinteger";
             case DecimalBaseClass _ -> "decimal";
             case DecimalClass _ -> "decimal";
             case FloatBaseClass _ -> "float";
             case FloatClass _ -> "float";
             case DoubleBaseClass _ -> "double";
             case DoubleClass _ -> "double";
-            case StringClass _ -> "string";
-            case DayTimeDurationBaseClass _ -> "daytimeduration";
-            case DayTimeDurationClass _ -> "daytimeduration";
             case DateTimeScalarClass _ -> "datetime";
             case DateTimeCompositeClass _ -> "datetime";
             case DateScalarClass _ -> "date";
             case DateCompositeClass _ -> "date";
+            case DayTimeDurationBaseClass _ -> "daytimeduration";
+            case DayTimeDurationClass _ -> "daytimeduration";
+            case StringClass _ -> "string";
 
             default -> throw new IllegalArgumentException();
         };

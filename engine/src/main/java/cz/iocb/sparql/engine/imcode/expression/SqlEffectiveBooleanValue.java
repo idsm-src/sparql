@@ -6,38 +6,36 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsupportedLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDoubleIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNegativeIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonNegativeIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonPositiveIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdPositiveIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedByteIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortIri;
 import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,8 +54,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 public final class SqlEffectiveBooleanValue extends SqlUnary
 {
-    private static final Set<ResourceClass> operandClasses = Set.of(genBoolean, genShort, genInt, genLong, genInteger,
-            genDecimal, genFloat, genDouble, xsdString, unsupportedType);
+    private static final Set<ResourceClass> operandClasses = Stream
+            .concat(Stream.of(genBoolean, xsdString, unsupportedType), numericBaseClasses.stream()).collect(toSet());
 
     private static final ResourceClass operandClass = unionize(operandClasses);
 
@@ -130,43 +128,20 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
         for(Entry<ResourceClass, List<Column>> e : operand.getMappings().entrySet())
         {
-            if(isShort(e.getKey()))
-            {
-                Column col = e.getKey().toGeneralClass(genShort, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genShort.getSqlTypes().get(0) + ")"));
-            }
-            else if(isInt(e.getKey()))
-            {
-                Column col = e.getKey().toGeneralClass(genInt, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genInt.getSqlTypes().get(0) + ")"));
-            }
-            else if(isLong(e.getKey()))
-            {
-                Column col = e.getKey().toGeneralClass(genLong, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genLong.getSqlTypes().get(0) + ")"));
-            }
+            ResourceClass numericBase = numericBaseClasses.stream().filter(r -> e.getKey().isSubclassOf(r)).findFirst()
+                    .orElse(null);
 
-            else if(isInteger(e.getKey()))
+            if(numericBase != null && isFloatPoint(numericBase))
             {
-                Column col = e.getKey().toGeneralClass(genInteger, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genInteger.getSqlTypes().get(0) + ")"));
-            }
-            else if(isDecimal(e.getKey()))
-            {
-                Column col = e.getKey().toGeneralClass(genDecimal, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + genDecimal.getSqlTypes().get(0) + ")"));
-            }
-            else if(isFloat(e.getKey()))
-            {
-                String type = genFloat.getSqlTypes().get(0);
-                Column col = e.getKey().toGeneralClass(genFloat, e.getValue(), true).get(0);
+                String type = numericBase.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
             }
-            else if(isDouble(e.getKey()))
+            else if(numericBase != null)
             {
-                String type = genDouble.getSqlTypes().get(0);
-                Column col = e.getKey().toGeneralClass(genDouble, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
+                String type = numericBase.getSqlTypes().get(0);
+                Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + type + ")"));
             }
             else if(isString(e.getKey()))
             {
@@ -181,8 +156,10 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             else if(isUnsupportedLiteral(e.getKey()))
             {
                 String types = Stream
-                        .of(xsdBooleanIri, xsdShortIri, xsdIntIri, xsdLongIri, xsdIntegerIri, xsdDecimalIri,
-                                xsdFloatIri, xsdDoubleIri)
+                        .of(xsdBooleanIri, xsdByteIri, xsdUnsignedByteIri, xsdShortIri, xsdUnsignedShortIri, xsdIntIri,
+                                xsdUnsignedIntIri, xsdLongIri, xsdUnsignedLongIri, xsdIntegerIri,
+                                xsdNonPositiveIntegerIri, xsdNegativeIntegerIri, xsdNonNegativeIntegerIri,
+                                xsdPositiveIntegerIri, xsdDecimalIri, xsdFloatIri, xsdDoubleIri)
                         .map(i -> "'" + i.getValue().replaceAll("'", "''") + "'").collect(joining(", ", "(", ")"));
 
                 Column col = e.getKey().toGeneralClass(unsupportedType, e.getValue(), true).get(1);

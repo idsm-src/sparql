@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
+import java.util.List;
 import java.util.Set;
 
 
@@ -22,10 +23,19 @@ public class BuiltinClasses
     public static final StrBlankNodeClass bnodeStrBlankNode = new StrBlankNodeInSegmentClass(Integer.MIN_VALUE);
 
     public static final BooleanBaseClass genBoolean = new BooleanBaseClass();
+    public static final ByteBaseClass genByte = new ByteBaseClass();
+    public static final UnsignedByteBaseClass genUnsignedByte = new UnsignedByteBaseClass();
     public static final ShortBaseClass genShort = new ShortBaseClass();
+    public static final UnsignedShortBaseClass genUnsignedShort = new UnsignedShortBaseClass();
     public static final IntBaseClass genInt = new IntBaseClass();
+    public static final UnsignedIntBaseClass genUnsignedInt = new UnsignedIntBaseClass();
     public static final LongBaseClass genLong = new LongBaseClass();
+    public static final UnsignedLongBaseClass genUnsignedLong = new UnsignedLongBaseClass();
     public static final IntegerBaseClass genInteger = new IntegerBaseClass();
+    public static final NonPositiveIntegerBaseClass genNonPositiveInteger = new NonPositiveIntegerBaseClass();
+    public static final NegativeIntegerBaseClass genNegativeInteger = new NegativeIntegerBaseClass();
+    public static final NonNegativeIntegerBaseClass genNonNegativeInteger = new NonNegativeIntegerBaseClass();
+    public static final PositiveIntegerBaseClass genPositiveInteger = new PositiveIntegerBaseClass();
     public static final DecimalBaseClass genDecimal = new DecimalBaseClass();
     public static final FloatBaseClass genFloat = new FloatBaseClass();
     public static final DoubleBaseClass genDouble = new DoubleBaseClass();
@@ -37,34 +47,55 @@ public class BuiltinClasses
     public static final UserLiteralCompositeBaseClass genUserType = new UserLiteralCompositeBaseClass();
 
     public static final BooleanClass xsdBoolean = new BooleanClass();
+    public static final ByteClass xsdByte = new ByteClass();
+    public static final UnsignedByteClass xsdUnsignedByte = new UnsignedByteClass();
     public static final ShortClass xsdShort = new ShortClass();
+    public static final UnsignedShortClass xsdUnsignedShort = new UnsignedShortClass();
     public static final IntClass xsdInt = new IntClass();
+    public static final UnsignedIntClass xsdUnsignedInt = new UnsignedIntClass();
     public static final LongClass xsdLong = new LongClass();
+    public static final UnsignedLongClass xsdUnsignedLong = new UnsignedLongClass();
     public static final IntegerClass xsdInteger = new IntegerClass();
+    public static final NonPositiveIntegerClass xsdNonPositiveInteger = new NonPositiveIntegerClass();
+    public static final NegativeIntegerClass xsdNegativeInteger = new NegativeIntegerClass();
+    public static final NonNegativeIntegerClass xsdNonNegativeInteger = new NonNegativeIntegerClass();
+    public static final PositiveIntegerClass xsdPositiveInteger = new PositiveIntegerClass();
     public static final DecimalClass xsdDecimal = new DecimalClass();
     public static final FloatClass xsdFloat = new FloatClass();
     public static final DoubleClass xsdDouble = new DoubleClass();
-    public static final StringClass xsdString = new StringClass();
     public static final DateTimeScalarClass xsdScalarDateTime = new DateTimeScalarClass();
     public static final DateTimeCompositeClass xsdDateTime = new DateTimeCompositeClass();
     public static final DateScalarClass xsdScalarDate = new DateScalarClass();
     public static final DateCompositeClass xsdDate = new DateCompositeClass();
     public static final DayTimeDurationClass xsdDayTimeDuration = new DayTimeDurationClass();
+    public static final StringClass xsdString = new StringClass();
 
     public static final LangStringClass rdfLangString = new LangStringClass();
     public static final UserLiteralCompositeClass userType = new UserLiteralCompositeClass();
     public static final UnsupportedLiteralClass unsupportedType = new UnsupportedLiteralClass();
 
     public static final Set<ResultResourceClass> resultClasses = Set.of(iri, intBlankNode, strBlankNode, xsdBoolean,
-            genBoolean, xsdShort, genShort, xsdInt, genInt, xsdLong, genLong, xsdInteger, genInteger, xsdDecimal,
-            genDecimal, xsdFloat, genFloat, xsdDouble, genDouble, xsdString, xsdDayTimeDuration, genDayTimeDuration,
-            xsdDateTime, genDateTime, xsdDate, genDate, rdfLangString, unsupportedType);
+            genBoolean, xsdByte, genByte, xsdUnsignedByte, genUnsignedByte, xsdShort, genShort, xsdUnsignedShort,
+            genUnsignedShort, xsdInt, genInt, xsdUnsignedInt, genUnsignedInt, xsdLong, genLong, xsdUnsignedLong,
+            genUnsignedLong, xsdInteger, genInteger, xsdNonPositiveInteger, genNonPositiveInteger, xsdNegativeInteger,
+            genNegativeInteger, xsdNonNegativeInteger, genNonNegativeInteger, xsdPositiveInteger, genPositiveInteger,
+            xsdDecimal, genDecimal, xsdFloat, genFloat, xsdDouble, genDouble, xsdDateTime, genDateTime, xsdDate,
+            genDate, xsdDayTimeDuration, genDayTimeDuration, xsdString, rdfLangString, unsupportedType);
 
     public static final ResourceClass lexBoolean = subtract(genBoolean, xsdBoolean);
+    public static final ResourceClass lexByte = subtract(genByte, xsdByte);
+    public static final ResourceClass lexUnsignedByte = subtract(genUnsignedByte, xsdUnsignedByte);
     public static final ResourceClass lexShort = subtract(genShort, xsdShort);
+    public static final ResourceClass lexUnsignedShort = subtract(genUnsignedShort, xsdUnsignedShort);
     public static final ResourceClass lexInt = subtract(genInt, xsdInt);
+    public static final ResourceClass lexUnsignedInt = subtract(genUnsignedInt, xsdUnsignedInt);
     public static final ResourceClass lexLong = subtract(genLong, xsdLong);
+    public static final ResourceClass lexUnsignedLong = subtract(genUnsignedLong, xsdUnsignedLong);
     public static final ResourceClass lexInteger = subtract(genInteger, xsdInteger);
+    public static final ResourceClass lexNonPositiveInteger = subtract(genNonPositiveInteger, xsdNonPositiveInteger);
+    public static final ResourceClass lexNegativeInteger = subtract(genNegativeInteger, xsdNegativeInteger);
+    public static final ResourceClass lexNonNegativeInteger = subtract(genNonNegativeInteger, xsdNonNegativeInteger);
+    public static final ResourceClass lexPositiveInteger = subtract(genPositiveInteger, xsdPositiveInteger);
     public static final ResourceClass lexDecimal = subtract(genDecimal, xsdDecimal);
     public static final ResourceClass lexFloat = subtract(genFloat, xsdFloat);
     public static final ResourceClass lexDouble = subtract(genDouble, xsdDouble);
@@ -74,13 +105,22 @@ public class BuiltinClasses
 
     public static final ResourceClass scalarBlankNode = unionize(intScalarBlankNode, strScalarBlankNode);
     public static final ResourceClass stringLiteral = unionize(xsdString, rdfLangString);
-    public static final ResourceClass integerNumeric = unionize(genShort, genInt, genLong, genInteger);
+    public static final ResourceClass shortNumeric = unionize(genByte, genUnsignedByte, genShort);
+    public static final ResourceClass intNumeric = unionize(shortNumeric, genUnsignedShort, genInt);
+    public static final ResourceClass longNumeric = unionize(intNumeric, genUnsignedInt, genLong);
+    public static final ResourceClass integerNumeric = unionize(longNumeric, genUnsignedLong, genInteger,
+            genNonPositiveInteger, genNegativeInteger, genNonNegativeInteger, genPositiveInteger);
     public static final ResourceClass floatPoint = unionize(genFloat, genDouble);
     public static final ResourceClass reference = unionize(iri, scalarBlankNode);
     public static final ResourceClass numeric = unionize(integerNumeric, genDecimal, genFloat, genDouble);
-    public static final ResourceClass temporal = unionize(genScalarDate, genScalarDateTime, genDayTimeDuration);
+    public static final ResourceClass temporal = unionize(genScalarDateTime, genScalarDate, genDayTimeDuration);
     public static final ResourceClass dateOrDateTime = unionize(genScalarDateTime, genScalarDate);
     public static final ResourceClass literal = unionize(genBoolean, numeric, stringLiteral, temporal, unsupportedType);
+
+    /* numeric base classes, each listed before the classes to which its values are promoted */
+    public static final List<ResourceClass> numericBaseClasses = List.of(genByte, genUnsignedByte, genShort,
+            genUnsignedShort, genInt, genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
+            genNegativeInteger, genNonNegativeInteger, genPositiveInteger, genDecimal, genFloat, genDouble);
 
 
     public static boolean isReference(ResourceClass resClass)
@@ -137,9 +177,45 @@ public class BuiltinClasses
     }
 
 
+    public static boolean isRepresentableAsShort(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(shortNumeric);
+    }
+
+
+    public static boolean isRepresentableAsInt(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(intNumeric);
+    }
+
+
+    public static boolean isRepresentableAsLong(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(longNumeric);
+    }
+
+
+    public static boolean isByte(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genByte);
+    }
+
+
+    public static boolean isUnsignedByte(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genUnsignedByte);
+    }
+
+
     public static boolean isShort(ResourceClass resClass)
     {
         return resClass.isSubclassOf(genShort);
+    }
+
+
+    public static boolean isUnsignedShort(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genUnsignedShort);
     }
 
 
@@ -149,15 +225,51 @@ public class BuiltinClasses
     }
 
 
+    public static boolean isUnsignedInt(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genUnsignedInt);
+    }
+
+
     public static boolean isLong(ResourceClass resClass)
     {
         return resClass.isSubclassOf(genLong);
     }
 
 
+    public static boolean isUnsignedLong(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genUnsignedLong);
+    }
+
+
     public static boolean isInteger(ResourceClass resClass)
     {
         return resClass.isSubclassOf(genInteger);
+    }
+
+
+    public static boolean isNonPositiveInteger(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genNonPositiveInteger);
+    }
+
+
+    public static boolean isNegativeInteger(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genNegativeInteger);
+    }
+
+
+    public static boolean isNonNegativeInteger(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genNonNegativeInteger);
+    }
+
+
+    public static boolean isPositiveInteger(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genPositiveInteger);
     }
 
 
@@ -191,15 +303,15 @@ public class BuiltinClasses
     }
 
 
-    public static boolean isDate(ResourceClass resClass)
-    {
-        return resClass.isSubclassOf(genScalarDate);
-    }
-
-
     public static boolean isDateTime(ResourceClass resClass)
     {
         return resClass.isSubclassOf(genScalarDateTime);
+    }
+
+
+    public static boolean isDate(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(genScalarDate);
     }
 
 
@@ -287,9 +399,27 @@ public class BuiltinClasses
     }
 
 
+    public static boolean hasByte(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genByte);
+    }
+
+
+    public static boolean hasUnsignedByte(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genUnsignedByte);
+    }
+
+
     public static boolean hasShort(ResourceClass resClass)
     {
         return !areDisjunct(resClass, genShort);
+    }
+
+
+    public static boolean hasUnsignedShort(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genUnsignedShort);
     }
 
 
@@ -299,15 +429,51 @@ public class BuiltinClasses
     }
 
 
+    public static boolean hasUnsignedInt(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genUnsignedInt);
+    }
+
+
     public static boolean hasLong(ResourceClass resClass)
     {
         return !areDisjunct(resClass, genLong);
     }
 
 
+    public static boolean hasUnsignedLong(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genUnsignedLong);
+    }
+
+
     public static boolean hasInteger(ResourceClass resClass)
     {
         return !areDisjunct(resClass, genInteger);
+    }
+
+
+    public static boolean hasNonPositiveInteger(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genNonPositiveInteger);
+    }
+
+
+    public static boolean hasNegativeInteger(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genNegativeInteger);
+    }
+
+
+    public static boolean hasNonNegativeInteger(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genNonNegativeInteger);
+    }
+
+
+    public static boolean hasPositiveInteger(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genPositiveInteger);
     }
 
 
@@ -341,15 +507,15 @@ public class BuiltinClasses
     }
 
 
-    public static boolean hasDate(ResourceClass resClass)
-    {
-        return !areDisjunct(resClass, genScalarDate);
-    }
-
-
     public static boolean hasDateTime(ResourceClass resClass)
     {
         return !areDisjunct(resClass, genScalarDateTime);
+    }
+
+
+    public static boolean hasDate(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, genScalarDate);
     }
 
 
@@ -359,9 +525,9 @@ public class BuiltinClasses
     }
 
 
-    public static boolean hasLangString(ResourceClass resClass)
+    public static boolean hasStringLiteral(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, rdfLangString);
+        return !areDisjunct(resClass, stringLiteral);
     }
 
 
@@ -371,8 +537,8 @@ public class BuiltinClasses
     }
 
 
-    public static boolean hasStringLiteral(ResourceClass resClass)
+    public static boolean hasLangString(ResourceClass resClass)
     {
-        return !areDisjunct(resClass, stringLiteral);
+        return !areDisjunct(resClass, rdfLangString);
     }
 }

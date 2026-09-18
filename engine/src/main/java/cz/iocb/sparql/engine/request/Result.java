@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.request;
 
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateTimeIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationIri;
@@ -10,8 +11,16 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatI
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNegativeIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonNegativeIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonPositiveIntegerIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdPositiveIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedByteIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedIntIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedLongIri;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsignedShortIri;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE;
@@ -36,6 +45,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
+import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.ByteClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateCompositeClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeCompositeBaseClass;
@@ -57,12 +68,28 @@ import cz.iocb.sparql.engine.mapping.classes.IriScalarClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringClass;
 import cz.iocb.sparql.engine.mapping.classes.LongBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.LongClass;
+import cz.iocb.sparql.engine.mapping.classes.NegativeIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NegativeIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.NonNegativeIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NonNegativeIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.StringClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedByteBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedByteClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedIntBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedIntClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedLongBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedLongClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedShortBaseClass;
+import cz.iocb.sparql.engine.mapping.classes.UnsignedShortClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
@@ -163,6 +190,11 @@ public class Result implements AutoCloseable
 
                 rowData[idx] = switch(rc)
                 {
+                    case IriScalarClass _ ->
+                    {
+                        yield new Iri((String) value);
+                    }
+
                     case IntBlankNodeClass _ ->
                     {
                         int segment = rs.getInt(i++);
@@ -173,11 +205,6 @@ public class Result implements AutoCloseable
                     {
                         int segment = rs.getInt(i++);
                         yield new StrBlankNode((String) value, segment);
-                    }
-
-                    case IriScalarClass _ ->
-                    {
-                        yield new Iri((String) value);
                     }
 
                     case BooleanClass _ ->
@@ -191,6 +218,28 @@ public class Result implements AutoCloseable
                         yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdBooleanIri);
                     }
 
+                    case ByteClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdByteIri);
+                    }
+
+                    case ByteBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdByteIri);
+                    }
+
+                    case UnsignedByteClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdUnsignedByteIri);
+                    }
+
+                    case UnsignedByteBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedByteIri);
+                    }
+
                     case ShortClass _ ->
                     {
                         yield new TypedLiteral(value.toString(), xsdShortIri);
@@ -202,6 +251,17 @@ public class Result implements AutoCloseable
                         yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdShortIri);
                     }
 
+                    case UnsignedShortClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdUnsignedShortIri);
+                    }
+
+                    case UnsignedShortBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedShortIri);
+                    }
+
                     case IntClass _ ->
                     {
                         yield new TypedLiteral(value.toString(), xsdIntIri);
@@ -211,6 +271,17 @@ public class Result implements AutoCloseable
                     {
                         String lexical = rs.getString(i++);
                         yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdIntIri);
+                    }
+
+                    case UnsignedIntClass _ ->
+                    {
+                        yield new TypedLiteral(value.toString(), xsdUnsignedIntIri);
+                    }
+
+                    case UnsignedIntBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedIntIri);
                     }
 
                     case LongClass _ ->
@@ -225,6 +296,20 @@ public class Result implements AutoCloseable
                         yield new TypedLiteral(str, xsdLongIri);
                     }
 
+                    case UnsignedLongClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdUnsignedLongIri);
+                    }
+
+                    case UnsignedLongBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdUnsignedLongIri);
+                    }
+
                     case IntegerClass _ ->
                     {
                         yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
@@ -237,6 +322,62 @@ public class Result implements AutoCloseable
                         BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
                         String str = lexical.isEmpty() ? num.toPlainString() : lexical;
                         yield new TypedLiteral(str, xsdIntegerIri);
+                    }
+
+                    case NonPositiveIntegerClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdNonPositiveIntegerIri);
+                    }
+
+                    case NonPositiveIntegerBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdNonPositiveIntegerIri);
+                    }
+
+                    case NegativeIntegerClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdNegativeIntegerIri);
+                    }
+
+                    case NegativeIntegerBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdNegativeIntegerIri);
+                    }
+
+                    case NonNegativeIntegerClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdNonNegativeIntegerIri);
+                    }
+
+                    case NonNegativeIntegerBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdNonNegativeIntegerIri);
+                    }
+
+                    case PositiveIntegerClass _ ->
+                    {
+                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                                xsdPositiveIntegerIri);
+                    }
+
+                    case PositiveIntegerBaseClass _ ->
+                    {
+                        String lexical = rs.getString(i++);
+                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                        yield new TypedLiteral(str, xsdPositiveIntegerIri);
                     }
 
                     case DecimalClass _ ->

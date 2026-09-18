@@ -4,16 +4,10 @@ import static cz.iocb.sparql.engine.database.Column.coalesce;
 import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getLiteralClassName;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDouble;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.joining;
@@ -277,7 +271,7 @@ public class VariableBinding
 
     public Column promoteNumericAs(ResourceClass source, ResourceClass target)
     {
-        ResourceClass base = Stream.of(genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble, box)
+        ResourceClass base = Stream.concat(numericBaseClasses.stream(), Stream.of(box))
                 .filter(r -> source.isSubclassOf(r)).findFirst().orElseThrow(IllegalArgumentException::new);
 
         Column value = deriveMapping(base).get(0);

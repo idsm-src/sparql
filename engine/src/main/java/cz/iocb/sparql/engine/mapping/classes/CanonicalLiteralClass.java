@@ -17,6 +17,7 @@ public abstract class CanonicalLiteralClass extends LiteralClass
     }
 
 
+    @Override
     public boolean match(Statement statement, Literal literal)
     {
         if(!datatype.getTypeIri().equals(literal.getType()))

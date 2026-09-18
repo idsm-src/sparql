@@ -3,14 +3,23 @@ package cz.iocb.sparql.engine.test;
 import static cz.iocb.sparql.engine.error.MessageCategory.ERROR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDecimal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -145,15 +154,24 @@ public class SparqlTest
         }
 
 
-        literalClassMap.put(xsdString, new SubsetLiteralClass(xsdString));
-        literalClassMap.put(xsdDouble, new SubsetLiteralClass(xsdDouble));
-        literalClassMap.put(xsdFloat, new SubsetLiteralClass(xsdFloat));
-        literalClassMap.put(xsdDecimal, new SubsetLiteralClass(xsdDecimal));
-        literalClassMap.put(xsdInteger, new SubsetLiteralClass(xsdInteger));
-        literalClassMap.put(xsdLong, new SubsetLiteralClass(xsdLong));
-        literalClassMap.put(xsdInt, new SubsetLiteralClass(xsdInt));
-        literalClassMap.put(xsdShort, new SubsetLiteralClass(xsdShort));
         literalClassMap.put(xsdBoolean, new SubsetLiteralClass(xsdBoolean));
+        literalClassMap.put(xsdByte, new SubsetLiteralClass(xsdByte));
+        literalClassMap.put(xsdUnsignedByte, new SubsetLiteralClass(xsdUnsignedByte));
+        literalClassMap.put(xsdShort, new SubsetLiteralClass(xsdShort));
+        literalClassMap.put(xsdUnsignedShort, new SubsetLiteralClass(xsdUnsignedShort));
+        literalClassMap.put(xsdInt, new SubsetLiteralClass(xsdInt));
+        literalClassMap.put(xsdUnsignedInt, new SubsetLiteralClass(xsdUnsignedInt));
+        literalClassMap.put(xsdLong, new SubsetLiteralClass(xsdLong));
+        literalClassMap.put(xsdUnsignedLong, new SubsetLiteralClass(xsdUnsignedLong));
+        literalClassMap.put(xsdInteger, new SubsetLiteralClass(xsdInteger));
+        literalClassMap.put(xsdNonPositiveInteger, new SubsetLiteralClass(xsdNonPositiveInteger));
+        literalClassMap.put(xsdNegativeInteger, new SubsetLiteralClass(xsdNegativeInteger));
+        literalClassMap.put(xsdNonNegativeInteger, new SubsetLiteralClass(xsdNonNegativeInteger));
+        literalClassMap.put(xsdPositiveInteger, new SubsetLiteralClass(xsdPositiveInteger));
+        literalClassMap.put(xsdDecimal, new SubsetLiteralClass(xsdDecimal));
+        literalClassMap.put(xsdFloat, new SubsetLiteralClass(xsdFloat));
+        literalClassMap.put(xsdDouble, new SubsetLiteralClass(xsdDouble));
+        literalClassMap.put(xsdString, new SubsetLiteralClass(xsdString));
     }
 
 

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.imcode.expression;
 import static cz.iocb.sparql.engine.database.Column.coalesce;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
@@ -12,9 +13,17 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
@@ -23,8 +32,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTemporalClass;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.integerNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDayTimeDuration;
@@ -35,12 +47,23 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNonPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isUnsignedShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.longNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.shortNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.temporal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
@@ -50,10 +73,18 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
@@ -79,10 +110,13 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 public final class SqlCast extends SqlUnary
 {
-    private static final Set<LiteralClass> supportedClasses = Set.of(genBoolean, genShort, genInt, genLong, genInteger,
-            genDecimal, genFloat, genDouble, genDayTimeDuration, genScalarDateTime, genScalarDate, xsdBoolean, xsdShort,
-            xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble, xsdDayTimeDuration, xsdScalarDateTime,
-            xsdScalarDate, xsdString);
+    private static final Set<LiteralClass> supportedClasses = Set.of(genBoolean, genByte, genUnsignedByte, genShort,
+            genUnsignedShort, genInt, genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
+            genNegativeInteger, genNonNegativeInteger, genPositiveInteger, genDecimal, genFloat, genDouble,
+            genScalarDateTime, genScalarDate, genDayTimeDuration, xsdBoolean, xsdByte, xsdUnsignedByte, xsdShort,
+            xsdUnsignedShort, xsdInt, xsdUnsignedInt, xsdLong, xsdUnsignedLong, xsdInteger, xsdNonPositiveInteger,
+            xsdNegativeInteger, xsdNonNegativeInteger, xsdPositiveInteger, xsdDecimal, xsdFloat, xsdDouble,
+            xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration, xsdString);
 
     private final LiteralClass resourceClass;
 
@@ -254,26 +288,55 @@ public final class SqlCast extends SqlUnary
         if(isBoolean(to))
             return !from.isSubclassOf(unionize(genBoolean, numeric));
 
+        if(isByte(to))
+            return !from.isSubclassOf(unionize(genBoolean, genByte));
+
+        if(isUnsignedByte(to))
+            return !from.isSubclassOf(unionize(genBoolean, genUnsignedByte));
+
         if(isShort(to))
-            return !from.isSubclassOf(unionize(genBoolean, genShort));
+            return !from.isSubclassOf(unionize(genBoolean, shortNumeric));
+
+        if(isUnsignedShort(to))
+            return !from.isSubclassOf(unionize(genBoolean, genUnsignedByte, genUnsignedShort));
 
         if(isInt(to))
-            return !from.isSubclassOf(unionize(genBoolean, genShort, genInt));
+            return !from.isSubclassOf(unionize(genBoolean, intNumeric));
+
+        if(isUnsignedInt(to))
+            return !from.isSubclassOf(unionize(genBoolean, genUnsignedByte, genUnsignedShort, genUnsignedInt));
 
         if(isLong(to))
-            return !from.isSubclassOf(unionize(genBoolean, genShort, genInt, genLong));
+            return !from.isSubclassOf(unionize(genBoolean, longNumeric));
+
+        if(isUnsignedLong(to))
+            return !from.isSubclassOf(
+                    unionize(genBoolean, genUnsignedByte, genUnsignedShort, genUnsignedInt, genUnsignedLong));
 
         if(isInteger(to))
-            return !from.isSubclassOf(unionize(genBoolean, genShort, genInt, genLong, genInteger));
+            return !from.isSubclassOf(unionize(genBoolean, integerNumeric));
+
+        if(isNonPositiveInteger(to))
+            return !from.isSubclassOf(unionize(genNonPositiveInteger, genNegativeInteger));
+
+        if(isNegativeInteger(to))
+            return !from.isSubclassOf(genNegativeInteger);
+
+        if(isNonNegativeInteger(to))
+            return !from.isSubclassOf(unionize(genBoolean, genUnsignedByte, genUnsignedShort, genUnsignedInt,
+                    genUnsignedLong, genNonNegativeInteger, genPositiveInteger));
+
+        if(isPositiveInteger(to))
+            return !from.isSubclassOf(genPositiveInteger);
 
         if(isDecimal(to))
-            return !from.isSubclassOf(unionize(genBoolean, genShort, genInt, genLong, genInteger, genDecimal));
+            return !from.isSubclassOf(unionize(genBoolean, integerNumeric, genDecimal));
 
         if(isFloat(to) || isDouble(to))
             return !from.isSubclassOf(unionize(genBoolean, numeric));
 
         if(isDate(to) || isDateTime(to))
-            return !from.isSubclassOf(unionize(genScalarDate, genScalarDateTime));
+            return !from.isSubclassOf(unionize(genScalarDateTime, genScalarDate));
 
         if(isDayTimeDuration(to))
             return !from.isSubclassOf(unionize(genDayTimeDuration));

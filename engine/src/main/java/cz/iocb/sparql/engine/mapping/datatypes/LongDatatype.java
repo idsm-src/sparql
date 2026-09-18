@@ -13,7 +13,7 @@ public final class LongDatatype extends FixedSizeIntegerDatatype
 {
     public LongDatatype()
     {
-        super(xsdLongIri, Long.toString(Long.MAX_VALUE));
+        super(xsdLongIri, Long.toString(Long.MIN_VALUE), Long.toString(Long.MAX_VALUE));
     }
 
 

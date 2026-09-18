@@ -9,6 +9,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeIntBlank
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeStrBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDayTimeDuration;
@@ -18,9 +19,17 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
@@ -46,6 +55,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDayTimeDuration;
@@ -55,11 +65,20 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexShort;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.literal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDayTimeDuration;
@@ -69,10 +88,18 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInt;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonNegativeInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdNonPositiveInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdPositiveInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedByte;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedInt;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedLong;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
@@ -799,18 +826,24 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(!isBlankNode(argumentClass))
                     {
                         LiteralClass canonicalClass = Stream
-                                .of(xsdBoolean, xsdShort, xsdInt, xsdLong, xsdInteger, xsdDecimal, xsdFloat, xsdDouble,
-                                        xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration)
+                                .of(xsdBoolean, xsdByte, xsdUnsignedByte, xsdShort, xsdUnsignedShort, xsdInt,
+                                        xsdUnsignedInt, xsdLong, xsdUnsignedLong, xsdInteger, xsdNonPositiveInteger,
+                                        xsdNegativeInteger, xsdNonNegativeInteger, xsdPositiveInteger, xsdDecimal,
+                                        xsdFloat, xsdDouble, xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration)
                                 .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
 
                         ResourceClass nonCanonicalClass = Stream
-                                .of(lexBoolean, lexShort, lexInt, lexLong, lexInteger, lexDecimal, lexFloat, lexDouble,
-                                        lexDateTime, lexDate, lexDayTimeDuration)
+                                .of(lexBoolean, lexByte, lexUnsignedByte, lexShort, lexUnsignedShort, lexInt,
+                                        lexUnsignedInt, lexLong, lexUnsignedLong, lexInteger, lexNonPositiveInteger,
+                                        lexNegativeInteger, lexNonNegativeInteger, lexPositiveInteger, lexDecimal,
+                                        lexFloat, lexDouble, lexDateTime, lexDate, lexDayTimeDuration)
                                 .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
 
                         LiteralClass baseClass = Stream
-                                .of(genBoolean, genShort, genInt, genLong, genInteger, genDecimal, genFloat, genDouble,
-                                        genScalarDateTime, genScalarDate, genDayTimeDuration)
+                                .of(genBoolean, genByte, genUnsignedByte, genShort, genUnsignedShort, genInt,
+                                        genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
+                                        genNegativeInteger, genNonNegativeInteger, genPositiveInteger, genDecimal,
+                                        genFloat, genDouble, genScalarDateTime, genScalarDate, genDayTimeDuration)
                                 .filter(r -> argumentClass.isSubclassOf(r)).findFirst().orElse(null);
 
                         if(canonicalClass != null)
@@ -2843,7 +2876,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "year", "month", "day", "tz" ->
                     {
                         yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(genScalarDate, genScalarDateTime), evalServices));
+                                new Restriction(genScalarDateTime, genScalarDate), evalServices));
                     }
 
                     case "timezone" ->

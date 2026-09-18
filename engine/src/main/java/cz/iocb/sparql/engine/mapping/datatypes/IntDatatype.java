@@ -13,7 +13,7 @@ public final class IntDatatype extends FixedSizeIntegerDatatype
 {
     public IntDatatype()
     {
-        super(xsdIntIri, Integer.toString(Integer.MAX_VALUE));
+        super(xsdIntIri, Integer.toString(Integer.MIN_VALUE), Integer.toString(Integer.MAX_VALUE));
     }
 
 

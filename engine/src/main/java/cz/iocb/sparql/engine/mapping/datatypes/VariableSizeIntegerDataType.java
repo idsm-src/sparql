@@ -5,7 +5,8 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
-public abstract sealed class VariableSizeIntegerDataType extends GenericIntegerDataType permits IntegerDatatype
+public abstract sealed class VariableSizeIntegerDataType extends GenericIntegerDataType permits IntegerDatatype,
+        NonPositiveIntegerDatatype, NegativeIntegerDatatype, NonNegativeIntegerDatatype, PositiveIntegerDatatype
 {
     protected enum Variant
     {
@@ -43,21 +44,19 @@ public abstract sealed class VariableSizeIntegerDataType extends GenericIntegerD
 
         if(variant.plus && variant.minus)
             builder.append("[-+]?");
-        else if(variant.plus && !variant.minus)
+        else if(variant.plus)
             builder.append("\\+?");
-        else if(!variant.plus && variant.minus)
+        else if(variant.minus)
             builder.append("-");
 
-        builder.append("0*");
-
         //NOTE: postgres is able to express integers up to 131072 digits
-        builder.append("[0-9]{1,131072}");
+        builder.append("0*[1-9][0-9]{0,131071}");
 
-        if(!variant.zero)
-            builder.append(")");
-        else
-            builder.append("|[-+]?0+)");
+        // zero can be written with any sign
+        if(variant.zero)
+            builder.append("|[-+]?0+");
 
+        builder.append(")");
         builder.append(WS);
 
         return Pattern.compile(builder.toString());
