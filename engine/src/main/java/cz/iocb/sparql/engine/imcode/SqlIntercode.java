@@ -873,74 +873,10 @@ public abstract class SqlIntercode extends SqlBaseClass
 
         for(VariableBindingPair pair : VariableBindingPair.getPairs(left, right))
         {
-            VariableBinding leftBinding = pair.getLeftVariableBinding();
-            VariableBinding rightBinding = pair.getRightVariableBinding();
+            String condition = generateJoinCondition(pair, leftTable, rightTable);
 
-            Set<String> condition = new HashSet<>();
-
-            if(leftBinding.canBeNull())
-            {
-                Set<Column> cols = leftBinding.getNonConstantColumns();
-
-                if(cols.isEmpty())
-                    condition.add("true");
-                else
-                    condition.add(leftBinding.getNonConstantColumns().stream()
-                            .map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
-            }
-
-            if(rightBinding.canBeNull())
-            {
-                Set<Column> cols = rightBinding.getNonConstantColumns();
-
-                if(cols.isEmpty())
-                    condition.add("true");
-                else
-                    condition.add(rightBinding.getNonConstantColumns().stream()
-                            .map(c -> c.fromTable(rightTable) + " IS NULL").sorted().collect(joining(" AND ")));
-            }
-
-            for(ResourceClassPair pairedClass : pair.getClasses())
-            {
-                ResourceClass leftClass = pairedClass.getLeftClass();
-                ResourceClass rightClass = pairedClass.getRightClass();
-
-                if(leftClass == null || rightClass == null)
-                    continue;
-
-                ResourceClass unionClass = unionize(leftClass, rightClass);
-
-                List<Column> leftCols = toTableColumns(leftTable, leftBinding.getMapping(leftClass));
-                List<Column> rightCols = toTableColumns(rightTable, rightBinding.getMapping(rightClass));
-
-                List<Column> genLeftCols = leftClass.toGeneralClass(unionClass, leftCols, false);
-                List<Column> genRightCols = rightClass.toGeneralClass(unionClass, rightCols, false);
-
-                Set<String> compare = new HashSet<>();
-
-                for(int i = 0; i < unionClass.getColumnCount(); i++)
-                {
-                    Column leftCol = genLeftCols.get(i);
-                    Column rightCol = genRightCols.get(i);
-
-                    if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
-                        compare.add(leftCol + " = " + rightCol);
-                    else if(!leftCol.equals(rightCol))
-                        compare.add("false");
-                }
-
-                if(compare.isEmpty())
-                    compare.add("true");
-
-                if(!compare.contains("false"))
-                    condition.add(compare.stream().sorted().collect(joining(" AND ")));
-            }
-
-            if(condition.isEmpty())
-                condition.add("false");
-
-            if(!condition.contains("true"))
-                join.add(condition.stream().sorted().collect(joining(" OR ", "(", ")")));
+            if(condition != null)
+                join.add(condition);
         }
 
         if(join.isEmpty())
@@ -951,7 +887,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * SQL condition that one variable is compatible on both sides, or null if it always holds.
+     * SQL condition that one variable is compatible on both sides, or null if it always holds (also when the variable
+     * is bound on one side only).
      *
      * @param leftBinding the variable binding
      * @param rightBinding the variable binding
@@ -965,17 +902,49 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(leftBinding == null || rightBinding == null)
             return null;
 
-        List<String> condition = new ArrayList<>();
+        return generateJoinCondition(new VariableBindingPair(leftBinding, rightBinding), leftTable, rightTable);
+    }
+
+
+    /**
+     * SQL condition that the paired variable is compatible on both sides: unbound on either side, or equal values after
+     * conversion to a common class. Null if the condition always holds, {@code (false)} if it never holds.
+     *
+     * @param pair the paired bindings of the variable
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @return SQL condition that the paired variable is compatible on both sides, or null if it always holds
+     */
+    private static String generateJoinCondition(VariableBindingPair pair, Table leftTable, Table rightTable)
+    {
+        VariableBinding leftBinding = pair.getLeftVariableBinding();
+        VariableBinding rightBinding = pair.getRightVariableBinding();
+
+        Set<String> condition = new HashSet<>();
 
         if(leftBinding.canBeNull())
-            condition.add(leftBinding.getNonConstantColumns().stream().map(c -> c.fromTable(leftTable) + " IS NULL")
-                    .sorted().collect(joining(" AND ")));
+        {
+            Set<Column> cols = leftBinding.getNonConstantColumns();
+
+            if(cols.isEmpty())
+                condition.add("true");
+            else
+                condition.add(
+                        cols.stream().map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
+        }
 
         if(rightBinding.canBeNull())
-            condition.add(rightBinding.getNonConstantColumns().stream().map(c -> c.fromTable(rightTable) + " IS NULL")
-                    .sorted().collect(joining(" AND ")));
+        {
+            Set<Column> cols = rightBinding.getNonConstantColumns();
 
-        for(ResourceClassPair pairedClass : (new VariableBindingPair(leftBinding, rightBinding)).getClasses())
+            if(cols.isEmpty())
+                condition.add("true");
+            else
+                condition.add(cols.stream().map(c -> c.fromTable(rightTable) + " IS NULL").sorted()
+                        .collect(joining(" AND ")));
+        }
+
+        for(ResourceClassPair pairedClass : pair.getClasses())
         {
             ResourceClass leftClass = pairedClass.getLeftClass();
             ResourceClass rightClass = pairedClass.getRightClass();
@@ -1005,13 +974,14 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
 
             if(compare.isEmpty())
-                condition.add("true");
+                compare.add("true");
 
             if(!compare.contains("false"))
                 condition.add(compare.stream().sorted().collect(joining(" AND ")));
         }
 
-        assert !condition.isEmpty();
+        if(condition.isEmpty())
+            condition.add("false");
 
         if(condition.contains("true"))
             return null;
