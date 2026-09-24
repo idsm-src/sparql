@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -23,7 +25,7 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass implements
      */
     protected UserLiteralCompositeClass()
     {
-        super("user", null, List.of("sparql.ubox", "varchar"), Set.of(box, genUserType));
+        super("user", null, List.of(UBOX, VARCHAR), Set.of(box, genUserType));
     }
 
 
@@ -65,7 +67,7 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass implements
             return List.of(expression("sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
 
         if(targetClass.equals(genUserType))
-            return List.of(value, type, !canBeNull ? constant("", "varchar") :
+            return List.of(value, type, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
 
         throw new IllegalArgumentException();

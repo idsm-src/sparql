@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATE;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -22,7 +24,7 @@ public final class DateScalarBaseClass extends BaseLiteralClass
      */
     protected DateScalarBaseClass()
     {
-        super("base-date@1c", xsdDateType, List.of("sparql.zoneddate", "varchar"), Set.of(box/*, genDate*/));
+        super("base-date@1c", xsdDateType, List.of(ZONEDDATE, VARCHAR), Set.of(box/*, genDate*/));
     }
 
 

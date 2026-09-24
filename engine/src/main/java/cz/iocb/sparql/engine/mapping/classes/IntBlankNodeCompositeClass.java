@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -22,7 +23,7 @@ public final class IntBlankNodeCompositeClass extends IntBlankNodeClass implemen
      */
     protected IntBlankNodeCompositeClass()
     {
-        super("iblanknode@2c", List.of("int4", "int4"), Set.of(box, intScalarBlankNode));
+        super("iblanknode@2c", List.of(INT4, INT4), Set.of(box, intScalarBlankNode));
     }
 
 

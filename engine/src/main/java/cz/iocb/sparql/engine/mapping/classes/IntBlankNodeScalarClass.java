@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
@@ -20,7 +21,7 @@ public final class IntBlankNodeScalarClass extends IntBlankNodeClass
      */
     protected IntBlankNodeScalarClass()
     {
-        super("iblanknode@1c", List.of("int8"), Set.of(box/*, intBlankNode*/));
+        super("iblanknode@1c", List.of(INT8), Set.of(box/*, intBlankNode*/));
     }
 
 

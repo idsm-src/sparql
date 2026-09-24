@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -49,7 +50,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
      * @param sqlType the SQL type
      * @param values stored value of each member IRI
      */
-    public EnumUserIriClass(String name, String sqlType, Map<Iri, String> values)
+    public EnumUserIriClass(String name, SqlType sqlType, Map<Iri, String> values)
     {
         super(name, sqlType);
 

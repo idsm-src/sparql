@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanType;
 
@@ -15,6 +16,6 @@ public final class BooleanClass extends SimpleLiteralClass
      */
     protected BooleanClass()
     {
-        super("boolean", xsdBooleanType, "bool", genBoolean);
+        super("boolean", xsdBooleanType, BOOL, genBoolean);
     }
 }

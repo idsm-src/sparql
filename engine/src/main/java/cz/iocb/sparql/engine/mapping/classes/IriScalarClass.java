@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -22,7 +23,7 @@ public final class IriScalarClass extends IriClass implements ResultResourceClas
      */
     protected IriScalarClass()
     {
-        super("iri", List.of("varchar"), Set.of(box));
+        super("iri", List.of(VARCHAR), Set.of(box));
     }
 
 
@@ -36,7 +37,7 @@ public final class IriScalarClass extends IriClass implements ResultResourceClas
     @Override
     public List<Column> toColumns(Statement statement, Iri iri)
     {
-        return List.of(constant(iri.getValue(), "varchar"));
+        return List.of(constant(iri.getValue(), VARCHAR));
     }
 
 

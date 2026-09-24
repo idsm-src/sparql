@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -40,7 +41,7 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
      */
     private LangStringWithTagClass(String tag)
     {
-        super("lang-" + tag, rdfLangStringType, List.of("varchar"), Set.of(box, rdfLangString));
+        super("lang-" + tag, rdfLangStringType, List.of(VARCHAR), Set.of(box, rdfLangString));
         this.tag = tag;
     }
 
@@ -77,7 +78,7 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), "varchar"));
+        return List.of(constant(literal.getValue(), VARCHAR));
     }
 
 
@@ -97,7 +98,7 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
             return List.of(expression("sparql.rdfbox_create_from_langstring(%s, '%s'::varchar)", string, tag));
 
         if(targetClass.equals(rdfLangString))
-            return List.of(string, !canBeNull ? constant(tag, "varchar") :
+            return List.of(string, !canBeNull ? constant(tag, VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
 
         throw new IllegalArgumentException();

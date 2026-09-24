@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -46,7 +47,7 @@ public class ListUserIriClass extends SimpleUserIriClass
      */
     public ListUserIriClass(String name, DatabaseTable table, TableColumn column)
     {
-        super(name, "varchar");
+        super(name, VARCHAR);
 
         this.table = table;
         this.column = column;
@@ -60,7 +61,7 @@ public class ListUserIriClass extends SimpleUserIriClass
     {
         assert match(statement, iri);
 
-        return List.of(constant(iri.getValue(), "varchar"));
+        return List.of(constant(iri.getValue(), VARCHAR));
     }
 
 

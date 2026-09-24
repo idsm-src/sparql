@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.combined;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration.schema;
 import static java.util.Arrays.asList;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -38,8 +39,8 @@ public class Expression
             config.addQuadMapping(
                     asList(new DatabaseTable(schema, "isoform_bases"), table,
                             new DatabaseTable(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), INT4),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), INT4)),
                     graph, subject, config.createIriMapping(":lowExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -51,8 +52,8 @@ public class Expression
             config.addQuadMapping(
                     asList(new DatabaseTable(schema, "isoform_bases"), table,
                             new DatabaseTable(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), INT4),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), INT4)),
                     graph, subject, config.createIriMapping(":mediumExpression"),
                     config.createIriMapping("annotation", "iri"));
         }
@@ -64,8 +65,8 @@ public class Expression
             config.addQuadMapping(
                     asList(new DatabaseTable(schema, "isoform_bases"), table,
                             new DatabaseTable(schema, "annotation_bases")),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), "int4"),
-                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), "int4")),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("isoform"), INT4),
+                            new JoinColumns(new TableColumn("annotation"), new TableColumn("id"), INT4)),
                     graph, subject, config.createIriMapping(":highExpression"),
                     config.createIriMapping("annotation", "iri"));
         }

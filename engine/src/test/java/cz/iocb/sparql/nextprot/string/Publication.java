@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.string;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -21,7 +22,7 @@ public class Publication
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("publication", "int4", "http://nextprot.org/rdf/publication/"));
+        config.addIriClass(new IntegerUserIriClass("publication", INT4, "http://nextprot.org/rdf/publication/"));
     }
 
 

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.FLOAT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genFloat;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatType;
 
@@ -15,6 +16,6 @@ public final class FloatClass extends SimpleLiteralClass
      */
     public FloatClass()
     {
-        super("float", xsdFloatType, "float4", genFloat);
+        super("float", xsdFloatType, FLOAT4, genFloat);
     }
 }

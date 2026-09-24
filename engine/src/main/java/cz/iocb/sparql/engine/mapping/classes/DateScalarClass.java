@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATE;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
@@ -24,7 +26,7 @@ public final class DateScalarClass extends CanonicalLiteralClass
      */
     protected DateScalarClass()
     {
-        super("date@1c", xsdDateType, List.of("sparql.zoneddate"), Set.of(box, genScalarDate, genDate /*, xsdDate*/));
+        super("date@1c", xsdDateType, List.of(ZONEDDATE), Set.of(box, genScalarDate, genDate /*, xsdDate*/));
     }
 
 
@@ -58,12 +60,12 @@ public final class DateScalarClass extends CanonicalLiteralClass
             return List.of(expression("sparql.rdfbox_create_from_date(%s)", date));
 
         if(targetClass.equals(genScalarDate))
-            return List.of(date, !canBeNull ? constant("", "varchar") :
+            return List.of(date, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(genDate))
             return List.of(expression("sparql.zoneddate_get_value(%s)", date),
-                    expression("sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", "varchar") :
+                    expression("sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", VARCHAR) :
                             expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         //if(targetClass.equals(xsdDate))

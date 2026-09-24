@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
@@ -74,8 +75,9 @@ public abstract class AbstractResourceClassTest
         this.iri = literalClass.getDatatype().getTypeIri();
 
 
-        this.values = values.entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> IntStream
-                .range(0, e.getValue().size()).mapToObj(i -> constant(e.getValue().get(i), types.get(i))).toList()));
+        this.values = values.entrySet().stream()
+                .collect(Collectors.toMap(e -> e.getKey(), e -> IntStream.range(0, e.getValue().size())
+                        .mapToObj(i -> constant(e.getValue().get(i), SqlType.of(types.get(i)))).toList()));
     }
 
 

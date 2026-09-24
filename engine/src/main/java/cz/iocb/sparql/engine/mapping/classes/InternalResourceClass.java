@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
@@ -26,7 +27,7 @@ public final class InternalResourceClass extends PrimitiveResourceClass
      *
      * @param sqlTypes the SQL types
      */
-    public InternalResourceClass(List<String> sqlTypes)
+    public InternalResourceClass(List<SqlType> sqlTypes)
     {
         super("internal-" + Integer.toHexString(counter.getAndIncrement()), sqlTypes, Set.of());
     }

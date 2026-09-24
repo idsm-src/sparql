@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInt;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntType;
 
@@ -15,6 +16,6 @@ public final class IntClass extends SimpleLiteralClass
      */
     public IntClass()
     {
-        super("int", xsdIntType, "int4", genInt);
+        super("int", xsdIntType, INT4, genInt);
     }
 }

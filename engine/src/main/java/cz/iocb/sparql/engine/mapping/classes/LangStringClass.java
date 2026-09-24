@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -23,7 +24,7 @@ public final class LangStringClass extends CanonicalLiteralClass implements Resu
      */
     protected LangStringClass()
     {
-        super("lang", rdfLangStringType, List.of("varchar", "varchar"), Set.of(box));
+        super("lang", rdfLangStringType, List.of(VARCHAR, VARCHAR), Set.of(box));
     }
 
 
@@ -49,7 +50,7 @@ public final class LangStringClass extends CanonicalLiteralClass implements Resu
     {
         LangStringLiteral langLiteral = (LangStringLiteral) literal;
 
-        return List.of(constant(langLiteral.getValue(), "varchar"), constant(langLiteral.getTag(), "varchar"));
+        return List.of(constant(langLiteral.getValue(), VARCHAR), constant(langLiteral.getTag(), VARCHAR));
     }
 
 

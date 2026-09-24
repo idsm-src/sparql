@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.test;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
@@ -97,7 +98,7 @@ public class DistinctTableAccessTest
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
 
         config.addPrefix("ex", "http://example.org/");
-        config.addIriClass(new IntegerUserIriClass("compound", "int4", "http://example.org/compound/"));
+        config.addIriClass(new IntegerUserIriClass("compound", INT4, "http://example.org/compound/"));
 
         DatabaseTable compound = new DatabaseTable("distinct_test", "compound");
         DatabaseTable synonym = new DatabaseTable("distinct_test", "synonym");
@@ -119,7 +120,7 @@ public class DistinctTableAccessTest
                 config.createAreEqualCondition("source", "'2'::int4"), distinct);
 
         config.addQuadMapping(List.of(compound, synonym),
-                List.of(new JoinColumns(new TableColumn("id"), new TableColumn("compound"), "int4")), graph,
+                List.of(new JoinColumns(new TableColumn("id"), new TableColumn("compound"), INT4)), graph,
                 config.createLiteralMapping(xsdString, "label"), config.createIriMapping("ex:labelSynonym"),
                 config.createLiteralMapping(xsdString, "synonym"), List.of(new Conditions(true), new Conditions(true)),
                 List.of(false, distinct));

@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
@@ -26,7 +29,7 @@ public final class DateTimeCompositeClass extends CanonicalLiteralClass implemen
      */
     protected DateTimeCompositeClass()
     {
-        super("datetime@2c", xsdDateTimeType, List.of("timestamptz", "int4"),
+        super("datetime@2c", xsdDateTimeType, List.of(TIMESTAMPTZ, INT4),
                 Set.of(box, genScalarDateTime, genDateTime, xsdScalarDateTime));
     }
 
@@ -64,10 +67,10 @@ public final class DateTimeCompositeClass extends CanonicalLiteralClass implemen
 
         if(targetClass.equals(genScalarDateTime))
             return List.of(expression("sparql.zoneddatetime_create(%s, %s)", time, zone), !canBeNull ?
-                    constant("", "varchar") : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+                    constant("", VARCHAR) : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(genDateTime))
-            return List.of(time, zone, !canBeNull ? constant("", "varchar") :
+            return List.of(time, zone, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(xsdScalarDateTime))

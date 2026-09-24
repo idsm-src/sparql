@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.userType;
@@ -40,7 +41,7 @@ public final class UserLiteralClass extends CanonicalLiteralClass
      */
     public UserLiteralClass(String name, UserType sqlType, UserDatatype datatype, LiteralClass base)
     {
-        super(name, datatype, List.of(sqlType.name()), Set.of(box, genUserType, userType, base));
+        super(name, datatype, List.of(sqlType), Set.of(box, genUserType, userType, base));
 
         this.sqlType = sqlType;
         this.base = base;
@@ -72,8 +73,8 @@ public final class UserLiteralClass extends CanonicalLiteralClass
             return columns;
 
         Column value = columns.get(0);
-        Column lexical = constant("", "varchar");
-        Column type = constant(datatype.getTypeIri().getValue(), "varchar");
+        Column lexical = constant("", VARCHAR);
+        Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(targetClass.equals(box))
             return List.of(expression("sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
@@ -105,20 +106,20 @@ public final class UserLiteralClass extends CanonicalLiteralClass
 
         assert isSubclassOf(sourceClass);
 
-        Column type = constant(datatype.getTypeIri().getValue(), "varchar");
+        Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(sourceClass.equals(box))
             return List.of(expression("sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s, false)",
-                    columns.get(0), type, sqlType.name()));
+                    columns.get(0), type, sqlType));
 
         if(sourceClass.equals(genUserType))
             return List.of(
                     expression("(CASE WHEN %s = ''::varchar AND %s = %s THEN sparql.ubox_get_value(%s, NULL::%s) END)",
-                            columns.get(2), columns.get(1), type, columns.get(0), sqlType.name()));
+                            columns.get(2), columns.get(1), type, columns.get(0), sqlType));
 
         if(sourceClass.equals(userType))
             return List.of(expression("(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)", columns.get(1),
-                    type, columns.get(0), sqlType.name()));
+                    type, columns.get(0), sqlType));
 
         if(sourceClass.equals(base))
             return List.of(expression("(CASE %s WHEN ''::varchar THEN %s END)", columns.get(1), columns.get(0)));

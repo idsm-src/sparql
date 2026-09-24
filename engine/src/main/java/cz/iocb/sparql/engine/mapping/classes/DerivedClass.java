@@ -16,6 +16,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
@@ -871,7 +872,7 @@ public class DerivedClass extends ResourceClass
 
 
     @Override
-    public List<String> getSqlTypes()
+    public List<SqlType> getSqlTypes()
     {
         return effectiveClass.getSqlTypes();
     }

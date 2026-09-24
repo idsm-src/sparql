@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -108,7 +109,7 @@ public abstract class ResourceClass
      *
      * @return SQL types of the columns representing a value, in column order
      */
-    public abstract List<String> getSqlTypes();
+    public abstract List<SqlType> getSqlTypes();
 
 
     /**

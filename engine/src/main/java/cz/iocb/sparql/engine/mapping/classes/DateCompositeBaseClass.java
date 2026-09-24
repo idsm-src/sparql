@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.DATE;
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -24,7 +27,7 @@ public final class DateCompositeBaseClass extends BaseLiteralClass implements Re
      */
     protected DateCompositeBaseClass()
     {
-        super("base-date@1c", xsdDateType, List.of("date", "int4", "varchar"), Set.of(box, genScalarDate));
+        super("base-date@1c", xsdDateType, List.of(DATE, INT4, VARCHAR), Set.of(box, genScalarDate));
     }
 
 

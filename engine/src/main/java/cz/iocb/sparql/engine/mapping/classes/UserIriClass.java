@@ -5,6 +5,7 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -20,7 +21,7 @@ public abstract class UserIriClass extends IriClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected UserIriClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
+    protected UserIriClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

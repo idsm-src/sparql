@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -95,7 +96,7 @@ public class GenericUserIriClass extends UserIriClass
      * @param regexp regular expression recognising the IRIs
      * @param sqlCheck when to verify IRIs in the database
      */
-    public GenericUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,
+    public GenericUserIriClass(String name, String schema, String function, List<SqlType> sqlTypes, String regexp,
             SqlCheck sqlCheck)
     {
         super(name, sqlTypes, Set.of(box, iri));
@@ -132,7 +133,7 @@ public class GenericUserIriClass extends UserIriClass
      * @param sqlTypes the SQL types
      * @param pattern regular expression recognising the IRIs
      */
-    public GenericUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern)
+    public GenericUserIriClass(String name, String schema, String function, List<SqlType> sqlTypes, String pattern)
     {
         this(name, schema, function, sqlTypes, pattern, SqlCheck.NEVER);
     }

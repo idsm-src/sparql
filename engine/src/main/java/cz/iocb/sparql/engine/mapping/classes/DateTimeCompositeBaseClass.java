@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -24,8 +27,7 @@ public final class DateTimeCompositeBaseClass extends BaseLiteralClass implement
      */
     protected DateTimeCompositeBaseClass()
     {
-        super("base-datetime@2c", xsdDateTimeType, List.of("timestamptz", "int4", "varchar"),
-                Set.of(box, genScalarDateTime));
+        super("base-datetime@2c", xsdDateTimeType, List.of(TIMESTAMPTZ, INT4, VARCHAR), Set.of(box, genScalarDateTime));
     }
 
 

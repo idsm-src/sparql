@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.test;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
@@ -147,7 +148,7 @@ public class VirtualTableTest
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
         config.addPrefix("ex", "http://example.org/");
-        config.addIriClass(new IntegerUserIriClass("compound", "int4", "http://example.org/compound/"));
+        config.addIriClass(new IntegerUserIriClass("compound", INT4, "http://example.org/compound/"));
 
         config.addVirtualTable(synonyms, synonymsDefinition());
         config.addVirtualTable(labeled, labeledDefinition());
@@ -320,7 +321,7 @@ public class VirtualTableTest
     void undefinedVirtualTable() throws Exception
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
-        config.addIriClass(new IntegerUserIriClass("compound", "int4", "http://example.org/compound/"));
+        config.addIriClass(new IntegerUserIriClass("compound", INT4, "http://example.org/compound/"));
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         assertThrows(IllegalArgumentException.class,

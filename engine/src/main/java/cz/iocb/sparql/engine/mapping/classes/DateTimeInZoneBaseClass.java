@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
@@ -42,7 +45,7 @@ public final class DateTimeInZoneBaseClass extends BaseLiteralClass implements D
      */
     private DateTimeInZoneBaseClass(int zone)
     {
-        super("base-datetime$" + zone, xsdDateTimeType, List.of("timestamptz", "varchar"),
+        super("base-datetime$" + zone, xsdDateTimeType, List.of(TIMESTAMPTZ, VARCHAR),
                 Set.of(box, genScalarDateTime, genDateTime));
         this.zone = zone;
     }
@@ -102,7 +105,7 @@ public final class DateTimeInZoneBaseClass extends BaseLiteralClass implements D
             return List.of(expression("sparql.zoneddatetime_create(%s, '%d'::int4)", time, zone), lexical);
 
         if(targetClass.equals(genDateTime))
-            return List.of(time, !canBeNull ? constant(zone, "int4") :
+            return List.of(time, !canBeNull ? constant(zone, INT4) :
                     expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", time, zone), lexical);
 
         throw new IllegalArgumentException();

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.combined;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -79,7 +80,7 @@ public class NeXtProtCombinedConfiguration extends SparqlDatabaseConfiguration
     {
         addIriClass(new StringUserIriClass("uniprot", "http://purl.uniprot.org/uniprot/"));
         addIriClass(new StringUserIriClass("uniprotpage", "http://www.uniprot.org/uniprot/"));
-        addIriClass(new IntegerUserIriClass("chebi", "int4", "http://purl.obolibrary.org/obo/CHEBI_"));
+        addIriClass(new IntegerUserIriClass("chebi", INT4, "http://purl.obolibrary.org/obo/CHEBI_"));
         addIriClass(new StringUserIriClass("drugbank",
                 "http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB"));
 

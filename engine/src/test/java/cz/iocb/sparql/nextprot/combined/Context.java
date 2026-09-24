@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.combined;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration.schema;
 import static java.util.Arrays.asList;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -22,7 +23,7 @@ public class Context
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("context", "int4", "http://nextprot.org/rdf/context/"));
+        config.addIriClass(new IntegerUserIriClass("context", INT4, "http://nextprot.org/rdf/context/"));
     }
 
 
@@ -42,19 +43,19 @@ public class Context
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":metadata"),
                     config.createIriMapping("publication", "metadata"));
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("method"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("method"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping(":detectionMethod"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("disease"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("disease"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping(":disease"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("tissue"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("tissue"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping(":tissue"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("line"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("line"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping(":cellLine"), config.createIriMapping("terminology", "iri"));
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "terminology_bases")),
-                    asList(new JoinColumns(new TableColumn("stage"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("stage"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping(":developmentalStage"), config.createIriMapping("terminology", "iri"));
         }
     }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT2;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genByte;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteType;
 
@@ -15,6 +16,6 @@ public final class ByteClass extends SimpleLiteralClass
      */
     public ByteClass()
     {
-        super("byte", xsdByteType, "int2", genByte);
+        super("byte", xsdByteType, INT2, genByte);
     }
 }

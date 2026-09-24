@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.NUMERIC;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genInteger;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerType;
 
@@ -15,6 +16,6 @@ public final class IntegerClass extends SimpleLiteralClass
      */
     public IntegerClass()
     {
-        super("integer", xsdIntegerType, "numeric", genInteger);
+        super("integer", xsdIntegerType, NUMERIC, genInteger);
     }
 }

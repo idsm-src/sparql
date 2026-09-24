@@ -55,6 +55,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
@@ -849,8 +850,9 @@ public class SparqlDatabaseConfiguration
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object)
     {
-        addQuadMapping(List.of(subjectTable, objectTable), List.of(
-                new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn), type)),
+        addQuadMapping(List.of(subjectTable, objectTable),
+                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn),
+                        SqlType.of(type))),
                 graph, subject, predicate, object);
     }
 
@@ -874,9 +876,9 @@ public class SparqlDatabaseConfiguration
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
-        addQuadMapping(
-                List.of(subjectTable, objectTable), List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn),
-                        new TableColumn(objectTableJoinColumn), type)),
+        addQuadMapping(List.of(subjectTable, objectTable),
+                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn),
+                        SqlType.of(type))),
                 graph, subject, predicate, object, List.of(subjectCondition, objectCondition));
     }
 
@@ -1027,7 +1029,7 @@ public class SparqlDatabaseConfiguration
             return new ExpressionColumn(value);
         else if(value.matches("'.*'::[_a-zA-Z0-9.]+"))
             return new ConstantColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
-                    value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1"));
+                    SqlType.of(value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1")));
         else
             return new TableColumn(value);
     }

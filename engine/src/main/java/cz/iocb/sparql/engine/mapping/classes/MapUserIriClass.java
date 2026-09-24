@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 
@@ -82,7 +83,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param pattern regular expression constraining the id, or null
      * @param suffix the suffix
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, int length, String pattern, String suffix)
     {
         super(name, sqlType);
@@ -149,7 +150,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param pattern regular expression constraining the id, or null
      * @param suffix the suffix
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, String pattern, String suffix)
     {
         this(name, sqlType, table, from, to, prefix, 0, pattern, suffix);
@@ -168,7 +169,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param length fixed length of the id, or zero
      * @param pattern regular expression constraining the id, or null
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, int length, String pattern)
     {
         this(name, sqlType, table, from, to, prefix, length, pattern, null);
@@ -186,7 +187,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param prefix the prefix
      * @param pattern regular expression constraining the id, or null
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, String pattern)
     {
         this(name, sqlType, table, from, to, prefix, 0, pattern, null);
@@ -204,7 +205,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param prefix the prefix
      * @param length fixed length of the id, or zero
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix, int length)
     {
         this(name, sqlType, table, from, to, prefix, length, null, null);
@@ -221,7 +222,7 @@ public class MapUserIriClass extends SimpleUserIriClass
      * @param to column holding the ids
      * @param prefix the prefix
      */
-    public MapUserIriClass(String name, String sqlType, DatabaseTable table, TableColumn from, TableColumn to,
+    public MapUserIriClass(String name, SqlType sqlType, DatabaseTable table, TableColumn from, TableColumn to,
             String prefix)
     {
         this(name, sqlType, table, from, to, prefix, 0, null, null);

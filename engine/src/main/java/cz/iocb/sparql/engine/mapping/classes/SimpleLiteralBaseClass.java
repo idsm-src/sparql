@@ -1,11 +1,13 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Literal;
 
@@ -33,9 +35,9 @@ public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass imp
      * @param datatype the datatype
      * @param sqlType the SQL type
      */
-    protected SimpleLiteralBaseClass(String name, Datatype datatype, String sqlType)
+    protected SimpleLiteralBaseClass(String name, Datatype datatype, SqlType sqlType)
     {
-        super("base-" + name, datatype, List.of(sqlType, "varchar"), Set.of(box));
+        super("base-" + name, datatype, List.of(sqlType, VARCHAR), Set.of(box));
 
         this.fname = name;
     }

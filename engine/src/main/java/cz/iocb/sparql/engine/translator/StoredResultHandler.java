@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.translator;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static java.util.Collections.nCopies;
 import static java.util.stream.Collectors.joining;
 import java.sql.SQLException;
@@ -19,6 +20,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -66,7 +68,7 @@ public class StoredResultHandler extends ResultHandler
     /**
      * Table columns with their SQL types.
      */
-    private LinkedHashMap<Column, String> columns = new LinkedHashMap<>();
+    private LinkedHashMap<Column, SqlType> columns = new LinkedHashMap<>();
 
     /**
      * Bindings of the received variables.
@@ -114,7 +116,7 @@ public class StoredResultHandler extends ResultHandler
     {
         super(request, restrictions);
 
-        columns.put(new TableColumn("__"), "int4");
+        columns.put(new TableColumn("__"), INT4);
     }
 
 
@@ -146,7 +148,7 @@ public class StoredResultHandler extends ResultHandler
 
             List<Column> vals = getColumns(request, resClass, entry.getValue());
             List<Column> cols = binding.getMapping(resClass);
-            List<String> types = resClass.getSqlTypes();
+            List<SqlType> types = resClass.getSqlTypes();
 
             if(cols == null)
             {
@@ -213,7 +215,7 @@ public class StoredResultHandler extends ResultHandler
 
         if(rowCount < minTableSize)
         {
-            Map<Column, String> sqlTypes = new HashMap<>();
+            Map<Column, SqlType> sqlTypes = new HashMap<>();
 
             for(VariableBinding v : varBindings.getValues())
                 for(Entry<ResourceClass, List<Column>> e : v.getMappings().entrySet())
@@ -233,7 +235,7 @@ public class StoredResultHandler extends ResultHandler
 
             for(Entry<Column, List<Column>> entry : data.entrySet())
             {
-                String type = sqlTypes.get(entry.getKey());
+                SqlType type = sqlTypes.get(entry.getKey());
 
                 if(columns.contains(entry.getKey()))
                     values.put(entry.getKey(), entry.getValue().stream().limit(rowCount)

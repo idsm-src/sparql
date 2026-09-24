@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT2;
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -57,7 +61,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param pattern regular expression constraining the digits, or null
      * @param suffix the suffix
      */
-    public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String pattern, String suffix)
+    public IntegerUserIriClass(String name, SqlType sqlType, String prefix, int length, String pattern, String suffix)
     {
         super(name, sqlType);
 
@@ -75,11 +79,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
             builder.append("(" + pattern + ")");
         else if(length > 0)
             builder.append(format("[0-9]{%d}", length));
-        else if(sqlType.equals("int2"))
+        else if(sqlType.equals(INT2))
             builder.append(generateMaxNumberPattern("32767", -length));
-        else if(sqlType.equals("int4"))
+        else if(sqlType.equals(INT4))
             builder.append(generateMaxNumberPattern("2147483647", -length));
-        else if(sqlType.equals("int8"))
+        else if(sqlType.equals(INT8))
             builder.append(generateMaxNumberPattern("9223372036854775807", -length));
         else
             throw new IllegalArgumentException("unsupported sql numeric type: " + sqlType);
@@ -104,7 +108,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param length width of the number: positive fixed, negative minimal, zero unpadded
      * @param suffix the suffix
      */
-    public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String suffix)
+    public IntegerUserIriClass(String name, SqlType sqlType, String prefix, int length, String suffix)
     {
         this(name, sqlType, prefix, length, null, suffix);
     }
@@ -118,7 +122,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param prefix the prefix
      * @param suffix the suffix
      */
-    public IntegerUserIriClass(String name, String sqlType, String prefix, String suffix)
+    public IntegerUserIriClass(String name, SqlType sqlType, String prefix, String suffix)
     {
         this(name, sqlType, prefix, 0, null, suffix);
     }
@@ -132,7 +136,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param prefix the prefix
      * @param length width of the number: positive fixed, negative minimal, zero unpadded
      */
-    public IntegerUserIriClass(String name, String sqlType, String prefix, int length)
+    public IntegerUserIriClass(String name, SqlType sqlType, String prefix, int length)
     {
         this(name, sqlType, prefix, length, null, null);
     }
@@ -145,7 +149,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      * @param sqlType the SQL type
      * @param prefix the prefix
      */
-    public IntegerUserIriClass(String name, String sqlType, String prefix)
+    public IntegerUserIriClass(String name, SqlType sqlType, String prefix)
     {
         this(name, sqlType, prefix, 0, null, null);
     }
@@ -221,7 +225,7 @@ public class IntegerUserIriClass extends SimpleUserIriClass
      */
     protected Column generateNonCheckedInverseFunction(Column column)
     {
-        String sqlType = sqlTypes.get(0);
+        SqlType sqlType = sqlTypes.get(0);
 
         if(length > 0)
             return expression("substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);

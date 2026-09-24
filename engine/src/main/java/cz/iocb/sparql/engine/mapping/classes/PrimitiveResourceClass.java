@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -16,7 +17,7 @@ public abstract class PrimitiveResourceClass extends ResourceClass
     /**
      * SQL types of the columns.
      */
-    protected final List<String> sqlTypes;
+    protected final List<SqlType> sqlTypes;
 
     /**
      * Classes this class converts to, excluding itself.
@@ -31,7 +32,7 @@ public abstract class PrimitiveResourceClass extends ResourceClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected PrimitiveResourceClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
+    protected PrimitiveResourceClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name);
 
@@ -53,7 +54,7 @@ public abstract class PrimitiveResourceClass extends ResourceClass
 
 
     @Override
-    public final List<String> getSqlTypes()
+    public final List<SqlType> getSqlTypes()
     {
         return sqlTypes;
     }

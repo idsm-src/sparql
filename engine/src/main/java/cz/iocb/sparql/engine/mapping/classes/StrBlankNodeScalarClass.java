@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
@@ -20,7 +21,7 @@ public final class StrBlankNodeScalarClass extends StrBlankNodeClass
      */
     protected StrBlankNodeScalarClass()
     {
-        super("sblanknode@1c", List.of("varchar"), Set.of(box/*, strBlankNode*/));
+        super("sblanknode@1c", List.of(VARCHAR), Set.of(box/*, strBlankNode*/));
     }
 
 

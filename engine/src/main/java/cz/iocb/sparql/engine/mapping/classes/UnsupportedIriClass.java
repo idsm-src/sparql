@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -25,7 +26,7 @@ public class UnsupportedIriClass extends IriClass
      */
     protected UnsupportedIriClass()
     {
-        super("unsupported", List.of("varchar"), Set.of(box, iri));
+        super("unsupported", List.of(VARCHAR), Set.of(box, iri));
     }
 
 
@@ -49,7 +50,7 @@ public class UnsupportedIriClass extends IriClass
     @Override
     public List<Column> toColumns(Statement statement, Iri iri)
     {
-        return List.of(constant(iri.getValue(), "varchar"));
+        return List.of(constant(iri.getValue(), VARCHAR));
     }
 
 

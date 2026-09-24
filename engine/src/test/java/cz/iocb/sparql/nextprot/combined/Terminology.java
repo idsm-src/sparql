@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.combined;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration.schema;
 import static java.util.Arrays.asList;
@@ -40,7 +41,7 @@ public class Terminology
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(table, new DatabaseTable(schema, "schema_bases")),
-                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), INT4)), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("schema", "iri"));
         }
 
@@ -49,8 +50,8 @@ public class Terminology
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), "int4"),
-                            new JoinColumns(new TableColumn("parent"), new TableColumn("id"), "int4")),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), INT4),
+                            new JoinColumns(new TableColumn("parent"), new TableColumn("id"), INT4)),
                     graph, subject, config.createIriMapping(":childOf"), config.createIriMapping("terminology", "iri"));
         }
 
@@ -59,8 +60,8 @@ public class Terminology
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), "int4"),
-                            new JoinColumns(new TableColumn("related"), new TableColumn("id"), "int4")),
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), INT4),
+                            new JoinColumns(new TableColumn("related"), new TableColumn("id"), INT4)),
                     graph, subject, config.createIriMapping(":related"), config.createIriMapping("terminology", "iri"));
         }
 
@@ -69,7 +70,7 @@ public class Terminology
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), "int4")), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("term"), INT4)), graph, subject,
                     config.createIriMapping("rdfs:label"), config.createLiteralMapping(xsdString, "label"));
         }
     }

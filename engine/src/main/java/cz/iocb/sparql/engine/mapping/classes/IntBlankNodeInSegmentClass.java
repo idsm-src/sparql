@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
@@ -31,7 +32,7 @@ public class IntBlankNodeInSegmentClass extends IntBlankNodeClass
      */
     public IntBlankNodeInSegmentClass(int segment)
     {
-        super("iblanknode-" + Integer.toHexString(segment), List.of("int4"),
+        super("iblanknode-" + Integer.toHexString(segment), List.of(INT4),
                 Set.of(box, intScalarBlankNode, intBlankNode));
 
         this.segment = segment;
@@ -64,7 +65,7 @@ public class IntBlankNodeInSegmentClass extends IntBlankNodeClass
             return List.of(expression("sparql.iblanknode_create(%s, '%d'::int4)", bnvalue, segment));
 
         if(targetClass.equals(intBlankNode))
-            return List.of(bnvalue, !canBeNull ? constant(segment, "int4") :
+            return List.of(bnvalue, !canBeNull ? constant(segment, INT4) :
                     expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", bnvalue, segment));
 
         throw new IllegalArgumentException();

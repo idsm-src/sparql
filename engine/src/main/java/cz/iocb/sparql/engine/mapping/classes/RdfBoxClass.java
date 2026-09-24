@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.resultClasses;
 import java.sql.Statement;
@@ -21,7 +22,7 @@ public class RdfBoxClass extends PrimitiveResourceClass
      */
     protected RdfBoxClass()
     {
-        super("rdfbox", List.of("sparql.rdfbox"), Set.of());
+        super("rdfbox", List.of(RDFBOX), Set.of());
     }
 
 

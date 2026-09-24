@@ -1,10 +1,12 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Literal;
 
@@ -24,7 +26,7 @@ public abstract class BaseLiteralClass extends LiteralClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected BaseLiteralClass(String name, Datatype datatype, List<String> sqlTypes,
+    protected BaseLiteralClass(String name, Datatype datatype, List<SqlType> sqlTypes,
             Set<PrimitiveResourceClass> superClasses)
     {
         super(name, datatype, sqlTypes, superClasses);
@@ -53,8 +55,8 @@ public abstract class BaseLiteralClass extends LiteralClass
     protected Column getLexicalColumn(Literal literal)
     {
         if(datatype.isCanonicalForm(literal.getValue()))
-            return constant("", "varchar");
+            return constant("", VARCHAR);
 
-        return constant(literal.getValue(), "varchar");
+        return constant(literal.getValue(), VARCHAR);
     }
 }

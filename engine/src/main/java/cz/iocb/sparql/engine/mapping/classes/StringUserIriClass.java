@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -9,6 +10,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -56,7 +58,7 @@ public class StringUserIriClass extends SimpleUserIriClass
      */
     public StringUserIriClass(String name, String prefix, int length, String pattern, String suffix)
     {
-        super(name, "varchar");
+        super(name, VARCHAR);
 
         this.length = length;
         this.prefix = prefix;
@@ -167,7 +169,7 @@ public class StringUserIriClass extends SimpleUserIriClass
         String value = iri.getValue();
         String id = value.substring(prefix.length(), value.length() - (suffix != null ? suffix.length() : 0));
 
-        return List.of(constant(id, "varchar"));
+        return List.of(constant(id, VARCHAR));
     }
 
 
@@ -198,7 +200,7 @@ public class StringUserIriClass extends SimpleUserIriClass
      */
     private Column generateNonCheckedInverseFunction(Column column)
     {
-        String sqlType = sqlTypes.get(0);
+        SqlType sqlType = sqlTypes.get(0);
 
         if(prefix == null && suffix == null)
             return column;

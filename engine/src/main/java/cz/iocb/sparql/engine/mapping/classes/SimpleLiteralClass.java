@@ -1,11 +1,13 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Literal;
 
@@ -35,7 +37,7 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass im
      * @param sqlType the SQL type
      * @param base the base class keeping the lexical form
      */
-    protected SimpleLiteralClass(String name, Datatype datatype, String sqlType, LiteralClass base)
+    protected SimpleLiteralClass(String name, Datatype datatype, SqlType sqlType, LiteralClass base)
     {
         super(name, datatype, List.of(sqlType), Set.of(box, base));
 
@@ -50,7 +52,7 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass im
      * @param datatype the datatype
      * @param sqlType the SQL type
      */
-    protected SimpleLiteralClass(String name, Datatype datatype, String sqlType)
+    protected SimpleLiteralClass(String name, Datatype datatype, SqlType sqlType)
     {
         super(name, datatype, List.of(sqlType), Set.of(box));
 
@@ -90,7 +92,7 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass im
             return List.of(expression("sparql.rdfbox_create_from_%s(%s)", name, value));
 
         if(targetClass.equals(base))
-            return List.of(value, !canBeNull ? constant("", "varchar") :
+            return List.of(value, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
 
         throw new IllegalArgumentException();

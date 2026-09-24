@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -21,7 +22,7 @@ public final class UnsupportedLiteralClass extends BaseLiteralClass implements R
      */
     protected UnsupportedLiteralClass()
     {
-        super("literal", null, List.of("varchar", "varchar"), Set.of(box));
+        super("literal", null, List.of(VARCHAR, VARCHAR), Set.of(box));
     }
 
 
@@ -35,7 +36,7 @@ public final class UnsupportedLiteralClass extends BaseLiteralClass implements R
     @Override
     public List<Column> toColumns(Literal literal)
     {
-        return List.of(constant(literal.getValue(), "varchar"), constant(literal.getType().getValue(), "varchar"));
+        return List.of(constant(literal.getValue(), VARCHAR), constant(literal.getType().getValue(), VARCHAR));
     }
 
 

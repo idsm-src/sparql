@@ -165,15 +165,6 @@ public class Result implements AutoCloseable
     private static final long USECS_PER_SEC = 1000000l;
 
     /**
-     * Java type to read each SQL type with.
-     */
-    private static final Map<String, Class<?>> typeMap = Map.ofEntries(Map.entry("bool", Boolean.class),
-            Map.entry("char", Character.class), Map.entry("int2", Short.class), Map.entry("int4", Integer.class),
-            Map.entry("int8", Long.class), Map.entry("numeric", BigDecimal.class), Map.entry("float8", Double.class),
-            Map.entry("float4", Float.class), Map.entry("varchar", String.class), Map.entry("date", LocalDate.class),
-            Map.entry("timestamptz", LocalDateTime.class));
-
-    /**
      * Form of the query.
      */
     protected final ResultType type;
@@ -280,7 +271,7 @@ public class Result implements AutoCloseable
         {
             for(ResultResourceClass rc : entry.getValue())
             {
-                Object value = rs.getObject(i++, typeMap.get(((ResourceClass) rc).getSqlTypes().get(0)));
+                Object value = rs.getObject(i++, ((ResourceClass) rc).getSqlTypes().get(0).getJavaClass());
 
                 if(value == null)
                 {

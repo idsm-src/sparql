@@ -4,6 +4,7 @@ import java.util.Locale;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -39,7 +40,7 @@ public class CodeHelper
      * @param type the SQL type
      * @return typed constant column {@code 'value'::type}
      */
-    public static Column constant(Object value, String type)
+    public static Column constant(Object value, SqlType type)
     {
         return new ConstantColumn(value.toString(), type);
     }

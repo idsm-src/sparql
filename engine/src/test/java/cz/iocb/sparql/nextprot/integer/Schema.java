@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.integer;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
@@ -26,11 +27,11 @@ public class Schema
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("source", "int4", new DatabaseTable(schema, "source_bases"),
+        config.addIriClass(new MapUserIriClass("source", INT4, new DatabaseTable(schema, "source_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/source/", 0));
-        config.addIriClass(new MapUserIriClass("database", "int4", new DatabaseTable(schema, "database_bases"),
+        config.addIriClass(new MapUserIriClass("database", INT4, new DatabaseTable(schema, "database_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/db/", 0));
-        config.addIriClass(new MapUserIriClass("schema", "int4", new DatabaseTable(schema, "schema_bases"),
+        config.addIriClass(new MapUserIriClass("schema", INT4, new DatabaseTable(schema, "schema_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf#", 0));
     }
 

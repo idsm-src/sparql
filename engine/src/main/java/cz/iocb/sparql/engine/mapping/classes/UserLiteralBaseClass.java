@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -33,7 +34,7 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
      */
     public UserLiteralBaseClass(String name, UserType sqlType, UserDatatype datatype)
     {
-        super(name, datatype, List.of(sqlType.name(), "varchar"), Set.of(box, genUserType));
+        super(name, datatype, List.of(sqlType, VARCHAR), Set.of(box, genUserType));
 
         this.sqlType = sqlType;
     }
@@ -66,7 +67,7 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
 
         Column value = columns.get(0);
         Column lexical = columns.get(1);
-        Column type = constant(datatype.getTypeIri().getValue(), "varchar");
+        Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(targetClass.equals(box))
             return List.of(
@@ -90,18 +91,18 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
 
         assert isSubclassOf(sourceClass);
 
-        Column type = constant(datatype.getTypeIri().getValue(), "varchar");
+        Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(sourceClass.equals(box))
             return List.of(
                     expression("sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s)", columns.get(0),
-                            type, sqlType.name()),
+                            type, sqlType),
                     expression("sparql.rdfbox_get_userliteral_lexical_of_type(%s, %s)", columns.get(0), type));
 
         if(sourceClass.equals(genUserType))
             return List.of(
                     expression("(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)", columns.get(1), type,
-                            columns.get(0), sqlType.name()),
+                            columns.get(0), sqlType),
                     expression("(CASE %s WHEN %s THEN %s END)", columns.get(1), type, columns.get(2)));
 
         throw new IllegalArgumentException();

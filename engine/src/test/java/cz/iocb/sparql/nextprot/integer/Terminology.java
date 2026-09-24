@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.integer;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
@@ -21,7 +22,7 @@ public class Terminology
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("terminology", "int4", new DatabaseTable(schema, "terminology_bases"),
+        config.addIriClass(new MapUserIriClass("terminology", INT4, new DatabaseTable(schema, "terminology_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/terminology/", 0));
     }
 

@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.DATE;
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
@@ -25,7 +28,7 @@ public final class DateCompositeClass extends CanonicalLiteralClass implements R
      */
     protected DateCompositeClass()
     {
-        super("date@2c", xsdDateType, List.of("date", "int4"), Set.of(box, genScalarDate, genDate, xsdScalarDate));
+        super("date@2c", xsdDateType, List.of(DATE, INT4), Set.of(box, genScalarDate, genDate, xsdScalarDate));
     }
 
 
@@ -62,10 +65,10 @@ public final class DateCompositeClass extends CanonicalLiteralClass implements R
 
         if(targetClass.equals(genScalarDate))
             return List.of(expression("sparql.zoneddate_create(%s, %s)", date, zone), !canBeNull ?
-                    constant("", "varchar") : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+                    constant("", VARCHAR) : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(genDate))
-            return List.of(date, zone, !canBeNull ? constant("", "varchar") :
+            return List.of(date, zone, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(xsdScalarDate))

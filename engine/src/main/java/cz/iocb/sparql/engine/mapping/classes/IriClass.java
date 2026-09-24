@@ -5,6 +5,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -23,7 +24,7 @@ public abstract class IriClass extends PrimitiveResourceClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected IriClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
+    protected IriClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

@@ -6,6 +6,7 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -36,7 +37,7 @@ public class JoinTableQuadMapping extends QuadMapping
         /**
          * SQL type of each column pair.
          */
-        private final List<String> types;
+        private final List<SqlType> types;
 
         /**
          * Creates the join on several column pairs.
@@ -45,7 +46,7 @@ public class JoinTableQuadMapping extends QuadMapping
          * @param rightColumns columns of the right table
          * @param types SQL types of the column pairs
          */
-        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns, List<String> types)
+        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns, List<SqlType> types)
         {
             this.leftColumns = leftColumns;
             this.rightColumns = rightColumns;
@@ -62,7 +63,7 @@ public class JoinTableQuadMapping extends QuadMapping
          * @param rightColumn column of the right table
          * @param type the SQL type
          */
-        public JoinColumns(Column leftColumn, Column rightColumn, String type)
+        public JoinColumns(Column leftColumn, Column rightColumn, SqlType type)
         {
             this.leftColumns = List.of(leftColumn);
             this.rightColumns = List.of(rightColumn);
@@ -97,7 +98,7 @@ public class JoinTableQuadMapping extends QuadMapping
          *
          * @return SQL type of each column pair
          */
-        public List<String> getTypes()
+        public List<SqlType> getTypes()
         {
             return types;
         }

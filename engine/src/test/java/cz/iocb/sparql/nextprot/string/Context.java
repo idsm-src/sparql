@@ -1,5 +1,6 @@
 package cz.iocb.sparql.nextprot.string;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseTable;
@@ -19,7 +20,7 @@ public class Context
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new IntegerUserIriClass("context", "int4", "http://nextprot.org/rdf/context/"));
+        config.addIriClass(new IntegerUserIriClass("context", INT4, "http://nextprot.org/rdf/context/"));
     }
 
 

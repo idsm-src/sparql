@@ -5,6 +5,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -24,7 +25,7 @@ public abstract class IntBlankNodeClass extends BlankNodeClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected IntBlankNodeClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
+    protected IntBlankNodeClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }

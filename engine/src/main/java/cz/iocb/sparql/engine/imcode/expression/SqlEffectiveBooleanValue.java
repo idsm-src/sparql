@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -172,13 +173,13 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
 
             if(numericBase != null && isFloatPoint(numericBase))
             {
-                String type = numericBase.getSqlTypes().get(0);
+                SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
             }
             else if(numericBase != null)
             {
-                String type = numericBase.getSqlTypes().get(0);
+                SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
                 cols.add(new ExpressionColumn("(" + col + " != '0'::" + type + ")"));
             }

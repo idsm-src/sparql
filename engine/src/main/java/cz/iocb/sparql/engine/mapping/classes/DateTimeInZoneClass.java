@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
@@ -49,7 +52,7 @@ public final class DateTimeInZoneClass extends CanonicalLiteralClass implements 
      */
     private DateTimeInZoneClass(int zone)
     {
-        super("datetime$" + zone, xsdDateTimeType, List.of("timestamptz"),
+        super("datetime$" + zone, xsdDateTimeType, List.of(TIMESTAMPTZ),
                 Set.of(box, genScalarDateTime, genDateTime, xsdScalarDateTime, xsdDateTime));
 
         this.base = DateTimeInZoneBaseClass.get(zone);
@@ -107,24 +110,24 @@ public final class DateTimeInZoneClass extends CanonicalLiteralClass implements 
 
         if(targetClass.equals(genScalarDateTime))
             return List.of(expression("sparql.zoneddatetime_create(%s, '%d'::int4)", time, zone), !canBeNull ?
-                    constant("", "varchar") : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+                    constant("", VARCHAR) : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(genDateTime))
             return List.of(time,
-                    !canBeNull ? constant(zone, "int4") :
+                    !canBeNull ? constant(zone, INT4) :
                             expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", time, zone),
-                    !canBeNull ? constant("", "varchar") :
+                    !canBeNull ? constant("", VARCHAR) :
                             expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(xsdScalarDateTime))
             return List.of(expression("sparql.zoneddatetime_create(%s, '%d'::int4)", time, zone));
 
         if(targetClass.equals(xsdDateTime))
-            return List.of(time, !canBeNull ? constant(zone, "int4") :
+            return List.of(time, !canBeNull ? constant(zone, INT4) :
                     expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", time, zone));
 
         if(targetClass.equals(base))
-            return List.of(time, !canBeNull ? constant("", "varchar") :
+            return List.of(time, !canBeNull ? constant("", VARCHAR) :
                     expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         throw new IllegalArgumentException();

@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.sql.Statement;
@@ -21,7 +23,7 @@ public final class UserLiteralCompositeBaseClass extends BaseLiteralClass implem
      */
     protected UserLiteralCompositeBaseClass()
     {
-        super("base-user", null, List.of("sparql.ubox", "varchar", "varchar"), Set.of(box));
+        super("base-user", null, List.of(UBOX, VARCHAR, VARCHAR), Set.of(box));
     }
 
 

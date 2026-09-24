@@ -6,6 +6,7 @@ import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -21,7 +22,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
      * @param name the name
      * @param sqlType the SQL type
      */
-    protected SimpleUserIriClass(String name, String sqlType)
+    protected SimpleUserIriClass(String name, SqlType sqlType)
     {
         super(name, List.of(sqlType), Set.of(iri, box));
     }

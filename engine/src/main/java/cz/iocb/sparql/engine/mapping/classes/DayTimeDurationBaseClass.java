@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDayTimeDurationType;
 import java.util.List;
@@ -19,7 +20,7 @@ public final class DayTimeDurationBaseClass extends SimpleLiteralBaseClass
      */
     public DayTimeDurationBaseClass()
     {
-        super("daytimeduration", xsdDayTimeDurationType, "int8");
+        super("daytimeduration", xsdDayTimeDurationType, INT8);
     }
 
 

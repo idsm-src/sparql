@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
 import static cz.iocb.sparql.engine.database.Column.coalesce;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction.ALL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction.NONE;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
@@ -1201,7 +1202,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(resourceClass == null && argumentIsString && !argument.canBeNull())
                     {
                         List<Column> result = !restriction.contains(unsupportedType) ? null : List.of(
-                                argument.get(xsdString).get(0), new ConstantColumn(iri.getIri().getValue(), "varchar"));
+                                argument.get(xsdString).get(0), new ConstantColumn(iri.getIri().getValue(), VARCHAR));
 
                         return new SqlBuiltinCall(function, arguments, singletonMap(unsupportedType, result),
                                 canBeNull);

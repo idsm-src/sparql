@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATETIME;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -22,8 +24,7 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
      */
     protected DateTimeScalarBaseClass()
     {
-        super("base-datetime@1c", xsdDateTimeType, List.of("sparql.zoneddatetime", "varchar"),
-                Set.of(box /*, genDateTime*/));
+        super("base-datetime@1c", xsdDateTimeType, List.of(ZONEDDATETIME, VARCHAR), Set.of(box /*, genDateTime*/));
     }
 
 

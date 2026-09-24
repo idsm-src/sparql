@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genLong;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdLongType;
 
@@ -15,6 +16,6 @@ public final class LongClass extends SimpleLiteralClass
      */
     public LongClass()
     {
-        super("long", xsdLongType, "int8", genLong);
+        super("long", xsdLongType, INT8, genLong);
     }
 }

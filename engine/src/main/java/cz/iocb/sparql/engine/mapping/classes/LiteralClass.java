@@ -4,6 +4,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -31,7 +32,7 @@ public abstract class LiteralClass extends PrimitiveResourceClass
      * @param sqlTypes the SQL types
      * @param superClasses the superclasses
      */
-    protected LiteralClass(String name, Datatype datatype, List<String> sqlTypes,
+    protected LiteralClass(String name, Datatype datatype, List<SqlType> sqlTypes,
             Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.NUMERIC;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDecimal;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDecimalType;
 
@@ -15,6 +16,6 @@ public final class DecimalClass extends SimpleLiteralClass
      */
     public DecimalClass()
     {
-        super("decimal", xsdDecimalType, "numeric", genDecimal);
+        super("decimal", xsdDecimalType, NUMERIC, genDecimal);
     }
 }
