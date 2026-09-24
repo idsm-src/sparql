@@ -120,6 +120,7 @@ public class Request implements AutoCloseable
     private Statement statement;
     private ColumnMap columnMap = new ColumnMap();
     private List<Table> tables = new ArrayList<>();
+    private int lateralId = 0;
 
     private long begin;
     private long timeout;
@@ -497,6 +498,12 @@ public class Request implements AutoCloseable
     public ColumnMap getColumnMap()
     {
         return columnMap;
+    }
+
+
+    public Table createLateralTable()
+    {
+        return new Table("lateral" + lateralId++);
     }
 
 

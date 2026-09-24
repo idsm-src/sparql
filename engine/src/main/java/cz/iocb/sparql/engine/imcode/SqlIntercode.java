@@ -808,6 +808,9 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(child instanceof SqlLeftJoin join)
             return getJoinList(join.getLeft());
 
+        if(child instanceof SqlLateralJoin join)
+            return Stream.concat(getJoinList(join.getLeft()).stream(), getJoinList(join.getRight()).stream()).toList();
+
         if(child instanceof SqlDistinct distinct)
             return getJoinList(distinct.getChild());
 

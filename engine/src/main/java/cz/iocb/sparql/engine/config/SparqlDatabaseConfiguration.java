@@ -99,7 +99,6 @@ public class SparqlDatabaseConfiguration
     protected Map<String, UserIriClass> iriClassMap = new HashMap<>();
 
     private final List<Iri> services = new ArrayList<>();
-    protected Map<Iri, Set<Iri>> graphs = new HashMap<>();
     protected Map<Iri, List<QuadMapping>> mappings = new HashMap<>();
     protected Map<Iri, Map<String, ProcedureDefinition>> procedures = new HashMap<>();
     protected Map<Iri, Map<String, FunctionDefinition>> functions = new HashMap<>();
@@ -334,7 +333,6 @@ public class SparqlDatabaseConfiguration
     {
         services.add(service);
         mappings.put(service, new ArrayList<>());
-        graphs.put(service, new HashSet<>());
         procedures.put(service, new HashMap<>());
         functions.put(service, new HashMap<>());
     }
@@ -349,9 +347,6 @@ public class SparqlDatabaseConfiguration
             return;
 
         mappings.get(service).add(mapping);
-
-        if(mapping.getGraph() != null)
-            graphs.get(service).add((Iri) mapping.getGraph().getValue());
     }
 
 
@@ -378,9 +373,6 @@ public class SparqlDatabaseConfiguration
     {
         mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions));
 
-        if(graph != null)
-            graphs.get(serviceIri).add((Iri) graph.getValue());
-
         if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri)
                     .add(new SingleTableQuadMapping(table, null, subject, predicate, object, conditions));
@@ -406,9 +398,6 @@ public class SparqlDatabaseConfiguration
     {
         mappings.get(serviceIri)
                 .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions));
-
-        if(graph != null)
-            graphs.get(serviceIri).add((Iri) graph.getValue());
 
         if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri).add(
@@ -552,47 +541,6 @@ public class SparqlDatabaseConfiguration
     }
 
 
-    public void addDatasetServiceDescription()
-    {
-        //FIXME: code depends on prefix definitions
-
-        ConstantIriMapping graph = createIriMapping(descriptionGraphIri);
-        ConstantIriMapping endpoint = createIriMapping(serviceIri);
-
-        //FIXME: use blank node
-        ConstantIriMapping defaultDataset = createIriMapping("<" + serviceIri.getValue() + "#default-dataset>");
-        ConstantIriMapping availableGraphs = createIriMapping("<" + serviceIri.getValue() + "#available-graphs>");
-        ConstantIriMapping defaultGraph = createIriMapping("<" + serviceIri.getValue() + "#DefaultGraph>");
-
-        addQuadMapping(graph, endpoint, createIriMapping("sd:availableGraphs"), availableGraphs);
-        addQuadMapping(graph, availableGraphs, createIriMapping("rdf:type"), createIriMapping("sd:GraphCollection"));
-
-        addQuadMapping(graph, endpoint, createIriMapping("sd:defaultDataset"), defaultDataset);
-        addQuadMapping(graph, defaultDataset, createIriMapping("rdf:type"), createIriMapping("sd:Dataset"));
-
-        addQuadMapping(graph, defaultDataset, createIriMapping("sd:defaultGraph"), defaultGraph);
-        addQuadMapping(graph, defaultGraph, createIriMapping("rdf:type"), createIriMapping("sd:Graph"));
-
-        for(Iri namedGraph : graphs.get(serviceIri))
-        {
-            ConstantIriMapping subject = new ConstantIriMapping(namedGraph);
-
-            addQuadMapping(graph, defaultDataset, createIriMapping("sd:namedGraph"), subject);
-
-            addQuadMapping(graph, subject, createIriMapping("rdf:type"), createIriMapping("sd:NamedGraph"));
-            addQuadMapping(graph, subject, createIriMapping("rdf:name"), subject);
-            addQuadMapping(graph, subject, createIriMapping("sd:entailmentRegime"), createIriMapping("ent:Simple"));
-
-            //FIXME: use blank node
-            String iri = ((Iri) subject.getValue()).getValue();
-            ConstantIriMapping namedGraphGraph = createIriMapping(
-                    "<" + iri + (iri.contains("#") ? "" : "#") + "Graph>");
-            addQuadMapping(graph, subject, createIriMapping("sd:graph"), namedGraphGraph);
-            addQuadMapping(graph, namedGraphGraph, createIriMapping("rdf:type"), createIriMapping("sd:Graph"));
-        }
-    }
-
-
     public static Column getColumn(String value)
     {
         if(value.startsWith("("))
@@ -672,12 +620,6 @@ public class SparqlDatabaseConfiguration
     public List<QuadMapping> getMappings(Iri iri)
     {
         return mappings.get(iri);
-    }
-
-
-    public Set<Iri> getGraphs(Iri iri)
-    {
-        return graphs.get(iri);
     }
 
 

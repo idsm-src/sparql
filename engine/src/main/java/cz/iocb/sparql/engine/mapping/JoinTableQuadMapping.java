@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
@@ -78,20 +79,22 @@ public class JoinTableQuadMapping extends QuadMapping
     private final List<Table> tables;
     private final List<JoinColumns> joinColumnsPairs;
     private final List<Conditions> conditions;
+    private final int graphTableIdx;
     private final int subjectTableIdx;
     private final int predicateTableIdx;
     private final int objectTableIdx;
 
 
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate, int objectTableIdx,
-            TermMapping object, List<Conditions> conditions)
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
+            TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
+            int objectTableIdx, TermMapping object, List<Conditions> conditions)
     {
         super(graph, subject, predicate, object);
 
         this.tables = tables;
         this.joinColumnsPairs = joinColumnsPairs;
         this.conditions = conditions;
+        this.graphTableIdx = graphTableIdx;
         this.subjectTableIdx = subjectTableIdx;
         this.predicateTableIdx = predicateTableIdx;
         this.objectTableIdx = objectTableIdx;
@@ -100,10 +103,10 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
-        this(tables, joinColumnsPairs, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
+        this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
     }
 
 
@@ -118,8 +121,30 @@ public class JoinTableQuadMapping extends QuadMapping
     @Override
     public QuadMapping asDefaultGraphMapping()
     {
-        return new JoinTableQuadMapping(tables, joinColumnsPairs, null, subjectTableIdx, getSubject(),
+        return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, null, subjectTableIdx, getSubject(),
                 predicateTableIdx, getPredicate(), objectTableIdx, getObject(), conditions);
+    }
+
+
+    @Override
+    public QuadMapping asDefaultGraphMapping(Conditions graphConditions)
+    {
+        List<Conditions> newConditions = new ArrayList<>(conditions);
+        newConditions.set(graphTableIdx, Conditions.and(conditions.get(graphTableIdx), graphConditions));
+
+        return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, null, subjectTableIdx, getSubject(),
+                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions);
+    }
+
+
+    @Override
+    public QuadMapping asNamedGraphMapping(Conditions graphConditions)
+    {
+        List<Conditions> newConditions = new ArrayList<>(conditions);
+        newConditions.set(graphTableIdx, Conditions.and(conditions.get(graphTableIdx), graphConditions));
+
+        return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, getGraph(), subjectTableIdx,
+                getSubject(), predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions);
     }
 
 

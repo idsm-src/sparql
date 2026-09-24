@@ -24,6 +24,8 @@ import java.util.Set;
 import java.util.Stack;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.Condition;
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.imcode.SqlAggregation;
@@ -39,7 +41,9 @@ import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlFilter;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
+import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.SqlJoin;
+import cz.iocb.sparql.engine.imcode.SqlLateralJoin;
 import cz.iocb.sparql.engine.imcode.SqlLeftJoin;
 import cz.iocb.sparql.engine.imcode.SqlMerge;
 import cz.iocb.sparql.engine.imcode.SqlMinus;
@@ -57,7 +61,9 @@ import cz.iocb.sparql.engine.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
@@ -130,7 +136,6 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
     private Map<String, List<Range>> variableOccurrences;
     private List<QuadMapping> mappings;
-    private Set<Iri> graphs;
 
     private Prologue prologue;
 
@@ -515,8 +520,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     {
         RdfTerm graphTerm = getTerm(graph.getName());
 
-        if(graphTerm instanceof Iri iri && !graphs.contains(iri))
-            return SqlNoSolution.get();
+        SqlIntercode quads = null;
+
+        if(graphTerm instanceof Iri)
+        {
+            //NOTE: no mapping can provide the graph, so the graph does not exist regardless of the data
+            quads = translateGraphQuads(graphTerm);
+
+            if(quads.equals(SqlNoSolution.get()))
+                return SqlNoSolution.get();
+        }
 
 
         boolean rename = false;
@@ -562,40 +575,143 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
             if(binding == null || binding.canBeNull())
             {
-                if(translatedPattern.isDeterministic())
-                {
-                    //TODO: can be ignored, if the graph variable is not required outside the graph pattern
+                SqlIntercode graphs = SqlDistinct.create(request, translateGraphQuads(var), Set.of(var));
 
-                    List<List<RdfTerm>> values = new ArrayList<>();
-
-                    for(RdfTerm g : graphs)
-                        values.add(List.of(g));
-
-                    translatedPattern = SqlJoin.join(request, translatedPattern, translateValues(List.of(var), values));
-                }
-                else if(binding == null)
-                {
-                    List<SqlIntercode> unionList = new ArrayList<>();
-
-                    for(Iri g : graphs)
-                        unionList.add(SqlBind.bind(request, var, SqlIri.create(request, g), translatedPattern));
-
-                    translatedPattern = SqlUnion.union(request, unionList);
-                }
-                else
-                {
-                    List<SqlIntercode> unionList = new ArrayList<>();
-
-                    for(Iri g : graphs)
-                        unionList.add(SqlJoin.join(request, translatedPattern,
-                                translateValues(List.of(var), List.of(List.of(g)))));
-
-                    translatedPattern = SqlUnion.union(request, unionList);
-                }
+                /* NOTE: The pattern does not refer to the graphs, but it has to be evaluated again for every graph,
+                 * which matters if it is nondeterministic.
+                 */
+                translatedPattern = SqlLateralJoin.lateralJoin(request, graphs, translatedPattern,
+                        request.createLateralTable(), new Restrictions());
             }
+        }
+        else if(!isGraphWitnessed(graph, graphTerm))
+        {
+            //NOTE: the pattern has solutions even if the graph does not exist, so the existence has to be checked
+            SqlExpressionIntercode exists = SqlExists.create(request, false, quads, new VariableBindings());
+
+            translatedPattern = SqlFilter.filter(request, List.of(exists), translatedPattern);
         }
 
         return translatedPattern;
+    }
+
+
+    private SqlIntercode translateGraphQuads(RdfTerm graph)
+    {
+        PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, mappings);
+
+        return pathVisitor.translate(graph, createVariable("@graphvar"), createVariableNode("@graphvar"),
+                createVariable("@graphvar"));
+    }
+
+
+    /* Decides whether every solution of the pattern of the GRAPH clause implies that the graph exists, i.e., whether
+     * it necessarily comes from a triple pattern evaluated in the graph. If it does not (e.g. {}, VALUES or BIND
+     * alone), the existence of the graph has to be checked separately.
+     */
+    private boolean isGraphWitnessed(Graph graph, RdfTerm graphTerm)
+    {
+        return new ElementVisitor<Boolean>()
+        {
+            @Override
+            protected Boolean defaultResult()
+            {
+                return false;
+            }
+
+            @Override
+            protected Boolean aggregateResult(List<Boolean> results)
+            {
+                return results.stream().anyMatch(e -> e != null && e);
+            }
+
+            @Override
+            public Boolean visit(Triple triple)
+            {
+                return true;
+            }
+
+            @Override
+            public Boolean visit(GroupGraph groupGraph)
+            {
+                //NOTE: the group is a join, so it suffices if any of its members witnesses the graph
+                return groupGraph.getPatterns().stream().anyMatch(p -> visitElement(p));
+            }
+
+            @Override
+            public Boolean visit(Union union)
+            {
+                return union.getPatterns().stream().allMatch(p -> visitElement(p));
+            }
+
+            @Override
+            public Boolean visit(Select select)
+            {
+                //NOTE: an aggregation without GROUP BY has a solution even if its pattern has none
+                if(select.isInAggregateMode() && select.getGroupByConditions().isEmpty())
+                    return false;
+
+                return visitElement(select.getPattern());
+            }
+
+            @Override
+            public Boolean visit(Graph nested)
+            {
+                //NOTE: a nested GRAPH clause is evaluated in another graph, unless it names the same one
+                if(!getTerm(nested.getName()).equals(graphTerm))
+                    return false;
+
+                return visitElement(nested.getPattern());
+            }
+
+            @Override
+            public Boolean visit(Optional optional)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(Minus minus)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(Filter filter)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(Bind bind)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(Values values)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(Service service)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(ProcedureCall procedureCall)
+            {
+                return false;
+            }
+
+            @Override
+            public Boolean visit(MultiProcedureCall multiProcedureCall)
+            {
+                return false;
+            }
+        }.visitElement(graph.getPattern());
     }
 
 
@@ -1141,33 +1257,64 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    private Conditions getGraphCondition(TermMapping graphMap, Set<Iri> iris)
+    {
+        ResourceClass resClass = graphMap.getResourceClass(request);
+        List<Column> cols = graphMap.getColumns(request);
+
+        Conditions conditions = new Conditions(false);
+
+        for(Iri iri : iris)
+        {
+            Condition condition = new Condition();
+            condition.addAreEqual(cols, resClass.toColumns(request.getStatement(), iri));
+            conditions = Conditions.or(conditions, new Conditions(condition));
+        }
+
+        return conditions;
+    }
+
+
     protected void setDatasets(List<DataSet> datasets)
     {
         if(datasets.isEmpty())
         {
             mappings = request.getConfiguration().getMappings(getService());
-            graphs = request.getConfiguration().getGraphs(getService());
         }
         else
         {
-            List<QuadMapping> sources = request.getConfiguration().getMappings(getService());
+            Set<Iri> defaults = datasets.stream().filter(d -> d.isDefault()).map(d -> getIri(d.getSourceSelector()))
+                    .collect(toSet());
+
+            Set<Iri> named = datasets.stream().filter(d -> !d.isDefault()).map(d -> getIri(d.getSourceSelector()))
+                    .collect(toSet());
+
 
             mappings = new ArrayList<>();
-            graphs = new HashSet<>();
 
-            for(DataSet dataset : datasets)
+            for(QuadMapping source : request.getConfiguration().getMappings(getService()))
             {
-                Iri iri = getIri(dataset.getSourceSelector());
+                TermMapping graphMap = source.getGraph();
 
-                for(QuadMapping source : sources)
+                if(graphMap instanceof ConstantIriMapping constGraphMapping)
                 {
-                    if(iri.equals(source.getGraph().getIri()))
-                    {
-                        mappings.add(dataset.isDefault() ? source.asDefaultGraphMapping() : source);
+                    if(defaults.contains(constGraphMapping.getIri()))
+                        mappings.add(source.asDefaultGraphMapping());
 
-                        if(!dataset.isDefault())
-                            graphs.add(iri);
-                    }
+                    if(named.contains(constGraphMapping.getIri()))
+                        mappings.add(source);
+                }
+                else
+                {
+                    Set<Iri> validDefaults = defaults.stream().filter(i -> graphMap.match(request, i)).collect(toSet());
+
+                    if(!validDefaults.isEmpty())
+                        mappings.add(source.asDefaultGraphMapping(getGraphCondition(graphMap, validDefaults)));
+
+                    Set<Iri> validNamed = named.stream().filter(i -> graphMap.match(request, i)).collect(toSet());
+
+                    if(!validNamed.isEmpty())
+                        mappings.add(source.asNamedGraphMapping(getGraphCondition(graphMap, validNamed)));
                 }
             }
         }

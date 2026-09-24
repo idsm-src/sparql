@@ -11,14 +11,14 @@ public class SingleTableQuadMapping extends QuadMapping
     private final Conditions conditions;
 
 
-    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, TermMapping predicate,
+    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object)
     {
         this(table, graph, subject, predicate, object, new Conditions(true));
     }
 
 
-    public SingleTableQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, TermMapping predicate,
+    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions)
     {
         super(graph, subject, predicate, object);
@@ -32,6 +32,22 @@ public class SingleTableQuadMapping extends QuadMapping
     public QuadMapping asDefaultGraphMapping()
     {
         return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(), conditions);
+    }
+
+
+    @Override
+    public QuadMapping asDefaultGraphMapping(Conditions graphConditions)
+    {
+        return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(),
+                Conditions.and(conditions, graphConditions));
+    }
+
+
+    @Override
+    public QuadMapping asNamedGraphMapping(Conditions graphConditions)
+    {
+        return new SingleTableQuadMapping(table, getGraph(), getSubject(), getPredicate(), getObject(),
+                Conditions.and(conditions, graphConditions));
     }
 
 

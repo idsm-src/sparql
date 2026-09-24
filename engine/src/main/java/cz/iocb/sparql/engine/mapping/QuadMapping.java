@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping;
 
+import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -9,13 +10,13 @@ import cz.iocb.sparql.engine.request.Request;
 
 public abstract class QuadMapping
 {
-    private final ConstantIriMapping graph;
+    private final TermMapping graph;
     private final TermMapping subject;
     private final TermMapping predicate;
     private final TermMapping object;
 
 
-    public QuadMapping(ConstantIriMapping graph, TermMapping subject, TermMapping predicate, TermMapping object)
+    public QuadMapping(TermMapping graph, TermMapping subject, TermMapping predicate, TermMapping object)
     {
         //TODO: add support for parameterized graph mapping
 
@@ -27,6 +28,12 @@ public abstract class QuadMapping
 
 
     public abstract QuadMapping asDefaultGraphMapping();
+
+
+    public abstract QuadMapping asDefaultGraphMapping(Conditions graphConditions);
+
+
+    public abstract QuadMapping asNamedGraphMapping(Conditions graphConditions);
 
 
     public boolean match(Request request, RdfTerm graph, RdfTerm subject, RdfTerm predicate, RdfTerm object)
@@ -93,7 +100,7 @@ public abstract class QuadMapping
     }
 
 
-    public final ConstantIriMapping getGraph()
+    public final TermMapping getGraph()
     {
         return graph;
     }

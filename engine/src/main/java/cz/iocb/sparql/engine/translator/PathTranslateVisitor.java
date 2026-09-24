@@ -78,7 +78,6 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     private final TranslateVisitor parent;
     private final List<QuadMapping> mappings;
 
-
     private RdfTerm graph = null;
     private RdfTerm subject = null;
     private RdfTerm object = null;
