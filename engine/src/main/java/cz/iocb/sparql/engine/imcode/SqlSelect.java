@@ -260,7 +260,10 @@ public final class SqlSelect extends SqlIntercode
         childRestrictions.add(orderBy.keySet()); // FIXME: not all resource classes are sortable
         childRestrictions.add(simpleOrderBy); // FIXME: not all resource classes are sortable
 
-        SqlIntercode optChild = child.optimize(request, childRestrictions, reduced, evalServices);
+        // a slice picks its rows from the multiset, so the multiplicities of the child rows have to be kept exact
+        boolean childReduced = reduced && limit == null && (offset == null || offset.equals(BigInteger.ZERO));
+
+        SqlIntercode optChild = child.optimize(request, childRestrictions, childReduced, evalServices);
 
         LinkedHashMap<Variable, Direction> stripedOrderBy = new LinkedHashMap<>();
 

@@ -395,7 +395,8 @@ public final class SqlJoin extends SqlIntercode
                                 internal.add(access.getInternalVariableBinding(variable));
                         }
 
-                        optChilds.set(i, SqlTableAccess.create(access.getTable(), cnds, internal, access.getReduced()));
+                        optChilds.set(i, SqlTableAccess.create(access.getTable(), cnds, internal, access.getReduced(),
+                                access.getDistinctColumns()));
                     }
                 }
             }
@@ -623,12 +624,13 @@ public final class SqlJoin extends SqlIntercode
     {
         if(Objects.equals(distinct.getTable(), candidate.getTable()))
         {
-            Set<Column> joinColumns = SqlTableAccess.getJoinColumns(distinct, candidate);
+            // the distinct part denotes a set over all the columns it binds
+            Set<Column> distinctColumns = distinct.getInternalVariableBindings().getNonConstantColumns();
 
-            if(!joinColumns.containsAll(distinct.getVariableBindings().getNonConstantColumns()))
+            if(!SqlTableAccess.canBeJoinedByDistinctColumns(candidate, distinct, distinctColumns))
                 return null;
 
-            return SqlTableAccess.joinByPrimaryKey(candidate, distinct, restrictions);
+            return SqlTableAccess.joinByDistinctColumns(candidate, distinct, restrictions);
         }
         else
         {

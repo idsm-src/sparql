@@ -131,8 +131,8 @@ public final class SqlBind extends SqlIntercode
             VariableBindings internal = new VariableBindings(access.getInternalVariableBindings());
             internal.add(new VariableBinding(variable, binding.getMappings(), binding.canBeNull()));
 
-            return SqlTableAccess.create(access.getTable(), access.getConditions(), internal, access.getReduced())
-                    .optimize(request, restrictions, reduced, evalServices);
+            return SqlTableAccess.create(access.getTable(), access.getConditions(), internal, access.getReduced(),
+                    access.getDistinctColumns()).optimize(request, restrictions, reduced, evalServices);
         }
 
 

@@ -79,6 +79,7 @@ public class JoinTableQuadMapping extends QuadMapping
     private final List<Table> tables;
     private final List<JoinColumns> joinColumnsPairs;
     private final List<Conditions> conditions;
+    private final List<Boolean> distinct;
     private final int graphTableIdx;
     private final int subjectTableIdx;
     private final int predicateTableIdx;
@@ -89,17 +90,29 @@ public class JoinTableQuadMapping extends QuadMapping
             TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
             int objectTableIdx, TermMapping object, List<Conditions> conditions)
     {
+        this(tables, joinColumnsPairs, graphTableIdx, graph, subjectTableIdx, subject, predicateTableIdx, predicate,
+                objectTableIdx, object, conditions, Collections.nCopies(tables.size(), false));
+    }
+
+
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
+            TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
+            int objectTableIdx, TermMapping object, List<Conditions> conditions, List<Boolean> distinct)
+    {
         super(graph, subject, predicate, object);
 
         this.tables = tables;
         this.joinColumnsPairs = joinColumnsPairs;
         this.conditions = conditions;
+        this.distinct = distinct;
         this.graphTableIdx = graphTableIdx;
         this.subjectTableIdx = subjectTableIdx;
         this.predicateTableIdx = predicateTableIdx;
         this.objectTableIdx = objectTableIdx;
 
         assert tables.size() == joinColumnsPairs.size() + 1;
+        assert tables.size() == conditions.size();
+        assert tables.size() == distinct.size();
     }
 
 
@@ -107,6 +120,15 @@ public class JoinTableQuadMapping extends QuadMapping
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
+    }
+
+
+    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
+            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
+            List<Boolean> distinct)
+    {
+        this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions,
+                distinct);
     }
 
 
@@ -122,7 +144,7 @@ public class JoinTableQuadMapping extends QuadMapping
     public QuadMapping asDefaultGraphMapping()
     {
         return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, null, subjectTableIdx, getSubject(),
-                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), conditions);
+                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), conditions, distinct);
     }
 
 
@@ -133,7 +155,7 @@ public class JoinTableQuadMapping extends QuadMapping
         newConditions.set(graphTableIdx, Conditions.and(conditions.get(graphTableIdx), graphConditions));
 
         return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, null, subjectTableIdx, getSubject(),
-                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions);
+                predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions, distinct);
     }
 
 
@@ -144,7 +166,7 @@ public class JoinTableQuadMapping extends QuadMapping
         newConditions.set(graphTableIdx, Conditions.and(conditions.get(graphTableIdx), graphConditions));
 
         return new JoinTableQuadMapping(tables, joinColumnsPairs, graphTableIdx, getGraph(), subjectTableIdx,
-                getSubject(), predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions);
+                getSubject(), predicateTableIdx, getPredicate(), objectTableIdx, getObject(), newConditions, distinct);
     }
 
 
@@ -163,6 +185,12 @@ public class JoinTableQuadMapping extends QuadMapping
     public final List<Conditions> getConditions()
     {
         return conditions;
+    }
+
+
+    public final List<Boolean> getDistinct()
+    {
+        return distinct;
     }
 
 
@@ -202,6 +230,9 @@ public class JoinTableQuadMapping extends QuadMapping
             return false;
 
         if(!conditions.equals(mapping.conditions))
+            return false;
+
+        if(!distinct.equals(mapping.distinct))
             return false;
 
         return true;

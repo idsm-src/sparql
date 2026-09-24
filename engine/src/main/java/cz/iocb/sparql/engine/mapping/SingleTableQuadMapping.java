@@ -9,6 +9,7 @@ public class SingleTableQuadMapping extends QuadMapping
 {
     private final Table table;
     private final Conditions conditions;
+    private final boolean distinct;
 
 
     public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
@@ -21,17 +22,25 @@ public class SingleTableQuadMapping extends QuadMapping
     public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions)
     {
+        this(table, graph, subject, predicate, object, conditions, false);
+    }
+
+
+    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
+            TermMapping object, Conditions conditions, boolean distinct)
+    {
         super(graph, subject, predicate, object);
 
         this.table = table;
         this.conditions = conditions;
+        this.distinct = distinct;
     }
 
 
     @Override
     public QuadMapping asDefaultGraphMapping()
     {
-        return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(), conditions);
+        return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(), conditions, distinct);
     }
 
 
@@ -39,7 +48,7 @@ public class SingleTableQuadMapping extends QuadMapping
     public QuadMapping asDefaultGraphMapping(Conditions graphConditions)
     {
         return new SingleTableQuadMapping(table, null, getSubject(), getPredicate(), getObject(),
-                Conditions.and(conditions, graphConditions));
+                Conditions.and(conditions, graphConditions), distinct);
     }
 
 
@@ -47,7 +56,7 @@ public class SingleTableQuadMapping extends QuadMapping
     public QuadMapping asNamedGraphMapping(Conditions graphConditions)
     {
         return new SingleTableQuadMapping(table, getGraph(), getSubject(), getPredicate(), getObject(),
-                Conditions.and(conditions, graphConditions));
+                Conditions.and(conditions, graphConditions), distinct);
     }
 
 
@@ -60,6 +69,12 @@ public class SingleTableQuadMapping extends QuadMapping
     public final Conditions getConditions()
     {
         return conditions;
+    }
+
+
+    public final boolean isDistinct()
+    {
+        return distinct;
     }
 
 
@@ -78,6 +93,9 @@ public class SingleTableQuadMapping extends QuadMapping
             return false;
 
         if(!conditions.equals(mapping.conditions))
+            return false;
+
+        if(distinct != mapping.distinct)
             return false;
 
         return true;

@@ -410,7 +410,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             maps.add(new MappedTerm(predicate, mapping.getPredicate()));
             maps.add(new MappedTerm(object, mapping.getObject()));
 
-            return getTableAccess(request, mapping.getTable(), conditions, maps);
+            return getTableAccess(request, mapping.getTable(), conditions, maps, mapping.isDistinct());
         }
         else if(qmapping instanceof JoinTableQuadMapping mapping)
         {
@@ -462,7 +462,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 if(i == mapping.getPredicateTableIdx())
                     conditions = Conditions.and(conditions, predicateConditions);
 
-                SqlIntercode acess = getTableAccess(request, table, conditions, maps);
+                SqlIntercode acess = getTableAccess(request, table, conditions, maps, mapping.getDistinct().get(i));
 
                 result = SqlJoin.join(request, result, acess);
             }
@@ -475,7 +475,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     private static SqlIntercode getTableAccess(Request request, Table table, Conditions extraCondition,
-            List<MappedTerm> maps)
+            List<MappedTerm> maps, boolean distinct)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
 
@@ -527,7 +527,17 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             }
         }
 
-        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), bindings);
+        Set<Column> distinctColumns = Set.of();
+
+        if(distinct)
+        {
+            // all table columns touched by the mapped terms, including those bound to constants by the pattern
+            distinctColumns = new HashSet<>(bindings.getNonConstantColumns());
+            distinctColumns.addAll(condition.getNonConstantColumns());
+        }
+
+        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), bindings, false,
+                distinctColumns);
     }
 
 

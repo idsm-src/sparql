@@ -35,10 +35,12 @@ public final class SqlTableAccess extends SqlIntercode
     private final Table table;
     private final Conditions conditions;
     private final VariableBindings internal;
+    private final Set<Column> distinctColumns;
     private final boolean reduced;
 
 
-    protected SqlTableAccess(Table table, Conditions conditions, VariableBindings internal, boolean reduced)
+    protected SqlTableAccess(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
+            Set<Column> distinctColumns)
     {
         super(getExternalVariableBindings(internal, conditions), true);
 
@@ -46,12 +48,20 @@ public final class SqlTableAccess extends SqlIntercode
         this.conditions = conditions;
         this.internal = internal;
         this.reduced = reduced;
+        this.distinctColumns = distinctColumns;
+    }
+
+
+    public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
+            Set<Column> distinctColumns)
+    {
+        return new SqlTableAccess(table, conditions, internal, reduced, distinctColumns);
     }
 
 
     public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced)
     {
-        return new SqlTableAccess(table, conditions, internal, reduced);
+        return create(table, conditions, internal, reduced, Set.of());
     }
 
 
@@ -154,12 +164,11 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
-    @Override
-    public boolean isDistinct(Request request, Collection<Variable> selected)
+    /**
+     * Returns the table columns that are bound to a constant by every disjunct of the conditions.
+     */
+    private Set<Column> getConstantBoundColumns()
     {
-        if(table == null)
-            return true;
-
         Set<Column> columns = new HashSet<>();
 
         for(ColumnComparison p : conditions.getAreEqual())
@@ -171,19 +180,71 @@ public final class SqlTableAccess extends SqlIntercode
                 columns.add(p.getLeft());
         }
 
-        for(Variable var : selected)
-        {
-            VariableBinding binding = bindings.get(var);
+        return columns;
+    }
 
-            if(binding != null)
-            {
-                for(Column column : binding.getNonConstantColumns())
-                    for(Column col : conditions.getEqualTableColumns(column))
-                        columns.add(col);
-            }
+
+    /**
+     * Returns the given columns together with the constant-bound columns, closed under the equalities of the
+     * conditions.
+     */
+    private Set<Column> getCoveredColumns(Collection<Column> selected)
+    {
+        Set<Column> columns = getConstantBoundColumns();
+
+        for(Column column : selected)
+        {
+            columns.add(column);
+            columns.addAll(conditions.getEqualTableColumns(column));
         }
 
-        return request.getConfiguration().getDatabaseSchema().getCompatibleKey(table, columns) != null;
+        return columns;
+    }
+
+
+    /**
+     * Returns the internal columns of the selected variables together with the constant-bound columns, closed under the
+     * equalities of the conditions.
+     */
+    private Set<Column> getCoveredVariableColumns(Collection<Variable> selected)
+    {
+        Set<Column> columns = new HashSet<>();
+
+        for(Variable var : selected)
+        {
+            VariableBinding binding = internal.get(var);
+
+            if(binding != null)
+                columns.addAll(binding.getNonConstantColumns());
+        }
+
+        return getCoveredColumns(columns);
+    }
+
+
+    /**
+     * Returns whether the deduplication requested by {@link #distinctColumns} is implied by a key of the table, in
+     * which case the request can be dropped.
+     */
+    private boolean isDistinctImpliedByKey(DatabaseSchema schema)
+    {
+        return table == null || schema.getCompatibleKey(table, getCoveredColumns(distinctColumns)) != null;
+    }
+
+
+    @Override
+    public boolean isDistinct(Request request, Collection<Variable> selected)
+    {
+        if(table == null)
+            return true;
+
+        Set<Column> columns = getCoveredVariableColumns(selected);
+
+        if(request.getConfiguration().getDatabaseSchema().getCompatibleKey(table, columns) != null)
+            return true;
+
+        // the access deduplicates its rows itself, unless the duplicates do not matter to its parent
+        return !reduced && !distinctColumns.isEmpty() && columns.containsAll(distinctColumns);
     }
 
 
@@ -344,6 +405,10 @@ public final class SqlTableAccess extends SqlIntercode
         if(parent.hasExpression())
             return null;
 
+        // the parent is dropped, which is exact only when its rows are unique with respect to the key columns
+        if(!parent.distinctColumns.isEmpty())
+            return null;
+
         Set<ColumnPair> columns = getJoinColumnPairs(parent, child);
 
         Set<Column> parentColumns = new HashSet<>();
@@ -489,11 +554,67 @@ public final class SqlTableAccess extends SqlIntercode
     {
         Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariableBindings()));
 
-        return create(left.table, conditions, left.internal.restrict(restrictions), left.reduced);
+        return create(left.table, conditions, left.internal.restrict(restrictions), left.reduced, left.distinctColumns);
+    }
+
+
+    /**
+     * Returns whether the distinct access, which denotes a set of rows over the given distinct columns, is pinned by
+     * the join to at most one row for each row of the other access to the same table, so that it only restricts the
+     * rows of the other access and does not change their multiplicities. That requires the join columns (the columns
+     * tied on both sides to the same variables, or to the same constants) to cover the distinct columns, all columns
+     * the distinct access binds and all columns its conditions depend on. Otherwise the existence of a matching row is
+     * not decided by the row of the other access itself: another row with the same join values may satisfy the
+     * conditions while that row does not.
+     */
+    static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct,
+            Set<Column> distinctColumns)
+    {
+        Set<Column> joinColumns = getJoinColumns(distinct, access);
+
+        if(!joinColumns.containsAll(distinctColumns))
+            return false;
+
+        if(!joinColumns.containsAll(distinct.internal.getNonConstantColumns()))
+            return false;
+
+        if(!joinColumns.containsAll(distinct.conditions.getNonConstantColumns()))
+            return false;
+
+        return true;
+    }
+
+
+    /**
+     * Returns whether the distinct access is deduplicated over its own distinct columns and can be merged into the
+     * other access, see {@link #canBeJoinedByDistinctColumns(SqlTableAccess, SqlTableAccess, Set)}.
+     */
+    private static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct)
+    {
+        return !distinct.distinctColumns.isEmpty()
+                && canBeJoinedByDistinctColumns(access, distinct, distinct.distinctColumns);
     }
 
 
     static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions)
+    {
+        return join(left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
+    }
+
+
+    /**
+     * Merges the distinct access into the other access to the same table, see {@link #canBeJoinedByDistinctColumns}.
+     * The result keeps the multiplicities of the other access, including its deduplication request.
+     */
+    static SqlIntercode joinByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct,
+            Restrictions restrictions)
+    {
+        return join(access, distinct, restrictions, access.distinctColumns);
+    }
+
+
+    private static SqlIntercode join(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions,
+            Set<Column> distinctColumns)
     {
         Condition joinCondition = new Condition();
         VariableBindings bindings = new VariableBindings(left.internal);
@@ -527,7 +648,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced);
+        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced, distinctColumns);
     }
 
 
@@ -573,7 +694,9 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        return new SqlTableAccess(child.table, conditions, bindings, child.reduced && parent.reduced);
+        // each child row has exactly one parent row, so only the deduplication of the child remains
+        return new SqlTableAccess(child.table, conditions, bindings, child.reduced && parent.reduced,
+                child.distinctColumns);
     }
 
 
@@ -619,7 +742,8 @@ public final class SqlTableAccess extends SqlIntercode
 
         bindings = bindings.restrict(restrictions);
 
-        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced);
+        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced,
+                union(left.distinctColumns, right.distinctColumns));
     }
 
 
@@ -651,7 +775,7 @@ public final class SqlTableAccess extends SqlIntercode
             bindings.add(new VariableBinding(binding.getVariable(), binding.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(parent.table, conditions, bindings, true);
+        return new SqlTableAccess(parent.table, conditions, bindings, true, parent.distinctColumns);
     }
 
 
@@ -667,7 +791,8 @@ public final class SqlTableAccess extends SqlIntercode
             bindings.add(new VariableBinding(binding.getVariable(), binding.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(left.table, conditions, bindings, true);
+        return new SqlTableAccess(left.table, conditions, bindings, true,
+                union(left.distinctColumns, right.distinctColumns));
     }
 
 
@@ -698,6 +823,13 @@ public final class SqlTableAccess extends SqlIntercode
 
         if(SqlTableAccess.canBeJoinedByPrimaryKey(schema, left, right))
             return SqlTableAccess.joinByPrimaryKey(left, right, restrictions);
+
+
+        if(SqlTableAccess.canBeJoinedByDistinctColumns(left, right))
+            return SqlTableAccess.joinByDistinctColumns(left, right, restrictions);
+
+        if(SqlTableAccess.canBeJoinedByDistinctColumns(right, left))
+            return SqlTableAccess.joinByDistinctColumns(right, left, restrictions);
 
         return null;
     }
@@ -730,6 +862,23 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlTableAccess.distinctUnionizeByPrimaryKey(left, right);
 
         return null;
+    }
+
+
+    /**
+     * Combines the deduplication requests of two accesses to the same table that are merged through a key. An empty set
+     * stands for rows distinguished by their own identity, which is the finest distinction possible, so it absorbs the
+     * other side: each row of a multiset side matches at most one row of the other side and dictates the multiplicities
+     * of the result. Two non-empty sets denote through the key the same rows, so their union applies.
+     */
+    private static Set<Column> union(Set<Column> left, Set<Column> right)
+    {
+        if(left.isEmpty() || right.isEmpty())
+            return Set.of();
+
+        Set<Column> result = new HashSet<>(left);
+        result.addAll(right);
+        return result;
     }
 
 
@@ -835,10 +984,15 @@ public final class SqlTableAccess extends SqlIntercode
 
         VariableBindings optimizedBindings = internal.restrict(restrictions);
 
-        if(this.reduced == reduced && optimizedBindings.equals(internal))
+        Set<Column> optimizedDistinct = distinctColumns;
+
+        if(!distinctColumns.isEmpty() && isDistinctImpliedByKey(request.getConfiguration().getDatabaseSchema()))
+            optimizedDistinct = Set.of();
+
+        if(this.reduced == reduced && optimizedBindings.equals(internal) && optimizedDistinct == distinctColumns)
             return this;
 
-        return create(table, conditions, optimizedBindings, reduced);
+        return create(table, conditions, optimizedBindings, reduced, optimizedDistinct);
     }
 
 
@@ -874,11 +1028,33 @@ public final class SqlTableAccess extends SqlIntercode
                         || columns.stream().allMatch(column -> column instanceof ConstantColumn);
 
 
+        // when the duplicates do not matter to the parent, the deduplication is left out entirely
+        boolean distinct = !reduced && !distinctColumns.isEmpty();
+
+        Set<Column> columns = getVariableBindings().getNonConstantColumns();
+
+        // the projected columns as they are written in the table (expressions instead of their aliases)
+        Set<Column> projected = new HashSet<>();
+
+        for(Column column : columns)
+            projected.add(rev.getOrDefault(column, column));
+
+        Set<Column> groupColumns = null;
+
+        if(distinct && !getCoveredColumns(projected).containsAll(distinctColumns))
+        {
+            // some distinct column is not projected, so the rows have to be grouped instead
+            groupColumns = new HashSet<>(projected);
+            groupColumns.addAll(distinctColumns);
+        }
+
+
         StringBuilder builder = new StringBuilder();
 
         builder.append("SELECT ");
 
-        Set<Column> columns = getVariableBindings().getNonConstantColumns();
+        if(distinct && groupColumns == null)
+            builder.append("DISTINCT ");
 
         if(!columns.isEmpty())
             builder.append(columns.stream().map(c -> (rev.containsKey(c) ? rev.get(c) + " AS " : "") + c)
@@ -952,6 +1128,12 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
+        if(groupColumns != null)
+        {
+            builder.append(" GROUP BY ");
+            builder.append(groupColumns.stream().sorted().map(Object::toString).collect(joining(", ")));
+        }
+
         if(canBeLimited && table != null)
             builder.append(" LIMIT 1");
 
@@ -989,6 +1171,12 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    protected Set<Column> getDistinctColumns()
+    {
+        return distinctColumns;
+    }
+
+
     @Override
     public boolean hasServiceSubpattern()
     {
@@ -1007,6 +1195,12 @@ public final class SqlTableAccess extends SqlIntercode
             builder.append(table.getSchema());
             builder.append(".");
             builder.append(table.getName());
+        }
+
+        if(!distinctColumns.isEmpty())
+        {
+            builder.append(" distinct");
+            builder.append(distinctColumns.stream().sorted().map(c -> c.getName()).collect(joining(",", "(", ")")));
         }
 
         if(!conditions.isTrue())
@@ -1118,6 +1312,9 @@ public final class SqlTableAccess extends SqlIntercode
         if(!Objects.equals(conditions, imcode.conditions))
             return false;
 
+        if(!Objects.equals(distinctColumns, imcode.distinctColumns))
+            return false;
+
         return true;
     }
 
@@ -1125,6 +1322,6 @@ public final class SqlTableAccess extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(reduced, table, internal, conditions);
+        return Objects.hash(reduced, table, internal, conditions, distinctColumns);
     }
 }

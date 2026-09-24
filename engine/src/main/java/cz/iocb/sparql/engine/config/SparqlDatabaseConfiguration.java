@@ -369,13 +369,21 @@ public class SparqlDatabaseConfiguration
 
 
     public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
-            TermMapping object, Conditions conditions)
+            TermMapping object, Conditions conditions, boolean distinct)
     {
-        mappings.get(serviceIri).add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions));
+        mappings.get(serviceIri)
+                .add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions, distinct));
 
         if(graph != null && autoAddToDefaultGraph)
             mappings.get(serviceIri)
-                    .add(new SingleTableQuadMapping(table, null, subject, predicate, object, conditions));
+                    .add(new SingleTableQuadMapping(table, null, subject, predicate, object, conditions, distinct));
+    }
+
+
+    public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
+            TermMapping object, Conditions conditions)
+    {
+        addQuadMapping(table, graph, subject, predicate, object, conditions, false);
     }
 
 
@@ -394,14 +402,23 @@ public class SparqlDatabaseConfiguration
 
 
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
-            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
+            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
+            List<Boolean> distinct)
     {
-        mappings.get(serviceIri)
-                .add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions));
+        mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
+                object, conditions, distinct));
 
         if(graph != null && autoAddToDefaultGraph)
-            mappings.get(serviceIri).add(
-                    new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate, object, conditions));
+            mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, null, subject, predicate,
+                    object, conditions, distinct));
+    }
+
+
+    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+            TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
+    {
+        addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions,
+                Collections.nCopies(tables.size(), false));
     }
 
 
