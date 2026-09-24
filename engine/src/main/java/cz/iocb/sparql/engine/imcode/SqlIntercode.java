@@ -550,7 +550,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @return bindings of the join of the given children (aliased by {@code tables})
      */
     protected static VariableBindings getJoinVariableBindings(Request request, List<VariableBindings> allVars,
-            List<Table> tables, Restrictions restrictions, Map<Column, Column> map)
+            List<? extends Table> tables, Restrictions restrictions, Map<Column, Column> map)
     {
         Map<Column, Column> columnMap = new HashMap<>();
 
@@ -607,7 +607,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @return the join binding of the variable, or null when constants conflict
      */
     private static VariableBinding createVariableBinding(Request request, Variable variable,
-            Set<ResourceClass> resClasses, List<VariableBinding> vars, List<Table> tables,
+            Set<ResourceClass> resClasses, List<VariableBinding> vars, List<? extends Table> tables,
             Map<Column, Column> columnMap, boolean canBeNull)
     {
         VariableBinding variableBinding = new VariableBinding(variable, canBeNull);
@@ -839,7 +839,7 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param tables the tables
      * @return SQL condition joining every pair of children on their shared variables, or null if none is needed
      */
-    public static String generateJoinCondition(List<VariableBindings> vars, List<Table> tables)
+    public static String generateJoinCondition(List<VariableBindings> vars, List<? extends Table> tables)
     {
         int size = vars.size();
 

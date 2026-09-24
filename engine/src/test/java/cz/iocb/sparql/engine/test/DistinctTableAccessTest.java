@@ -19,7 +19,7 @@ import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
@@ -99,8 +99,8 @@ public class DistinctTableAccessTest
         config.addPrefix("ex", "http://example.org/");
         config.addIriClass(new IntegerUserIriClass("compound", "int4", "http://example.org/compound/"));
 
-        Table compound = new Table("distinct_test", "compound");
-        Table synonym = new Table("distinct_test", "synonym");
+        DatabaseTable compound = new DatabaseTable("distinct_test", "compound");
+        DatabaseTable synonym = new DatabaseTable("distinct_test", "synonym");
         ConstantIriMapping graph = config.createIriMapping("<http://example.org/graph>");
 
         config.addQuadMapping(compound, graph, config.createIriMapping("compound", "id"),

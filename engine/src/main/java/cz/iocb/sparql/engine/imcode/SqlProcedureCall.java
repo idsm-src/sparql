@@ -15,6 +15,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
@@ -425,6 +426,15 @@ public final class SqlProcedureCall extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        Set<VirtualTable> tables = getVirtualTables(child);
+        tables.addAll(getVirtualTables(parameters.values()));
+        return tables;
     }
 
 

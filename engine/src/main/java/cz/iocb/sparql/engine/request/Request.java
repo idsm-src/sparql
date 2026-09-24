@@ -17,9 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.error.MessageCategory;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.error.TranslateMessage;
@@ -217,7 +218,7 @@ public class Request implements AutoCloseable
     /**
      * Temporary tables to drop when closing.
      */
-    private List<Table> tables = new ArrayList<>();
+    private List<DatabaseTable> tables = new ArrayList<>();
 
     /**
      * Counter of LATERAL aliases.
@@ -655,7 +656,7 @@ public class Request implements AutoCloseable
         {
             if(connection != null)
             {
-                for(Table table : tables)
+                for(DatabaseTable table : tables)
                 {
                     try(Statement stm = connection.createStatement())
                     {
@@ -790,9 +791,9 @@ public class Request implements AutoCloseable
      *
      * @return fresh alias for a LATERAL subquery
      */
-    public Table createLateralTable()
+    public AliasTable createLateralTable()
     {
-        return new Table("lateral" + lateralId++);
+        return new AliasTable("lateral" + lateralId++);
     }
 
 

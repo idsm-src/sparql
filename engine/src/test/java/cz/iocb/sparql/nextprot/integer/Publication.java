@@ -3,7 +3,7 @@ package cz.iocb.sparql.nextprot.integer;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
@@ -33,7 +33,7 @@ public class Publication
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "publication_bases");
+            DatabaseTable table = new DatabaseTable(schema, "publication_bases");
             TermMapping subject = config.createIriMapping("publication", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -64,7 +64,7 @@ public class Publication
         }
 
         {
-            Table table = new Table(schema, "publication_links");
+            DatabaseTable table = new DatabaseTable(schema, "publication_links");
             TermMapping subject = config.createIriMapping("publication", "publication");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":from"),
@@ -72,7 +72,7 @@ public class Publication
         }
 
         {
-            Table table = new Table(schema, "publication_authors");
+            DatabaseTable table = new DatabaseTable(schema, "publication_authors");
             TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeInSegmentClass(12), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -90,7 +90,7 @@ public class Publication
         }
 
         {
-            Table table = new Table(schema, "publication_editors");
+            DatabaseTable table = new DatabaseTable(schema, "publication_editors");
             TermMapping subject = config.createBlankNodeMapping(new IntBlankNodeInSegmentClass(13), "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),

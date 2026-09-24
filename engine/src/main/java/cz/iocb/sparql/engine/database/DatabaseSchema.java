@@ -13,125 +13,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import javax.sql.DataSource;
+import cz.iocb.sparql.engine.database.VirtualTableDefinition.ForeignKey;
+import cz.iocb.sparql.engine.database.VirtualTableDefinition.UnjoinableColumns;
 
 
 
 /**
- * Catalog facts about the target database used by the optimiser: nullable columns, unique keys, foreign keys, column
- * pairs known never to join, and character columns with a collation that does not order by code points. Read from the
- * JDBC metadata and the PostgreSQL catalog, or filled in by hand.
+ * Catalog facts about the source tables used by the optimiser: nullable columns, unique keys, foreign keys, column
+ * pairs known never to join, and character columns with a collation that does not order by code points. The facts about
+ * database tables are read from the JDBC metadata and the PostgreSQL catalog (or filled in by hand); the facts about
+ * virtual tables are merged in from their definitions by {@link #addVirtualTable}.
  */
 public class DatabaseSchema
 {
-    /**
-     * Ordered pair.
-     *
-     * @param <T> type of the members
-     */
-    public static class Pair<T>
-    {
-        /**
-         * First member.
-         */
-        protected final T left;
-
-        /**
-         * Second member.
-         */
-        protected final T right;
-
-        /**
-         * Creates the pair.
-         *
-         * @param left the first member
-         * @param right the second member
-         */
-        public Pair(T left, T right)
-        {
-            this.left = left;
-            this.right = right;
-        }
-
-
-        /**
-         * First member.
-         *
-         * @return first member
-         */
-        public final T getLeft()
-        {
-            return left;
-        }
-
-
-        /**
-         * Second member.
-         *
-         * @return second member
-         */
-        public final T getRight()
-        {
-            return right;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return left.hashCode() ^ right.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object object)
-        {
-            if(this == object)
-                return true;
-
-            if(object == null || getClass() != object.getClass())
-                return false;
-
-            Pair<?> other = (Pair<?>) object;
-
-            return left.equals(other.left) && right.equals(other.right);
-        }
-    }
-
-
-    /**
-     * Pair of a parent (referenced) table and a foreign (referencing) table.
-     */
-    public static class TablePair extends Pair<Table>
-    {
-        /**
-         * Creates the pair of a referenced and a referencing table.
-         *
-         * @param parent the table
-         * @param foreign the table
-         */
-        public TablePair(Table parent, Table foreign)
-        {
-            super(parent, foreign);
-        }
-    }
-
-
-    /**
-     * Pair of a parent table column and the foreign table column referencing it.
-     */
-    public static class ColumnPair extends Pair<Column>
-    {
-        /**
-         * Creates the pair of a referenced column and the column referencing it.
-         *
-         * @param parent the column
-         * @param foreign the column
-         */
-        public ColumnPair(Column parent, Column foreign)
-        {
-            super(parent, foreign);
-        }
-    }
-
-
     /**
      * Catalog query listing every column of a user table or view that has an explicit collation. SPARQL orders and
      * compares strings by unicode code points, whereas PostgreSQL orders a character column by its collation, so only
@@ -160,17 +54,17 @@ public class DatabaseSchema
     /**
      * Nullable columns per table.
      */
-    protected final Map<Table, List<Column>> nullableColumns = new HashMap<>();
+    protected final Map<SourceTable, List<Column>> nullableColumns = new HashMap<>();
 
     /**
      * Per table, the character columns whose collation does not order by code points, with the collation name.
      */
-    protected final Map<Table, Map<Column, String>> foreignCollations = new HashMap<>();
+    protected final Map<SourceTable, Map<Column, String>> foreignCollations = new HashMap<>();
 
     /**
      * Unique keys per table, each as its list of columns.
      */
-    protected final Map<Table, List<List<Column>>> primaryKeys = new HashMap<>();
+    protected final Map<SourceTable, List<List<Column>>> primaryKeys = new HashMap<>();
 
     /**
      * Foreign keys per (parent table, foreign table) pair, each as its set of column pairs.
@@ -204,7 +98,7 @@ public class DatabaseSchema
                 {
                     String tableSchema = tables.getString("TABLE_SCHEM");
                     String tableName = tables.getString("TABLE_NAME");
-                    Table table = new Table(tableSchema, tableName);
+                    SourceTable table = new DatabaseTable(tableSchema, tableName);
 
 
                     try(ResultSet columns = metaData.getColumns(null, tableSchema, tableName, null))
@@ -248,7 +142,7 @@ public class DatabaseSchema
 
                     try(ResultSet indexes = metaData.getCrossReference(null, tableSchema, tableName, null, null, null))
                     {
-                        Table foreignTable = null;
+                        SourceTable foreignTable = null;
                         List<Column> parentColumns = new ArrayList<>();
                         List<Column> foreignColumns = new ArrayList<>();
 
@@ -267,7 +161,7 @@ public class DatabaseSchema
                                     foreignColumns = new ArrayList<>();
                                 }
 
-                                foreignTable = new Table(indexes.getString("FKTABLE_SCHEM"),
+                                foreignTable = new DatabaseTable(indexes.getString("FKTABLE_SCHEM"),
                                         indexes.getString("FKTABLE_NAME"));
                             }
 
@@ -303,8 +197,8 @@ public class DatabaseSchema
                 if(checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
                     continue;
 
-                addForeignCollation(new Table(collatedColumn[0], collatedColumn[1]), new TableColumn(collatedColumn[2]),
-                        collation);
+                addForeignCollation(new DatabaseTable(collatedColumn[0], collatedColumn[1]),
+                        new TableColumn(collatedColumn[2]), collation);
             }
         }
     }
@@ -343,13 +237,13 @@ public class DatabaseSchema
      */
     public DatabaseSchema(DatabaseSchema other)
     {
-        for(Entry<Table, List<Column>> e : other.nullableColumns.entrySet())
+        for(Entry<SourceTable, List<Column>> e : other.nullableColumns.entrySet())
             nullableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
 
-        for(Entry<Table, Map<Column, String>> e : other.foreignCollations.entrySet())
+        for(Entry<SourceTable, Map<Column, String>> e : other.foreignCollations.entrySet())
             foreignCollations.put(e.getKey(), new HashMap<>(e.getValue()));
 
-        for(Entry<Table, List<List<Column>>> e : other.primaryKeys.entrySet())
+        for(Entry<SourceTable, List<List<Column>>> e : other.primaryKeys.entrySet())
             primaryKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
 
         for(Entry<TablePair, List<Set<ColumnPair>>> e : other.foreignKeys.entrySet())
@@ -361,12 +255,37 @@ public class DatabaseSchema
 
 
     /**
+     * Merges the facts stated by the definition of a virtual table: its nullable columns, unique keys, foreign keys and
+     * unjoinable column lists. The query of the definition is not needed here; it is attached to the generated
+     * statements by the translator.
+     *
+     * @param table the virtual table
+     * @param definition the definition of the virtual table
+     */
+    public void addVirtualTable(VirtualTable table, VirtualTableDefinition definition)
+    {
+        for(TableColumn column : definition.getNullableColumns())
+            addNullableColumn(table, column);
+
+        for(List<Column> key : definition.getPrimaryKeys())
+            addPrimaryKeys(table, key);
+
+        for(ForeignKey key : definition.getForeignKeys())
+            addForeignKeys(key.parentTable(), key.parentColumns(), key.foreignTable(), key.foreignColumns());
+
+        for(UnjoinableColumns unjoinable : definition.getUnjoinableColumns())
+            addUnjoinableColumns(unjoinable.leftTable(), unjoinable.leftColumns(), unjoinable.rightTable(),
+                    unjoinable.rightColumns());
+    }
+
+
+    /**
      * Declares the column nullable.
      *
      * @param table the table
      * @param column the column
      */
-    public void addNullableColumn(Table table, TableColumn column)
+    public void addNullableColumn(SourceTable table, TableColumn column)
     {
         List<Column> columnList = nullableColumns.get(table);
 
@@ -386,7 +305,7 @@ public class DatabaseSchema
      * @param table the table
      * @param columns the columns
      */
-    public void addPrimaryKeys(Table table, List<Column> columns)
+    public void addPrimaryKeys(SourceTable table, List<Column> columns)
     {
         List<List<Column>> primaryKeyList = primaryKeys.get(table);
 
@@ -409,7 +328,7 @@ public class DatabaseSchema
      * @param foreignTable the referencing table
      * @param foreignColumns the referencing columns
      */
-    public void addForeignKeys(Table parentTable, List<Column> parentColumns, Table foreignTable,
+    public void addForeignKeys(SourceTable parentTable, List<Column> parentColumns, SourceTable foreignTable,
             List<Column> foreignColumns)
     {
         TablePair tablePair = new TablePair(parentTable, foreignTable);
@@ -440,7 +359,7 @@ public class DatabaseSchema
      * @param rightTable the right table
      * @param rightColumns columns of the right table
      */
-    public void addUnjoinableColumns(Table leftTable, List<Column> leftColumns, Table rightTable,
+    public void addUnjoinableColumns(SourceTable leftTable, List<Column> leftColumns, SourceTable rightTable,
             List<Column> rightColumns)
     {
         TablePair tablePair = new TablePair(leftTable, rightTable);
@@ -469,7 +388,7 @@ public class DatabaseSchema
      * @param column the column
      * @param collation name of the collation
      */
-    public void addForeignCollation(Table table, TableColumn column, String collation)
+    public void addForeignCollation(SourceTable table, TableColumn column, String collation)
     {
         Map<Column, String> columnMap = foreignCollations.get(table);
 
@@ -492,7 +411,7 @@ public class DatabaseSchema
      * @return the collation of the given character column when it does not order by unicode code points, and null when
      *         the column orders the way SPARQL prescribes or is not a character column at all
      */
-    public String getForeignCollation(Table table, Column column)
+    public String getForeignCollation(SourceTable table, Column column)
     {
         return foreignCollations.getOrDefault(table, Map.of()).get(column);
     }
@@ -505,7 +424,7 @@ public class DatabaseSchema
      * @param column the column
      * @return true if the column may be NULL, false otherwise
      */
-    public boolean isNullableColumn(Table table, Column column)
+    public boolean isNullableColumn(SourceTable table, Column column)
     {
         return switch(column)
         {
@@ -523,7 +442,7 @@ public class DatabaseSchema
      * @param columns the columns
      * @return A unique key of the table all of whose columns are among {@code columns}, or null
      */
-    public List<Column> getCompatibleKey(Table table, Set<Column> columns)
+    public List<Column> getCompatibleKey(SourceTable table, Set<Column> columns)
     {
         List<List<Column>> keys = primaryKeys.get(table);
 
@@ -549,7 +468,7 @@ public class DatabaseSchema
      * @return A foreign key from {@code childTable} to {@code parentTable} that contains all the given join pairs and
      *         whose child columns cover {@code extra}, or null
      */
-    public Set<ColumnPair> isPartOfForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
+    public Set<ColumnPair> isPartOfForeignKey(SourceTable parentTable, SourceTable childTable, Set<ColumnPair> columns,
             Set<Column> extra)
     {
         List<Set<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
@@ -584,8 +503,8 @@ public class DatabaseSchema
      * @return A foreign key from {@code childTable} to {@code parentTable} all of whose pairs are among the given join
      *         pairs and whose child columns cover, through the pairs, all of {@code parentColumns}, or null
      */
-    public Set<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
-            Set<Column> parentColumns)
+    public Set<ColumnPair> getCompatibleForeignKey(SourceTable parentTable, SourceTable childTable,
+            Set<ColumnPair> columns, Set<Column> parentColumns)
     {
         List<Set<ColumnPair>> keys = getForeignKeys(parentTable, childTable);
 
@@ -617,7 +536,8 @@ public class DatabaseSchema
      * @param columns the join column pairs
      * @return A declared unjoinable column list fully contained in the given join pairs, or null
      */
-    public List<ColumnPair> getUnjoinableColumns(Table leftTable, Table rightTable, List<ColumnPair> columns)
+    public List<ColumnPair> getUnjoinableColumns(SourceTable leftTable, SourceTable rightTable,
+            List<ColumnPair> columns)
     {
         List<List<ColumnPair>> list = getUnjoinableColumns(leftTable, rightTable);
 
@@ -645,7 +565,7 @@ public class DatabaseSchema
      * @param columns the columns
      * @return true if the columns contain a unique key of the table, false otherwise
      */
-    public boolean isKey(Table table, Set<Column> columns)
+    public boolean isKey(SourceTable table, Set<Column> columns)
     {
         return getCompatibleKey(table, columns) != null;
     }
@@ -658,7 +578,7 @@ public class DatabaseSchema
      * @param foreignTable the referencing table
      * @return foreign keys from {@code foreignTable} to {@code parentTable}, each as its set of column pairs
      */
-    public List<Set<ColumnPair>> getForeignKeys(Table parentTable, Table foreignTable)
+    public List<Set<ColumnPair>> getForeignKeys(SourceTable parentTable, SourceTable foreignTable)
     {
         if(parentTable == null || foreignTable == null)
             return List.of();
@@ -674,7 +594,7 @@ public class DatabaseSchema
      * @param rightTable the right table
      * @return declared unjoinable column lists between the two tables, or null
      */
-    public List<List<ColumnPair>> getUnjoinableColumns(Table leftTable, Table rightTable)
+    public List<List<ColumnPair>> getUnjoinableColumns(SourceTable leftTable, SourceTable rightTable)
     {
         if(leftTable == null || rightTable == null)
             return null;

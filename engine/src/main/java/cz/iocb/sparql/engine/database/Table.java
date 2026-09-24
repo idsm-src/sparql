@@ -5,65 +5,37 @@ import java.util.List;
 
 
 /**
- * Optionally schema-qualified table (or view) name, rendered double-quoted.
+ * Name of a table-like relation appearing in the generated SQL, rendered double-quoted. A {@link SourceTable} is a
+ * relation the mappings read from (a {@link DatabaseTable} of the database or a {@link VirtualTable} defined by the
+ * configuration), whereas a {@link AliasTable} only names a subquery inside the generated statement.
  */
-public class Table
+public abstract class Table
 {
-    /**
-     * Schema, or null for the default search path.
-     */
-    private final String schema;
-
     /**
      * Name of the table.
      */
-    private final String table;
+    private final String name;
 
 
     /**
-     * Creates a schema-qualified reference.
+     * Creates the reference.
      *
-     * @param schema the schema name
-     * @param table the table name
+     * @param name the table name
      */
-    public Table(String schema, String table)
+    protected Table(String name)
     {
-        this.schema = schema;
-        this.table = table;
+        this.name = name;
     }
 
 
     /**
-     * Creates an unqualified reference.
+     * Name of the table without any qualification.
      *
-     * @param table the table name
+     * @return name of the table without any qualification
      */
-    public Table(String table)
+    public final String getName()
     {
-        this.schema = null;
-        this.table = table;
-    }
-
-
-    /**
-     * Schema, or null when unqualified.
-     *
-     * @return schema, or null when unqualified
-     */
-    public String getSchema()
-    {
-        return schema;
-    }
-
-
-    /**
-     * Name of the table without the schema.
-     *
-     * @return name of the table without the schema
-     */
-    public String getName()
-    {
-        return table;
+        return name;
     }
 
 
@@ -86,20 +58,29 @@ public class Table
     }
 
 
+    /**
+     * Renders the identifier double-quoted, doubling the embedded quotes.
+     *
+     * @param identifier the identifier
+     * @return the quoted identifier
+     */
+    protected static String quote(String identifier)
+    {
+        return "\"" + identifier.replaceAll("\"", "\"\"") + "\"";
+    }
+
+
     @Override
     public String toString()
     {
-        if(schema != null)
-            return "\"" + schema.replaceAll("\"", "\"\"") + "\".\"" + table.replaceAll("\"", "\"\"") + "\"";
-        else
-            return "\"" + table.replaceAll("\"", "\"\"") + "\"";
+        return quote(name);
     }
 
 
     @Override
     public int hashCode()
     {
-        return table.hashCode();
+        return name.hashCode();
     }
 
 
@@ -114,6 +95,6 @@ public class Table
 
         Table other = (Table) object;
 
-        return (schema == other.schema || schema != null && schema.equals(other.schema)) && table.equals(other.table);
+        return name.equals(other.name);
     }
 }

@@ -17,9 +17,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator;
 import cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonType;
@@ -117,6 +119,13 @@ public final class SqlInExpression extends SqlExpressionIntercode
         {
             return columnMap;
         }
+
+        @Override
+        public Set<VirtualTable> getVirtualTables()
+        {
+            throw new UnsupportedOperationException();
+        }
+
 
         @Override
         protected int getHashCode()
@@ -349,6 +358,15 @@ public final class SqlInExpression extends SqlExpressionIntercode
             return false;
 
         return true;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        Set<VirtualTable> tables = getVirtualTables(left);
+        tables.addAll(getVirtualTables(rights));
+        return tables;
     }
 
 

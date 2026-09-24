@@ -11,15 +11,17 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -42,7 +44,7 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Accessed table; null for constants only.
      */
-    private final Table table;
+    private final SourceTable table;
 
     /**
      * Conditions on the rows.
@@ -74,7 +76,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param reduced whether duplicate solutions may be dropped
      * @param distinctColumns columns over which deduplication is requested
      */
-    protected SqlTableAccess(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
+    protected SqlTableAccess(SourceTable table, Conditions conditions, VariableBindings internal, boolean reduced,
             Set<Column> distinctColumns)
     {
         super(getExternalVariableBindings(internal, conditions), true);
@@ -99,8 +101,8 @@ public final class SqlTableAccess extends SqlIntercode
      * @return access exposing the given bindings, restricted by the conditions, with a deduplication request over
      *         {@code distinctColumns}
      */
-    public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
-            Set<Column> distinctColumns)
+    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal,
+            boolean reduced, Set<Column> distinctColumns)
     {
         return new SqlTableAccess(table, conditions, internal, reduced, distinctColumns);
     }
@@ -115,7 +117,8 @@ public final class SqlTableAccess extends SqlIntercode
      * @param reduced whether duplicate solutions may be dropped
      * @return access exposing the given bindings, restricted by the conditions
      */
-    public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced)
+    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal,
+            boolean reduced)
     {
         return create(table, conditions, internal, reduced, Set.of());
     }
@@ -129,7 +132,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param internal bindings in terms of the table's own columns
      * @return access exposing the given bindings, restricted by the conditions
      */
-    public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal)
+    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal)
     {
         return create(table, conditions, internal, false);
     }
@@ -142,7 +145,7 @@ public final class SqlTableAccess extends SqlIntercode
      * @param internal bindings in terms of the table's own columns
      * @return unrestricted access exposing the given bindings
      */
-    public static SqlIntercode create(Table table, VariableBindings internal)
+    public static SqlIntercode create(SourceTable table, VariableBindings internal)
     {
         return create(table, new Conditions(true), internal, false);
     }
@@ -1487,7 +1490,7 @@ public final class SqlTableAccess extends SqlIntercode
      *
      * @return the accessed table; null for an access to constants only
      */
-    public Table getTable()
+    public SourceTable getTable()
     {
         return table;
     }
@@ -1557,6 +1560,13 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return table instanceof VirtualTable virtual ? Set.of(virtual) : Set.of();
+    }
+
+
+    @Override
     public void generateExplanation(StringBuilder builder, String indent)
     {
         builder.append("access");
@@ -1564,8 +1574,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(table != null)
         {
             builder.append(" ");
-            builder.append(table.getSchema());
-            builder.append(".");
+            builder.append(table instanceof DatabaseTable database ? database.getSchema() + "." : "");
             builder.append(table.getName());
         }
 

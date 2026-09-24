@@ -126,6 +126,7 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
@@ -2766,6 +2767,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return false;
 
         return true;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return getVirtualTables(arguments);
     }
 
 

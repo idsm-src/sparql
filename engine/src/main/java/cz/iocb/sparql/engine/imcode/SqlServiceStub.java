@@ -29,6 +29,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
@@ -648,6 +649,13 @@ public final class SqlServiceStub extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return true;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return context.getVirtualTables();
     }
 
 

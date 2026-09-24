@@ -2,7 +2,7 @@ package cz.iocb.sparql.nextprot.string;
 
 import static cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 
@@ -29,7 +29,7 @@ public class Expression
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "isoform_low_expressions");
+            DatabaseTable table = new DatabaseTable(schema, "isoform_low_expressions");
             TermMapping subject = config.createIriMapping("isoform", "isoform");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":lowExpression"),
@@ -37,7 +37,7 @@ public class Expression
         }
 
         {
-            Table table = new Table(schema, "isoform_medium_expressions");
+            DatabaseTable table = new DatabaseTable(schema, "isoform_medium_expressions");
             TermMapping subject = config.createIriMapping("isoform", "isoform");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":mediumExpression"),
@@ -45,7 +45,7 @@ public class Expression
         }
 
         {
-            Table table = new Table(schema, "isoform_high_expressions");
+            DatabaseTable table = new DatabaseTable(schema, "isoform_high_expressions");
             TermMapping subject = config.createIriMapping("isoform", "isoform");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":highExpression"),

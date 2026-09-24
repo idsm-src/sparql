@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.imcode;
 
 import java.util.Collection;
+import java.util.Set;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -63,6 +65,13 @@ public final class SqlEmptySolution extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return false;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return Set.of();
     }
 
 

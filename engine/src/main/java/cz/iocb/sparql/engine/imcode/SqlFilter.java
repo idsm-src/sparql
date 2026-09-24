@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -233,6 +234,15 @@ public final class SqlFilter extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        Set<VirtualTable> tables = getVirtualTables(child);
+        tables.addAll(getVirtualTables(conditions));
+        return tables;
     }
 
 

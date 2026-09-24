@@ -8,7 +8,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntege
 import static cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration.schema;
 import static java.util.Arrays.asList;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
@@ -50,7 +50,7 @@ public class Schema
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "source_bases");
+            DatabaseTable table = new DatabaseTable(schema, "source_bases");
             TermMapping subject = config.createIriMapping("source", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -66,10 +66,10 @@ public class Schema
     private static void addDatabaseQuadMapping(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
-        Table baseTable = new Table(schema, "database_bases");
+        DatabaseTable baseTable = new DatabaseTable(schema, "database_bases");
 
         {
-            Table table = new Table(schema, "database_bases");
+            DatabaseTable table = new DatabaseTable(schema, "database_bases");
             TermMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -79,7 +79,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "database_comments");
+            DatabaseTable table = new DatabaseTable(schema, "database_comments");
             TermMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
@@ -88,7 +88,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "database_categories");
+            DatabaseTable table = new DatabaseTable(schema, "database_categories");
             TermMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
@@ -101,10 +101,10 @@ public class Schema
     private static void addOntologyQuadMapping(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
-        Table baseTable = new Table(schema, "schema_bases");
+        DatabaseTable baseTable = new DatabaseTable(schema, "schema_bases");
 
         {
-            Table table = new Table(schema, "schema_bases");
+            DatabaseTable table = new DatabaseTable(schema, "schema_bases");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(table, baseTable),
@@ -119,7 +119,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_classes");
+            DatabaseTable table = new DatabaseTable(schema, "schema_classes");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
@@ -128,7 +128,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_thing_subclasses");
+            DatabaseTable table = new DatabaseTable(schema, "schema_thing_subclasses");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
@@ -137,7 +137,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_restrictions");
+            DatabaseTable table = new DatabaseTable(schema, "schema_restrictions");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
@@ -147,7 +147,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_related_terms");
+            DatabaseTable table = new DatabaseTable(schema, "schema_related_terms");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
@@ -157,7 +157,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_parent_classes");
+            DatabaseTable table = new DatabaseTable(schema, "schema_parent_classes");
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),

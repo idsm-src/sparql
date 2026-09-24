@@ -4,7 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.nextprot.combined.NeXtProtCombinedConfiguration.schema;
 import static java.util.Arrays.asList;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping.JoinColumns;
@@ -33,19 +33,19 @@ public class Terminology
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
-        Table baseTable = new Table(schema, "terminology_bases");
+        DatabaseTable baseTable = new DatabaseTable(schema, "terminology_bases");
 
         {
-            Table table = new Table(schema, "terminology_bases");
+            DatabaseTable table = new DatabaseTable(schema, "terminology_bases");
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
-            config.addQuadMapping(asList(table, new Table(schema, "schema_bases")),
+            config.addQuadMapping(asList(table, new DatabaseTable(schema, "schema_bases")),
                     asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), "int4")), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("schema", "iri"));
         }
 
         {
-            Table table = new Table(schema, "terminology_parents");
+            DatabaseTable table = new DatabaseTable(schema, "terminology_parents");
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
@@ -55,7 +55,7 @@ public class Terminology
         }
 
         {
-            Table table = new Table(schema, "terminology_related_terms");
+            DatabaseTable table = new DatabaseTable(schema, "terminology_related_terms");
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
@@ -65,7 +65,7 @@ public class Terminology
         }
 
         {
-            Table table = new Table(schema, "terminology_labels");
+            DatabaseTable table = new DatabaseTable(schema, "terminology_labels");
             TermMapping subject = config.createIriMapping("terminology", "iri");
 
             config.addQuadMapping(asList(baseTable, table),

@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Conditions;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
 
 
 
@@ -133,7 +133,7 @@ public class JoinTableQuadMapping extends QuadMapping
     /**
      * Tables of the chain in join order.
      */
-    private final List<Table> tables;
+    private final List<SourceTable> tables;
 
     /**
      * Join columns between adjacent tables; one fewer than tables.
@@ -186,7 +186,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param object the object mapping
      * @param conditions conditions on each table
      */
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
             TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
             int objectTableIdx, TermMapping object, List<Conditions> conditions)
     {
@@ -211,7 +211,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param conditions conditions on each table
      * @param distinct distinct flag of each table
      */
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
             TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
             int objectTableIdx, TermMapping object, List<Conditions> conditions, List<Boolean> distinct)
     {
@@ -243,7 +243,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param object the object mapping
      * @param conditions conditions on each table
      */
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         this(tables, joinColumnsPairs, 0, graph, 0, subject, 0, predicate, tables.size() - 1, object, conditions);
@@ -263,7 +263,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param conditions conditions on each table
      * @param distinct distinct flag of each table
      */
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
@@ -283,7 +283,7 @@ public class JoinTableQuadMapping extends QuadMapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public JoinTableQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
         this(tables, joinColumnsPairs, graph, subject, predicate, object,
@@ -326,7 +326,7 @@ public class JoinTableQuadMapping extends QuadMapping
      *
      * @return tables of the chain in join order
      */
-    public final List<Table> getTables()
+    public final List<SourceTable> getTables()
     {
         return tables;
     }

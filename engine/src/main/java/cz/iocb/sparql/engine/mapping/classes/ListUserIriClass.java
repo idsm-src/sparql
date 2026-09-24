@@ -9,8 +9,8 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 
@@ -24,7 +24,7 @@ public class ListUserIriClass extends SimpleUserIriClass
     /**
      * Table listing the member IRIs.
      */
-    private final Table table;
+    private final DatabaseTable table;
 
     /**
      * Column holding the member IRIs.
@@ -44,7 +44,7 @@ public class ListUserIriClass extends SimpleUserIriClass
      * @param table the table
      * @param column the column
      */
-    public ListUserIriClass(String name, Table table, TableColumn column)
+    public ListUserIriClass(String name, DatabaseTable table, TableColumn column)
     {
         super(name, "varchar");
 

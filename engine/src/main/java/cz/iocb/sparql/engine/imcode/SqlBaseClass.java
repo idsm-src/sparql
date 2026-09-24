@@ -1,5 +1,11 @@
 package cz.iocb.sparql.engine.imcode;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import cz.iocb.sparql.engine.database.VirtualTable;
+
 
 
 /**
@@ -25,6 +31,44 @@ public abstract class SqlBaseClass
      * @return the hash code
      */
     protected abstract int getHashCode();
+
+
+    /**
+     * Virtual tables the SQL of the node reads, including those read by its children. The top-level select declares
+     * them (and the virtual tables their definitions read) in the {@code WITH} clause of the generated statement.
+     *
+     * @return virtual tables the SQL of the node reads, including those read by its children
+     */
+    public abstract Set<VirtualTable> getVirtualTables();
+
+
+    /**
+     * Union of the virtual tables read by the given nodes.
+     *
+     * @param nodes the nodes
+     * @return union of the virtual tables read by the given nodes
+     */
+    protected static Set<VirtualTable> getVirtualTables(Collection<? extends SqlBaseClass> nodes)
+    {
+        Set<VirtualTable> tables = new HashSet<>();
+
+        for(SqlBaseClass node : nodes)
+            tables.addAll(node.getVirtualTables());
+
+        return tables;
+    }
+
+
+    /**
+     * Union of the virtual tables read by the given nodes.
+     *
+     * @param nodes the nodes
+     * @return union of the virtual tables read by the given nodes
+     */
+    protected static Set<VirtualTable> getVirtualTables(SqlBaseClass... nodes)
+    {
+        return getVirtualTables(Arrays.asList(nodes));
+    }
 
 
     /**

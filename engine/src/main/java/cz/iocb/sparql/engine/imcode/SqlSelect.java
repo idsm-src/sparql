@@ -28,6 +28,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
+import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.math.BigInteger;
@@ -40,7 +41,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -447,10 +451,71 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * {@code WITH} clause declaring the virtual tables the query reads and, transitively, the virtual tables their
+     * definitions read, each one after the tables it depends on; empty when the query reads no virtual table.
+     *
+     * @param request the current request
+     * @return the {@code WITH} clause followed by a space, or the empty string
+     * @throws IllegalStateException if a virtual table has no definition in the configuration or the dependencies of
+     *             the virtual tables are cyclic
+     */
+    private String translateWithClause(Request request)
+    {
+        Set<VirtualTable> tables = getVirtualTables();
+
+        if(tables.isEmpty())
+            return "";
+
+        LinkedHashMap<VirtualTable, VirtualTableDefinition> ordered = new LinkedHashMap<>();
+
+        for(VirtualTable table : tables.stream().sorted(comparing(VirtualTable::getName)).toList())
+            orderVirtualTable(request.getConfiguration(), table, ordered, new HashSet<>());
+
+        return ordered.entrySet().stream().map(e -> e.getKey() + " AS (" + e.getValue().getQuery() + ")")
+                .collect(joining(", ", "WITH ", " "));
+    }
+
+
+    /**
+     * Appends the table to the ordered definitions, preceded by the virtual tables its definition reads.
+     *
+     * @param config the configuration holding the definitions
+     * @param table the virtual table
+     * @param ordered the definitions collected so far, in declaration order
+     * @param visiting the tables on the current dependency path, to detect cycles
+     * @throws IllegalStateException if the table has no definition or its dependencies are cyclic
+     */
+    private static void orderVirtualTable(SparqlDatabaseConfiguration config, VirtualTable table,
+            LinkedHashMap<VirtualTable, VirtualTableDefinition> ordered, Set<VirtualTable> visiting)
+    {
+        if(ordered.containsKey(table))
+            return;
+
+        if(!visiting.add(table))
+            throw new IllegalStateException("cyclic dependency of virtual table " + table);
+
+        VirtualTableDefinition definition = config.getVirtualTableDefinition(table);
+
+        if(definition == null)
+            throw new IllegalStateException("virtual table " + table + " is not defined");
+
+        for(VirtualTable dependency : definition.getDependencies())
+            orderVirtualTable(config, dependency, ordered, visiting);
+
+        ordered.put(table, definition);
+        visiting.remove(table);
+    }
+
+
+
     @Override
     public String translate(Request request)
     {
         StringBuilder builder = new StringBuilder();
+
+        if(isTopLevel())
+            builder.append(translateWithClause(request));
 
         if(!isTopLevel())
         {
@@ -868,6 +933,13 @@ public final class SqlSelect extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return child.getVirtualTables();
     }
 
 

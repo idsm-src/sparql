@@ -7,7 +7,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdDateIr
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.nextprot.integer.NeXtProtIntegerConfiguration.schema;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
@@ -26,11 +26,11 @@ public class Schema
      */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
-        config.addIriClass(new MapUserIriClass("source", "int4", new Table(schema, "source_bases"),
+        config.addIriClass(new MapUserIriClass("source", "int4", new DatabaseTable(schema, "source_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/source/", 0));
-        config.addIriClass(new MapUserIriClass("database", "int4", new Table(schema, "database_bases"),
+        config.addIriClass(new MapUserIriClass("database", "int4", new DatabaseTable(schema, "database_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/db/", 0));
-        config.addIriClass(new MapUserIriClass("schema", "int4", new Table(schema, "schema_bases"),
+        config.addIriClass(new MapUserIriClass("schema", "int4", new DatabaseTable(schema, "schema_bases"),
                 new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf#", 0));
     }
 
@@ -51,7 +51,7 @@ public class Schema
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "source_bases");
+            DatabaseTable table = new DatabaseTable(schema, "source_bases");
             TermMapping subject = config.createIriMapping("source", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -69,7 +69,7 @@ public class Schema
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "database_bases");
+            DatabaseTable table = new DatabaseTable(schema, "database_bases");
             TermMapping subject = config.createIriMapping("database", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -79,7 +79,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "database_comments");
+            DatabaseTable table = new DatabaseTable(schema, "database_comments");
             TermMapping subject = config.createIriMapping("database", "db");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:comment"),
@@ -87,7 +87,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "database_categories");
+            DatabaseTable table = new DatabaseTable(schema, "database_categories");
             TermMapping subject = config.createIriMapping("database", "db");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":category"),
@@ -101,7 +101,7 @@ public class Schema
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");
 
         {
-            Table table = new Table(schema, "schema_bases");
+            DatabaseTable table = new DatabaseTable(schema, "schema_bases");
             TermMapping subject = config.createIriMapping("schema", "id");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -115,7 +115,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_classes");
+            DatabaseTable table = new DatabaseTable(schema, "schema_classes");
             TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdf:type"),
@@ -123,7 +123,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_thing_subclasses");
+            DatabaseTable table = new DatabaseTable(schema, "schema_thing_subclasses");
             TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),
@@ -131,7 +131,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_restrictions");
+            DatabaseTable table = new DatabaseTable(schema, "schema_restrictions");
             TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":notIn"),
@@ -139,7 +139,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_related_terms");
+            DatabaseTable table = new DatabaseTable(schema, "schema_related_terms");
             TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping(":related"),
@@ -147,7 +147,7 @@ public class Schema
         }
 
         {
-            Table table = new Table(schema, "schema_parent_classes");
+            DatabaseTable table = new DatabaseTable(schema, "schema_parent_classes");
             TermMapping subject = config.createIriMapping("schema", "entity");
 
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:subClassOf"),

@@ -25,7 +25,8 @@ import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -840,7 +841,7 @@ public final class SqlConstruct extends SqlIntercode
      * @return conditions that the nullable columns of some class of the binding are not null, i.e. the variable is
      *         bound
      */
-    private static Conditions createConditions(DatabaseSchema schema, Table table, VariableBinding binding)
+    private static Conditions createConditions(DatabaseSchema schema, SourceTable table, VariableBinding binding)
     {
         Conditions conditions = new Conditions(false);
 
@@ -863,6 +864,13 @@ public final class SqlConstruct extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return child.getVirtualTables();
     }
 
 

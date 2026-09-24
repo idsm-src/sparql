@@ -6,8 +6,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBinding;
@@ -25,12 +26,12 @@ public final class SqlMinus extends SqlIntercode
     /**
      * Alias of the left side.
      */
-    private static final Table leftTable = new Table("tab0");
+    private static final AliasTable leftTable = new AliasTable("tab0");
 
     /**
      * Alias of the right side.
      */
-    private static final Table rightTable = new Table("tab1");
+    private static final AliasTable rightTable = new AliasTable("tab1");
 
     /**
      * Left side, whose solutions are kept.
@@ -219,7 +220,8 @@ public final class SqlMinus extends SqlIntercode
      * @return SQL condition that a right solution removes a left one: the shared variables are compatible and at least
      *         one of them is bound on both sides
      */
-    private String generateCondition(VariableBindings left, VariableBindings right, Table leftTable, Table rightTable)
+    private String generateCondition(VariableBindings left, VariableBindings right, AliasTable leftTable,
+            AliasTable rightTable)
     {
         String joinCondition = generateJoinCondition(left, right, leftTable, rightTable);
 
@@ -314,6 +316,13 @@ public final class SqlMinus extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return getVirtualTables(left, right);
     }
 
 

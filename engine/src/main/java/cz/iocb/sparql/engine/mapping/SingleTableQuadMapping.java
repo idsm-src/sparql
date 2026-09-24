@@ -1,7 +1,7 @@
 package cz.iocb.sparql.engine.mapping;
 
 import cz.iocb.sparql.engine.database.Conditions;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
 
 
 
@@ -15,7 +15,7 @@ public class SingleTableQuadMapping extends QuadMapping
     /**
      * The table; null for constant-only quads.
      */
-    private final Table table;
+    private final SourceTable table;
 
     /**
      * Conditions restricting the rows.
@@ -37,7 +37,7 @@ public class SingleTableQuadMapping extends QuadMapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
+    public SingleTableQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object)
     {
         this(table, graph, subject, predicate, object, new Conditions(true));
@@ -54,7 +54,7 @@ public class SingleTableQuadMapping extends QuadMapping
      * @param object the object mapping
      * @param conditions the conditions
      */
-    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
+    public SingleTableQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions)
     {
         this(table, graph, subject, predicate, object, conditions, false);
@@ -72,7 +72,7 @@ public class SingleTableQuadMapping extends QuadMapping
      * @param conditions the conditions
      * @param distinct whether the mapping declares distinct rows
      */
-    public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
+    public SingleTableQuadMapping(SourceTable table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions, boolean distinct)
     {
         super(graph, subject, predicate, object);
@@ -111,7 +111,7 @@ public class SingleTableQuadMapping extends QuadMapping
      *
      * @return the table; null for constant-only quads
      */
-    public final Table getTable()
+    public final SourceTable getTable()
     {
         return table;
     }

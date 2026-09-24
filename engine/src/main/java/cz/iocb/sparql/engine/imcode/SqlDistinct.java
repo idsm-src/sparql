@@ -12,15 +12,16 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.common.Pair;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
-import cz.iocb.sparql.engine.translator.Pair;
 import cz.iocb.sparql.engine.translator.VariableBinding;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
@@ -263,8 +264,8 @@ public final class SqlDistinct extends SqlIntercode
             for(int i = 0; i < sorts.size(); i++)
             {
                 Pair<List<Set<ResourceClass>>, List<SqlIntercode>> pair = sorts.get(i);
-                List<Set<ResourceClass>> key = pair.getKey();
-                List<SqlIntercode> value = pair.getValue();
+                List<Set<ResourceClass>> key = pair.getLeft();
+                List<SqlIntercode> value = pair.getRight();
 
                 boolean isCompatible = true;
 
@@ -296,7 +297,7 @@ public final class SqlDistinct extends SqlIntercode
 
         for(Pair<List<Set<ResourceClass>>, List<SqlIntercode>> s : sorts)
         {
-            SqlIntercode item = SqlUnion.union(request, s.getValue());
+            SqlIntercode item = SqlUnion.union(request, s.getRight());
 
             if(item instanceof SqlUnion subUnion)
                 list.addAll(expandUnionByConstantColumns(request, subUnion, distinctVariables));
@@ -425,6 +426,13 @@ public final class SqlDistinct extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return child.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return child.getVirtualTables();
     }
 
 

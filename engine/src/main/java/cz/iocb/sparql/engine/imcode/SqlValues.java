@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -226,6 +227,13 @@ public final class SqlValues extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return false;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return Set.of();
     }
 
 

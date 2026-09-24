@@ -15,6 +15,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -284,6 +285,13 @@ public final class SqlExists extends SqlExpressionIntercode
             return false;
 
         return true;
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return pattern.getVirtualTables();
     }
 
 

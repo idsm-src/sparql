@@ -12,9 +12,10 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -35,12 +36,12 @@ public final class SqlRecursive extends SqlIntercode
     /**
      * Alias of the recursion in the recursive term.
      */
-    private static final Table leftTable = new Table("tab0");
+    private static final AliasTable leftTable = new AliasTable("tab0");
 
     /**
      * Alias of the step in the recursive term.
      */
-    private static final Table rightTable = new Table("tab1");
+    private static final AliasTable rightTable = new AliasTable("tab1");
 
     /**
      * Solutions starting the recursion.
@@ -467,6 +468,13 @@ public final class SqlRecursive extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return init.hasServiceSubpattern() || next.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return getVirtualTables(init, next);
     }
 
 

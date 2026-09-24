@@ -2,7 +2,7 @@ package cz.iocb.sparql.engine.mapping;
 
 import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
+import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.request.Request;

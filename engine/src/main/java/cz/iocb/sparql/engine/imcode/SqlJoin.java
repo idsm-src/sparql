@@ -16,13 +16,14 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.DatabaseSchema.ColumnPair;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -45,7 +46,7 @@ public final class SqlJoin extends SqlIntercode
     /**
      * Alias of each child.
      */
-    private final List<Table> tables;
+    private final List<AliasTable> tables;
 
     /**
      * Joined children.
@@ -66,7 +67,7 @@ public final class SqlJoin extends SqlIntercode
      * @param bindings the variable bindings
      * @param columnMap the column map
      */
-    protected SqlJoin(List<SqlIntercode> childs, List<Table> tables, VariableBindings bindings,
+    protected SqlJoin(List<SqlIntercode> childs, List<AliasTable> tables, VariableBindings bindings,
             Map<Column, Column> columnMap)
     {
         super(bindings, childs.stream().allMatch(c -> c.isDeterministic()));
@@ -114,7 +115,7 @@ public final class SqlJoin extends SqlIntercode
      */
     protected static SqlIntercode join(Request request, List<SqlIntercode> childs, Restrictions restrictions)
     {
-        List<Table> tables = IntStream.range(0, childs.size()).mapToObj(i -> new Table("tab" + i)).toList();
+        List<AliasTable> tables = IntStream.range(0, childs.size()).mapToObj(i -> new AliasTable("tab" + i)).toList();
 
         Map<Column, Column> columnMap = new HashMap<>();
         List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
@@ -930,6 +931,13 @@ public final class SqlJoin extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return childs.stream().anyMatch(c -> c.hasServiceSubpattern());
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        return getVirtualTables(childs);
     }
 
 

@@ -42,6 +42,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -53,8 +54,10 @@ import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.VirtualTable;
+import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
 import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
@@ -85,9 +88,9 @@ import info.adams.ryu.RyuFloat;
 
 
 /**
- * Describes one SPARQL endpoint deployment: prefixes, datatypes, user IRI classes, quad mappings of the database
- * tables, procedures, extension functions and federated services. Deployments subclass it and register their
- * definitions in the constructor; the endpoint instantiates it through JNDI, which requires a
+ * Describes one SPARQL endpoint deployment: prefixes, datatypes, user IRI classes, virtual tables, quad mappings of the
+ * database and virtual tables, procedures, extension functions and federated services. Deployments subclass it and
+ * register their definitions in the constructor; the endpoint instantiates it through JNDI, which requires a
  * {@code (String service, DataSource, DatabaseSchema)} constructor.
  */
 public class SparqlDatabaseConfiguration
@@ -158,6 +161,11 @@ public class SparqlDatabaseConfiguration
     protected Map<Iri, Map<String, FunctionDefinition>> functions = new HashMap<>();
 
     /**
+     * Definitions of the virtual tables the mappings may read, by table, in registration order.
+     */
+    protected Map<VirtualTable, VirtualTableDefinition> virtualTables = new LinkedHashMap<>();
+
+    /**
      * Cache of IRI class detections shared by all requests.
      */
     protected final IriCache iriCache = new IriCache(10000);
@@ -170,7 +178,8 @@ public class SparqlDatabaseConfiguration
      * @param descriptionGraph IRI of the graph holding the service description; defaults to
      *            {@code service#ServiceDescription}
      * @param connectionPool the connection pool of the database
-     * @param schema the database schema
+     * @param schema the database schema; it is copied, so the facts about the virtual tables of this configuration do
+     *            not leak into the original
      * @param autoAddToDefaultGraph if true, every mapping registered for a named graph is also added to the default
      *            graph (union default graph)
      *
@@ -186,7 +195,7 @@ public class SparqlDatabaseConfiguration
         this.serviceIri = serviceIri;
         this.descriptionGraphIri = descriptionGraphIri;
         this.connectionPool = connectionPool;
-        this.databaseSchema = schema;
+        this.databaseSchema = schema != null ? new DatabaseSchema(schema) : null;
         this.autoAddToDefaultGraph = autoAddToDefaultGraph;
 
         addEmptyService(serviceIri);
@@ -323,6 +332,46 @@ public class SparqlDatabaseConfiguration
             throw new IllegalArgumentException(
                     "resource class definition conflict for iri class '" + iriClass.getResourceName() + "'");
         }
+    }
+
+
+    /**
+     * Registers a virtual table: a table computed by an SQL query that quad mappings may read like a database table.
+     * Every generated statement reading the table declares it in a {@code WITH} clause, and the facts stated by the
+     * definition (nullable columns, keys, foreign keys, unjoinable columns) are merged into the database schema for the
+     * optimiser. Registering the same table again with an equal definition is ignored.
+     *
+     * @param table the virtual table
+     * @param definition the definition of the virtual table
+     * @throws IllegalArgumentException if the table is already registered with a different definition
+     */
+    public void addVirtualTable(VirtualTable table, VirtualTableDefinition definition)
+    {
+        VirtualTableDefinition previous = virtualTables.get(table);
+
+        if(previous == null)
+        {
+            virtualTables.put(table, definition);
+            databaseSchema.addVirtualTable(table, definition);
+        }
+        else if(!previous.equals(definition))
+        {
+            throw new IllegalArgumentException("virtual table definition conflict for '" + table.getName() + "'");
+        }
+    }
+
+
+    /**
+     * Checks that every virtual table among the given tables is registered.
+     *
+     * @param tables the tables of a quad mapping
+     * @throws IllegalArgumentException if a virtual table is not registered
+     */
+    private void checkVirtualTables(List<SourceTable> tables)
+    {
+        for(SourceTable table : tables)
+            if(table instanceof VirtualTable virtual && !virtualTables.containsKey(virtual))
+                throw new IllegalArgumentException("virtual table '" + table.getName() + "' is not defined");
     }
 
 
@@ -617,7 +666,7 @@ public class SparqlDatabaseConfiguration
      * @param tables the tables
      * @param terms the term mappings to check
      */
-    private void checkColumnCollations(List<Table> tables, TermMapping... terms)
+    private void checkColumnCollations(List<SourceTable> tables, TermMapping... terms)
     {
         for(TermMapping term : terms)
         {
@@ -626,7 +675,7 @@ public class SparqlDatabaseConfiguration
 
             for(Column column : term.getColumns(null))
             {
-                for(Table table : tables)
+                for(SourceTable table : tables)
                 {
                     String collation = databaseSchema.getForeignCollation(table, column);
 
@@ -653,9 +702,10 @@ public class SparqlDatabaseConfiguration
      * @param conditions the conditions
      * @param distinct distinct flag of each table
      */
-    public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
-            TermMapping object, Conditions conditions, boolean distinct)
+    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
+            ConstantIriMapping predicate, TermMapping object, Conditions conditions, boolean distinct)
     {
+        checkVirtualTables(table == null ? List.of() : List.of(table));
         checkColumnCollations(table == null ? List.of() : List.of(table), subject, predicate, object);
 
         mappings.get(serviceIri)
@@ -677,8 +727,8 @@ public class SparqlDatabaseConfiguration
      * @param object the object mapping
      * @param conditions the conditions
      */
-    public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
-            TermMapping object, Conditions conditions)
+    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
+            ConstantIriMapping predicate, TermMapping object, Conditions conditions)
     {
         addQuadMapping(table, graph, subject, predicate, object, conditions, false);
     }
@@ -693,8 +743,8 @@ public class SparqlDatabaseConfiguration
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
-            TermMapping object)
+    public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
+            ConstantIriMapping predicate, TermMapping object)
     {
         addQuadMapping(table, graph, subject, predicate, object, new Conditions(true));
     }
@@ -729,10 +779,11 @@ public class SparqlDatabaseConfiguration
      * @param conditions the conditions
      * @param distinct distinct flag of each table
      */
-    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
+        checkVirtualTables(tables);
         checkColumnCollations(tables, subject, predicate, object);
 
         mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
@@ -755,7 +806,7 @@ public class SparqlDatabaseConfiguration
      * @param object the object mapping
      * @param conditions the conditions
      */
-    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object, conditions,
@@ -773,7 +824,7 @@ public class SparqlDatabaseConfiguration
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
+    public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
         addQuadMapping(tables, joinColumnsPairs, graph, subject, predicate, object,
@@ -794,7 +845,7 @@ public class SparqlDatabaseConfiguration
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
-    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
+    public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object)
     {
@@ -819,7 +870,7 @@ public class SparqlDatabaseConfiguration
      * @param subjectCondition conditions on the subject table
      * @param objectCondition conditions on the object table
      */
-    public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
+    public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
@@ -871,6 +922,9 @@ public class SparqlDatabaseConfiguration
 
         for(UserIriClass iriClass : other.getIriClasses())
             addIriClass(iriClass);
+
+        for(Entry<VirtualTable, VirtualTableDefinition> entry : other.getVirtualTables().entrySet())
+            addVirtualTable(entry.getKey(), entry.getValue());
 
         for(Iri service : other.getServices())
         {
@@ -1135,6 +1189,29 @@ public class SparqlDatabaseConfiguration
     public DatabaseSchema getDatabaseSchema()
     {
         return databaseSchema;
+    }
+
+
+    /**
+     * Definition of the virtual table, or null when the table is not registered.
+     *
+     * @param table the virtual table
+     * @return definition of the virtual table, or null when the table is not registered
+     */
+    public VirtualTableDefinition getVirtualTableDefinition(VirtualTable table)
+    {
+        return virtualTables.get(table);
+    }
+
+
+    /**
+     * Registered virtual tables with their definitions, in registration order.
+     *
+     * @return registered virtual tables with their definitions, in registration order
+     */
+    public Map<VirtualTable, VirtualTableDefinition> getVirtualTables()
+    {
+        return virtualTables;
     }
 
 

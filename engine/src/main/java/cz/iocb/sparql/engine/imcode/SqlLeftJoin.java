@@ -11,10 +11,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -35,12 +36,12 @@ public final class SqlLeftJoin extends SqlIntercode
     /**
      * Alias of the left side.
      */
-    private static final Table leftTable = new Table("tab0");
+    private static final AliasTable leftTable = new AliasTable("tab0");
 
     /**
      * Alias of the right side.
      */
-    private static final Table rightTable = new Table("tab1");
+    private static final AliasTable rightTable = new AliasTable("tab1");
 
     /**
      * Left side, always kept.
@@ -437,6 +438,15 @@ public final class SqlLeftJoin extends SqlIntercode
     public boolean hasServiceSubpattern()
     {
         return left.hasServiceSubpattern() || right.hasServiceSubpattern();
+    }
+
+
+    @Override
+    public Set<VirtualTable> getVirtualTables()
+    {
+        Set<VirtualTable> tables = getVirtualTables(left, right);
+        tables.addAll(getVirtualTables(conditions));
+        return tables;
     }
 
 

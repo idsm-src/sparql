@@ -17,8 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
-import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.SqlIntercode;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -61,7 +61,7 @@ public class StoredResultHandler extends ResultHandler
     /**
      * Temporary table, created on the first flush.
      */
-    private Table table;
+    private DatabaseTable table;
 
     /**
      * Table columns with their SQL types.
@@ -309,7 +309,7 @@ public class StoredResultHandler extends ResultHandler
     {
         if(table == null)
         {
-            table = new Table(null, "tmp_table_" + tableIdx.getAndIncrement());
+            table = new DatabaseTable("pg_temp", "tmp_table_" + tableIdx.getAndIncrement());
 
             String sql = "create temporary table " + table + columns.entrySet().stream()
                     .map(e -> e.getKey() + " " + e.getValue()).collect(joining(", ", "(", ")"));

@@ -13,7 +13,7 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
-import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.imcode.SqlBind;
 import cz.iocb.sparql.engine.imcode.SqlDistinct;
 import cz.iocb.sparql.engine.imcode.SqlEmptySolution;
@@ -508,7 +508,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
         }
         else if(qmapping instanceof JoinTableQuadMapping mapping)
         {
-            List<Table> tables = mapping.getTables();
+            List<SourceTable> tables = mapping.getTables();
             List<JoinColumns> joinColumnsPairs = mapping.getJoinColumnsPairs();
 
             ResourceClass resourceClass = null;
@@ -550,7 +550,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 }
 
 
-                Table table = tables.get(i);
+                SourceTable table = tables.get(i);
                 Conditions conditions = mapping.getConditions().get(i);
 
                 if(i == mapping.getPredicateTableIdx())
@@ -580,7 +580,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
      * @return table access binding the mapped terms: constants become conditions, repeated variables become equalities,
      *         and mapped columns of variables are exposed as bindings
      */
-    private static SqlIntercode getTableAccess(Request request, Table table, Conditions extraCondition,
+    private static SqlIntercode getTableAccess(Request request, SourceTable table, Conditions extraCondition,
             List<MappedTerm> maps, boolean distinct)
     {
         DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
