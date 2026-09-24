@@ -30,15 +30,50 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Access to one table, or to constants only when the table is null: the mapped columns are exposed as variables and the
+ * rows are restricted by conditions. Joins, left joins and distinct unions of accesses to the same table or along keys
+ * are merged into a single access ({@link #tryReduceJoin} and friends). {@code reduced} means the parent does not care
+ * about duplicates; {@code distinctColumns} asks for deduplication over those columns (see
+ * {@link cz.iocb.sparql.engine.mapping.SingleTableQuadMapping}).
+ */
 public final class SqlTableAccess extends SqlIntercode
 {
+    /**
+     * Accessed table; null for constants only.
+     */
     private final Table table;
+
+    /**
+     * Conditions on the rows.
+     */
     private final Conditions conditions;
+
+    /**
+     * Bindings in terms of the table's own columns.
+     */
     private final VariableBindings internal;
+
+    /**
+     * Columns over which deduplication is requested.
+     */
     private final Set<Column> distinctColumns;
+
+    /**
+     * Whether the parent tolerates duplicate rows.
+     */
     private final boolean reduced;
 
 
+    /**
+     * Creates the node; the exposed bindings use one representative per set of columns equated by the conditions.
+     *
+     * @param table the table
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether duplicate solutions may be dropped
+     * @param distinctColumns columns over which deduplication is requested
+     */
     protected SqlTableAccess(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
             Set<Column> distinctColumns)
     {
@@ -52,6 +87,18 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Access exposing the given bindings, restricted by the conditions, with a deduplication request over
+     * {@code distinctColumns}.
+     *
+     * @param table the table
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether duplicate solutions may be dropped
+     * @param distinctColumns columns over which deduplication is requested
+     * @return access exposing the given bindings, restricted by the conditions, with a deduplication request over
+     *         {@code distinctColumns}
+     */
     public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced,
             Set<Column> distinctColumns)
     {
@@ -59,24 +106,56 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Access exposing the given bindings, restricted by the conditions.
+     *
+     * @param table the table
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether duplicate solutions may be dropped
+     * @return access exposing the given bindings, restricted by the conditions
+     */
     public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal, boolean reduced)
     {
         return create(table, conditions, internal, reduced, Set.of());
     }
 
 
+    /**
+     * Access exposing the given bindings, restricted by the conditions.
+     *
+     * @param table the table
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @return access exposing the given bindings, restricted by the conditions
+     */
     public static SqlIntercode create(Table table, Conditions conditions, VariableBindings internal)
     {
         return create(table, conditions, internal, false);
     }
 
 
+    /**
+     * Unrestricted access exposing the given bindings.
+     *
+     * @param table the table
+     * @param internal bindings in terms of the table's own columns
+     * @return unrestricted access exposing the given bindings
+     */
     public static SqlIntercode create(Table table, VariableBindings internal)
     {
         return create(table, new Conditions(true), internal, false);
     }
 
 
+    /**
+     * Bindings for the parent: equated columns replaced by their representative, expressions by generated columns.
+     *
+     * @param bindings the variable bindings
+     * @param conditions the conditions
+     * @return bindings for the parent: equated columns replaced by their representative, expressions by generated
+     *         columns
+     */
     private static VariableBindings getExternalVariableBindings(VariableBindings bindings, Conditions conditions)
     {
         Map<Column, Column> representants = selectColumnRepresentants(conditions);
@@ -98,6 +177,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * For each column equated with others in every disjunct, a representative: a constant if present, else a plain
+     * column rather than an expression.
+     *
+     * @param conditions the conditions
+     * @return for each column equated with others in every disjunct, a representative: a constant if present, else a
+     *         plain column rather than an expression
+     */
     private static Map<Column, Column> selectColumnRepresentants(Conditions conditions)
     {
         Set<ColumnComparison> equals = null;
@@ -135,6 +222,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Replaces the columns by their representatives and expressions by generated columns (allocated on first use).
+     *
+     * @param set representative of each equated column
+     * @param expressions generated columns of expressions, extended on demand
+     * @param columns the columns
+     * @return the replaced columns
+     */
     private static List<Column> selectColumns(Map<Column, Column> set, Map<Column, Column> expressions,
             List<Column> columns)
     {
@@ -166,6 +261,8 @@ public final class SqlTableAccess extends SqlIntercode
 
     /**
      * Returns the table columns that are bound to a constant by every disjunct of the conditions.
+     *
+     * @return the table columns that are bound to a constant by every disjunct of the conditions
      */
     private Set<Column> getConstantBoundColumns()
     {
@@ -187,6 +284,9 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Returns the given columns together with the constant-bound columns, closed under the equalities of the
      * conditions.
+     *
+     * @param selected the selected variables
+     * @return the given columns together with the constant-bound columns, closed under the equalities of the conditions
      */
     private Set<Column> getCoveredColumns(Collection<Column> selected)
     {
@@ -205,6 +305,10 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Returns the internal columns of the selected variables together with the constant-bound columns, closed under the
      * equalities of the conditions.
+     *
+     * @param selected the selected variables
+     * @return the internal columns of the selected variables together with the constant-bound columns, closed under the
+     *         equalities of the conditions
      */
     private Set<Column> getCoveredVariableColumns(Collection<Variable> selected)
     {
@@ -225,6 +329,9 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Returns whether the deduplication requested by {@link #distinctColumns} is implied by a key of the table, in
      * which case the request can be dropped.
+     *
+     * @param schema the database schema
+     * @return true if a key of the table covers the distinct columns, false otherwise
      */
     private boolean isDistinctImpliedByKey(DatabaseSchema schema)
     {
@@ -248,6 +355,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * True if the VALUES can be merged into the access: distinct rows, every variable bound in one class also bound in
+     * the access and never null on either side.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the VALUES node
+     * @return true if the VALUES can be merged into the access, false otherwise
+     */
     private static boolean canBeJoinedWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right)
     {
         if(!right.isDistinct())
@@ -279,6 +395,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Columns on which two accesses to the same table are equated through their shared variables; empty if the tables
+     * differ or the variables are not joined in a single class.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @return columns on which two accesses to the same table are equated through their shared variables; empty if the
+     *         tables differ or the variables are not joined in a single class
+     */
     static Set<Column> getJoinColumns(SqlTableAccess left, SqlTableAccess right)
     {
         // only the same tables can by merged
@@ -336,6 +461,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * True if the shared columns of two accesses to the same table contain a key of the table.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @return true if the shared columns of two accesses to the same table contain a key of the table, false otherwise
+     */
     private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         Set<Column> columns = getJoinColumns(left, right);
@@ -344,6 +477,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Pairs of parent and child columns equated through shared variables; empty if the variables are not joined in a
+     * single class.
+     *
+     * @param parent access to the referenced table
+     * @param child access to the referencing table
+     * @return pairs of parent and child columns equated through shared variables; empty if the variables are not joined
+     *         in a single class
+     */
     static Set<ColumnPair> getJoinColumnPairs(SqlTableAccess parent, SqlTableAccess child)
     {
         Set<ColumnPair> columns = new HashSet<>();
@@ -396,6 +538,16 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Foreign key allowing the parent access to be merged into the child access (no expressions, no deduplication
+     * request, parent columns covered), or null.
+     *
+     * @param schema the database schema
+     * @param parent access to the referenced table
+     * @param child access to the referencing table
+     * @return foreign key allowing the parent access to be merged into the child access (no expressions, no
+     *         deduplication request, parent columns covered), or null
+     */
     private static Set<ColumnPair> canBeJoinedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
             SqlTableAccess child)
     {
@@ -419,6 +571,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * True if two accesses to the same table bind the same variables in the same columns.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @return true if two accesses to the same table bind the same variables in the same columns, false otherwise
+     */
     private static boolean canBeDistinctUnionizedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left,
             SqlTableAccess right)
     {
@@ -439,6 +599,16 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has exactly
+     * one child row), or null.
+     *
+     * @param schema the database schema
+     * @param parent access to the referenced table
+     * @param child access to the referencing table
+     * @return foreign key allowing a distinct union of the parent and child accesses to be merged (each parent row has
+     *         exactly one child row), or null
+     */
     private static Set<ColumnPair> canBeDistinctUnionizedByForeignKey(DatabaseSchema schema, SqlTableAccess parent,
             SqlTableAccess child)
     {
@@ -485,6 +655,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * True if a left join of two accesses to the same table on a key can be merged: at most one extra not-null
+     * condition on the right side and no other right-side conditions.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @return true if a left join of two accesses to the same table on a key can be merged, false otherwise
+     */
     private static boolean canBeLeftJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         if(!canBeJoinedByPrimaryKey(schema, left, right))
@@ -550,6 +729,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges the VALUES into the access as conditions.
+     *
+     * @param left the left access
+     * @param right the VALUES node
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access
+     */
     private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Restrictions restrictions)
     {
         Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariableBindings()));
@@ -566,6 +753,11 @@ public final class SqlTableAccess extends SqlIntercode
      * the distinct access binds and all columns its conditions depend on. Otherwise the existence of a matching row is
      * not decided by the row of the other access itself: another row with the same join values may satisfy the
      * conditions while that row does not.
+     *
+     * @param access the other access
+     * @param distinct the deduplicated access
+     * @param distinctColumns columns over which deduplication is requested
+     * @return true if the distinct access can be merged without changing the multiplicities, false otherwise
      */
     static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct,
             Set<Column> distinctColumns)
@@ -588,6 +780,10 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Returns whether the distinct access is deduplicated over its own distinct columns and can be merged into the
      * other access, see {@link #canBeJoinedByDistinctColumns(SqlTableAccess, SqlTableAccess, Set)}.
+     *
+     * @param access the other access
+     * @param distinct the deduplicated access
+     * @return true if the distinct access can be merged without changing the multiplicities, false otherwise
      */
     private static boolean canBeJoinedByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct)
     {
@@ -596,6 +792,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges two accesses to the same table joined on a key into one access.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access
+     */
     static SqlIntercode joinByPrimaryKey(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions)
     {
         return join(left, right, restrictions, union(left.distinctColumns, right.distinctColumns));
@@ -605,14 +809,28 @@ public final class SqlTableAccess extends SqlIntercode
     /**
      * Merges the distinct access into the other access to the same table, see {@link #canBeJoinedByDistinctColumns}.
      * The result keeps the multiplicities of the other access, including its deduplication request.
+     *
+     * @param access the other access
+     * @param distinct the deduplicated access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access
      */
-    static SqlIntercode joinByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct,
-            Restrictions restrictions)
+    static SqlIntercode joinByDistinctColumns(SqlTableAccess access, SqlTableAccess distinct, Restrictions restrictions)
     {
         return join(access, distinct, restrictions, access.distinctColumns);
     }
 
 
+    /**
+     * Merges two accesses to the same table: their conditions are conjoined with the equalities of the shared
+     * variables; no solution when contradictory.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @param restrictions what the parent needs of the variables
+     * @param distinctColumns columns over which deduplication is requested
+     * @return the merged access, or no solution when the conditions contradict
+     */
     private static SqlIntercode join(SqlTableAccess left, SqlTableAccess right, Restrictions restrictions,
             Set<Column> distinctColumns)
     {
@@ -652,6 +870,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges the parent access into the child access along the foreign key, so the parent table is not accessed at all.
+     *
+     * @param parent access to the referenced table
+     * @param child access to the referencing table
+     * @param key the foreign key
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access
+     */
     static SqlIntercode joinByForeignKey(SqlTableAccess parent, SqlTableAccess child, Set<ColumnPair> key,
             Restrictions restrictions)
     {
@@ -700,6 +927,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a left join of two accesses to the same table on a key: right-side variables become nullable, an extra
+     * not-null condition of the right side becomes a CASE guarding its columns.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access
+     */
     private static SqlTableAccess leftJoinByPrimaryKey(SqlTableAccess left, SqlTableAccess right,
             Restrictions restrictions)
     {
@@ -747,6 +983,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a distinct union of a parent and a child access along a foreign key into an access to the parent table
+     * with the disjunction of the conditions.
+     *
+     * @param parent access to the referenced table
+     * @param child access to the referencing table
+     * @param key the foreign key
+     * @return the merged access
+     */
     private static SqlIntercode distinctUnionizeByForeignKey(SqlTableAccess parent, SqlTableAccess child,
             Set<ColumnPair> key)
     {
@@ -779,6 +1024,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a distinct union of two accesses to the same table binding the same columns into one access with the
+     * disjunction of the conditions.
+     *
+     * @param left the left access
+     * @param right the right access
+     * @return the merged access
+     */
     private static SqlTableAccess distinctUnionizeByPrimaryKey(SqlTableAccess left, SqlTableAccess right)
     {
         Conditions conditions = Conditions.or(left.conditions, right.conditions);
@@ -796,6 +1049,16 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a VALUES node into the access as conditions when its rows are distinct and bound in a single class, or
+     * returns null.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the VALUES node
+     * @param mergeRestrictions what the parent needs of the variables
+     * @return the merged access, or null
+     */
     public static SqlIntercode tryReduceJoinWithValues(DatabaseSchema schema, SqlTableAccess left, SqlValues right,
             Restrictions mergeRestrictions)
     {
@@ -806,6 +1069,16 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges the two accesses into one when a foreign key, a shared key or declared distinct columns allow it; null
+     * otherwise.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access, or null
+     */
     public static SqlIntercode tryReduceJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
             Restrictions restrictions)
     {
@@ -835,6 +1108,15 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a left join of two accesses to the same table on a key into one access; null otherwise.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access, or null
+     */
     public static SqlIntercode tryReduceLeftJoin(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right,
             Restrictions restrictions)
     {
@@ -845,6 +1127,14 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Merges a distinct union of two accesses related by a foreign key into one access; null otherwise.
+     *
+     * @param schema the database schema
+     * @param left the left access
+     * @param right the right access
+     * @return the merged access, or null
+     */
     public static SqlIntercode tryReduceDistinctUnion(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
         Set<ColumnPair> dropRight = SqlTableAccess.canBeDistinctUnionizedByForeignKey(schema, left, right);
@@ -870,6 +1160,10 @@ public final class SqlTableAccess extends SqlIntercode
      * stands for rows distinguished by their own identity, which is the finest distinction possible, so it absorbs the
      * other side: each row of a multiset side matches at most one row of the other side and dictates the multiplicities
      * of the result. Two non-empty sets denote through the key the same rows, so their union applies.
+     *
+     * @param left the first set
+     * @param right the second set
+     * @return union of the two sets
      */
     private static Set<Column> union(Set<Column> left, Set<Column> right)
     {
@@ -882,6 +1176,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The bindings with their columns renamed by the map.
+     *
+     * @param map the column map
+     * @param bindings the variable bindings
+     * @return the bindings with their columns renamed by the map
+     */
     protected static VariableBindings remap(Map<Column, Column> map, VariableBindings bindings)
     {
         VariableBindings result = new VariableBindings();
@@ -893,6 +1194,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The binding with its columns renamed by the map.
+     *
+     * @param map the column map
+     * @param binding the variable binding
+     * @return the binding with its columns renamed by the map
+     */
     protected static VariableBinding remap(Map<Column, Column> map, VariableBinding binding)
     {
         VariableBinding result = new VariableBinding(binding.getVariable(), binding.canBeNull());
@@ -904,6 +1212,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The columns renamed by the map.
+     *
+     * @param map the column map
+     * @param columns the columns
+     * @return the columns renamed by the map
+     */
     protected static List<Column> remap(Map<Column, Column> map, List<Column> columns)
     {
         if(columns == null)
@@ -918,6 +1233,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The column renamed by the map (unchanged if absent).
+     *
+     * @param map the column map
+     * @param column the column
+     * @return the column renamed by the map (unchanged if absent)
+     */
     protected static Column remap(Map<Column, Column> map, Column column)
     {
         if(column == null)
@@ -933,6 +1255,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The condition with its columns renamed by the map.
+     *
+     * @param map the column map
+     * @param conditions the conditions
+     * @return the condition with its columns renamed by the map
+     */
     protected static Condition remap(Map<Column, Column> map, Condition conditions)
     {
         Condition result = new Condition();
@@ -953,6 +1282,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The conditions with their columns renamed by the map.
+     *
+     * @param map the column map
+     * @param conditions the conditions
+     * @return the conditions with their columns renamed by the map
+     */
     protected static Conditions remap(Map<Column, Column> map, Conditions conditions)
     {
         Conditions result = new Conditions(false);
@@ -964,6 +1300,11 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * True if some bound or conditioned column is an SQL expression.
+     *
+     * @return true if some bound or conditioned column is an SQL expression, false otherwise
+     */
     boolean hasExpression()
     {
         if(internal.getNonConstantColumns().stream().anyMatch(c -> c instanceof ExpressionColumn))
@@ -1141,36 +1482,67 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * The accessed table; null for an access to constants only.
+     *
+     * @return the accessed table; null for an access to constants only
+     */
     public Table getTable()
     {
         return table;
     }
 
 
+    /**
+     * Whether the parent tolerates duplicate rows.
+     *
+     * @return true if the parent tolerates duplicate rows, false otherwise
+     */
     protected boolean getReduced()
     {
         return reduced;
     }
 
 
+    /**
+     * Conditions on the rows.
+     *
+     * @return conditions on the rows
+     */
     protected Conditions getConditions()
     {
         return conditions;
     }
 
 
+    /**
+     * Bindings in terms of the table's own columns (before representative columns of equalities are chosen).
+     *
+     * @return bindings in terms of the table's own columns (before representative columns of equalities are chosen)
+     */
     protected VariableBindings getInternalVariableBindings()
     {
         return internal;
     }
 
 
+    /**
+     * Binding of the variable in terms of the table's own columns.
+     *
+     * @param var the variable
+     * @return binding of the variable in terms of the table's own columns
+     */
     protected VariableBinding getInternalVariableBinding(Variable var)
     {
         return internal.get(var);
     }
 
 
+    /**
+     * Columns over which deduplication is requested; empty when none.
+     *
+     * @return columns over which deduplication is requested; empty when none
+     */
     protected Set<Column> getDistinctColumns()
     {
         return distinctColumns;

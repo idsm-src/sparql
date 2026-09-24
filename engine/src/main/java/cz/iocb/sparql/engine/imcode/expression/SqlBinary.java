@@ -8,12 +8,30 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * Expression with two operands.
+ */
 public abstract class SqlBinary extends SqlExpressionIntercode
 {
+    /**
+     * Left operand.
+     */
     protected final SqlExpressionIntercode left;
+
+    /**
+     * Right operand.
+     */
     protected final SqlExpressionIntercode right;
 
 
+    /**
+     * Creates the expression; deterministic if both operands are.
+     *
+     * @param left the left operand
+     * @param right the right operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlBinary(SqlExpressionIntercode left, SqlExpressionIntercode right,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -39,12 +57,22 @@ public abstract class SqlBinary extends SqlExpressionIntercode
 
 
 
+    /**
+     * Left operand.
+     *
+     * @return left operand
+     */
     public SqlExpressionIntercode getLeft()
     {
         return left;
     }
 
 
+    /**
+     * Right operand.
+     *
+     * @return right operand
+     */
     public SqlExpressionIntercode getRight()
     {
         return right;

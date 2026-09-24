@@ -10,12 +10,23 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class Projection extends ExpressionVariableBase
 {
+    /**
+     * Projection of a plain variable.
+     *
+     * @param variable the variable
+     */
     public Projection(VariableNode variable)
     {
         this(null, variable);
     }
 
 
+    /**
+     * Projection of an expression bound to a variable ({@code (expr AS ?v)}); the expression may be null.
+     *
+     * @param expression the expression
+     * @param variable the variable
+     */
     public Projection(Expression expression, VariableNode variable)
     {
         super(expression, variable);

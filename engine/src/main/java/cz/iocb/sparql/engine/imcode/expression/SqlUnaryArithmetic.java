@@ -24,11 +24,25 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Unary plus or minus of a numeric operand; other operands are an error.
+ */
 public final class SqlUnaryArithmetic extends SqlUnary
 {
+    /**
+     * True for minus, false for plus.
+     */
     private final boolean isMinus;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param isMinus true for minus, false for plus
+     * @param operand the operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     private SqlUnaryArithmetic(boolean isMinus, SqlExpressionIntercode operand,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -38,12 +52,27 @@ public final class SqlUnaryArithmetic extends SqlUnary
     }
 
 
+    /**
+     * Unary plus or minus of the operand.
+     *
+     * @param isMinus true for minus, false for plus
+     * @param operand the operand
+     * @return unary plus or minus of the operand
+     */
     public static SqlExpressionIntercode create(boolean isMinus, SqlExpressionIntercode operand)
     {
         return create(isMinus, operand, Restriction.ALL);
     }
 
 
+    /**
+     * Unary plus or minus materialising only the needed result classes; NULL for non-numeric operands.
+     *
+     * @param isMinus true for minus, false for plus
+     * @param operand the operand
+     * @param restriction the result classes the parent needs
+     * @return unary plus or minus materialising only the needed result classes; NULL for non-numeric operands
+     */
     public static SqlExpressionIntercode create(boolean isMinus, SqlExpressionIntercode operand,
             Restriction restriction)
     {
@@ -79,6 +108,15 @@ public final class SqlUnaryArithmetic extends SqlUnary
     }
 
 
+    /**
+     * SQL computing the result in the class from the operand promoted to it.
+     *
+     * @param isMinus true for minus, false for plus
+     * @param resultClass the result class
+     * @param variants combinations of argument classes
+     * @param operand the operand
+     * @return SQL computing the result in the class from the operand promoted to it
+     */
     private static List<Column> translate(boolean isMinus, ResourceClass resultClass,
             Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode operand)
     {

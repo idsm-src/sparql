@@ -69,31 +69,87 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Comparison of two terms following the SPARQL operator mapping: numeric, boolean, string, date and date-time
+ * comparison and RDF term equality; comparing incompatible types is an error. Dates and date-times of different
+ * timezones are compared through their common representation.
+ */
 public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanExpression
 {
+    /**
+     * Comparison operator with its SPARQL spelling and the suffix of its {@code sparql.*} SQL function.
+     */
     public static enum ComparisonOperator
     {
+        /**
+         * Equality.
+         */
         EQUAL("=", "equal"),
+
+        /**
+         * Inequality.
+         */
         NOT_EQUAL("!=", "not_equal"),
+
+        /**
+         * Less than.
+         */
         LESS_THAN("<", "less_than"),
+
+        /**
+         * Greater than.
+         */
         GREATER_THAN(">", "greater_than"),
+
+        /**
+         * Less than or equal.
+         */
         LESS_THAN_OR_EQUAL("<=", "not_greater_than"),
+
+        /**
+         * Greater than or equal.
+         */
         GREATER_THAN_OR_EQUAL(">=", "not_less_than");
 
+        /**
+         * SPARQL spelling.
+         */
         private final String text;
+
+        /**
+         * Suffix of the SQL function.
+         */
         private final String code;
 
+        /**
+         * Creates the operator.
+         *
+         * @param text the text
+         * @param code the SQL spelling
+         */
         ComparisonOperator(String text, String code)
         {
             this.text = text;
             this.code = code;
         }
 
+
+        /**
+         * SPARQL spelling of the operator.
+         *
+         * @return SPARQL spelling of the operator
+         */
         public String getText()
         {
             return text;
         }
 
+
+        /**
+         * Suffix of the {@code sparql.*} SQL function implementing the operator.
+         *
+         * @return suffix of the {@code sparql.*} SQL function implementing the operator
+         */
         public String getName()
         {
             return code;
@@ -101,36 +157,132 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Possible outcome of comparing values of two classes: always different, always an error, never an error, or
+     * anything.
+     */
     protected static enum ComparisonType
     {
-        DIFFERENT, NULL, NOT_NULL, FULL
+        /**
+         * The values are never equal.
+         */
+        DIFFERENT,
+
+        /**
+         * The comparison is always an error.
+         */
+        NULL,
+
+        /**
+         * The comparison never fails.
+         */
+        NOT_NULL,
+
+        /**
+         * Anything can happen.
+         */
+        FULL
     }
 
 
+    /**
+     * How the SQL of a comparison is generated for a pair of classes.
+     */
     private static enum ComparisonMode
     {
+        /**
+         * Always an error.
+         */
         NULL,
+
+        /**
+         * Always different (equality operators on disjoint terms).
+         */
         DIFF,
+
+        /**
+         * Boolean comparison.
+         */
         BOOLEAN,
+
+        /**
+         * Floating-point comparison.
+         */
         FLOAT,
+
+        /**
+         * Exact numeric comparison.
+         */
         DECIMAL,
+
+        /**
+         * Date-time comparison.
+         */
         DATETIME,
+
+        /**
+         * Dates with the left zone less than a day earlier than the right one.
+         */
         DATE_EARLIER_TZ,
+
+        /**
+         * Dates with equal zones.
+         */
         DATE_SAME_TZ,
+
+        /**
+         * Dates with the left zone less than a day later than the right one.
+         */
         DATE_LATER_TZ,
+
+        /**
+         * General date comparison.
+         */
         DATE,
+
+        /**
+         * Comparison of arbitrary literals through the box.
+         */
         LITERAL,
+
+        /**
+         * Direct SQL comparison of the columns (strings, references).
+         */
         DIRECT,
+
+        /**
+         * Comparison through the box.
+         */
         BOX
     }
 
 
+    /**
+     * Seconds in a day.
+     */
     private static final int SECS_PER_DAY = 24 * 60 * 60;
 
+    /**
+     * The operator.
+     */
     private final ComparisonOperator operator;
+
+    /**
+     * Values the comparison can take besides an error.
+     */
     private final NonConstantBooleanValue value;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     * @param value values the expression can take besides an error
+     */
     private SqlBinaryComparison(ComparisonOperator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull, NonConstantBooleanValue value)
     {
@@ -141,6 +293,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Comparison of the operands.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @return comparison of the operands
+     */
     public static SqlExpressionIntercode create(ComparisonOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
@@ -148,6 +308,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Comparison materialising only the needed result; constant when the classes decide it.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param restriction the result classes the parent needs
+     * @return comparison materialising only the needed result; constant when the classes decide it
+     */
     private static SqlExpressionIntercode create(ComparisonOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right, Restriction restriction)
     {
@@ -230,6 +399,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Outcome of comparing values of the two classes with the operator, decided from the classes alone.
+     *
+     * @param operator the operator
+     * @param l class on the left side
+     * @param r class on the right side
+     * @return outcome of comparing values of the two classes with the operator, decided from the classes alone
+     */
     protected static ComparisonType areComparable(ComparisonOperator operator, ResourceClass l, ResourceClass r)
     {
         boolean equalityComparison = (operator == EQUAL || operator == NOT_EQUAL);
@@ -284,6 +461,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Comparison mode covering all pairs of operand classes.
+     *
+     * @param operator the operator
+     * @param left classes of the left operand
+     * @param right classes of the right operand
+     * @return comparison mode covering all pairs of operand classes
+     */
     private static ComparisonMode getComparisonMode(ComparisonOperator operator, Set<ResourceClass> left,
             Set<ResourceClass> right)
     {
@@ -297,6 +482,16 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Comparison mode of a pair of classes according to the SPARQL operator mapping; equality of dates in zones
+     * differing by less than a day is handled specially.
+     *
+     * @param operator the operator
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return comparison mode of a pair of classes according to the SPARQL operator mapping; equality of dates in zones
+     *         differing by less than a day is handled specially
+     */
     private static ComparisonMode determineComparisonMode(ComparisonOperator operator, ResourceClass left,
             ResourceClass right)
     {
@@ -348,6 +543,12 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * True for the date modes.
+     *
+     * @param mode the comparison mode
+     * @return true for the date modes, false otherwise
+     */
     private static boolean isDateMode(ComparisonMode mode)
     {
         return mode == ComparisonMode.DATE || mode == ComparisonMode.DATE_EARLIER_TZ
@@ -355,6 +556,14 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Combines the modes of two class pairs: equal modes stay, date modes merge to the general date mode, anything else
+     * falls back to the box.
+     *
+     * @param a one mode
+     * @param b the other mode
+     * @return the comparison mode
+     */
     private static ComparisonMode mergeComparisonTypes(ComparisonMode a, ComparisonMode b)
     {
         if(a == null)
@@ -373,6 +582,15 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * SQL of the comparison as a COALESCE over the argument class combinations.
+     *
+     * @param operator the operator
+     * @param variants combinations of argument classes
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL of the comparison as a COALESCE over the argument class combinations
+     */
     private static List<Column> translate(ComparisonOperator operator, Set<List<Set<ResourceClass>>> variants,
             SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
@@ -385,6 +603,16 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * SQL comparing the operands taken in the given classes, according to their comparison mode.
+     *
+     * @param operator the operator
+     * @param lset classes of the left operand
+     * @param rset classes of the right operand
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL comparing the operands taken in the given classes, according to their comparison mode
+     */
     private static String translate(ComparisonOperator operator, Set<ResourceClass> lset, Set<ResourceClass> rset,
             SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
@@ -534,6 +762,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Numeric class in which the operands are compared, by promotion of all their classes.
+     *
+     * @param lset classes of the left operand
+     * @param rset classes of the right operand
+     * @return numeric class in which the operands are compared, by promotion of all their classes
+     */
     private static ResourceClass determineNumericComparisonType(Set<ResourceClass> lset, Set<ResourceClass> rset)
     {
         Set<ResourceClass> all = Stream.concat(lset.stream(), rset.stream()).collect(toSet());
@@ -563,6 +798,13 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     }
 
 
+    /**
+     * Difference of the timezone offsets in seconds (right minus left); a missing zone counts as UTC.
+     *
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return difference of the offsets in seconds
+     */
     private static int getTimezoneDiff(DateInZone left, DateInZone right)
     {
         int leftZone = left.getZone();

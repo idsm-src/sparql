@@ -14,21 +14,39 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class BracketedPath extends BaseElement implements Path
 {
+    /**
+     * The enclosed path.
+     */
     private Path child;
 
 
+    /**
+     * Creates the path around the child.
+     *
+     * @param child the child path
+     */
     public BracketedPath(Path child)
     {
         setChild(child);
     }
 
 
+    /**
+     * The enclosed path.
+     *
+     * @return the enclosed path
+     */
     public Path getChild()
     {
         return child;
     }
 
 
+    /**
+     * Sets the enclosed path.
+     *
+     * @param child the child path
+     */
     public void setChild(Path child)
     {
         this.child = child;

@@ -14,15 +14,49 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs of the form {@code prefix + number + suffix} with an integer id stored in an {@code int2}, {@code int4} or
+ * {@code int8} column. A positive {@code length} means a zero-padded fixed width, a negative one a zero-padded minimal
+ * width, zero no padding.
+ */
 public class IntegerUserIriClass extends SimpleUserIriClass
 {
+    /**
+     * Compiled regular expression of the IRIs.
+     */
     private final Pattern pattern;
+
+    /**
+     * Regular expression of the IRIs.
+     */
     private final String regexp;
+
+    /**
+     * Text before the number.
+     */
     private final String prefix;
+
+    /**
+     * Text after the number, or null.
+     */
     private final String suffix;
+
+    /**
+     * Width of the number: positive fixed, negative minimal, zero unpadded.
+     */
     private final int length;
 
 
+    /**
+     * Creates the class; {@code pattern} constrains the digits explicitly, otherwise the range of the SQL type is used.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param prefix the prefix
+     * @param length width of the number: positive fixed, negative minimal, zero unpadded
+     * @param pattern regular expression constraining the digits, or null
+     * @param suffix the suffix
+     */
     public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String pattern, String suffix)
     {
         super(name, sqlType);
@@ -61,24 +95,56 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class without an explicit digit pattern.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param prefix the prefix
+     * @param length width of the number: positive fixed, negative minimal, zero unpadded
+     * @param suffix the suffix
+     */
     public IntegerUserIriClass(String name, String sqlType, String prefix, int length, String suffix)
     {
         this(name, sqlType, prefix, length, null, suffix);
     }
 
 
+    /**
+     * Creates the class with unpadded numbers.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param prefix the prefix
+     * @param suffix the suffix
+     */
     public IntegerUserIriClass(String name, String sqlType, String prefix, String suffix)
     {
         this(name, sqlType, prefix, 0, null, suffix);
     }
 
 
+    /**
+     * Creates the class without a suffix.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param prefix the prefix
+     * @param length width of the number: positive fixed, negative minimal, zero unpadded
+     */
     public IntegerUserIriClass(String name, String sqlType, String prefix, int length)
     {
         this(name, sqlType, prefix, length, null, null);
     }
 
 
+    /**
+     * Creates the class with unpadded numbers and no suffix.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param prefix the prefix
+     */
     public IntegerUserIriClass(String name, String sqlType, String prefix)
     {
         this(name, sqlType, prefix, 0, null, null);
@@ -129,6 +195,12 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * SQL expression rendering the number with the configured padding.
+     *
+     * @param column the column
+     * @return SQL expression rendering the number with the configured padding
+     */
     private Column numberAsString(Column column)
     {
         if(length == 0)
@@ -141,6 +213,12 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * SQL expression extracting the number from an IRI assumed to belong to the class.
+     *
+     * @param column the column
+     * @return SQL expression extracting the number from an IRI assumed to belong to the class
+     */
     protected Column generateNonCheckedInverseFunction(Column column)
     {
         String sqlType = sqlTypes.get(0);
@@ -154,6 +232,13 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Regular expression of the decimal numbers from 0 to {@code max} having at least {@code minLength} digits.
+     *
+     * @param max decimal digits of the largest number
+     * @param minLength minimal number of digits
+     * @return regular expression of the decimal numbers from 0 to {@code max} having at least {@code minLength} digits
+     */
     private static String generateMaxNumberPattern(String max, int minLength)
     {
         if(max.length() - minLength < 1)
@@ -207,18 +292,33 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Text before the number.
+     *
+     * @return text before the number
+     */
     public String getPrefix()
     {
         return prefix;
     }
 
 
+    /**
+     * Text after the number, or null.
+     *
+     * @return text after the number, or null
+     */
     public String getSuffix()
     {
         return suffix;
     }
 
 
+    /**
+     * Width of the number: positive fixed, negative minimal, zero unpadded.
+     *
+     * @return width of the number: positive fixed, negative minimal, zero unpadded
+     */
     public int getIdLength()
     {
         return length;

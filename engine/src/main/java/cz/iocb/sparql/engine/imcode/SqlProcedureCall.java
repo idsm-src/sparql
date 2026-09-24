@@ -31,17 +31,57 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 //TODO: add support for binding parameter and result variables
+
+
+
+/**
+ * Call of a procedure (a set-returning SQL function) for every solution of the child: the parameters are expressions
+ * over the child's variables, the results are bound to variables (joined with the child when a result variable is
+ * already bound).
+ */
 public final class SqlProcedureCall extends SqlIntercode
 {
+    /**
+     * Alias of the function result in the generated SQL.
+     */
     private static final Variable resultVar = new Variable("@res");
 
+    /**
+     * Solutions the procedure is called for.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Called procedure.
+     */
     private final ProcedureDefinition procedure;
+
+    /**
+     * Expression of each parameter.
+     */
     private final LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters;
+
+    /**
+     * Variable receiving each result.
+     */
     private final LinkedHashMap<ResultDefinition, Variable> results;
+
+    /**
+     * For each output column, the column of the call or the child it is taken from.
+     */
     private final Map<Column, Column> columnMap;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param procedure the procedure definition
+     * @param parameters expression of each parameter
+     * @param results variable receiving each result
+     * @param child the child node
+     * @param columnMap the column map
+     */
     protected SqlProcedureCall(VariableBindings bindings, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child, Map<Column, Column> columnMap)
@@ -56,6 +96,16 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Procedure call over the child's solutions.
+     *
+     * @param request the current request
+     * @param procedure the procedure definition
+     * @param parameters expression of each parameter
+     * @param results variable receiving each result
+     * @param child the child node
+     * @return procedure call over the child's solutions
+     */
     public static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child)
@@ -64,6 +114,17 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Procedure call over the child, joined with it on the variables used as parameters and results.
+     *
+     * @param request the current request
+     * @param procedure the procedure definition
+     * @param parameters expression of each parameter
+     * @param results variable receiving each result
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @return procedure call over the child, joined with it on the variables used as parameters and results
+     */
     protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
             LinkedHashMap<ResultDefinition, Variable> results, SqlIntercode child, Restrictions restrictions)
@@ -213,6 +274,14 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Optimises the parameter expressions over the child's bindings.
+     *
+     * @param request the current request
+     * @param parameters expression of each parameter
+     * @param context solutions the call is evaluated for
+     * @return the optimised parameter expressions
+     */
     protected static LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> optimize(Request request,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters, SqlIntercode context)
     {
@@ -249,6 +318,12 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Appends the SQL calling the function with the parameters converted to their declared classes.
+     *
+     * @param request the current request
+     * @param builder the builder to append to
+     */
     private void generateInnerSelect(Request request, StringBuilder builder)
     {
         builder.append("SELECT ");
@@ -296,6 +371,14 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Columns of the variable in the class as provided by the child, or NULL constants when unbound.
+     *
+     * @param child the child node
+     * @param variable the variable
+     * @param resClass the resource class
+     * @return columns of the variable in the class as provided by the child, or NULL constants when unbound
+     */
     private static List<Column> getColumns(SqlIntercode child, Variable variable, ResourceClass resClass)
     {
         VariableBinding binding = child.getVariableBindings().get(variable);
@@ -307,6 +390,12 @@ public final class SqlProcedureCall extends SqlIntercode
     }
 
 
+    /**
+     * Columns reading a result from the function result: the whole result, or its fields.
+     *
+     * @param fields fields of the SQL result row, or null
+     * @return columns reading a result from the function result: the whole result, or its fields
+     */
     private static List<Column> getSqlResultColumns(List<Column> fields)
     {
         List<Column> result = new ArrayList<>();

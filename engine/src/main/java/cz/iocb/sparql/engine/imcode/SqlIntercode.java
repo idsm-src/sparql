@@ -33,27 +33,62 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Node of the intermediate code: a relational-algebra tree the translator builds from the SPARQL AST. Every node knows
+ * the variables it binds ({@link #getVariableBindings}) and implements two operations: {@link #optimize}, which
+ * rewrites the subtree for what its parent actually needs, and {@link #translate}, which emits the SQL subquery. Nodes
+ * are immutable and compared structurally.
+ */
 public abstract class SqlIntercode extends SqlBaseClass
 {
+    /**
+     * What a parent requires of a child's variables: for each needed variable, the resource classes whose values must
+     * be materialised (the box stands for any class). Variables absent from the restrictions are not needed at all.
+     */
     public static class Restrictions
     {
+        /**
+         * Needed classes per variable.
+         */
         private final Map<Variable, Set<ResourceClass>> map = new HashMap<>();
 
+        /**
+         * Creates empty restrictions (nothing is needed).
+         */
         public Restrictions()
         {
         }
 
+
+        /**
+         * Copy constructor.
+         *
+         * @param restrictions what the parent needs of the variables
+         */
         public Restrictions(Restrictions restrictions)
         {
             map.putAll(restrictions.map);
         }
 
+
+        /**
+         * Requires the given variables in any class.
+         *
+         * @param vars the variables
+         */
         public Restrictions(Collection<Variable> vars)
         {
             for(Variable var : vars)
                 map.put(var, Set.of(box));
         }
 
+
+        /**
+         * Union of two restrictions.
+         *
+         * @param a one restriction
+         * @param b the other restriction
+         */
         public Restrictions(Restrictions a, Restrictions b)
         {
             Set<Variable> vars = new HashSet<>();
@@ -83,22 +118,48 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
         }
 
+
+        /**
+         * Requires the variable in any class.
+         *
+         * @param var the variable
+         */
         public void add(Variable var)
         {
             map.put(var, Set.of(box));
         }
 
+
+        /**
+         * Requires the variables in any class.
+         *
+         * @param vars the variables
+         */
         public void add(Collection<Variable> vars)
         {
             for(Variable var : vars)
                 map.put(var, Set.of(box));
         }
 
+
+        /**
+         * The needed variables.
+         *
+         * @return the needed variables
+         */
         public Set<Variable> getNames()
         {
             return map.keySet();
         }
 
+
+        /**
+         * True if the variable is needed in some class overlapping the given one.
+         *
+         * @param var the variable
+         * @param resClass the resource class
+         * @return true if the variable is needed in some class overlapping the given one, false otherwise
+         */
         public boolean contains(Variable var, ResourceClass resClass)
         {
             if(!map.containsKey(var))
@@ -111,6 +172,13 @@ public abstract class SqlIntercode extends SqlBaseClass
             return false;
         }
 
+
+        /**
+         * True if restricting the bindings would drop a variable or the columns of some class.
+         *
+         * @param bindings the variable bindings
+         * @return true if restricting the bindings would drop a variable or the columns of some class, false otherwise
+         */
         public boolean canBeOptimized(VariableBindings bindings)
         {
             VariableBindings opt = bindings.restrict(this);
@@ -130,23 +198,49 @@ public abstract class SqlIntercode extends SqlBaseClass
         }
 
 
+        /**
+         * Adds needed classes of the variable.
+         *
+         * @param var the variable
+         * @param set the needed classes
+         */
         public void add(Variable var, Set<ResourceClass> set)
         {
             map.computeIfAbsent(var, _ -> new HashSet<>()).addAll(set);
         }
 
 
+        /**
+         * Adds a needed class of the variable.
+         *
+         * @param var the variable
+         * @param resClass the resource class
+         */
         public void add(Variable var, ResourceClass resClass)
         {
             map.computeIfAbsent(var, _ -> new HashSet<>()).add(resClass);
         }
 
 
+        /**
+         * Replaces the needed classes of the variable.
+         *
+         * @param variable the variable
+         * @param set the needed classes
+         */
         public void set(Variable variable, Set<ResourceClass> set)
         {
             map.put(variable, set);
         }
 
+
+        /**
+         * True if the variable is needed in some class overlapping one of the given ones.
+         *
+         * @param var the variable
+         * @param classes the classes
+         * @return true if the variable is needed in some class overlapping one of the given ones, false otherwise
+         */
         public boolean contains(Variable var, Set<ResourceClass> classes)
         {
             for(ResourceClass c : classes)
@@ -156,6 +250,12 @@ public abstract class SqlIntercode extends SqlBaseClass
             return false;
         }
 
+
+        /**
+         * Adds all the other restrictions.
+         *
+         * @param restrictions what the parent needs of the variables
+         */
         public void add(Restrictions restrictions)
         {
             for(Variable v : restrictions.getNames())
@@ -177,6 +277,13 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
         }
 
+
+        /**
+         * True if the variable is needed at all.
+         *
+         * @param var the variable
+         * @return true if the variable is needed at all, false otherwise
+         */
         public boolean containsVar(Variable var)
         {
             return map.containsKey(var);
@@ -194,16 +301,37 @@ public abstract class SqlIntercode extends SqlBaseClass
             return map.equals(((Restrictions) other).map);
         }
 
+
+        /**
+         * True if the bindings materialise exactly what is needed.
+         *
+         * @param bindings the variable bindings
+         * @return true if the bindings materialise exactly what is needed, false otherwise
+         */
         public boolean isOptimized(VariableBindings bindings)
         {
             return bindings.restrict(this).equals(bindings);
         }
 
+
+        /**
+         * Needed classes of the variable, or null.
+         *
+         * @param var the variable
+         * @return needed classes of the variable, or null
+         */
         public Set<ResourceClass> get(Variable var)
         {
             return map.get(var);
         }
 
+
+        /**
+         * The classes needed for the variable, as an expression restriction.
+         *
+         * @param var the variable
+         * @return the classes needed for the variable, as an expression restriction
+         */
         public Restriction getRestriction(Variable var)
         {
             return new Restriction(get(var));
@@ -211,10 +339,23 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Variables bound by the subtree.
+     */
     protected final VariableBindings bindings;
+
+    /**
+     * Whether repeated evaluation gives the same solutions.
+     */
     protected final boolean isDeterministic;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param isDeterministic whether the node is deterministic
+     */
     protected SqlIntercode(VariableBindings bindings, boolean isDeterministic)
     {
         this.bindings = bindings;
@@ -222,19 +363,55 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Returns a subtree with the same solutions (or, when {@code reduced}, the same solutions up to duplicates) that is
+     * optimised for the parent's needs: variables and classes outside {@code restrictions} are dropped, constants
+     * propagated and nodes simplified or merged. With {@code evalServices}, SERVICE stubs are evaluated against their
+     * endpoints and replaced by their results.
+     *
+     * @param request the current request
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return a subtree with the same solutions (or, when {@code reduced}, the same solutions up to duplicates) that is
+     *         optimised for the parent's needs: variables and classes outside {@code restrictions} are dropped,
+     *         constants propagated and nodes simplified or merged
+     */
     public abstract SqlIntercode optimize(Request request, Restrictions restrictions, boolean reduced,
             boolean evalServices);
 
 
+    /**
+     * SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings.
+     *
+     * @param request the current request
+     * @return SQL of the subtree: a SELECT statement whose result columns are those of the variable bindings
+     */
     public abstract String translate(Request request);
 
 
+    /**
+     * True if the subtree contains a SERVICE stub that has not been evaluated yet.
+     *
+     * @return true if the subtree contains a SERVICE stub that has not been evaluated yet, false otherwise
+     */
     public abstract boolean hasServiceSubpattern();
 
 
+    /**
+     * Appends a human-readable tree of the subtree, for debugging.
+     *
+     * @param builder the builder to append to
+     * @param indent the current indentation of the explanation
+     */
     public abstract void generateExplanation(StringBuilder builder, String indent);
 
 
+    /**
+     * Human-readable tree of the subtree, for debugging.
+     *
+     * @return human-readable tree of the subtree, for debugging
+     */
     public String getExplanation()
     {
         StringBuilder builder = new StringBuilder();
@@ -243,30 +420,60 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Variables bound by the subtree with their classes and result columns.
+     *
+     * @return variables bound by the subtree with their classes and result columns
+     */
     public final VariableBindings getVariableBindings()
     {
         return bindings;
     }
 
 
+    /**
+     * Binding of the variable, or null when unbound.
+     *
+     * @param variable the variable
+     * @return binding of the variable, or null when unbound
+     */
     public final VariableBinding getVariable(Variable variable)
     {
         return bindings.get(variable);
     }
 
 
+    /**
+     * Columns per class of the variable.
+     *
+     * @param variable the variable
+     * @return columns per class of the variable
+     */
     public final Map<ResourceClass, List<Column>> getMappings(Variable variable)
     {
         return bindings.get(variable).getMappings();
     }
 
 
+    /**
+     * Columns of the variable in the class, or null.
+     *
+     * @param variable the variable
+     * @param resClass the resource class
+     * @return columns of the variable in the class, or null
+     */
     public final List<Column> getMapping(Variable variable, ResourceClass resClass)
     {
         return bindings.get(variable).getMapping(resClass);
     }
 
 
+    /**
+     * True if the variable is unbound or bound only to constant columns.
+     *
+     * @param variable the variable
+     * @return true if the variable is unbound or bound only to constant columns, false otherwise
+     */
     public final boolean hasConstantVariable(Variable variable)
     {
         VariableBinding binding = bindings.get(variable);
@@ -275,18 +482,39 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if every variable is unbound or bound only to constant columns.
+     *
+     * @param variables the variables
+     * @return true if every variable is unbound or bound only to constant columns, false otherwise
+     */
     public final boolean hasConstantVariables(Set<Variable> variables)
     {
         return variables.stream().allMatch(v -> hasConstantVariable(v));
     }
 
 
+    /**
+     * True if repeated evaluation gives the same solutions (no {@code RAND}, {@code BNODE}, nondeterministic functions
+     * or unevaluated services).
+     *
+     * @return true if repeated evaluation gives the same solutions (no {@code RAND}, {@code BNODE}, nondeterministic
+     *         functions or unevaluated services), false otherwise
+     */
     public boolean isDeterministic()
     {
         return isDeterministic;
     }
 
 
+    /**
+     * Classes a variable can take in a join where it is always bound in the given children: the intersections of one
+     * class per child, merged into disjoint classes.
+     *
+     * @param defs bindings of the variable in the children where it is always bound
+     * @return classes a variable can take in a join where it is always bound in the given children: the intersections
+     *         of one class per child, merged into disjoint classes
+     */
     private static Set<ResourceClass> joinResourceClasses(List<VariableBinding> defs)
     {
         List<Set<ResourceClass>> result = List.of(Set.of());
@@ -308,6 +536,19 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Bindings of the join of the given children (aliased by {@code tables}). A variable bound non-null in some child
+     * keeps only the classes compatible across those children (empty bindings are returned if there is none, or if
+     * constants differ), otherwise all its classes are unioned and coalesced. Fresh output columns are allocated;
+     * {@code map} receives for each of them the child column it is taken from.
+     *
+     * @param request the current request
+     * @param allVars bindings of each child
+     * @param tables the tables
+     * @param restrictions what the parent needs of the variables
+     * @param map the column map
+     * @return bindings of the join of the given children (aliased by {@code tables})
+     */
     protected static VariableBindings getJoinVariableBindings(Request request, List<VariableBindings> allVars,
             List<Table> tables, Restrictions restrictions, Map<Column, Column> map)
     {
@@ -352,6 +593,19 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Binding of one join variable: for an always-bound variable the columns of each class are taken from the children
+     * binding it (null when constants conflict), otherwise the variants of all children are coalesced.
+     *
+     * @param request the current request
+     * @param variable the variable
+     * @param resClasses the resource classes
+     * @param vars bindings of the variable in each child, null where unbound
+     * @param tables the tables
+     * @param columnMap the column map
+     * @param canBeNull whether the value may be null
+     * @return the join binding of the variable, or null when constants conflict
+     */
     private static VariableBinding createVariableBinding(Request request, Variable variable,
             Set<ResourceClass> resClasses, List<VariableBinding> vars, List<Table> tables,
             Map<Column, Column> columnMap, boolean canBeNull)
@@ -424,6 +678,13 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Picks for each column position a constant if some child provides one, otherwise the first child's column.
+     *
+     * @param resClass the resource class
+     * @param mappings columns per resource class
+     * @return the selected columns
+     */
     private static List<Column> selectColumns(ResourceClass resClass, List<List<Column>> mappings)
     {
         return IntStream
@@ -433,6 +694,15 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Maps child columns to the output columns, reusing an output column already assigned to the same child column;
+     * constants pass through.
+     *
+     * @param output fresh output columns
+     * @param input child columns
+     * @param map the column map
+     * @return the output columns
+     */
     private static List<Column> getMappedColuns(List<Column> output, List<Column> input, Map<Column, Column> map)
     {
         List<Column> mapping = new ArrayList<>();
@@ -463,6 +733,13 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * COALESCE of the variants per column position; a single variant is returned as is.
+     *
+     * @param cols number of columns
+     * @param variants column variants to coalesce
+     * @return COALESCE of the variants per column position; a single variant is returned as is
+     */
     private static List<Column> coalesceVariants(int cols, List<List<Column>> variants)
     {
         if(variants.size() == 1)
@@ -475,12 +752,32 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Union of the classes of the bindings.
+     *
+     * @param variables the variables
+     * @return union of the classes of the bindings
+     */
     private static Set<ResourceClass> collectClasses(List<VariableBinding> variables)
     {
         return variables.stream().flatMap(v -> v.getClasses().stream()).collect(toSet());
     }
 
 
+    /**
+     * Bindings of the join of two children, see
+     * {@link #getJoinVariableBindings(Request, List, List, Restrictions, Map)}.
+     *
+     * @param request the current request
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @param restrictions what the parent needs of the variables
+     * @param map the column map
+     * @return bindings of the join of two children, see
+     *         {@link #getJoinVariableBindings(Request, List, List, Restrictions, Map)}
+     */
     protected static VariableBindings getJoinVariableBindings(Request request, VariableBindings left,
             VariableBindings right, Table leftTable, Table rightTable, Restrictions restrictions,
             Map<Column, Column> map)
@@ -490,6 +787,13 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if the shared variables need no join condition: all are always bound to identical constant columns.
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return true if the shared variables need no join condition, false otherwise
+     */
     public static boolean isJoinConditionAlwaysTrue(VariableBindings left, VariableBindings right)
     {
         for(VariableBindingPair pair : VariableBindingPair.getPairs(left, right))
@@ -528,6 +832,13 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * SQL condition joining every pair of children on their shared variables, or null if none is needed.
+     *
+     * @param vars the variables
+     * @param tables the tables
+     * @return SQL condition joining every pair of children on their shared variables, or null if none is needed
+     */
     public static String generateJoinCondition(List<VariableBindings> vars, List<Table> tables)
     {
         int size = vars.size();
@@ -544,6 +855,17 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * SQL condition that every shared variable is compatible on both sides (equal values after conversion to a common
+     * class, or unbound on either side), or null if it always holds.
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @return SQL condition that every shared variable is compatible on both sides (equal values after conversion to a
+     *         common class, or unbound on either side), or null if it always holds
+     */
     public static String generateJoinCondition(VariableBindings left, VariableBindings right, Table leftTable,
             Table rightTable)
     {
@@ -628,6 +950,15 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * SQL condition that one variable is compatible on both sides, or null if it always holds.
+     *
+     * @param leftBinding the variable binding
+     * @param rightBinding the variable binding
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @return SQL condition that one variable is compatible on both sides, or null if it always holds
+     */
     public static String generateJoinCondition(VariableBinding leftBinding, VariableBinding rightBinding,
             Table leftTable, Table rightTable)
     {
@@ -689,12 +1020,30 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if the solutions projected to the selected variables are known to contain no duplicates.
+     *
+     * @param request the current request
+     * @param selected the selected variables
+     * @return true if the solutions projected to the selected variables are known to contain no duplicates, false
+     *         otherwise
+     */
     public boolean isDistinct(Request request, Collection<Variable> selected)
     {
         return false;
     }
 
 
+    /**
+     * Restrictions for a join child on top of the parent's: its variables shared with the other side are needed in the
+     * classes compatible with that side (in all classes when the variable may be unbound).
+     *
+     * @param bindings the variable bindings
+     * @param other bindings of the other side
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for a join child on top of the parent's: its variables shared with the other side are needed
+     *         in the classes compatible with that side (in all classes when the variable may be unbound)
+     */
     public static Restrictions getJoinRestrictions(VariableBindings bindings, VariableBindings other,
             Restrictions restrictions)
     {
@@ -702,6 +1051,16 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Restrictions for a join child against several other children, see
+     * {@link #getJoinRestrictions(VariableBindings, VariableBindings, Restrictions)}.
+     *
+     * @param bindings the variable bindings
+     * @param others bindings of the other children
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for a join child against several other children, see
+     *         {@link #getJoinRestrictions(VariableBindings, VariableBindings, Restrictions)}
+     */
     protected static Restrictions getJoinRestrictions(VariableBindings bindings, Collection<VariableBindings> others,
             Restrictions restrictions)
     {
@@ -737,6 +1096,14 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * False if a variable is always bound in several children with disjoint classes or different constants, so the join
+     * is empty.
+     *
+     * @param childs the child nodes
+     * @return false if a variable is always bound in several children with disjoint classes or different constants, so
+     *         the join is empty, true otherwise
+     */
     protected static boolean isJoinable(List<SqlIntercode> childs)
     {
         List<VariableBindings> allVars = childs.stream().map(c -> c.getVariableBindings()).toList();
@@ -776,6 +1143,15 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * False if some shared variable can never match between a join component of the left and a join component of the
+     * right subtree (see {@link VariableBindingPair#isJoinable}).
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return false if some shared variable can never match between a join component of the left and a join component
+     *         of the right subtree (see {@link VariableBindingPair#isJoinable}), true otherwise
+     */
     protected static boolean isJoinable(SqlIntercode left, SqlIntercode right)
     {
         for(SqlIntercode l : getJoinList(left))
@@ -794,6 +1170,14 @@ public abstract class SqlIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * The components the subtree joins, looking through joins, filters, distinct, and the left sides of left joins and
+     * minus.
+     *
+     * @param child the child node
+     * @return the components the subtree joins, looking through joins, filters, distinct, and the left sides of left
+     *         joins and minus
+     */
     protected static List<SqlIntercode> getJoinList(SqlIntercode child)
     {
         if(child instanceof SqlJoin join)

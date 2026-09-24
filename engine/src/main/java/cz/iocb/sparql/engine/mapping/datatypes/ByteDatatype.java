@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:byte datatype.
+ */
 public final class ByteDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public ByteDatatype()
     {
         super(xsdByteIri, Byte.toString(Byte.MIN_VALUE), Byte.toString(Byte.MAX_VALUE));

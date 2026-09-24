@@ -17,21 +17,71 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs whose id (between prefix and suffix) is translated to the stored value through a mapping table: the {@code to}
+ * column holds the id, the {@code from} column the value stored in the mapped tables.
+ */
 public class MapUserIriClass extends SimpleUserIriClass
 {
+    /**
+     * Query translating a placeholder IRI to the stored value.
+     */
     private final String sqlQuery;
 
+    /**
+     * Mapping table.
+     */
     private final Table table;
+
+    /**
+     * Column holding the stored values.
+     */
     private final TableColumn from;
+
+    /**
+     * Column holding the ids.
+     */
     private final TableColumn to;
 
+    /**
+     * Compiled regular expression of the IRIs.
+     */
     private final Pattern pattern;
+
+    /**
+     * Regular expression of the IRIs.
+     */
     private final String regexp;
+
+    /**
+     * Text before the id, or null.
+     */
     private final String prefix;
+
+    /**
+     * Text after the id, or null.
+     */
     private final String suffix;
+
+    /**
+     * Fixed length of the id, or zero.
+     */
     private final int length;
 
 
+    /**
+     * Creates the class with all options.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     * @param pattern regular expression constraining the id, or null
+     * @param suffix the suffix
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix,
             int length, String pattern, String suffix)
     {
@@ -87,6 +137,18 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class with an id of any length.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     * @param pattern regular expression constraining the id, or null
+     * @param suffix the suffix
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix,
             String pattern, String suffix)
     {
@@ -94,6 +156,18 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class without a suffix.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     * @param pattern regular expression constraining the id, or null
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix,
             int length, String pattern)
     {
@@ -101,6 +175,17 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class with an id of any length and no suffix.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     * @param pattern regular expression constraining the id, or null
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix,
             String pattern)
     {
@@ -108,6 +193,17 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class with an id of fixed length and no pattern or suffix.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix,
             int length)
     {
@@ -115,6 +211,16 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class with a prefix only.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param table the table
+     * @param from column holding the stored values
+     * @param to column holding the ids
+     * @param prefix the prefix
+     */
     public MapUserIriClass(String name, String sqlType, Table table, TableColumn from, TableColumn to, String prefix)
     {
         this(name, sqlType, table, from, to, prefix, 0, null, null);
@@ -189,6 +295,12 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * SQL expression translating an IRI assumed to belong to the class to the stored value.
+     *
+     * @param column the column
+     * @return SQL expression translating an IRI assumed to belong to the class to the stored value
+     */
     protected Column generateNonCheckedInverseFunction(Column column)
     {
         Column access = expression("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
@@ -198,6 +310,12 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * SQL expression extracting the id from an IRI.
+     *
+     * @param column the column
+     * @return SQL expression extracting the id from an IRI
+     */
     protected Column generateExtractionFunction(Column column)
     {
         if(prefix == null && suffix == null)
@@ -239,36 +357,66 @@ public class MapUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Mapping table.
+     *
+     * @return mapping table
+     */
     public Table getTable()
     {
         return table;
     }
 
 
+    /**
+     * Column holding the stored values.
+     *
+     * @return column holding the stored values
+     */
     public TableColumn getFrom()
     {
         return from;
     }
 
 
+    /**
+     * Column holding the ids.
+     *
+     * @return column holding the ids
+     */
     public TableColumn getTo()
     {
         return to;
     }
 
 
+    /**
+     * Text before the id, or null.
+     *
+     * @return text before the id, or null
+     */
     public String getPrefix()
     {
         return prefix;
     }
 
 
+    /**
+     * Text after the id, or null.
+     *
+     * @return text after the id, or null
+     */
     public String getSuffix()
     {
         return suffix;
     }
 
 
+    /**
+     * Fixed length of the id, or zero.
+     *
+     * @return fixed length of the id, or zero
+     */
     public int getIdLength()
     {
         return length;

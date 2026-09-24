@@ -14,30 +14,68 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:dayTimeDuration datatype with microsecond precision, limited to the range of a signed 64-bit count of
+ * microseconds.
+ */
 public final class DayTimeDurationDatatype extends Datatype
 {
+    /**
+     * Microseconds in a day.
+     */
     static private final BigDecimal DAY_USEC = new BigDecimal(24 * 60 * 60 * 1000000l);
+
+    /**
+     * Microseconds in an hour.
+     */
     static private final BigDecimal HOUR_USEC = new BigDecimal(60 * 60 * 1000000l);
+
+    /**
+     * Microseconds in a minute.
+     */
     static private final BigDecimal MIN_USEC = new BigDecimal(60 * 1000000l);
+
+    /**
+     * Microseconds in a second.
+     */
     static private final BigDecimal SEC_USEC = new BigDecimal(1000000l);
 
+    /**
+     * Lexical form of xsd:dayTimeDuration with at most microsecond precision.
+     */
     private static final Pattern validFormPattern = Pattern.compile(WS + "-?P((([0-9]+D)(T(([0-9]+H)([0-9]+M)?([0-9]+"
             + "(\\.[0-9]{1,6}0*)?S)?|([0-9]+M)([0-9]+(\\.[0-9]{1,6}0*)?S)?|([0-9]+(\\.[0-9]{1,6}0*)?S)))?)|(T(([0-9]+H)([0-9]+M)?"
             + "([0-9]+(\\.[0-9]{1,6}0*)?S)?|([0-9]+M)([0-9]+(\\.[0-9]{1,6}0*)?S)?|([0-9]+(\\.[0-9]{1,6}0*)?S))))" + WS);
 
+    /**
+     * Canonical lexical form: no zero components, normalised ranges, no trailing zeros in seconds.
+     */
     private static final Pattern canonicalFormPattern = Pattern.compile("""
             (?:PT0S|-?P(?:[1-9][0-9]*D|(?:[1-9][0-9]*D)?\
             T(?:(?:[1-9]|1[0-9]|2[0-3])H(?:(?:[1-9]|[1-5][0-9])M)?(?:(?:0\\.[0-9]*[1-9]|(?:[1-9]|[1-5][0-9])\
             (?:\\.[0-9]*[1-9])?)S)?|(?:[1-9]|[1-5][0-9])M(?:(?:0\\.[0-9]*[1-9]|(?:[1-9]|[1-5][0-9])\
             (?:\\.[0-9]*[1-9])?)S)?|(?:0\\.[0-9]*[1-9]|(?:[1-9]|[1-5][0-9])(?:\\.[0-9]*[1-9])?)S)))""");
 
+    /**
+     * Pattern with named groups for the sign and the components of the duration.
+     */
     private static final Pattern splitPattern = Pattern.compile("^" + WS + "(?<sign>-)?P((?<days>[0-9]+)D)?"
             + "(T((?<hours>[0-9]+)H)?((?<mins>[0-9]+)M)?((?<secs>[0-9]+(\\.[0-9]{1,6})?)[0-9]*S)?)?" + WS + "$");
 
+    /**
+     * Lowest representable duration in microseconds.
+     */
     static private final BigDecimal MIN_VALUE = new BigDecimal(Long.MIN_VALUE);
+
+    /**
+     * Highest representable duration in microseconds.
+     */
     static private final BigDecimal MAX_VALUE = new BigDecimal(Long.MAX_VALUE);
 
 
+    /**
+     * Creates the datatype.
+     */
     public DayTimeDurationDatatype()
     {
         super(xsdDayTimeDurationIri);
@@ -137,6 +175,12 @@ public final class DayTimeDurationDatatype extends Datatype
     }
 
 
+    /**
+     * Length of the duration in microseconds (negative for negative durations).
+     *
+     * @param value the value
+     * @return length of the duration in microseconds (negative for negative durations)
+     */
     public static BigDecimal parseValue(String value)
     {
         Matcher match = splitPattern.matcher(value);

@@ -18,13 +18,28 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid xsd:date value of one fixed timezone offset, stored as a {@code date} plus its lexical form; instances are
+ * cached per offset.
+ */
 public final class DateInZoneBaseClass extends BaseLiteralClass implements DateInZone
 {
+    /**
+     * Instances by timezone offset.
+     */
     private static final ConcurrentMap<Integer, DateInZoneBaseClass> instances = new ConcurrentHashMap<>();
 
+    /**
+     * Timezone offset in seconds.
+     */
     private final int zone;
 
 
+    /**
+     * Creates the class of the offset; use {@link #get}.
+     *
+     * @param zone the timezone offset in seconds
+     */
     private DateInZoneBaseClass(int zone)
     {
         super("base-date$" + zone, xsdDateType, List.of("date", "varchar"), Set.of(box, genScalarDate, genDate));
@@ -32,6 +47,12 @@ public final class DateInZoneBaseClass extends BaseLiteralClass implements DateI
     }
 
 
+    /**
+     * The class of the given timezone offset (see {@link #getZone}).
+     *
+     * @param zone the timezone offset in seconds
+     * @return the class of the given timezone offset (see {@link #getZone})
+     */
     public static DateInZoneBaseClass get(int zone)
     {
         return instances.computeIfAbsent(zone, DateInZoneBaseClass::new);

@@ -13,11 +13,23 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Constant IRI, represented in its detected IRI class.
+ */
 public final class SqlIri extends SqlExpressionIntercode
 {
+    /**
+     * The IRI.
+     */
     private final Iri iri;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param iri the IRI
+     * @param map columns per resource class
+     */
     private SqlIri(Iri iri, Map<ResourceClass, List<Column>> map)
     {
         super(map, false, true);
@@ -26,12 +38,27 @@ public final class SqlIri extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Constant IRI expression.
+     *
+     * @param request the current request
+     * @param iri the IRI
+     * @return constant IRI expression
+     */
     public static SqlExpressionIntercode create(Request request, Iri iri)
     {
         return create(request, iri, Restriction.ALL);
     }
 
 
+    /**
+     * Constant IRI expression materialising its columns only when its class is needed.
+     *
+     * @param request the current request
+     * @param iri the IRI
+     * @param restriction the result classes the parent needs
+     * @return constant IRI expression materialising its columns only when its class is needed
+     */
     private static SqlExpressionIntercode create(Request request, Iri iri, Restriction restriction)
     {
         ResourceClass resClass = request.getIriClass(iri);
@@ -60,6 +87,11 @@ public final class SqlIri extends SqlExpressionIntercode
     }
 
 
+    /**
+     * The IRI.
+     *
+     * @return the IRI
+     */
     public Iri getIri()
     {
         return iri;

@@ -13,21 +13,39 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class NegatedPath extends BaseElement implements Path
 {
+    /**
+     * The negated property set: an IRI, an inverse IRI, or an alternative of those.
+     */
     private Path child;
 
 
+    /**
+     * Creates the negation of the child.
+     *
+     * @param child the child path
+     */
     public NegatedPath(Path child)
     {
         setChild(child);
     }
 
 
+    /**
+     * The negated property set.
+     *
+     * @return the negated property set
+     */
     public Path getChild()
     {
         return child;
     }
 
 
+    /**
+     * Sets the negated property set.
+     *
+     * @param child the child path
+     */
     public void setChild(Path child)
     {
         this.child = child;

@@ -19,12 +19,30 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Turns the constant columns of the child's bindings into real columns of a projection, so that a parent such as a left
+ * join can test them for NULL.
+ */
 public final class SqlStripConstantColumns extends SqlIntercode
 {
+    /**
+     * Wrapped solutions.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Constant supplied by each generated column.
+     */
     private final Map<TableColumn, ConstantColumn> map;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param child the child node
+     * @param map constant supplied by each generated column
+     */
     protected SqlStripConstantColumns(VariableBindings bindings, SqlIntercode child,
             Map<TableColumn, ConstantColumn> map)
     {
@@ -35,6 +53,12 @@ public final class SqlStripConstantColumns extends SqlIntercode
     }
 
 
+    /**
+     * The child with its constant columns exposed as real columns.
+     *
+     * @param child the child node
+     * @return the child with its constant columns exposed as real columns
+     */
     protected static SqlIntercode strip(SqlIntercode child)
     {
         Map<ConstantColumn, TableColumn> map = new HashMap<>();
@@ -170,6 +194,11 @@ public final class SqlStripConstantColumns extends SqlIntercode
     }
 
 
+    /**
+     * Wrapped solutions.
+     *
+     * @return wrapped solutions
+     */
     public final SqlIntercode getChild()
     {
         return child;

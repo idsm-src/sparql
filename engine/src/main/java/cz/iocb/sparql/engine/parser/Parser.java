@@ -22,9 +22,17 @@ import cz.iocb.sparql.engine.model.base.Range;
  */
 public class Parser
 {
+    /**
+     * Messages the syntax errors are appended to.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates a parser that appends syntax errors to {@code messages}.
+     *
+     * @param messages the message list to append to
+     */
     public Parser(List<TranslateMessage> messages)
     {
         this.messages = messages;
@@ -32,7 +40,11 @@ public class Parser
 
 
     /**
-     * Parses a SPARQL query contained in the given string.
+     * Parses a SPARQL query and returns its parse tree. Unicode escapes (&#92;uXXXX and &#92;UXXXXXXXX) are resolved
+     * before lexing; syntax errors are reported as messages, not thrown.
+     *
+     * @param query the query text
+     * @return the parse tree
      */
     public ParserRuleContext parse(String query)
     {
@@ -76,6 +88,12 @@ public class Parser
     }
 
 
+    /**
+     * Runs the ANTLR lexer and parser on the stream, collecting syntax errors as messages.
+     *
+     * @param stream character stream of the query
+     * @return the parse tree
+     */
     private ParserRuleContext parse(CharStream stream)
     {
         BaseErrorListener errorListener = new BaseErrorListener()

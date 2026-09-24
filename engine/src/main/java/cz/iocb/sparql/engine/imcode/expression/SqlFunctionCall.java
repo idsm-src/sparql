@@ -17,12 +17,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Call of an extension function defined by the configuration; an argument whose classes are disjoint with the declared
+ * argument class makes the call an error.
+ */
 public final class SqlFunctionCall extends SqlExpressionIntercode
 {
+    /**
+     * Called function.
+     */
     private final FunctionDefinition definition;
+
+    /**
+     * Arguments in order.
+     */
     private final List<SqlExpressionIntercode> arguments;
 
 
+    /**
+     * Creates the expression; deterministic if the function and all arguments are.
+     *
+     * @param definition the function definition
+     * @param arguments the arguments
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlFunctionCall(FunctionDefinition definition, List<SqlExpressionIntercode> arguments,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -38,12 +57,28 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Call of the function with the given arguments.
+     *
+     * @param definition the function definition
+     * @param arguments the arguments
+     * @return call of the function with the given arguments
+     */
     public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
     {
         return create(definition, arguments, Restriction.ALL);
     }
 
 
+    /**
+     * Call materialising the result only when needed; an argument disjoint with its declared class makes the call NULL.
+     *
+     * @param definition the function definition
+     * @param arguments the arguments
+     * @param restriction the result classes the parent needs
+     * @return call materialising the result only when needed; an argument disjoint with its declared class makes the
+     *         call NULL
+     */
     public static SqlExpressionIntercode create(FunctionDefinition definition, List<SqlExpressionIntercode> arguments,
             Restriction restriction)
     {
@@ -100,6 +135,13 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * SQL calling the function with the arguments converted to their declared classes.
+     *
+     * @param definition the function definition
+     * @param arguments the arguments
+     * @return SQL calling the function with the arguments converted to their declared classes
+     */
     private static List<Column> translate(FunctionDefinition definition, List<SqlExpressionIntercode> arguments)
     {
         StringBuilder builder = new StringBuilder();

@@ -10,8 +10,14 @@ import cz.iocb.sparql.engine.rdf.StrBlankNode;
 
 
 
+/**
+ * String blank nodes in one varchar column encoding both value and segment.
+ */
 public final class StrBlankNodeScalarClass extends StrBlankNodeClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected StrBlankNodeScalarClass()
     {
         super("sblanknode@1c", List.of("varchar"), Set.of(box/*, strBlankNode*/));

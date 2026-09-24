@@ -7,7 +7,6 @@ import java.util.List;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
-import cz.iocb.sparql.engine.parser.Parser;
 
 
 
@@ -16,15 +15,25 @@ import cz.iocb.sparql.engine.parser.Parser;
  *
  * <p>
  * It is written as a triple where the subject represents the results of the procedure ({@link #getResults}), the
- * predicate is the name of the procedure ( {@link #getProcedure}) (which is one of the predefined names, see
- * {@link Parser#getProcedures}) and the object is a blank node property list containing the parameters of the procedure
- * ({@link #getParameters}).
+ * predicate is the name of the procedure ({@link #getProcedure}), which is one of the procedures defined by the
+ * configuration ({@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration#getProcedures}), and the object is a
+ * blank node property list containing the parameters of the procedure ({@link #getParameters}).
  */
 public class MultiProcedureCall extends ProcedureCallBase
 {
+    /**
+     * Named results of the procedure.
+     */
     private final List<Parameter> results;
 
 
+    /**
+     * Creates the call; variables among the results and parameters become in scope.
+     *
+     * @param results the named results
+     * @param procedure IRI of the procedure
+     * @param parameters the parameters
+     */
     public MultiProcedureCall(Collection<Parameter> results, IriNode procedure, Collection<Parameter> parameters)
     {
         super(procedure, parameters);
@@ -40,6 +49,11 @@ public class MultiProcedureCall extends ProcedureCallBase
     }
 
 
+    /**
+     * Named results of the procedure.
+     *
+     * @return named results of the procedure
+     */
     public List<Parameter> getResults()
     {
         return results;

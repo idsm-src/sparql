@@ -119,27 +119,75 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Translates the AST of a query into intermediate code ({@link SqlIntercode}). It applies the SPARQL algebra of group
+ * graph patterns (joins, left joins for OPTIONAL, MINUS, filters, binds, values, sub-selects), rewrites grouped selects
+ * into aggregations, handles GRAPH and SERVICE scoping, procedure calls and dataset clauses, and finally wraps the
+ * result in a {@link SqlSelect}.
+ */
 public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 {
+    /**
+     * Name prefix of the fresh variables.
+     */
     private static final String variablePrefix = "@additionalvar";
 
+    /**
+     * Counter of fresh variables.
+     */
     private int variableId = 0;
+
+    /**
+     * Counter of SERVICE calls, giving each its blank node segment.
+     */
     private int serviceId = 0;
 
+    /**
+     * Current request.
+     */
     private final Request request;
 
+    /**
+     * Enclosing services, innermost last (the own service at the bottom).
+     */
     private final Stack<Iri> serviceRestrictions = new Stack<>();
+
+    /**
+     * Enclosing graphs, innermost last (null for the default graph).
+     */
     private final Stack<RdfTerm> graphRestrictions = new Stack<>();
 
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration configuration;
+
+    /**
+     * User IRI classes of the configuration.
+     */
     private final List<UserIriClass> iriClasses;
 
+    /**
+     * Source ranges of every occurrence of each variable name in the WHERE clause.
+     */
     private Map<String, List<Range>> variableOccurrences;
+
+    /**
+     * Quad mappings in effect after applying the dataset clauses.
+     */
     private List<QuadMapping> mappings;
 
+    /**
+     * Prologue of the query being translated.
+     */
     private Prologue prologue;
 
 
+    /**
+     * Creates the translator for the request.
+     *
+     * @param request the current request
+     */
     public TranslateVisitor(Request request)
     {
         this.request = request;
@@ -268,6 +316,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Template position for a node of a CONSTRUCT template.
+     *
+     * @param node the template node
+     * @return template position for a node of a CONSTRUCT template
+     */
     private RdfTermTemplate<?> createTemplate(Node node)
     {
         return switch(node)
@@ -596,6 +650,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Code matching any quad of the graph, used to check that the graph exists.
+     *
+     * @param graph the GRAPH pattern
+     * @return code matching any quad of the graph, used to check that the graph exists
+     */
     private SqlIntercode translateGraphQuads(RdfTerm graph)
     {
         PathTranslateVisitor pathVisitor = new PathTranslateVisitor(request, this, mappings);
@@ -605,9 +665,16 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
-    /* Decides whether every solution of the pattern of the GRAPH clause implies that the graph exists, i.e., whether
-     * it necessarily comes from a triple pattern evaluated in the graph. If it does not (e.g. {}, VALUES or BIND
-     * alone), the existence of the graph has to be checked separately.
+    /**
+     * True if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, so the graph
+     * is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, whose graph has to be checked
+     * separately.
+     *
+     * @param graph the GRAPH pattern
+     * @param graphTerm the graph term
+     * @return true if every solution of the GRAPH pattern necessarily comes from a triple evaluated in the graph, so
+     *         the graph is known to exist; false for patterns like {@code {}}, VALUES or BIND alone, whose graph has to
+     *         be checked separately
      */
     private boolean isGraphWitnessed(Graph graph, RdfTerm graphTerm)
     {
@@ -801,6 +868,15 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates the patterns of a group starting from {@code base}: joins them left to right, applies OPTIONAL as a
+     * left join (with its filters as join conditions), MINUS, BIND, SERVICE and procedure calls in place, and the
+     * group's FILTERs at the end.
+     *
+     * @param patterns the patterns
+     * @param base the code the patterns are joined to
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translatePatternList(List<Pattern> patterns, SqlIntercode base)
     {
         SqlIntercode translatedGroupPattern = base;
@@ -873,6 +949,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Left join of the group pattern with an OPTIONAL pattern, its filters becoming join conditions.
+     *
+     * @param translatedGroupPattern code of the patterns so far
+     * @param translatedPattern code of the optional pattern
+     * @param optionalFilters filters inside the OPTIONAL
+     * @return left join of the group pattern with an OPTIONAL pattern, its filters becoming join conditions
+     */
     private SqlIntercode translateLeftJoin(SqlIntercode translatedGroupPattern, SqlIntercode translatedPattern,
             LinkedList<Filter> optionalFilters)
     {
@@ -898,6 +982,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Applies a MINUS pattern to the group pattern.
+     *
+     * @param pattern the MINUS pattern
+     * @param translatedGroupPattern code of the patterns so far
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateMinus(Minus pattern, SqlIntercode translatedGroupPattern)
     {
         SqlIntercode minusPattern = visitElement(pattern.getPattern());
@@ -906,6 +997,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Applies a BIND to the group pattern.
+     *
+     * @param bind the BIND pattern
+     * @param translatedGroupPattern code of the patterns so far
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateBind(Bind bind, SqlIntercode translatedGroupPattern)
     {
         Variable var = getVariable(bind.getVariable());
@@ -918,6 +1016,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Applies the FILTERs to the group pattern.
+     *
+     * @param filters the filters
+     * @param groupPattern code of the group
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateFilters(List<Filter> filters, SqlIntercode groupPattern)
     {
         if(filters.size() == 0)
@@ -940,6 +1045,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates inline data into a VALUES node, materialising each variable in the classes of the terms it takes.
+     *
+     * @param variableNames variables of the VALUES clause
+     * @param lines the rows of terms
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateValues(List<Variable> variableNames, List<List<RdfTerm>> lines)
     {
         if(lines.size() == 0)
@@ -1046,6 +1158,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates a procedure call evaluated laterally for every solution of {@code context}, filling in the default
+     * values of omitted parameters.
+     *
+     * @param procedureCallBase the procedure call
+     * @param context solutions the call is evaluated for
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateProcedureCall(ProcedureCallBase procedureCallBase, SqlIntercode context)
     {
         IriNode procedureName = procedureCallBase.getProcedure();
@@ -1165,6 +1285,14 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates a SERVICE pattern: a service known to the configuration is translated in place with its own mappings,
+     * any other becomes a {@link SqlServiceStub} evaluated later against the remote endpoint.
+     *
+     * @param service the SERVICE pattern
+     * @param context solutions the call is evaluated for
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateService(Service service, SqlIntercode context)
     {
         RdfTerm name = getTerm(service.getName());
@@ -1206,6 +1334,18 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates the whole query; the optional offset, limit and ordering given by the caller (e.g. the endpoint) are
+     * applied on top of those of the query.
+     *
+     * @param sparqlQuery the query to translate
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @param order variables to order the results by, on top of the query's own ORDER BY
+     * @return the resulting select
+     * @throws SQLException on database errors
+     * @throws ServiceException if a federated SERVICE call fails
+     */
     public SqlSelect translate(Query sparqlQuery, BigInteger offset, BigInteger limit, List<Variable> order)
             throws SQLException, ServiceException
     {
@@ -1257,6 +1397,13 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Condition restricting the graph term of the mapping to the given IRIs.
+     *
+     * @param graphMap the graph term mapping
+     * @param iris IRIs the graph may take
+     * @return condition restricting the graph term of the mapping to the given IRIs
+     */
     private Conditions getGraphCondition(TermMapping graphMap, Set<Iri> iris)
     {
         ResourceClass resClass = graphMap.getResourceClass(request);
@@ -1275,6 +1422,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Selects the quad mappings of the query according to its FROM and FROM NAMED clauses (all mappings of the service
+     * when there are none).
+     *
+     * @param datasets the dataset clauses
+     */
     protected void setDatasets(List<DataSet> datasets)
     {
         if(datasets.isEmpty())
@@ -1321,36 +1474,68 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Fresh variable node with a name that cannot occur in a query.
+     *
+     * @param prefix name prefix of the variable
+     * @return fresh variable node with a name that cannot occur in a query
+     */
     protected VariableNode createVariableNode(String prefix)
     {
         return new VariableNode(prefix + variableId++);
     }
 
 
+    /**
+     * Fresh variable with a name that cannot occur in a query.
+     *
+     * @param prefix name prefix of the variable
+     * @return fresh variable with a name that cannot occur in a query
+     */
     protected Variable createVariable(String prefix)
     {
         return getVariable(new VariableNode(prefix + variableId++));
     }
 
 
+    /**
+     * Service whose mappings are in effect at the current position.
+     *
+     * @return service whose mappings are in effect at the current position
+     */
     public final Iri getService()
     {
         return serviceRestrictions.peek();
     }
 
 
+    /**
+     * Graph term in effect at the current position; null for the default graph.
+     *
+     * @return graph term in effect at the current position; null for the default graph
+     */
     public final RdfTerm getGraph()
     {
         return graphRestrictions.peek();
     }
 
 
+    /**
+     * User IRI classes of the configuration.
+     *
+     * @return user IRI classes of the configuration
+     */
     public final List<UserIriClass> getIriClasses()
     {
         return iriClasses;
     }
 
 
+    /**
+     * Prologue of the query being translated.
+     *
+     * @return prologue of the query being translated
+     */
     public Prologue getPrologue()
     {
         return prologue;

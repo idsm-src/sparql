@@ -9,12 +9,8 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 /**
- * Represents a literal value ({@link #getStringValue}) that has a type ({@link #getTypeIri}) and can have a language
- * tag ({@link #getLanguageTag}). This includes the shorthand forms for numeric and boolean literals.
- *
- * <p>
- * For supported literal types, a converted value ({@link #getValue}), along with its Java type ({@link #getJavaClass})
- * is also provided.
+ * Represents a literal: a lexical value ({@link #getValue}) with either a datatype IRI ({@link #getType}) or a language
+ * tag ({@link #getTag}). Numeric and boolean shorthand forms get the corresponding xsd datatype.
  *
  * <p>
  * Corresponds to the following rules in the SPARQL grammar:
@@ -26,11 +22,28 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class LiteralNode extends BaseComplexNode implements Expression, Node
 {
+    /**
+     * Lexical form.
+     */
     private final String value;
+
+    /**
+     * Datatype IRI, null for language-tagged literals.
+     */
     private final IriNode type;
+
+    /**
+     * Language tag, null for typed literals.
+     */
     private final String tag;
 
 
+    /**
+     * Creates a language-tagged literal.
+     *
+     * @param value the lexical form
+     * @param tag the language tag
+     */
     public LiteralNode(String value, String tag)
     {
         this.value = value;
@@ -39,6 +52,12 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
     }
 
 
+    /**
+     * Creates a typed literal.
+     *
+     * @param value the lexical form
+     * @param type the datatype IRI
+     */
     public LiteralNode(String value, IriNode type)
     {
         this.value = value;
@@ -47,18 +66,33 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
     }
 
 
+    /**
+     * Lexical form with quotes removed and escapes resolved.
+     *
+     * @return lexical form with quotes removed and escapes resolved
+     */
     public String getValue()
     {
         return value;
     }
 
 
+    /**
+     * Datatype IRI; null for language-tagged literals.
+     *
+     * @return datatype IRI; null for language-tagged literals
+     */
     public IriNode getType()
     {
         return type;
     }
 
 
+    /**
+     * Language tag without the leading {@code @}; null for typed literals.
+     *
+     * @return language tag without the leading {@code @}; null for typed literals
+     */
     public String getTag()
     {
         return tag;

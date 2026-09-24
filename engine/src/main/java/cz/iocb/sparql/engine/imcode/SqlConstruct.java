@@ -38,19 +38,54 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Instantiates the templates of a CONSTRUCT or DESCRIBE query for every solution of the child, producing the columns
+ * subject, predicate and object as a union over the templates; blank nodes of the templates get labels unique per
+ * solution and template. Templates that cannot be instantiated (an unbound or literal subject) are dropped.
+ */
 public final class SqlConstruct extends SqlIntercode
 {
+    /**
+     * The three output columns of a construct.
+     */
     public static enum ConstructColumn
     {
-        SUBJECT(new Variable("subject")), PREDICATE(new Variable("predicate")), OBJECT(new Variable("object"));
+        /**
+         * Subject column.
+         */
+        SUBJECT(new Variable("subject")),
 
+        /**
+         * Predicate column.
+         */
+        PREDICATE(new Variable("predicate")),
+
+        /**
+         * Object column.
+         */
+        OBJECT(new Variable("object"));
+
+        /**
+         * Variable exposing the column.
+         */
         final Variable variable;
 
+        /**
+         * Creates the column with its variable.
+         *
+         * @param variable the variable
+         */
         private ConstructColumn(Variable variable)
         {
             this.variable = variable;
         }
 
+
+        /**
+         * Variable exposing the column.
+         *
+         * @return variable exposing the column
+         */
         public Variable getVariable()
         {
             return variable;
@@ -58,15 +93,34 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Term at a position of a triple template: a constant IRI or literal, a template blank node or a variable.
+     *
+     * @param <T> type of the value
+     */
     public static abstract class RdfTermTemplate<T>
     {
+        /**
+         * The constant, label or variable.
+         */
         private final T value;
 
+        /**
+         * Creates the template position.
+         *
+         * @param value the constant, label or variable
+         */
         RdfTermTemplate(T value)
         {
             this.value = value;
         }
 
+
+        /**
+         * The constant, label or variable.
+         *
+         * @return the constant, label or variable
+         */
         public T getValue()
         {
             return value;
@@ -94,8 +148,16 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Constant IRI in a template.
+     */
     public static class IriTemplate extends RdfTermTemplate<Iri>
     {
+        /**
+         * Creates the template position.
+         *
+         * @param iri the IRI
+         */
         public IriTemplate(Iri iri)
         {
             super(iri);
@@ -103,8 +165,16 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Constant literal in a template.
+     */
     public static class LiteralTemplate extends RdfTermTemplate<Literal>
     {
+        /**
+         * Creates the template position.
+         *
+         * @param literal the literal
+         */
         public LiteralTemplate(Literal literal)
         {
             super(literal);
@@ -112,8 +182,16 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Blank node of a template, identified by its label; a fresh node is created per solution.
+     */
     public static class BlankNodeTemplate extends RdfTermTemplate<String>
     {
+        /**
+         * Creates the template position.
+         *
+         * @param label label of the blank node
+         */
         public BlankNodeTemplate(String label)
         {
             super(label);
@@ -121,8 +199,16 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Variable of a template, taking the value from the solution.
+     */
     public static class VariableTemplate extends RdfTermTemplate<Variable>
     {
+        /**
+         * Creates the template position.
+         *
+         * @param variable the variable
+         */
         public VariableTemplate(Variable variable)
         {
             super(variable);
@@ -131,8 +217,21 @@ public final class SqlConstruct extends SqlIntercode
 
 
 
+    /**
+     * Triple template.
+     *
+     * @param subject the subject template
+     * @param predicate the predicate template
+     * @param object the object template
+     */
     public static record Template(RdfTermTemplate<?> subject, RdfTermTemplate<?> predicate, RdfTermTemplate<?> object)
     {
+        /**
+         * Template position of the column.
+         *
+         * @param column the column
+         * @return template position of the column
+         */
         RdfTermTemplate<?> get(ConstructColumn column)
         {
             return switch(column)
@@ -145,15 +244,42 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * The output variables in order.
+     */
     private static final List<Variable> columns = List.of(SUBJECT.getVariable(), PREDICATE.getVariable(),
             OBJECT.getVariable());
 
+    /**
+     * Solutions the templates are instantiated for.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Templates that can produce triples.
+     */
     private final List<Template> templates;
+
+    /**
+     * Per template, the output column each union column is taken from.
+     */
     private final List<Map<Column, Column>> columnMappings;
+
+    /**
+     * Counter giving template blank nodes distinct segments, shared by nested constructs.
+     */
     private final AtomicInteger bnOffset;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param child the child node
+     * @param templates the triple templates
+     * @param columnMappings per branch, the branch column each output column is taken from
+     * @param bnOffset counter giving template blank nodes distinct segments
+     */
     protected SqlConstruct(VariableBindings bindings, SqlIntercode child, List<Template> templates,
             List<Map<Column, Column>> columnMappings, AtomicInteger bnOffset)
     {
@@ -166,12 +292,30 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Construct of the templates over the child's solutions.
+     *
+     * @param request the current request
+     * @param templates the triple templates
+     * @param child the child node
+     * @return construct of the templates over the child's solutions
+     */
     public static SqlIntercode construct(Request request, List<Template> templates, SqlIntercode child)
     {
         return construct(request, templates, child, new AtomicInteger(0));
     }
 
 
+    /**
+     * Construct restricted to the valid templates; the output variables get the disjoint classes of all templates.
+     *
+     * @param request the current request
+     * @param templates the triple templates
+     * @param child the child node
+     * @param bnOffset counter giving template blank nodes distinct segments
+     * @return construct restricted to the valid templates; the output variables get the disjoint classes of all
+     *         templates
+     */
     protected static SqlIntercode construct(Request request, List<Template> templates, SqlIntercode child,
             AtomicInteger bnOffset)
     {
@@ -456,12 +600,24 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * The output variables subject, predicate and object.
+     *
+     * @return the output variables subject, predicate and object
+     */
     public static List<Variable> getColumns()
     {
         return columns;
     }
 
 
+    /**
+     * Restrictions for the child: each template variable in the classes usable at its positions.
+     *
+     * @param templates the triple templates
+     * @param bindings the variable bindings
+     * @return restrictions for the child: each template variable in the classes usable at its positions
+     */
     private static Restrictions getTemplateRestrictions(Collection<Template> templates, VariableBindings bindings)
     {
         Restrictions restrictions = new Restrictions();
@@ -475,6 +631,13 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Classes of the binding usable at the column: references for subjects, IRIs for predicates.
+     *
+     * @param column the output column
+     * @param binding the variable binding
+     * @return classes of the binding usable at the column: references for subjects, IRIs for predicates
+     */
     private static Set<ResourceClass> filterResourceClasses(ConstructColumn column, VariableBinding binding)
     {
         Set<ResourceClass> result = new HashSet<>();
@@ -490,12 +653,26 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Templates that can produce triples for the child.
+     *
+     * @param templates the triple templates
+     * @param child the child node
+     * @return templates that can produce triples for the child
+     */
     private static List<Template> getValidTemplates(Collection<Template> templates, SqlIntercode child)
     {
         return templates.stream().filter(t -> isValidTemplate(t, child)).toList();
     }
 
 
+    /**
+     * True if every position of the template can produce a term.
+     *
+     * @param template the triple template
+     * @param child the child node
+     * @return true if every position of the template can produce a term, false otherwise
+     */
     private static boolean isValidTemplate(Template template, SqlIntercode child)
     {
         for(ConstructColumn column : ConstructColumn.values())
@@ -506,6 +683,14 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * True if the position can produce a term: literals only as objects, variables bound to a suitable class.
+     *
+     * @param column the output column
+     * @param rdfTermTemplate the template position
+     * @param child the child node
+     * @return true if the position can produce a term, false otherwise
+     */
     private static boolean isValidTemplateVariable(ConstructColumn column, RdfTermTemplate<?> rdfTermTemplate,
             SqlIntercode child)
     {
@@ -548,6 +733,19 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Binding of the output column for the template position: constant columns for IRIs and literals, a blank node
+     * built from the row number for blank node templates, the variable's usable classes otherwise.
+     *
+     * @param request the current request
+     * @param column the output column
+     * @param rdfTermTemplate the template position
+     * @param bnOffset counter giving template blank nodes distinct segments
+     * @param bnResourceClasses classes assigned to the template blank nodes so far
+     * @param child the child node
+     * @return binding of the output column for the template position: constant columns for IRIs and literals, a blank
+     *         node built from the row number for blank node templates, the variable's usable classes otherwise
+     */
     private static VariableBinding getVariableBinding(Request request, ConstructColumn column,
             RdfTermTemplate<?> rdfTermTemplate, AtomicInteger bnOffset,
             Map<BlankNodeTemplate, ResourceClass> bnResourceClasses, SqlIntercode child)
@@ -613,6 +811,13 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * The mappings filtered to the classes usable at the column.
+     *
+     * @param column the output column
+     * @param original the original mappings
+     * @return the mappings filtered to the classes usable at the column
+     */
     private static VariableBinding getInternalVariableBinding(ConstructColumn column,
             Map<ResourceClass, List<Column>> original)
     {
@@ -626,6 +831,15 @@ public final class SqlConstruct extends SqlIntercode
     }
 
 
+    /**
+     * Conditions that the nullable columns of some class of the binding are not null, i.e. the variable is bound.
+     *
+     * @param schema the database schema
+     * @param table the table
+     * @param binding the variable binding
+     * @return conditions that the nullable columns of some class of the binding are not null, i.e. the variable is
+     *         bound
+     */
     private static Conditions createConditions(DatabaseSchema schema, Table table, VariableBinding binding)
     {
         Conditions conditions = new Conditions(false);

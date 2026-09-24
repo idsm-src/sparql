@@ -27,13 +27,27 @@ public class Values extends PatternElement implements Pattern
      */
     public static class ValuesList extends BaseElement
     {
+        /**
+         * Values in the order of the variables; null for UNDEF.
+         */
         private final List<Expression> values;
 
+        /**
+         * Creates the row.
+         *
+         * @param values the values, null for UNDEF
+         */
         public ValuesList(Collection<Expression> values)
         {
             this.values = Collections.unmodifiableList(new ArrayList<>(values));
         }
 
+
+        /**
+         * Values in the order of the variables; null for UNDEF.
+         *
+         * @return values in the order of the variables; null for UNDEF
+         */
         public List<Expression> getValues()
         {
             return values;
@@ -47,10 +61,23 @@ public class Values extends PatternElement implements Pattern
     }
 
 
+    /**
+     * Variables being assigned.
+     */
     private final List<VariableNode> variables;
+
+    /**
+     * Rows of values.
+     */
     private final List<ValuesList> valuesLists;
 
 
+    /**
+     * Creates the pattern; the variables become in scope.
+     *
+     * @param variables the variables
+     * @param valuesLists the rows of values
+     */
     public Values(Collection<VariableNode> variables, Collection<ValuesList> valuesLists)
     {
         this.variables = Collections.unmodifiableList(new ArrayList<>(variables));
@@ -60,12 +87,22 @@ public class Values extends PatternElement implements Pattern
     }
 
 
+    /**
+     * Variables being assigned.
+     *
+     * @return variables being assigned
+     */
     public List<VariableNode> getVariables()
     {
         return variables;
     }
 
 
+    /**
+     * Rows of values.
+     *
+     * @return rows of values
+     */
     public List<ValuesList> getValuesLists()
     {
         return valuesLists;

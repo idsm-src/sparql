@@ -7,8 +7,17 @@ import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 
 
 
+/**
+ * Column-based mapping of literals of a {@link LiteralClass}.
+ */
 public class ParametrisedLiteralMapping extends ParametrisedMapping
 {
+    /**
+     * Creates the mapping.
+     *
+     * @param literalClass the literal class
+     * @param columns the columns
+     */
     public ParametrisedLiteralMapping(LiteralClass literalClass, List<Column> columns)
     {
         super(literalClass, columns);

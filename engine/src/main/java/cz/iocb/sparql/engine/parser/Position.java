@@ -7,10 +7,23 @@ package cz.iocb.sparql.engine.parser;
  */
 public class Position
 {
+    /**
+     * Line number, starting at one.
+     */
     private int lineNumber;
+
+    /**
+     * Character position in the line, starting at zero.
+     */
     private int positionInLine;
 
 
+    /**
+     * Creates the position.
+     *
+     * @param lineNumber line number, starting at one
+     * @param positionInLine position in the line, starting at zero
+     */
     public Position(int lineNumber, int positionInLine)
     {
         this.lineNumber = lineNumber;
@@ -18,12 +31,22 @@ public class Position
     }
 
 
+    /**
+     * Line number, starting at one.
+     *
+     * @return line number, starting at one
+     */
     public int getLineNumber()
     {
         return lineNumber;
     }
 
 
+    /**
+     * Character position in the line, starting at zero.
+     *
+     * @return character position in the line, starting at zero
+     */
     public int getPositionInLine()
     {
         return positionInLine;

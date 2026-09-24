@@ -31,13 +31,34 @@ import cz.iocb.sparql.engine.rdf.Variable;
 
 
 
+/**
+ * How a variable is represented in a piece of intermediate code: for each resource class it may take, the columns
+ * holding the value in that class (null columns mean the class is possible but not materialised), plus whether the
+ * variable can be unbound. In a solution at most one class has non-null columns.
+ */
 public class VariableBinding
 {
+    /**
+     * The variable; null for the binding of an expression.
+     */
     private final Variable variable;
+
+    /**
+     * Whether the variable can be unbound.
+     */
     private final boolean canBeNull;
+
+    /**
+     * Columns per resource class; null columns mean the class is not materialised.
+     */
     private final Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
 
+    /**
+     * Copy constructor.
+     *
+     * @param other binding of the other variable
+     */
     public VariableBinding(VariableBinding other)
     {
         this.variable = other.variable;
@@ -46,6 +67,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * Creates the binding of an expression (no variable).
+     *
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     public VariableBinding(Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         this.variable = null;
@@ -54,6 +81,13 @@ public class VariableBinding
     }
 
 
+    /**
+     * Creates the binding with the given mappings (may be null).
+     *
+     * @param variable the variable
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     public VariableBinding(Variable variable, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         this.variable = variable;
@@ -64,6 +98,14 @@ public class VariableBinding
     }
 
 
+    /**
+     * Creates the binding with a single class.
+     *
+     * @param variable the variable
+     * @param resClass the resource class
+     * @param columns the columns
+     * @param canBeNull whether the value may be null
+     */
     public VariableBinding(Variable variable, ResourceClass resClass, List<Column> columns, boolean canBeNull)
     {
         this.variable = variable;
@@ -72,6 +114,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * Creates the binding without classes.
+     *
+     * @param variable the variable
+     * @param canBeNull whether the value may be null
+     */
     public VariableBinding(Variable variable, boolean canBeNull)
     {
         this.variable = variable;
@@ -79,6 +127,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * Adds a class with its columns; the class must be new.
+     *
+     * @param resClass the resource class
+     * @param columns the columns
+     */
     public void addMapping(ResourceClass resClass, List<Column> columns)
     {
         assert !mappings.containsKey(resClass);
@@ -87,42 +141,84 @@ public class VariableBinding
     }
 
 
+    /**
+     * True if exactly this class is among the classes of the variable.
+     *
+     * @param resClass the resource class
+     * @return true if exactly this class is among the classes of the variable, false otherwise
+     */
     public boolean containsClass(ResourceClass resClass)
     {
         return mappings.containsKey(resClass);
     }
 
 
+    /**
+     * True if some class of the variable overlaps with the given class.
+     *
+     * @param resClass the resource class
+     * @return true if some class of the variable overlaps with the given class, false otherwise
+     */
     public boolean contains(ResourceClass resClass)
     {
         return mappings.keySet().stream().anyMatch(r -> !ResourceClass.areDisjunct(r, resClass));
     }
 
 
+    /**
+     * The variable; null for the binding of an expression.
+     *
+     * @return the variable; null for the binding of an expression
+     */
     public final Variable getVariable()
     {
         return variable;
     }
 
 
+    /**
+     * True if the variable can be unbound.
+     *
+     * @return true if the variable can be unbound, false otherwise
+     */
     public final boolean canBeNull()
     {
         return canBeNull;
     }
 
 
+    /**
+     * Columns per resource class; null columns mean the class is not materialised.
+     *
+     * @return columns per resource class; null columns mean the class is not materialised
+     */
     public final Map<ResourceClass, List<Column>> getMappings()
     {
         return mappings;
     }
 
 
+    /**
+     * Columns of exactly the given class, or null.
+     *
+     * @param resourceClass the resource class
+     * @return columns of exactly the given class, or null
+     */
     public List<Column> getMapping(ResourceClass resourceClass)
     {
         return mappings.get(resourceClass);
     }
 
 
+    /**
+     * Columns holding the value of the variable converted to {@code targetClass}, qualified by the table if given: the
+     * stored columns when the class is present, otherwise a COALESCE over the conversions of all overlapping classes,
+     * or NULL constants when no class overlaps. Returns null when a needed class has no materialised columns.
+     *
+     * @param targetClass the class to convert to
+     * @param table the table
+     * @return the derived columns, or null when a needed class has no materialised columns
+     */
     public List<Column> deriveMapping(ResourceClass targetClass, Table table)
     {
         if(mappings.containsKey(targetClass))
@@ -179,12 +275,23 @@ public class VariableBinding
     }
 
 
+    /**
+     * Same as {@link #deriveMapping(ResourceClass, Table)} without table qualification.
+     *
+     * @param targetClass the class to convert to
+     * @return the derived columns, or null when a needed class has no materialised columns
+     */
     public List<Column> deriveMapping(ResourceClass targetClass)
     {
         return deriveMapping(targetClass, null);
     }
 
 
+    /**
+     * SQL condition that the variable is unbound (all columns null).
+     *
+     * @return SQL condition that the variable is unbound (all columns null)
+     */
     public String getIsNull()
     {
         //TODO: add support for different null strategy
@@ -195,6 +302,11 @@ public class VariableBinding
     }
 
 
+    /**
+     * SQL condition that the variable is bound (some column not null).
+     *
+     * @return SQL condition that the variable is bound (some column not null)
+     */
     public String getIsNotNull()
     {
         //TODO: add support for different null strategy
@@ -205,6 +317,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * SQL condition that the variable has no value of the given class.
+     *
+     * @param resClass the resource class
+     * @return SQL condition that the variable has no value of the given class
+     */
     public String getIsNull(ResourceClass resClass)
     {
         //TODO: add support for different null strategy
@@ -214,6 +332,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * SQL condition that the variable has a value of the given class.
+     *
+     * @param resClass the resource class
+     * @return SQL condition that the variable has a value of the given class
+     */
     public String getIsNotNull(ResourceClass resClass)
     {
         //TODO: add support for different null strategy
@@ -223,6 +347,13 @@ public class VariableBinding
     }
 
 
+    /**
+     * Expression yielding the string value of the variable when it is a string literal (plain or language-tagged), null
+     * otherwise.
+     *
+     * @return expression yielding the string value of the variable when it is a string literal (plain or
+     *         language-tagged), null otherwise
+     */
     public Column getStringLiteral()
     {
         boolean literalCanBeNull = canBeNull || mappings.size() > 1;
@@ -244,6 +375,13 @@ public class VariableBinding
     }
 
 
+    /**
+     * Expression yielding the string value of the variable when it belongs to one of the given string literal classes.
+     *
+     * @param resClasses the resource classes
+     * @return expression yielding the string value of the variable when it belongs to one of the given string literal
+     *         classes
+     */
     public Column getStringLiteral(Set<ResourceClass> resClasses)
     {
         boolean literalCanBeNull = canBeNull || mappings.size() > 1;
@@ -269,6 +407,16 @@ public class VariableBinding
     }
 
 
+    /**
+     * Expression yielding the numeric value of the variable, taken in class {@code source}, promoted to the numeric
+     * class {@code target} by the {@code sparql.cast_as_*_from_*} or {@code sparql.rdfbox_promote_to_*} functions.
+     *
+     * @param source the class the value is taken in
+     * @param target the numeric class to promote to
+     * @return expression yielding the numeric value of the variable, taken in class {@code source}, promoted to the
+     *         numeric class {@code target} by the {@code sparql.cast_as_*_from_*} or {@code
+     *         sparql.rdfbox_promote_to_*} functions
+     */
     public Column promoteNumericAs(ResourceClass source, ResourceClass target)
     {
         ResourceClass base = Stream.concat(numericBaseClasses.stream(), Stream.of(box))
@@ -286,18 +434,36 @@ public class VariableBinding
     }
 
 
+    /**
+     * COALESCE of {@link #promoteNumericAs(ResourceClass, ResourceClass)} over the given source classes.
+     *
+     * @param set the classes
+     * @param target the numeric class to promote to
+     * @return COALESCE of {@link #promoteNumericAs(ResourceClass, ResourceClass)} over the given source classes
+     */
     public Column promoteNumericAs(Set<ResourceClass> set, ResourceClass target)
     {
         return Column.coalesce(set.stream().map(r -> promoteNumericAs(r, target)).collect(toSet()));
     }
 
 
+    /**
+     * Resource classes the variable may take.
+     *
+     * @return resource classes the variable may take
+     */
     public final Set<ResourceClass> getClasses()
     {
         return mappings.keySet();
     }
 
 
+    /**
+     * Classes of the variable that overlap with the given class.
+     *
+     * @param resClass the resource class
+     * @return classes of the variable that overlap with the given class
+     */
     public final Set<ResourceClass> getCompatibleClasses(ResourceClass resClass)
     {
         Set<ResourceClass> result = new HashSet<>();
@@ -310,6 +476,11 @@ public class VariableBinding
     }
 
 
+    /**
+     * Non-constant columns of all classes.
+     *
+     * @return non-constant columns of all classes
+     */
     public Set<Column> getNonConstantColumns()
     {
         Set<Column> result = new HashSet<>();
@@ -324,6 +495,11 @@ public class VariableBinding
     }
 
 
+    /**
+     * Expression columns of all classes.
+     *
+     * @return expression columns of all classes
+     */
     public Set<Column> getExpressionColumns()
     {
         Set<Column> result = new HashSet<>();
@@ -338,6 +514,12 @@ public class VariableBinding
     }
 
 
+    /**
+     * Non-constant columns of the given class.
+     *
+     * @param resourceClass the resource class
+     * @return non-constant columns of the given class
+     */
     public Set<Column> getNonConstantColumns(ResourceClass resourceClass)
     {
         Set<Column> result = new HashSet<>();
@@ -350,6 +532,11 @@ public class VariableBinding
     }
 
 
+    /**
+     * True if every class is materialised by constant columns only.
+     *
+     * @return true if every class is materialised by constant columns only, false otherwise
+     */
     public boolean isConstant()
     {
         for(List<Column> columns : mappings.values())
@@ -397,12 +584,22 @@ public class VariableBinding
     }
 
 
+    /**
+     * True if some class has materialised columns.
+     *
+     * @return true if some class has materialised columns, false otherwise
+     */
     public boolean hasMapping()
     {
         return mappings.values().stream().anyMatch(c -> c != null);
     }
 
 
+    /**
+     * True if some column is an SQL expression rather than a plain column or constant.
+     *
+     * @return true if some column is an SQL expression rather than a plain column or constant, false otherwise
+     */
     public boolean hasExpressionColumn()
     {
         return mappings.values().stream().flatMap(c -> c.stream()).anyMatch(c -> c instanceof ExpressionColumn);

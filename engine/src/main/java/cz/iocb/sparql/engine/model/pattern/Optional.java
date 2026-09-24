@@ -12,9 +12,17 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class Optional extends PatternElement implements Pattern
 {
+    /**
+     * The optional pattern.
+     */
     private final GraphPattern pattern;
 
 
+    /**
+     * Creates the pattern; the variables of the optional pattern become in scope.
+     *
+     * @param pattern the WHERE clause
+     */
     public Optional(GraphPattern pattern)
     {
         this.pattern = pattern;
@@ -23,6 +31,11 @@ public class Optional extends PatternElement implements Pattern
     }
 
 
+    /**
+     * The optional pattern.
+     *
+     * @return the optional pattern
+     */
     public GraphPattern getPattern()
     {
         return pattern;

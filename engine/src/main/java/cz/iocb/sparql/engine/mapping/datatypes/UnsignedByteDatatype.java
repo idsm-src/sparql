@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:unsignedByte datatype.
+ */
 public final class UnsignedByteDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public UnsignedByteDatatype()
     {
         super(xsdUnsignedByteIri, "0", "255");

@@ -12,11 +12,20 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:boolean datatype; {@code 1} and {@code 0} are valid but not canonical.
+ */
 public final class BooleanDatatype extends Datatype
 {
+    /**
+     * Valid lexical forms: {@code true}, {@code false}, {@code 1}, {@code 0} with surrounding whitespace.
+     */
     static final Pattern validFormPattern = Pattern.compile(WS + "(true|false|1|0)" + WS);
 
 
+    /**
+     * Creates the datatype.
+     */
     public BooleanDatatype()
     {
         super(xsdBooleanIri);

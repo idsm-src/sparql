@@ -5,21 +5,65 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Unbounded integer datatypes (xsd:integer and its sign-restricted derivatives), limited only by the precision of
+ * PostgreSQL {@code numeric}.
+ */
 public abstract sealed class VariableSizeIntegerDataType extends GenericIntegerDataType permits IntegerDatatype,
         NonPositiveIntegerDatatype, NegativeIntegerDatatype, NonNegativeIntegerDatatype, PositiveIntegerDatatype
 {
+    /**
+     * Which signs, and whether zero, the datatype admits.
+     */
     protected enum Variant
     {
+        /**
+         * Any integer.
+         */
         FULL(true, true, true),
+
+        /**
+         * Positive integers.
+         */
         POSITIVE(false, true, false),
+
+        /**
+         * Negative integers.
+         */
         NEGATIVE(false, false, true),
+
+        /**
+         * Zero and negative integers.
+         */
         NONPOSITIVE(true, false, true),
+
+        /**
+         * Zero and positive integers.
+         */
         NONNEGATIVE(true, true, false);
 
+        /**
+         * Whether zero is admitted.
+         */
         boolean zero;
+
+        /**
+         * Whether positive numbers are admitted.
+         */
         boolean plus;
+
+        /**
+         * Whether negative numbers are admitted.
+         */
         boolean minus;
 
+        /**
+         * Creates the variant.
+         *
+         * @param zero whether zero is admitted
+         * @param plus whether positive numbers are admitted
+         * @param minus whether negative numbers are admitted
+         */
         Variant(boolean zero, boolean plus, boolean minus)
         {
             this.zero = zero;
@@ -29,12 +73,25 @@ public abstract sealed class VariableSizeIntegerDataType extends GenericIntegerD
     }
 
 
+    /**
+     * Creates the datatype admitting the signs of the variant.
+     *
+     * @param typeIri the datatype IRI
+     * @param variant the sign variant
+     */
     protected VariableSizeIntegerDataType(Iri typeIri, Variant variant)
     {
         super(typeIri, generatePattern(variant));
     }
 
 
+    /**
+     * Pattern of the lexical forms admitted by the variant, up to the digit limit of PostgreSQL {@code numeric}.
+     *
+     * @param variant the sign variant
+     * @return pattern of the lexical forms admitted by the variant, up to the digit limit of PostgreSQL {@code
+     *         numeric}
+     */
     private static Pattern generatePattern(Variant variant)
     {
         StringBuilder builder = new StringBuilder();

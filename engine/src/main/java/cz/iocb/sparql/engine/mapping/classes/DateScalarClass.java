@@ -14,8 +14,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical xsd:date values in one {@code sparql.zoneddate} column.
+ */
 public final class DateScalarClass extends CanonicalLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateScalarClass()
     {
         super("date@1c", xsdDateType, List.of("sparql.zoneddate"), Set.of(box, genScalarDate, genDate /*, xsdDate*/));

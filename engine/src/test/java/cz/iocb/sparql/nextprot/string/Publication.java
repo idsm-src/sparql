@@ -11,14 +11,23 @@ import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 
 
 
+/**
+ * Mappings of the publications and their bibliographic data.
+ */
 public class Publication
 {
+    /**
+     * Registers the IRI class of the publications.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new IntegerUserIriClass("publication", "int4", "http://nextprot.org/rdf/publication/"));
     }
 
 
+    /**
+     * Registers the quad mappings of the publications.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");

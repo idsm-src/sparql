@@ -6,18 +6,39 @@ import cz.iocb.sparql.engine.model.base.Range;
 
 
 /**
- * Exception class for the main translation process.
- *
+ * Diagnostic message (error or warning) produced while parsing or translating a query, located by the source
+ * {@link Range} it refers to.
  */
 public class TranslateMessage implements Serializable
 {
+    /**
+     * Serialization version.
+     */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Source range the message refers to.
+     */
     private final Range range;
+
+    /**
+     * Severity of the message.
+     */
     private final MessageCategory category;
+
+    /**
+     * Formatted message text.
+     */
     private final String message;
 
 
+    /**
+     * Creates a message of the given type, formatting its template with the arguments {@code o}.
+     *
+     * @param erType type of the message
+     * @param range the source range
+     * @param o arguments of the message template
+     */
     public TranslateMessage(MessageType erType, Range range, Object... o)
     {
         this.range = range;
@@ -25,10 +46,11 @@ public class TranslateMessage implements Serializable
         this.message = String.format(erType.getText(), o);
     }
 
+
     /**
-     * Get the context where the error occured.
+     * Source range the message refers to; may be null.
      *
-     * @return Error context.
+     * @return source range the message refers to; may be null
      */
     public Range getRange()
     {
@@ -36,6 +58,11 @@ public class TranslateMessage implements Serializable
     }
 
 
+    /**
+     * Severity of the message.
+     *
+     * @return severity of the message
+     */
     public MessageCategory getCategory()
     {
         return category;
@@ -43,9 +70,9 @@ public class TranslateMessage implements Serializable
 
 
     /**
-     * Get the error message.
+     * Formatted message text.
      *
-     * @return Error message.
+     * @return formatted message text
      */
     public String getMessage()
     {

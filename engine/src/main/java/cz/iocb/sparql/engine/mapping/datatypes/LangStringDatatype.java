@@ -10,8 +10,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The rdf:langString datatype; a literal is classified by its language tag.
+ */
 public final class LangStringDatatype extends StringLiteralDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     protected LangStringDatatype()
     {
         super(rdfLangStringIri);

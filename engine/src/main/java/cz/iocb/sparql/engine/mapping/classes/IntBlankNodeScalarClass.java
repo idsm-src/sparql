@@ -10,8 +10,14 @@ import cz.iocb.sparql.engine.rdf.IntBlankNode;
 
 
 
+/**
+ * Integer blank nodes in one {@code int8} column packing value and segment.
+ */
 public final class IntBlankNodeScalarClass extends IntBlankNodeClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected IntBlankNodeScalarClass()
     {
         super("iblanknode@1c", List.of("int8"), Set.of(box/*, intBlankNode*/));

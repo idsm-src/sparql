@@ -23,10 +23,23 @@ import cz.iocb.sparql.engine.parser.Parser;
  */
 public class ComplexTriple extends BaseElement implements ComplexElement
 {
+    /**
+     * The subject, possibly with syntax sugar.
+     */
     private ComplexNode node;
+
+    /**
+     * Properties of the subject.
+     */
     private List<Property> properties;
 
 
+    /**
+     * Creates the triple.
+     *
+     * @param node the subject node
+     * @param properties the properties
+     */
     public ComplexTriple(ComplexNode node, Collection<Property> properties)
     {
         this.node = node;
@@ -34,18 +47,33 @@ public class ComplexTriple extends BaseElement implements ComplexElement
     }
 
 
+    /**
+     * The subject, possibly with syntax sugar.
+     *
+     * @return the subject, possibly with syntax sugar
+     */
     public ComplexNode getNode()
     {
         return node;
     }
 
 
+    /**
+     * Sets the subject.
+     *
+     * @param node the subject node
+     */
     public void setNode(ComplexNode node)
     {
         this.node = node;
     }
 
 
+    /**
+     * Properties of the subject.
+     *
+     * @return properties of the subject
+     */
     public List<Property> getProperties()
     {
         return properties;

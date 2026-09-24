@@ -24,21 +24,78 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Transitive closure of a path step for the {@code +} and {@code *} property paths, translated to
+ * {@code WITH RECURSIVE}: {@code init} yields the end nodes reachable in the first step (or in zero steps) from the
+ * begin variable, and {@code next}, whose start node is {@code joinVar}, extends a path from its current end node to a
+ * new {@code endVar}. {@code graphVar} carries the graph when the pattern is evaluated in a variable graph.
+ */
 public final class SqlRecursive extends SqlIntercode
 {
+    /**
+     * Alias of the recursion in the recursive term.
+     */
     private static final Table leftTable = new Table("tab0");
+
+    /**
+     * Alias of the step in the recursive term.
+     */
     private static final Table rightTable = new Table("tab1");
 
+    /**
+     * Solutions starting the recursion.
+     */
     public final SqlIntercode init;
+
+    /**
+     * Step extending a path by one traversal.
+     */
     public final SqlIntercode next;
+
+    /**
+     * Binding of the end variable in the result.
+     */
     public final VariableBinding endBinding;
+
+    /**
+     * Variable of the step bound to the current end node.
+     */
     public final Variable joinVar;
+
+    /**
+     * Variable of the start node; null for a constant start.
+     */
     public final Variable beginVar;
+
+    /**
+     * Columns of the start and graph variables inside the recursion.
+     */
     public final List<Column> iv;
+
+    /**
+     * Columns of the start and graph variables exposed by the recursion.
+     */
     public final List<Column> ev;
+
+    /**
+     * Graph variable; null when the graph is not a variable.
+     */
     public final Variable graphVar;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param init the initial solutions
+     * @param next the recursive step
+     * @param endBinding binding of the end variable in the result
+     * @param joinVar variable of the step bound to the current end node
+     * @param beginVar the start variable, or null
+     * @param iv columns of the start and graph variables inside the recursion
+     * @param ev columns of the start and graph variables exposed by the recursion
+     * @param graphVar the graph variable, or null
+     */
     protected SqlRecursive(VariableBindings bindings, SqlIntercode init, SqlIntercode next, VariableBinding endBinding,
             Variable joinVar, Variable beginVar, List<Column> iv, List<Column> ev, Variable graphVar)
     {
@@ -54,6 +111,20 @@ public final class SqlRecursive extends SqlIntercode
     }
 
 
+    /**
+     * Recursive closure of {@code next} started from {@code init}; {@code beginVar} may be null when the start is a
+     * constant.
+     *
+     * @param request the current request
+     * @param init the initial solutions
+     * @param next the recursive step
+     * @param beginVar the start variable, or null
+     * @param joinVar variable of the step bound to the current end node
+     * @param endVar the end variable
+     * @param graphVar the graph variable, or null
+     * @return recursive closure of {@code next} started from {@code init}; {@code beginVar} may be null when the start
+     *         is a constant
+     */
     public static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar)
     {
@@ -61,6 +132,19 @@ public final class SqlRecursive extends SqlIntercode
     }
 
 
+    /**
+     * Recursion exposing only what the parent needs; the start and graph variables get fresh output columns.
+     *
+     * @param request the current request
+     * @param init the initial solutions
+     * @param next the recursive step
+     * @param beginVar the start variable, or null
+     * @param joinVar variable of the step bound to the current end node
+     * @param endVar the end variable
+     * @param graphVar the graph variable, or null
+     * @param restrictions what the parent needs of the variables
+     * @return recursion exposing only what the parent needs; the start and graph variables get fresh output columns
+     */
     protected static SqlIntercode create(Request request, SqlIntercode init, SqlIntercode next, Variable beginVar,
             Variable joinVar, Variable endVar, Variable graphVar, Restrictions restrictions)
     {
@@ -345,6 +429,15 @@ public final class SqlRecursive extends SqlIntercode
     }
 
 
+    /**
+     * Binding of the end variable over the disjoint classes it takes in the initial and the recursive step.
+     *
+     * @param request the current request
+     * @param endVar the end variable
+     * @param init the initial solutions
+     * @param next the recursive step
+     * @return binding of the end variable, or null when it is unbound on both sides
+     */
     private static VariableBinding createEndVariableBinding(Request request, Variable endVar, SqlIntercode init,
             SqlIntercode next)
     {

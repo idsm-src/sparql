@@ -4,17 +4,34 @@ import java.util.Objects;
 
 
 
+/**
+ * Query variable as seen by the translator, identified by its name (scope-qualified by
+ * {@link cz.iocb.sparql.engine.translator.TermGenerator}).
+ */
 public class Variable extends RdfTerm
 {
+    /**
+     * Name of the variable.
+     */
     private final String name;
 
 
+    /**
+     * Creates the variable.
+     *
+     * @param name the variable name
+     */
     public Variable(String name)
     {
         this.name = name;
     }
 
 
+    /**
+     * Name of the variable (scope-qualified when it comes from a named scope).
+     *
+     * @return name of the variable (scope-qualified when it comes from a named scope)
+     */
     public String getName()
     {
         return name;

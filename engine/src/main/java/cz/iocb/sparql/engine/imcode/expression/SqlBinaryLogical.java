@@ -21,26 +21,66 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Logical AND and OR with the three-valued SPARQL semantics: an error operand yields an error only when the other
+ * operand does not decide the result.
+ */
 public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpression
 {
+    /**
+     * Logical operator with its SPARQL spelling and the suffix of its {@code sparql.*} SQL function.
+     */
     public static enum LogicalOperator
     {
-        OR("||", "or"), AND("&&", "and");
+        /**
+         * Logical or.
+         */
+        OR("||", "or"),
 
+        /**
+         * Logical and.
+         */
+        AND("&&", "and");
+
+        /**
+         * SPARQL spelling.
+         */
         private final String text;
+
+        /**
+         * Suffix of the SQL function.
+         */
         private final String name;
 
+        /**
+         * Creates the operator.
+         *
+         * @param text the text
+         * @param name the name
+         */
         LogicalOperator(String text, String name)
         {
             this.text = text;
             this.name = name;
         }
 
+
+        /**
+         * SPARQL spelling of the operator.
+         *
+         * @return SPARQL spelling of the operator
+         */
         public String getText()
         {
             return text;
         }
 
+
+        /**
+         * Suffix of the {@code sparql.*} SQL function implementing the operator.
+         *
+         * @return suffix of the {@code sparql.*} SQL function implementing the operator
+         */
         public String getName()
         {
             return name;
@@ -48,10 +88,27 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     }
 
 
+    /**
+     * The operator.
+     */
     private final LogicalOperator operator;
+
+    /**
+     * Values the expression can take besides an error.
+     */
     private final NonConstantBooleanValue value;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     * @param value values the expression can take besides an error
+     */
     private SqlBinaryLogical(LogicalOperator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull, NonConstantBooleanValue value)
     {
@@ -62,6 +119,14 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     }
 
 
+    /**
+     * Logical expression over boolean operands.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @return logical expression over boolean operands
+     */
     public static SqlExpressionIntercode create(LogicalOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
@@ -69,6 +134,15 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     }
 
 
+    /**
+     * Logical expression materialising only the needed result; constant operands are folded.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param restriction the result classes the parent needs
+     * @return logical expression materialising only the needed result; constant operands are folded
+     */
     private static SqlExpressionIntercode create(LogicalOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right, Restriction restriction)
     {
@@ -128,6 +202,14 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     }
 
 
+    /**
+     * SQL applying the {@code sparql.*} operator to the boolean values of the operands.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL applying the {@code sparql.*} operator to the boolean values of the operands
+     */
     private static List<Column> translate(LogicalOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {

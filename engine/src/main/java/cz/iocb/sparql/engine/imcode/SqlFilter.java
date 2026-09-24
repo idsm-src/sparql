@@ -22,12 +22,29 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Keeps the solutions of the child for which every condition evaluates to true (FILTER).
+ */
 public final class SqlFilter extends SqlIntercode
 {
+    /**
+     * Filtered solutions.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Conditions, all of which must hold.
+     */
     private final List<SqlExpressionIntercode> conditions;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param child the child node
+     * @param conditions the conditions
+     */
     protected SqlFilter(VariableBindings bindings, SqlIntercode child, List<SqlExpressionIntercode> conditions)
     {
         super(bindings, child.isDeterministic() && conditions.stream().allMatch(c -> c.isDeterministic()));
@@ -37,12 +54,29 @@ public final class SqlFilter extends SqlIntercode
     }
 
 
+    /**
+     * Filter of the child by the conjunction of the conditions.
+     *
+     * @param request the current request
+     * @param conditions the conditions
+     * @param child the child node
+     * @return filter of the child by the conjunction of the conditions
+     */
     public static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child)
     {
         return filter(request, conditions, child, null);
     }
 
 
+    /**
+     * Filter exposing only what the parent needs.
+     *
+     * @param request the current request
+     * @param conditions the conditions
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @return filter exposing only what the parent needs
+     */
     protected static SqlIntercode filter(Request request, List<SqlExpressionIntercode> conditions, SqlIntercode child,
             Restrictions restrictions)
     {
@@ -173,12 +207,22 @@ public final class SqlFilter extends SqlIntercode
     }
 
 
+    /**
+     * Filtered solutions.
+     *
+     * @return filtered solutions
+     */
     public final SqlIntercode getChild()
     {
         return child;
     }
 
 
+    /**
+     * Conditions, all of which must hold.
+     *
+     * @return conditions, all of which must hold
+     */
     public final List<SqlExpressionIntercode> getConditions()
     {
         return conditions;

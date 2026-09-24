@@ -9,17 +9,42 @@ import cz.iocb.sparql.engine.database.Column;
 
 
 
+/**
+ * User IRI class with a single column; subclasses provide the SQL expressions rebuilding the IRI from the column and
+ * extracting the column from the IRI.
+ */
 public abstract class SimpleUserIriClass extends UserIriClass
 {
+    /**
+     * Creates the class with a single column of the SQL type.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     */
     protected SimpleUserIriClass(String name, String sqlType)
     {
         super(name, List.of(sqlType), Set.of(iri, box));
     }
 
 
+    /**
+     * SQL expression computing the full IRI from the column value.
+     *
+     * @param column the column
+     * @return SQL expression computing the full IRI from the column value
+     */
     protected abstract Column generateFunction(Column column);
 
 
+    /**
+     * SQL expression extracting the column value from an IRI; with {@code check}, it yields NULL for IRIs outside the
+     * class.
+     *
+     * @param column the column
+     * @param check whether IRIs outside the class must yield NULL
+     * @return SQL expression extracting the column value from an IRI; with {@code check}, it yields NULL for IRIs
+     *         outside the class
+     */
     protected abstract Column generateInverseFunction(Column column, boolean check);
 
 

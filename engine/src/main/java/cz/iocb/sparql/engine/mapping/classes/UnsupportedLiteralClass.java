@@ -10,8 +10,15 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Literals of datatypes unknown to the configuration, or with an invalid lexical form, stored as the lexical value and
+ * the datatype IRI text.
+ */
 public final class UnsupportedLiteralClass extends BaseLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected UnsupportedLiteralClass()
     {
         super("literal", null, List.of("varchar", "varchar"), Set.of(box));

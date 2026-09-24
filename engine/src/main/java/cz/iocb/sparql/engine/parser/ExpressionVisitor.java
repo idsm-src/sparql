@@ -61,18 +61,65 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Builds {@link Expression}s. Reports aggregates where they are not allowed, unknown extension functions and wrong
+ * argument counts (checked against the function definitions of the current service).
+ */
 public class ExpressionVisitor extends BaseVisitor<Expression>
 {
+    /**
+     * Configuration providing datatypes and functions.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Blank node labels used so far in the query.
+     */
     private final Set<String> usedBlankNodes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
+
+    /**
+     * Whether aggregates may appear in the visited expressions.
+     */
     private final boolean allowAggregates;
 
 
+    /**
+     * Creates a visitor; {@code allowAggregates} is true only for projections, HAVING and ORDER BY of a select.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     * @param allowAggregates whether aggregates may appear
+     */
     public ExpressionVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages, boolean allowAggregates)
@@ -171,6 +218,12 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     }
 
 
+    /**
+     * The position one character to the right.
+     *
+     * @param original the position to move
+     * @return the position one character to the right
+     */
     private static Position moveByOneCharacter(Position original)
     {
         return new Position(original.getLineNumber(), original.getPositionInLine() + 1);
@@ -219,6 +272,12 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     }
 
 
+    /**
+     * Parses the expressions of an argument list.
+     *
+     * @param ctx the parse tree node
+     * @return the parsed expressions
+     */
     private List<Expression> parseExpressionList(ExpressionListContext ctx)
     {
         if(ctx == null)
@@ -408,6 +467,14 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
     }
 
 
+    /**
+     * Builds an extension function call and checks the function against the datatypes and the functions of the current
+     * service.
+     *
+     * @param iri IRI of the function
+     * @param ctx the parse tree node
+     * @return the call
+     */
     private FunctionCallExpression parseFunctionCall(IriNode iri, ArgListContext ctx)
     {
         ArgumentsVisitor argumentsVisitor = new ArgumentsVisitor(config, prologue, graphs, services, scopes,
@@ -518,19 +585,70 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 }
 
 
+/**
+ * Collects the argument list of a built-in call, aggregate or extension function call, and records whether it contained
+ * {@code DISTINCT}.
+ */
 class ArgumentsVisitor extends BaseVisitor<List<Expression>>
 {
+    /**
+     * Configuration providing datatypes and functions.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Blank node labels used so far in the query.
+     */
     private final Set<String> usedBlankNodes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
+
+    /**
+     * Whether aggregates may appear in the arguments.
+     */
     private final boolean allowAggregates;
+
+    /**
+     * Set when the visited list started with DISTINCT.
+     */
     private boolean foundDistinct = false;
 
 
+    /**
+     * Creates the visitor sharing the state of the enclosing expression visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     * @param allowAggregates whether aggregates may appear
+     */
     public ArgumentsVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages, boolean allowAggregates)
@@ -546,12 +664,23 @@ class ArgumentsVisitor extends BaseVisitor<List<Expression>>
     }
 
 
+    /**
+     * True if the visited argument list started with {@code DISTINCT}.
+     *
+     * @return true if the visited argument list started with {@code DISTINCT}, false otherwise
+     */
     public boolean foundDistinct()
     {
         return foundDistinct;
     }
 
 
+    /**
+     * Parses each context as an expression.
+     *
+     * @param contexts the parse tree nodes
+     * @return the parsed expressions
+     */
     private List<Expression> visitExpressions(List<? extends ParserRuleContext> contexts)
     {
         return contexts.stream().map(new ExpressionVisitor(config, prologue, graphs, services, scopes, usedBlankNodes,

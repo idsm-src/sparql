@@ -9,14 +9,23 @@ import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 
 
 
+/**
+ * Mappings of the experimental contexts (detection method, disease, tissue, cell line, developmental stage).
+ */
 public class Context
 {
+    /**
+     * Registers the IRI class of the contexts.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new IntegerUserIriClass("context", "int4", "http://nextprot.org/rdf/context/"));
     }
 
 
+    /**
+     * Registers the quad mappings of the contexts.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");

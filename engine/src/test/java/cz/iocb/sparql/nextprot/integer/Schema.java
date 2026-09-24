@@ -16,8 +16,14 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 
 
 
+/**
+ * Mappings of the schema-level resources: data sources, databases and the ontology terms of the NeXtProt vocabulary.
+ */
 public class Schema
 {
+    /**
+     * Registers the IRI classes of the sources, databases and schema terms.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("source", "int4", new Table(schema, "source_bases"),
@@ -29,6 +35,9 @@ public class Schema
     }
 
 
+    /**
+     * Registers the quad mappings of the sources, databases and ontology.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         addSourceQuadMapping(config);

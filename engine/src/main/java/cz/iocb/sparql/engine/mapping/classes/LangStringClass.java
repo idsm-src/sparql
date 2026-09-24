@@ -13,8 +13,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Language-tagged strings stored as value and tag columns; the result class of all language-tagged strings.
+ */
 public final class LangStringClass extends CanonicalLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected LangStringClass()
     {
         super("lang", rdfLangStringType, List.of("varchar", "varchar"), Set.of(box));

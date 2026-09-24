@@ -13,11 +13,22 @@ import cz.iocb.sparql.engine.rdf.IntBlankNode;
 
 
 
+/**
+ * Integer blank nodes of one fixed segment, stored as the {@code int4} value only.
+ */
 public class IntBlankNodeInSegmentClass extends IntBlankNodeClass
 {
+    /**
+     * The fixed segment.
+     */
     private final int segment;
 
 
+    /**
+     * Creates the class of the segment.
+     *
+     * @param segment the segment
+     */
     public IntBlankNodeInSegmentClass(int segment)
     {
         super("iblanknode-" + Integer.toHexString(segment), List.of("int4"),
@@ -93,6 +104,11 @@ public class IntBlankNodeInSegmentClass extends IntBlankNodeClass
     }
 
 
+    /**
+     * The fixed segment.
+     *
+     * @return the fixed segment
+     */
     public int getSegment()
     {
         return segment;

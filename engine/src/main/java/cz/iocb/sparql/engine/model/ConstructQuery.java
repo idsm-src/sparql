@@ -11,9 +11,19 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class ConstructQuery extends Query
 {
+    /**
+     * Triple templates of the CONSTRUCT clause.
+     */
     private final List<Pattern> templates;
 
 
+    /**
+     * Creates the query from its prologue, templates and select part.
+     *
+     * @param prologue the prologue of the query
+     * @param templates the triple templates
+     * @param select the query body
+     */
     public ConstructQuery(Prologue prologue, List<Pattern> templates, Select select)
     {
         super(prologue, select);
@@ -21,6 +31,11 @@ public class ConstructQuery extends Query
     }
 
 
+    /**
+     * Triple templates of the CONSTRUCT clause.
+     *
+     * @return triple templates of the CONSTRUCT clause
+     */
     public List<Pattern> getTemplates()
     {
         return templates;

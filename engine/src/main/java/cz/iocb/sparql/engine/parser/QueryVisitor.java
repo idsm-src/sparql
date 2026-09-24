@@ -128,17 +128,55 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Turns the parse tree of a whole query into a {@link Query}. Besides building the AST it performs the checks that need
+ * the complete query: blank node reuse across basic graph patterns, use of variables before BIND or GROUP BY, grouping
+ * and aggregate rules, and assembly and validation of procedure calls.
+ */
 public class QueryVisitor extends BaseVisitor<Query>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Blank node labels used so far in the query.
+     */
     private final Set<String> usedBlankNodes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
+
+    /**
+     * Prologue of the query; set while the query is being visited.
+     */
     private Prologue prologue;
 
 
+    /**
+     * Creates the visitor for a top-level query.
+     *
+     * @param config the endpoint configuration
+     * @param messages the message list to append to
+     */
     public QueryVisitor(SparqlDatabaseConfiguration config, List<TranslateMessage> messages)
     {
         this.config = config;
@@ -150,6 +188,17 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Creates the visitor for a sub-select, sharing the state of the enclosing query.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     */
     public QueryVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages)
@@ -412,7 +461,10 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
     /**
+     * Parses the trailing VALUES clause of a query.
+     *
      * @param ctx Can be null.
+     * @return the VALUES pattern, or null
      */
     public Values parseValues(ValuesClauseContext ctx)
     {
@@ -428,6 +480,13 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * True if any of the contexts contains an aggregate or a GROUP BY clause; (NOT) EXISTS sub-patterns are not
+     * inspected.
+     *
+     * @param contexts the parse tree nodes
+     * @return true if any of the contexts contains an aggregate or a GROUP BY clause, false otherwise
+     */
     public boolean isInAggregateMode(ParserRuleContext... contexts)
     {
         BaseVisitor<Boolean> visitor = new BaseVisitor<>()
@@ -483,6 +542,18 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Builds a {@link Select} from its clauses, expanding {@code SELECT *}. A select with an explicit projection gets
+     * its own variable scope, so that its non-projected variables stay local to it.
+     *
+     * @param selectClauseCtx the SELECT clause
+     * @param dataSetClauseCtxs the dataset clauses
+     * @param whereClauseCtx the WHERE clause
+     * @param solutionModifierCtx the solution modifiers
+     * @param valuesClauseContext the VALUES clause, or null
+     * @param isSubSelect true for a sub-select
+     * @return the select
+     */
     public Select parseSelect(SelectClauseContext selectClauseCtx, List<DatasetClauseContext> dataSetClauseCtxs,
             WhereClauseContext whereClauseCtx, SolutionModifierContext solutionModifierCtx,
             ValuesClauseContext valuesClauseContext, boolean isSubSelect)
@@ -620,6 +691,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Checks the select: no variable projected twice, and in a grouped select only grouped or aggregated variables in
+     * the projections and HAVING.
+     *
+     * @param select the select to check
+     */
     private void checkSelect(Select select)
     {
         Set<String> vars = new HashSet<>();
@@ -685,6 +762,13 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Reports variables used outside an aggregate that are not in {@code groupByVars} (a projection or HAVING
+     * expression of a grouped select may only use grouped variables).
+     *
+     * @param expresion the expression to check
+     * @param groupByVars names of the grouped variables
+     */
     private void checkExpressionForGroupedSolutions(Expression expresion, Set<String> groupByVars)
     {
         new ElementVisitor<Void>()
@@ -723,6 +807,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses a projected variable or {@code (expression AS ?variable)}; null for {@code *}.
+     *
+     * @param variableCtx the projected variable node
+     * @return the projection, or null for {@code *}
+     */
     private Projection parseProjection(SelectVariableContext variableCtx)
     {
         if(variableCtx.var() == null)
@@ -744,6 +834,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses a FROM or FROM NAMED clause.
+     *
+     * @param dataSetCtx the dataset clause node
+     * @return the dataset clause
+     */
     private DataSet parseDataSet(DatasetClauseContext dataSetCtx)
     {
         IriNode iri = new IriVisitor(prologue, messages).visit(dataSetCtx.iri());
@@ -753,6 +849,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses the conditions of a GROUP BY clause.
+     *
+     * @param ctx the parse tree node
+     * @return the parsed conditions
+     */
     private List<GroupCondition> parseGroupClause(GroupClauseContext ctx)
     {
         if(ctx == null)
@@ -762,6 +864,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses one GROUP BY condition: a variable, an expression, or {@code (expression AS ?variable)}.
+     *
+     * @param ctx the parse tree node
+     * @return the group condition
+     */
     private GroupCondition parseGroupCondition(GroupConditionContext ctx)
     {
         ExpressionVisitor expressionVisitor = new ExpressionVisitor(config, prologue, graphs, services, scopes,
@@ -786,6 +894,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses the constraints of a HAVING clause, allowing aggregates.
+     *
+     * @param ctx the parse tree node
+     * @return the parsed constraints
+     */
     private List<Expression> parseHavingClause(HavingClauseContext ctx)
     {
         if(ctx == null)
@@ -798,6 +912,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses the conditions of an ORDER BY clause.
+     *
+     * @param ctx the parse tree node
+     * @return the parsed conditions
+     */
     private List<OrderCondition> parseOrderClause(OrderClauseContext ctx)
     {
         if(ctx == null)
@@ -807,6 +927,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * Parses one ORDER BY condition with its optional direction, allowing aggregates.
+     *
+     * @param ctx the parse tree node
+     * @return the order condition
+     */
     private OrderCondition parseOrderCondition(OrderConditionContext ctx)
     {
         if(ctx.ASC() != null || ctx.DESC() != null)
@@ -826,6 +952,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * LIMIT value, or null.
+     *
+     * @param ctx the parse tree node
+     * @return LIMIT value, or null
+     */
     private static BigInteger parseLimitClause(LimitOffsetClausesContext ctx)
     {
         if(ctx == null || ctx.limitClause() == null)
@@ -835,6 +967,12 @@ public class QueryVisitor extends BaseVisitor<Query>
     }
 
 
+    /**
+     * OFFSET value, or null.
+     *
+     * @param ctx the parse tree node
+     * @return OFFSET value, or null
+     */
     private static BigInteger parseOffsetClause(LimitOffsetClausesContext ctx)
     {
         if(ctx == null || ctx.offsetClause() == null)
@@ -845,12 +983,28 @@ public class QueryVisitor extends BaseVisitor<Query>
 }
 
 
+/**
+ * Collects BASE and PREFIX declarations into a {@link Prologue} initialised with the configured prefixes.
+ */
 class PrologueVisitor extends BaseVisitor<Void>
 {
+    /**
+     * Prologue being built.
+     */
     private final Prologue prologue;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor with the configured prefixes as the initial prologue.
+     *
+     * @param config the endpoint configuration
+     * @param messages the message list to append to
+     */
     public PrologueVisitor(SparqlDatabaseConfiguration config, List<TranslateMessage> messages)
     {
         this.messages = messages;
@@ -858,6 +1012,11 @@ class PrologueVisitor extends BaseVisitor<Void>
     }
 
 
+    /**
+     * The collected prologue.
+     *
+     * @return the collected prologue
+     */
     public Prologue getPrologue()
     {
         return prologue;
@@ -901,17 +1060,59 @@ class PrologueVisitor extends BaseVisitor<Void>
 }
 
 
+/**
+ * Builds the {@link GraphPattern} of a group graph pattern or a sub-select, reporting BIND variables already in scope
+ * and assembling procedure calls from their triples.
+ */
 class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Blank node labels used so far in the query.
+     */
     private final Set<String> usedBlankNodes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor sharing the state of the enclosing visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     */
     public GraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages)
@@ -976,6 +1177,14 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     }
 
 
+    /**
+     * Replaces the triples spelling out a procedure call (result node, procedure IRI, parameter blank node) with
+     * {@link ProcedureCall} or {@link MultiProcedureCall} patterns, for the procedures known to the current service;
+     * other triples are kept.
+     *
+     * @param patterns the patterns
+     * @return the patterns with procedure calls assembled
+     */
     private List<Pattern> assembleProcedureCalls(List<Pattern> patterns)
     {
         if(!services.stream().allMatch(s -> s instanceof IriNode n && config.getServices().contains(getIri(n))))
@@ -1182,6 +1391,13 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
     }
 
 
+    /**
+     * Validates a procedure call against its definition: not inside GRAPH, only known and unrepeated parameters and
+     * results, and all parameters without a default present.
+     *
+     * @param procedureCallBase the procedure call
+     * @param service the service IRI
+     */
     private void checkProcedureCall(ProcedureCallBase procedureCallBase, Iri service)
     {
         IriNode procedureName = procedureCallBase.getProcedure();
@@ -1272,21 +1488,49 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 }
 
 
+/**
+ * Expands the syntax sugar of {@link ComplexTriple}s (object lists, blank node property lists, collections) into plain
+ * {@link Triple}s, allocating fresh blank nodes where needed.
+ */
 class TripleExpander extends ComplexElementVisitor<Node>
 {
+    /**
+     * Triples produced so far.
+     */
     private final List<Pattern> results = new ArrayList<>();
+
+    /**
+     * Blank node labels used in the query, to keep generated labels unique.
+     */
     private final Set<String> usedBlankNodes;
 
+    /**
+     * Prefix of generated blank node labels.
+     */
     private final String blankNodePrefix = "blanknode";
+
+    /**
+     * Counter of generated blank node labels.
+     */
     private int blankNodeId = 0;
 
 
+    /**
+     * Creates the expander sharing the set of used blank node labels.
+     *
+     * @param usedBlankNodes blank node labels used in the query
+     */
     public TripleExpander(Set<String> usedBlankNodes)
     {
         this.usedBlankNodes = usedBlankNodes;
     }
 
 
+    /**
+     * The triples produced by all visits so far.
+     *
+     * @return the triples produced by all visits so far
+     */
     public List<Pattern> getResults()
     {
         return results;
@@ -1410,6 +1654,11 @@ class TripleExpander extends ComplexElementVisitor<Node>
     }
 
 
+    /**
+     * Allocates a fresh blank node whose label is not used anywhere in the query.
+     *
+     * @return the fresh blank node
+     */
     private BlankNode getBlankNode()
     {
         String name = null;
@@ -1426,17 +1675,58 @@ class TripleExpander extends ComplexElementVisitor<Node>
 }
 
 
+/**
+ * Flattens the content of a group graph pattern into a stream of patterns, expanding triples blocks.
+ */
 class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Blank node labels used so far in the query.
+     */
     private final Set<String> usedBlankNodes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor sharing the state of the enclosing visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     */
     public GroupGraphPatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages)
@@ -1451,6 +1741,12 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     }
 
 
+    /**
+     * Visits {@code ctx}, returning an empty stream when it is null.
+     *
+     * @param ctx the parse tree node
+     * @return the patterns, or an empty stream
+     */
     public Stream<Pattern> visitIfNotNull(ParseTree ctx)
     {
         if(ctx == null)
@@ -1519,18 +1815,63 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
 }
 
 
+/**
+ * Builds the non-triple patterns: UNION, OPTIONAL, MINUS, GRAPH, SERVICE, FILTER, BIND and VALUES.
+ */
 class PatternVisitor extends BaseVisitor<Pattern>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Enclosing GRAPH names, innermost last.
+     */
     private final Stack<VarOrIri> graphs;
+
+    /**
+     * Enclosing SERVICE names, innermost last.
+     */
     private final Stack<VarOrIri> services;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
+
+    /**
+     * Visitor for nested group graph patterns.
+     */
     private final GraphPatternVisitor graphPatternVisitor;
+
+    /**
+     * Visitor for FILTER and BIND expressions (aggregates not allowed).
+     */
     private final ExpressionVisitor expressionVisitor;
 
 
+    /**
+     * Creates the visitor sharing the state of the enclosing visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param graphs the enclosing GRAPH names
+     * @param services the enclosing SERVICE names
+     * @param scopes the variable scopes
+     * @param usedBlankNodes blank node labels used in the query
+     * @param messages the message list to append to
+     */
     public PatternVisitor(SparqlDatabaseConfiguration config, Prologue prologue, Stack<VarOrIri> graphs,
             Stack<VarOrIri> services, VariableScopes scopes, Set<String> usedBlankNodes,
             List<TranslateMessage> messages)
@@ -1689,6 +2030,12 @@ class PatternVisitor extends BaseVisitor<Pattern>
     }
 
 
+    /**
+     * Parses a VALUES data block value: a literal or an IRI.
+     *
+     * @param value the value
+     * @return the literal or IRI node
+     */
     Expression createVal(DataBlockValueContext value)
     {
         Expression ret = new LiteralVisitor(prologue, messages).visit(value);
@@ -1701,12 +2048,28 @@ class PatternVisitor extends BaseVisitor<Pattern>
 }
 
 
+/**
+ * Builds {@link IriNode}s, resolving relative IRIs against BASE and prefixed names against the prologue prefixes.
+ */
 class IriVisitor extends BaseVisitor<IriNode>
 {
+    /**
+     * Prologue providing BASE and the prefixes.
+     */
     private final Prologue prologue;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param prologue the prologue of the query
+     * @param messages the message list to append to
+     */
     public IriVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
@@ -1727,6 +2090,14 @@ class IriVisitor extends BaseVisitor<IriNode>
     }
 
 
+    /**
+     * Strips the angle brackets of an IRI reference and resolves it against BASE if it is relative; a malformed IRI is
+     * reported and returned as is.
+     *
+     * @param iriRef the IRIREF token
+     * @param prologue the prologue of the query
+     * @return the absolute IRI text
+     */
     public String parseUri(TerminalNode iriRef, Prologue prologue)
     {
         String uri = iriRef.getText();
@@ -1765,6 +2136,12 @@ class IriVisitor extends BaseVisitor<IriNode>
     }
 
 
+    /**
+     * Splits a prefixed name into prefix and local part, removing the backslash escapes of the local part.
+     *
+     * @param ctx the parse tree node
+     * @return the prefixed name
+     */
     public static PrefixedName parsePrefixedName(PrefixedNameContext ctx)
     {
         String[] parts = ctx.getText().split(":", 2);

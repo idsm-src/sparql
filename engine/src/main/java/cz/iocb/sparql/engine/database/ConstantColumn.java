@@ -2,10 +2,23 @@ package cz.iocb.sparql.engine.database;
 
 
 
+/**
+ * Typed SQL constant {@code 'literal'::type} (or {@code NULL::type}); the type is normalised to its PostgreSQL internal
+ * name.
+ */
 public class ConstantColumn extends Column
 {
+    /**
+     * Unquoted literal value; null for NULL.
+     */
     private final String literal;
 
+    /**
+     * Creates the constant; the type is normalised to its PostgreSQL internal name.
+     *
+     * @param literal the literal value, null for NULL
+     * @param type the SQL type
+     */
     public ConstantColumn(String literal, String type)
     {
         super((literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'") + "::" + normalizeSqlType(type));
@@ -28,12 +41,23 @@ public class ConstantColumn extends Column
     }
 
 
+    /**
+     * The unquoted literal value; null for a NULL constant.
+     *
+     * @return the unquoted literal value; null for a NULL constant
+     */
     public String getValue()
     {
         return literal;
     }
 
 
+    /**
+     * Maps SQL standard type names to the PostgreSQL internal names used in generated code.
+     *
+     * @param type the SQL type
+     * @return the PostgreSQL internal type name
+     */
     private static String normalizeSqlType(String type)
     {
         return switch(type)

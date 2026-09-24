@@ -22,22 +22,79 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs recognised by a regular expression and converted by SQL functions supplied by the deployment: {@code function}
+ * builds the IRI from the columns, {@code function_inverse} (or {@code function_inv1} .. {@code function_invN} for
+ * several columns) extract them. {@link SqlCheck} says when a term must additionally be verified through the inverse
+ * functions in the database.
+ */
 public class GenericUserIriClass extends UserIriClass
 {
+    /**
+     * When an IRI must be verified in the database: never, only when the regular expression matches, or only when it
+     * does not.
+     */
     public static enum SqlCheck
     {
-        NEVER, IF_MATCH, IF_NOT_MATCH
+        /**
+         * Trust the regular expression alone.
+         */
+        NEVER,
+
+        /**
+         * Verify IRIs that match the regular expression.
+         */
+        IF_MATCH,
+
+        /**
+         * Verify IRIs that do not match the regular expression.
+         */
+        IF_NOT_MATCH
     }
 
 
+    /**
+     * When to verify IRIs in the database.
+     */
     protected final SqlCheck sqlCheck;
+
+    /**
+     * Query applying the inverse functions to a placeholder IRI.
+     */
     protected final String sqlQuery;
+
+    /**
+     * Compiled regular expression.
+     */
     protected final Pattern pattern;
+
+    /**
+     * Regular expression recognising the IRIs.
+     */
     protected final String regexp;
+
+    /**
+     * SQL function building the IRI from the columns.
+     */
     protected final Function function;
+
+    /**
+     * SQL functions extracting each column from the IRI.
+     */
     protected final List<Function> inverseFunction;
 
 
+    /**
+     * Creates the class; the inverse functions are derived from the function name ({@code _inverse}, or {@code _inv1}
+     * .. {@code _invN} for several columns).
+     *
+     * @param name the name
+     * @param schema the schema name
+     * @param function name of the SQL function building the IRI
+     * @param sqlTypes the SQL types
+     * @param regexp regular expression recognising the IRIs
+     * @param sqlCheck when to verify IRIs in the database
+     */
     public GenericUserIriClass(String name, String schema, String function, List<String> sqlTypes, String regexp,
             SqlCheck sqlCheck)
     {
@@ -66,6 +123,15 @@ public class GenericUserIriClass extends UserIriClass
     }
 
 
+    /**
+     * Creates the class trusting the regular expression alone.
+     *
+     * @param name the name
+     * @param schema the schema name
+     * @param function name of the SQL function building the IRI
+     * @param sqlTypes the SQL types
+     * @param pattern regular expression recognising the IRIs
+     */
     public GenericUserIriClass(String name, String schema, String function, List<String> sqlTypes, String pattern)
     {
         this(name, schema, function, sqlTypes, pattern, SqlCheck.NEVER);
@@ -177,6 +243,13 @@ public class GenericUserIriClass extends UserIriClass
     }
 
 
+    /**
+     * True if all inverse functions return non-null for the IRI.
+     *
+     * @param statement database statement used for lookups in the database
+     * @param iri the IRI
+     * @return true if all inverse functions return non-null for the IRI, false otherwise
+     */
     private boolean check(Statement statement, Iri iri)
     {
         try

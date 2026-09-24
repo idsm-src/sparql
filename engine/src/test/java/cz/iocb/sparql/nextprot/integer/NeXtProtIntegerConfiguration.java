@@ -9,11 +9,23 @@ import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
 
 
 
+/**
+ * NeXtProt configuration over the {@code nextprot_indirect} schema, where entities are identified by integers and their
+ * IRIs are kept in the {@code *_bases} tables. Each entity class is a
+ * {@link cz.iocb.sparql.engine.mapping.classes.MapUserIriClass} translating between the IRI and the integer id through
+ * that table.
+ */
 public class NeXtProtIntegerConfiguration extends SparqlDatabaseConfiguration
 {
+    /**
+     * Database schema holding the NeXtProt tables.
+     */
     static final String schema = "nextprot_indirect";
 
 
+    /**
+     * Creates the configuration (JNDI-compatible constructor).
+     */
     public NeXtProtIntegerConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
             throws SQLException
     {
@@ -25,6 +37,9 @@ public class NeXtProtIntegerConfiguration extends SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers the prefixes used by the NeXtProt queries.
+     */
     private void addPrefixes()
     {
         addPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -57,6 +72,9 @@ public class NeXtProtIntegerConfiguration extends SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers the IRI classes of the external resources and of every mapped NeXtProt entity.
+     */
     private void addResourceClasses() throws SQLException
     {
         addIriClass(new StringUserIriClass("uniprot", "http://purl.uniprot.org/uniprot/"));
@@ -74,6 +92,9 @@ public class NeXtProtIntegerConfiguration extends SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers the quad mappings of every part of the dataset.
+     */
     private void addQuadMappings()
     {
         Chromosome.addQuadMappings(this);

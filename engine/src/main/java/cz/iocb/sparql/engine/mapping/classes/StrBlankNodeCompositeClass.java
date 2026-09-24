@@ -12,8 +12,15 @@ import cz.iocb.sparql.engine.rdf.StrBlankNode;
 
 
 
+/**
+ * String blank nodes as separate varchar value and {@code int4} segment columns; the result class of string blank
+ * nodes.
+ */
 public final class StrBlankNodeCompositeClass extends StrBlankNodeClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected StrBlankNodeCompositeClass()
     {
         super("sblanknode@2c", List.of("varchar", "int4"), Set.of(box, strScalarBlankNode));

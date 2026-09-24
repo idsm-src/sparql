@@ -10,8 +10,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical {@code xsd:dayTimeDuration} literals stored in one {@code int8} column.
+ */
 public final class DayTimeDurationClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public DayTimeDurationClass()
     {
         super("daytimeduration", xsdDayTimeDurationType, "int8", genDayTimeDuration);

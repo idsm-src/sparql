@@ -19,14 +19,43 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Unifies two variables of the child into one: {@code variable2} is renamed to {@code variable1} and, where both are
+ * bound, their values are required to be equal. Used for a GRAPH variable that also occurs in its pattern and for
+ * procedure results bound to variables already in use.
+ */
 public final class SqlMerge extends SqlIntercode
 {
+    /**
+     * Solutions whose variables are merged.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Variable kept.
+     */
     private final Variable variable1;
+
+    /**
+     * Variable merged into the first one.
+     */
     private final Variable variable2;
+
+    /**
+     * For each output column, the child column it is taken from.
+     */
     private final Map<Column, Column> columnMap;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param variable1 the variable kept
+     * @param variable2 the variable merged into the first one
+     * @param child the child node
+     * @param columnMap the column map
+     */
     protected SqlMerge(VariableBindings bindings, Variable variable1, Variable variable2, SqlIntercode child,
             Map<Column, Column> columnMap)
     {
@@ -39,12 +68,33 @@ public final class SqlMerge extends SqlIntercode
     }
 
 
+    /**
+     * Merges {@code variable2} into {@code variable1}.
+     *
+     * @param request the current request
+     * @param variable1 the variable kept
+     * @param variable2 the variable merged into the first one
+     * @param child the child node
+     * @return the resulting intermediate code
+     */
     public static SqlIntercode create(Request request, Variable variable1, Variable variable2, SqlIntercode child)
     {
         return create(request, variable1, variable2, child, null);
     }
 
 
+    /**
+     * Merge exposing only what the parent needs; the bindings are computed as a join of the child's bindings with the
+     * second variable renamed.
+     *
+     * @param request the current request
+     * @param variable1 the variable kept
+     * @param variable2 the variable merged into the first one
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @return merge exposing only what the parent needs; the bindings are computed as a join of the child's bindings
+     *         with the second variable renamed
+     */
     protected static SqlIntercode create(Request request, Variable variable1, Variable variable2, SqlIntercode child,
             Restrictions restrictions)
     {
@@ -151,6 +201,15 @@ public final class SqlMerge extends SqlIntercode
     }
 
 
+    /**
+     * Restrictions for the child: the parent's plus the compatibility requirements between the two variables.
+     *
+     * @param child the child node
+     * @param variable1 the variable kept
+     * @param variable2 the variable merged into the first one
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for the child: the parent's plus the compatibility requirements between the two variables
+     */
     protected static Restrictions getRestrictions(SqlIntercode child, Variable variable1, Variable variable2,
             Restrictions restrictions)
     {
@@ -165,6 +224,14 @@ public final class SqlMerge extends SqlIntercode
     }
 
 
+    /**
+     * Restrictions for one of the merged variables: the classes compatible with the other (all when it may be unbound).
+     *
+     * @param binding the variable binding
+     * @param other binding of the other variable
+     * @return restrictions for one of the merged variables: the classes compatible with the other (all when it may be
+     *         unbound)
+     */
     protected static Restrictions getJoinRestrictions(VariableBinding binding, VariableBinding other)
     {
         Restrictions restrictions = new Restrictions();

@@ -52,14 +52,32 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Effective boolean value of an operand (SPARQL 1.1, section 17.2.2): booleans as they are, numerics true when
+ * non-zero, strings true when non-empty, invalid lexical forms false, other types an error.
+ */
 public final class SqlEffectiveBooleanValue extends SqlUnary
 {
+    /**
+     * Classes that have an effective boolean value.
+     */
     private static final Set<ResourceClass> operandClasses = Stream
             .concat(Stream.of(genBoolean, xsdString, unsupportedType), numericBaseClasses.stream()).collect(toSet());
 
+    /**
+     * Union of the classes that have an effective boolean value.
+     */
     private static final ResourceClass operandClass = unionize(operandClasses);
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operand the operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     * @param value values the expression can take besides an error
+     */
     private SqlEffectiveBooleanValue(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings,
             boolean canBeNull, NonConstantBooleanValue value)
     {
@@ -67,12 +85,25 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
     }
 
 
+    /**
+     * Effective boolean value of the operand.
+     *
+     * @param operand the operand
+     * @return effective boolean value of the operand
+     */
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
     {
         return create(operand, Restriction.ALL);
     }
 
 
+    /**
+     * Effective boolean value materialising only when needed; constants and NULL pass through.
+     *
+     * @param operand the operand
+     * @param restriction the result classes the parent needs
+     * @return effective boolean value materialising only when needed; constants and NULL pass through
+     */
     private static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
     {
         if(operand.equals(SqlNull.get()))
@@ -122,6 +153,14 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
     }
 
 
+    /**
+     * SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
+     * emptiness, unsupported literals false.
+     *
+     * @param operand the operand
+     * @return SQL computing the effective boolean value: booleans as is, numerics compared to zero, strings tested for
+     *         emptiness, unsupported literals false
+     */
     private static List<Column> translate(SqlExpressionIntercode operand)
     {
         Set<Column> cols = new HashSet<>();

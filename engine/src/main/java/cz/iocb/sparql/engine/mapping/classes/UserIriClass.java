@@ -8,17 +8,42 @@ import cz.iocb.sparql.engine.database.Column;
 
 
 
+/**
+ * IRI class defined by a deployment: IRIs of a recognisable shape whose identifying part is stored in native columns.
+ */
 public abstract class UserIriClass extends IriClass
 {
+    /**
+     * Creates the class with its name, column types and superclasses.
+     *
+     * @param name the name
+     * @param sqlTypes the SQL types
+     * @param superClasses the superclasses
+     */
     protected UserIriClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name, sqlTypes, superClasses);
     }
 
 
+    /**
+     * Relative cost of {@link #match}: 0 for a regular expression test only, 1 when a database lookup may be needed, 2
+     * when it always is. The configuration tries cheaper classes first when detecting the class of an IRI.
+     *
+     * @return relative cost of {@link #match}: 0 for a regular expression test only, 1 when a database lookup may be
+     *         needed, 2 when it always is
+     */
     public abstract int getCheckCost();
 
 
+    /**
+     * SQL expression concatenating the (non-null) prefix, the value and the (non-null) suffix into a varchar.
+     *
+     * @param prefix the prefix
+     * @param value the value column
+     * @param suffix the suffix
+     * @return SQL expression concatenating the (non-null) prefix, the value and the (non-null) suffix into a varchar
+     */
     protected static Column addPrefixAndSuffix(String prefix, Column value, String suffix)
     {
         if(prefix != null && suffix != null)

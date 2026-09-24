@@ -10,8 +10,15 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
+/**
+ * The universal class: any term boxed in one {@code sparql.rdfbox} column. It is a superclass of every other class and
+ * the fallback when the class of a value cannot be narrowed.
+ */
 public class RdfBoxClass extends PrimitiveResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected RdfBoxClass()
     {
         super("rdfbox", List.of("sparql.rdfbox"), Set.of());

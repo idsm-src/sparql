@@ -14,12 +14,30 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical literals of one user datatype stored in its PostgreSQL user type.
+ */
 public final class UserLiteralClass extends CanonicalLiteralClass
 {
+    /**
+     * PostgreSQL user type of the values.
+     */
     protected UserType sqlType;
+
+    /**
+     * Base class keeping the lexical form.
+     */
     protected LiteralClass base;
 
 
+    /**
+     * Creates the class over the user type with the given base class as a superclass.
+     *
+     * @param name the name
+     * @param sqlType the PostgreSQL user type
+     * @param datatype the user datatype
+     * @param base the base class keeping the lexical form
+     */
     public UserLiteralClass(String name, UserType sqlType, UserDatatype datatype, LiteralClass base)
     {
         super(name, datatype, List.of(sqlType.name()), Set.of(box, genUserType, userType, base));

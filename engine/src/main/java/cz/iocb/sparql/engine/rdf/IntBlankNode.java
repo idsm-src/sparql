@@ -4,12 +4,29 @@ import java.util.Objects;
 
 
 
+/**
+ * Blank node with an integer value; its label is {@code i} followed by the segment and the value, each as eight
+ * hexadecimal digits.
+ */
 public class IntBlankNode extends BlankNode
 {
+    /**
+     * Integer value within the segment.
+     */
     private final int value;
+
+    /**
+     * Segment the node belongs to.
+     */
     private final int segment;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param value the integer value
+     * @param segment the segment
+     */
     public IntBlankNode(int value, int segment)
     {
         this.value = value;
@@ -24,12 +41,22 @@ public class IntBlankNode extends BlankNode
     }
 
 
+    /**
+     * Integer value within the segment.
+     *
+     * @return integer value within the segment
+     */
     public int getValue()
     {
         return value;
     }
 
 
+    /**
+     * Segment the node belongs to.
+     *
+     * @return segment the node belongs to
+     */
     public int getSegment()
     {
         return segment;

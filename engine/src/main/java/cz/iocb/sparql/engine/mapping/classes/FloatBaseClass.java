@@ -4,8 +4,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdFloatT
 
 
 
+/**
+ * Any valid {@code xsd:float} literal stored as a {@code float4} value plus its lexical form.
+ */
 public final class FloatBaseClass extends SimpleLiteralBaseClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public FloatBaseClass()
     {
         super("float", xsdFloatType, "float4");

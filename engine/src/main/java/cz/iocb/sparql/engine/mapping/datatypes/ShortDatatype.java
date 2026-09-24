@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:short datatype.
+ */
 public final class ShortDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public ShortDatatype()
     {
         super(xsdShortIri, Short.toString(Short.MIN_VALUE), Short.toString(Short.MAX_VALUE));

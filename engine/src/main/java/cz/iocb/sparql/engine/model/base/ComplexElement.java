@@ -12,6 +12,10 @@ public interface ComplexElement extends Element
 {
     /**
      * Helper method used for implementing visitors.
+     *
+     * @param <T> the result type of the visitor
+     * @param visitor the visitor
+     * @return the result of the visit
      */
     <T> T accept(ComplexElementVisitor<T> visitor);
 }

@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid {@code xsd:dayTimeDuration} literal stored as a {@code int8} value plus its lexical form.
+ */
 public final class DayTimeDurationBaseClass extends SimpleLiteralBaseClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public DayTimeDurationBaseClass()
     {
         super("daytimeduration", xsdDayTimeDurationType, "int8");

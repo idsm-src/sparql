@@ -16,11 +16,17 @@ public interface Element
      * Each implementation should look exactly the same:
      *
      * {@code return visitor.visit(this)}
+     *
+     * @param <T> the result type of the visitor
+     * @param visitor the visitor
+     * @return the result of the visit
      */
     <T> T accept(ElementVisitor<T> visitor);
 
     /**
      * Returns the source range for this element.
+     *
+     * @return the source range for this element
      */
     Range getRange();
 
@@ -29,6 +35,8 @@ public interface Element
      *
      * <p>
      * Should be called only when creating a new element.
+     *
+     * @param range the source range
      */
     void setRange(Range range);
 }

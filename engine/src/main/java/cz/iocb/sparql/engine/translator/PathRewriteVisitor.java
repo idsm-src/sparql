@@ -18,8 +18,19 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
+/**
+ * Normalises a property path before translation: pushes inverses down to the IRIs, flattens nested alternatives and
+ * sequences, distributes alternatives over sequences, drops brackets and merges nested repetitions.
+ */
 public class PathRewriteVisitor extends ElementVisitor<Path>
 {
+    /**
+     * Creates the visitor.
+     */
+    public PathRewriteVisitor()
+    {
+    }
+
     @Override
     public Path visit(AlternativePath path)
     {

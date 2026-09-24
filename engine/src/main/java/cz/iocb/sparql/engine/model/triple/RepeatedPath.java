@@ -14,17 +14,47 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class RepeatedPath extends BaseElement implements Path
 {
+    /**
+     * Repetition modifier of a path element.
+     */
     public enum Kind
     {
-        ZeroOrOne("?"), ZeroOrMore("*"), OneOrMore("+");
+        /**
+         * Zero or one traversal ({@code ?}).
+         */
+        ZeroOrOne("?"),
 
+        /**
+         * Any number of traversals ({@code *}).
+         */
+        ZeroOrMore("*"),
+
+        /**
+         * At least one traversal ({@code +}).
+         */
+        OneOrMore("+");
+
+        /**
+         * SPARQL spelling.
+         */
         private final String text;
 
+        /**
+         * Creates the kind with its SPARQL spelling.
+         *
+         * @param text the text
+         */
         Kind(String text)
         {
             this.text = text;
         }
 
+
+        /**
+         * SPARQL spelling of the modifier.
+         *
+         * @return SPARQL spelling of the modifier
+         */
         public String getText()
         {
             return text;
@@ -32,10 +62,23 @@ public class RepeatedPath extends BaseElement implements Path
     }
 
 
+    /**
+     * Repetition kind.
+     */
     private Kind kind;
+
+    /**
+     * The repeated path.
+     */
     private Path child;
 
 
+    /**
+     * Creates the repetition of the child.
+     *
+     * @param kind the repetition kind
+     * @param child the child path
+     */
     public RepeatedPath(Kind kind, Path child)
     {
         setKind(kind);
@@ -43,12 +86,22 @@ public class RepeatedPath extends BaseElement implements Path
     }
 
 
+    /**
+     * Repetition kind.
+     *
+     * @return repetition kind
+     */
     public Kind getKind()
     {
         return kind;
     }
 
 
+    /**
+     * Sets the repetition kind (required).
+     *
+     * @param kind the repetition kind
+     */
     public void setKind(Kind kind)
     {
         if(kind == null)
@@ -58,12 +111,22 @@ public class RepeatedPath extends BaseElement implements Path
     }
 
 
+    /**
+     * The repeated path.
+     *
+     * @return the repeated path
+     */
     public Path getChild()
     {
         return child;
     }
 
 
+    /**
+     * Sets the repeated path.
+     *
+     * @param child the child path
+     */
     public void setChild(Path child)
     {
         this.child = child;

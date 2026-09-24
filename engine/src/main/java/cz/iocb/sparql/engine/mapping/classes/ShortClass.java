@@ -5,8 +5,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdShortT
 
 
 
+/**
+ * Canonical {@code xsd:short} literals stored in one {@code int2} column.
+ */
 public final class ShortClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public ShortClass()
     {
         super("short", xsdShortType, "int2", genShort);

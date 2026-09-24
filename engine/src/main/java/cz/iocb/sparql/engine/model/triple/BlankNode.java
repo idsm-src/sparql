@@ -14,9 +14,17 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public final class BlankNode extends BaseComplexNode implements Node, VariableOrBlankNode
 {
+    /**
+     * Label without the {@code _:} prefix.
+     */
     private String name;
 
 
+    /**
+     * Creates the node; a leading {@code _:} is stripped from the label.
+     *
+     * @param name the label, possibly with the {@code _:} prefix
+     */
     public BlankNode(String name)
     {
         if(name.startsWith("_:"))
@@ -26,6 +34,11 @@ public final class BlankNode extends BaseComplexNode implements Node, VariableOr
     }
 
 
+    /**
+     * Label without the {@code _:} prefix.
+     *
+     * @return label without the {@code _:} prefix
+     */
     public String getName()
     {
         return name;

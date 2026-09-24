@@ -12,8 +12,14 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Any IRI, stored as its full text in one varchar column; the result class of all IRIs.
+ */
 public final class IriScalarClass extends IriClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected IriScalarClass()
     {
         super("iri", List.of("varchar"), Set.of(box));

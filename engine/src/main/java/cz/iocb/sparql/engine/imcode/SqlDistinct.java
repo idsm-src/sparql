@@ -26,12 +26,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Removes duplicate solutions with respect to the given variables (DISTINCT, and the deduplication required by property
+ * paths). Optimisation drops it when the child is already distinct, merges distinct unions of table accesses, and
+ * splits a union into groups of branches that can be deduplicated separately.
+ */
 public final class SqlDistinct extends SqlIntercode
 {
+    /**
+     * Solutions being deduplicated.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Variables the deduplication applies to.
+     */
     private final Set<Variable> distinctVariables;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param child the child node
+     * @param distinctVariables variables to deduplicate over
+     */
     protected SqlDistinct(VariableBindings bindings, SqlIntercode child, Set<Variable> distinctVariables)
     {
         super(bindings, child.isDeterministic());
@@ -41,12 +60,29 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * Deduplication of the child over the given variables.
+     *
+     * @param request the current request
+     * @param child the child node
+     * @param distinct variables to deduplicate over
+     * @return deduplication of the child over the given variables
+     */
     public static SqlIntercode create(Request request, SqlIntercode child, Set<Variable> distinct)
     {
         return create(request, child, distinct, null);
     }
 
 
+    /**
+     * Deduplication over the variables, exposing only what the parent needs.
+     *
+     * @param request the current request
+     * @param child the child node
+     * @param distinctVariables variables to deduplicate over
+     * @param restrictions what the parent needs of the variables
+     * @return deduplication over the variables, exposing only what the parent needs
+     */
     protected static SqlIntercode create(Request request, SqlIntercode child, Set<Variable> distinctVariables,
             Restrictions restrictions)
     {
@@ -184,6 +220,15 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * Groups the branches of the union so that branches whose distinct variables take disjoint classes fall into
+     * different groups; duplicates can only arise within a group.
+     *
+     * @param request the current request
+     * @param union the union
+     * @param distinctVariables variables to deduplicate over
+     * @return the grouped branches
+     */
     protected static List<SqlIntercode> expandUnionByResourceClasses(Request request, SqlUnion union,
             Set<Variable> distinctVariables)
     {
@@ -263,6 +308,15 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * Groups the branches of the union by the constants their distinct variables are bound to (where every branch binds
+     * a constant), since branches with different constants cannot share solutions.
+     *
+     * @param request the current request
+     * @param union the union
+     * @param distinctVariables variables to deduplicate over
+     * @return the grouped branches
+     */
     private static List<SqlIntercode> expandUnionByConstantColumns(Request request, SqlUnion union,
             Set<Variable> distinctVariables)
     {
@@ -307,6 +361,15 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * Merges pairs of table accesses of the union that can be combined into one access (see
+     * {@link SqlTableAccess#tryReduceDistinctUnion}).
+     *
+     * @param request the current request
+     * @param union the union
+     * @param schema the database schema
+     * @return the reduced union
+     */
     private static SqlIntercode reduceDistinctUnion(Request request, SqlUnion union, DatabaseSchema schema)
     {
         List<SqlIntercode> optChilds = new ArrayList<>(union.getChilds());
@@ -340,6 +403,11 @@ public final class SqlDistinct extends SqlIntercode
     }
 
 
+    /**
+     * The deduplicated child.
+     *
+     * @return the deduplicated child
+     */
     public final SqlIntercode getChild()
     {
         return child;

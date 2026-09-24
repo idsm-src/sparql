@@ -10,12 +10,23 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class GroupCondition extends ExpressionVariableBase
 {
+    /**
+     * Grouping by an expression without a variable.
+     *
+     * @param expression the expression
+     */
     public GroupCondition(Expression expression)
     {
         this(expression, null);
     }
 
 
+    /**
+     * Grouping by an expression bound to a variable ({@code GROUP BY (expr AS ?v)}); the variable may be null.
+     *
+     * @param expression the expression
+     * @param variable the variable
+     */
     public GroupCondition(Expression expression, VariableNode variable)
     {
         super(expression, variable);

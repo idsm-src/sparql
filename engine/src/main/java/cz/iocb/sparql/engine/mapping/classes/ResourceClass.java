@@ -18,11 +18,26 @@ import cz.iocb.sparql.engine.request.ColumnMap;
 
 
 
+/**
+ * Describes how RDF terms of one kind are represented in SQL: how many columns of which types hold a value, how a
+ * constant term becomes columns, and how columns are converted to and from more general classes, ultimately to
+ * {@link BuiltinClasses#box}, the universal {@code sparql.rdfbox} representation. Classes form a hierarchy: a variable
+ * whose possible classes are known keeps native columns instead of boxed values, and disjoint classes let joins,
+ * filters and comparisons be pruned at translation time.
+ */
 public abstract class ResourceClass
 {
+    /**
+     * Unique name of the class.
+     */
     protected final String name;
 
 
+    /**
+     * Creates the class with its name.
+     *
+     * @param name the name
+     */
     protected ResourceClass(String name)
     {
         this.name = name;
@@ -88,9 +103,19 @@ public abstract class ResourceClass
     public abstract PrimitiveResourceClass getEffectiveClass();
 
 
+    /**
+     * SQL types of the columns representing a value, in column order.
+     *
+     * @return SQL types of the columns representing a value, in column order
+     */
     public abstract List<String> getSqlTypes();
 
 
+    /**
+     * Number of SQL columns representing a value.
+     *
+     * @return number of SQL columns representing a value
+     */
     public abstract int getColumnCount();
 
 
@@ -116,12 +141,26 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * True if every value of this class is also a value of {@code resClass} (and can be converted to it by
+     * {@link #toGeneralClass}); a class is a subclass of itself.
+     *
+     * @param resClass the resource class
+     * @return true if {@code a} is a subclass of {@code b}, false otherwise
+     */
     public final boolean isSubclassOf(ResourceClass resClass)
     {
         return equals(resClass) || isSubclassOf(this, resClass);
     }
 
 
+    /**
+     * Subclass test delegating to the primitive hierarchy or to the derived-class normal forms.
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return true if {@code a} is a subclass of {@code b}, false otherwise
+     */
     private boolean isSubclassOf(ResourceClass a, ResourceClass b)
     {
         if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
@@ -131,6 +170,13 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * True if no term belongs to both classes.
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return true if no term belongs to both classes, false otherwise
+     */
     public static boolean areDisjunct(ResourceClass a, ResourceClass b)
     {
         if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
@@ -140,18 +186,40 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * True if {@code resClass} is disjoint with every class of the set.
+     *
+     * @param resClass the resource class
+     * @param resClasses the resource classes
+     * @return true if {@code resClass} is disjoint with every class of the set, false otherwise
+     */
     public static boolean areDisjunct(ResourceClass resClass, Set<ResourceClass> resClasses)
     {
         return resClasses.stream().allMatch(c -> areDisjunct(resClass, c));
     }
 
 
+    /**
+     * True if every class of the first set is disjoint with every class of the second one.
+     *
+     * @param classes1 the first set of classes
+     * @param classes2 the second set of classes
+     * @return true if every class of the first set is disjoint with every class of the second one, false otherwise
+     */
     public static boolean areDisjunct(Set<ResourceClass> classes1, Set<ResourceClass> classes2)
     {
         return classes1.stream().allMatch(c1 -> ResourceClass.areDisjunct(c1, classes2));
     }
 
 
+    /**
+     * Creates the column names under which a value of this class of the variable is exposed by a generated subquery
+     * ({@code <variable>#<class>_par<i>}), shortened through the column map when too long for PostgreSQL.
+     *
+     * @param map map shortening long column names
+     * @param variable the variable
+     * @return the column names
+     */
     public List<Column> createColumns(ColumnMap map, Variable variable)
     {
         //FIXME: consider whether there might be a collision of names with those generated in another part of the query
@@ -168,18 +236,39 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * Unique name of the class, also used in generated column names.
+     *
+     * @return unique name of the class, also used in generated column names
+     */
     public final String getResourceName()
     {
         return name;
     }
 
 
+    /**
+     * Class in which an expression over values of the given classes is evaluated: their union, stored in the
+     * single-column superclass selected by {@link #getExpressionClass(ResourceClass)}.
+     *
+     * @param resClasses the resource classes
+     * @return class in which an expression over values of the given classes is evaluated: their union, stored in the
+     *         single-column superclass selected by {@link #getExpressionClass(ResourceClass)}
+     */
     public static ResourceClass getExpressionClass(Set<ResourceClass> resClasses)
     {
         return unionize(resClasses, (PrimitiveResourceClass) getExpressionClass(unionize(resClasses)));
     }
 
 
+    /**
+     * The most specific single-column primitive superclass of the (effective) class, i.e. the narrowest type able to
+     * hold its values in one SQL expression; the class itself when it has a single column.
+     *
+     * @param resClass the resource class
+     * @return the most specific single-column primitive superclass of the (effective) class, i.e. the narrowest type
+     *         able to hold its values in one SQL expression; the class itself when it has a single column
+     */
     public static ResourceClass getExpressionClass(ResourceClass resClass)
     {
         if(resClass instanceof DerivedClass c)
@@ -208,6 +297,12 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * The most specific of the given classes, which are expected to be mutually comparable.
+     *
+     * @param classes the classes
+     * @return the most specific of the given classes, which are expected to be mutually comparable
+     */
     public static ResourceClass getIntersectionClass(Set<ResourceClass> classes)
     {
         //TODO: take into account that a primitive class can be composed of (finitely many) other primitive classes
@@ -223,6 +318,12 @@ public abstract class ResourceClass
     }
 
 
+    /**
+     * Merges the given classes into pairwise disjoint ones: classes that overlap (transitively) are unioned together.
+     *
+     * @param classes the classes
+     * @return the disjoint classes
+     */
     public static Set<ResourceClass> getDisjunctClasses(Set<ResourceClass> classes)
     {
         Collection<Set<ResourceClass>> out = UnionFind.getDisjunctEntries(classes, (l, r) -> !areDisjunct(l, r));

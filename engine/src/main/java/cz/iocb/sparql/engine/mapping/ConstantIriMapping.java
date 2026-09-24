@@ -9,14 +9,30 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Mapping of a position to a fixed IRI. When created from the IRI alone, its IRI class and columns are detected on
+ * first use through the request (and cached).
+ */
 public class ConstantIriMapping extends ConstantMapping
 {
+    /**
+     * Creates the mapping with an explicit IRI class and columns.
+     *
+     * @param iri the IRI
+     * @param iriClass the IRI class
+     * @param columns the columns
+     */
     public ConstantIriMapping(Iri iri, ResourceClass iriClass, List<Column> columns)
     {
         super(iri, iriClass, columns);
     }
 
 
+    /**
+     * Creates the mapping; the IRI class and columns are detected lazily.
+     *
+     * @param iri the IRI
+     */
     public ConstantIriMapping(Iri iri)
     {
         this(iri, null, null);
@@ -33,6 +49,11 @@ public class ConstantIriMapping extends ConstantMapping
     }
 
 
+    /**
+     * The IRI class given at construction, or null when it is detected lazily.
+     *
+     * @return the IRI class given at construction, or null when it is detected lazily
+     */
     public IriClass getResourceClass()
     {
         return (IriClass) resourceClass;
@@ -49,12 +70,22 @@ public class ConstantIriMapping extends ConstantMapping
     }
 
 
+    /**
+     * The columns given at construction, or null when they are detected lazily.
+     *
+     * @return the columns given at construction, or null when they are detected lazily
+     */
     public List<Column> getColumns()
     {
         return columns;
     }
 
 
+    /**
+     * The constant IRI.
+     *
+     * @return the constant IRI
+     */
     public Iri getIri()
     {
         return (Iri) value;

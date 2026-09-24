@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:integer datatype.
+ */
 public final class IntegerDatatype extends VariableSizeIntegerDataType
 {
+    /**
+     * Creates the datatype.
+     */
     public IntegerDatatype()
     {
         super(xsdIntegerIri, Variant.FULL);

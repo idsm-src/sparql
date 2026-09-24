@@ -5,8 +5,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdUnsign
 
 
 
+/**
+ * Canonical {@code xsd:unsignedInt} literals stored in one {@code int8} column.
+ */
 public final class UnsignedIntClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public UnsignedIntClass()
     {
         super("unsignedint", xsdUnsignedIntType, "int8", genUnsignedInt);

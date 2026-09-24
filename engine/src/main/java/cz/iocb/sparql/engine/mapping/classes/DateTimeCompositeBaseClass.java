@@ -13,8 +13,15 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid xsd:dateTime value as a UTC {@code timestamptz}, an {@code int4} timezone offset and its lexical form; the
+ * result class of non-canonical date-times.
+ */
 public final class DateTimeCompositeBaseClass extends BaseLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateTimeCompositeBaseClass()
     {
         super("base-datetime@2c", xsdDateTimeType, List.of("timestamptz", "int4", "varchar"),

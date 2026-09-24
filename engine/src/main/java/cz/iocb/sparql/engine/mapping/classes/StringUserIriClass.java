@@ -13,15 +13,47 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs of the form {@code prefix + id + suffix} with a varchar id, optionally of a fixed length or constrained by a
+ * regular expression.
+ */
 public class StringUserIriClass extends SimpleUserIriClass
 {
+    /**
+     * Compiled regular expression of the IRIs.
+     */
     private final Pattern pattern;
+
+    /**
+     * Regular expression of the IRIs.
+     */
     private final String regexp;
+
+    /**
+     * Text before the id, or null.
+     */
     private final String prefix;
+
+    /**
+     * Text after the id, or null.
+     */
     private final String suffix;
+
+    /**
+     * Fixed length of the id, or zero.
+     */
     private final int length;
 
 
+    /**
+     * Creates the class with all options; without {@code pattern}, the id is any text of the given (or any) length.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     * @param pattern regular expression constraining the id, or null
+     * @param suffix the suffix
+     */
     public StringUserIriClass(String name, String prefix, int length, String pattern, String suffix)
     {
         super(name, "varchar");
@@ -54,30 +86,66 @@ public class StringUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Creates the class with an id of any length.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     * @param pattern regular expression constraining the id, or null
+     * @param suffix the suffix
+     */
     public StringUserIriClass(String name, String prefix, String pattern, String suffix)
     {
         this(name, prefix, 0, pattern, suffix);
     }
 
 
+    /**
+     * Creates the class without a suffix.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     * @param pattern regular expression constraining the id, or null
+     */
     public StringUserIriClass(String name, String prefix, int length, String pattern)
     {
         this(name, prefix, length, pattern, null);
     }
 
 
+    /**
+     * Creates the class with an id of any length and no suffix.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     * @param pattern regular expression constraining the id, or null
+     */
     public StringUserIriClass(String name, String prefix, String pattern)
     {
         this(name, prefix, 0, pattern, null);
     }
 
 
+    /**
+     * Creates the class with an id of fixed length and no pattern or suffix.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     * @param length fixed length of the id, or zero
+     */
     public StringUserIriClass(String name, String prefix, int length)
     {
         this(name, prefix, length, null, null);
     }
 
 
+    /**
+     * Creates the class with a prefix only.
+     *
+     * @param name the name
+     * @param prefix the prefix
+     */
     public StringUserIriClass(String name, String prefix)
     {
         this(name, prefix, 0, null, null);
@@ -122,6 +190,12 @@ public class StringUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * SQL expression extracting the id from an IRI assumed to belong to the class.
+     *
+     * @param column the column
+     * @return SQL expression extracting the id from an IRI assumed to belong to the class
+     */
     private Column generateNonCheckedInverseFunction(Column column)
     {
         String sqlType = sqlTypes.get(0);
@@ -165,18 +239,33 @@ public class StringUserIriClass extends SimpleUserIriClass
     }
 
 
+    /**
+     * Text before the id, or null.
+     *
+     * @return text before the id, or null
+     */
     public String getPrefix()
     {
         return prefix;
     }
 
 
+    /**
+     * Text after the id, or null.
+     *
+     * @return text after the id, or null
+     */
     public String getSuffix()
     {
         return suffix;
     }
 
 
+    /**
+     * Fixed length of the id, or zero.
+     *
+     * @return fixed length of the id, or zero
+     */
     public int getIdLength()
     {
         return length;

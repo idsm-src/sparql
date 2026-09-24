@@ -5,8 +5,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteTy
 
 
 
+/**
+ * Canonical {@code xsd:byte} literals stored in one {@code int2} column.
+ */
 public final class ByteClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public ByteClass()
     {
         super("byte", xsdByteType, "int2", genByte);

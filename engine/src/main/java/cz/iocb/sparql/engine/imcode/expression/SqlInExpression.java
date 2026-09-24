@@ -31,12 +31,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * IN and NOT IN: equality of the left operand with any of the right operands, with the SPARQL error semantics of a
+ * chain of {@code ||} (or {@code &&}) comparisons.
+ */
 public final class SqlInExpression extends SqlExpressionIntercode
 {
+    /**
+     * Operand whose expression columns are replaced by named columns, so that the operand is evaluated once in a
+     * subquery and referred to by name in the comparisons.
+     */
     static private final class OperandWrapper extends SqlExpressionIntercode
     {
+        /**
+         * Generated column of each expression column of the operand.
+         */
         private LinkedHashMap<Column, Column> columnMap;
 
+        /**
+         * Creates the wrapper.
+         *
+         * @param mappings columns per resource class
+         * @param canBeNull whether the value may be null
+         * @param isDeterministic whether the node is deterministic
+         * @param columnMap the column map
+         */
         protected OperandWrapper(Map<ResourceClass, List<Column>> mappings, boolean canBeNull, boolean isDeterministic,
                 LinkedHashMap<Column, Column> columnMap)
         {
@@ -45,6 +64,13 @@ public final class SqlInExpression extends SqlExpressionIntercode
             this.columnMap = columnMap;
         }
 
+
+        /**
+         * The operand itself when it has no expression columns, otherwise its wrapper.
+         *
+         * @param operand the operand
+         * @return the operand itself when it has no expression columns, otherwise its wrapper
+         */
         public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
         {
             if(!operand.getBinding().hasExpressionColumn())
@@ -81,6 +107,12 @@ public final class SqlInExpression extends SqlExpressionIntercode
             throw new UnsupportedOperationException();
         }
 
+
+        /**
+         * Generated column of each expression column of the operand.
+         *
+         * @return generated column of each expression column of the operand
+         */
         public Map<Column, Column> getColumnMap()
         {
             return columnMap;
@@ -100,11 +132,31 @@ public final class SqlInExpression extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True for NOT IN.
+     */
     private boolean negated;
+
+    /**
+     * Tested operand.
+     */
     private SqlExpressionIntercode left;
+
+    /**
+     * Operands compared against.
+     */
     private List<SqlExpressionIntercode> rights;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param negated whether the test is negated
+     * @param left the left operand
+     * @param rights the operands compared against
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlInExpression(boolean negated, SqlExpressionIntercode left, List<SqlExpressionIntercode> rights,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -121,6 +173,14 @@ public final class SqlInExpression extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Membership test of {@code left} in {@code rights}.
+     *
+     * @param negated whether the test is negated
+     * @param left the left operand
+     * @param rights the operands compared against
+     * @return membership test of {@code left} in {@code rights}
+     */
     public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights)
     {
@@ -128,6 +188,17 @@ public final class SqlInExpression extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Membership test materialising only when needed: an empty list is constant, a single operand a plain comparison,
+     * otherwise a chain of comparisons over the wrapped left operand.
+     *
+     * @param negated whether the test is negated
+     * @param left the left operand
+     * @param rights the operands compared against
+     * @param restriction the result classes the parent needs
+     * @return membership test materialising only when needed: an empty list is constant, a single operand a plain
+     *         comparison, otherwise a chain of comparisons over the wrapped left operand
+     */
     public static SqlExpressionIntercode create(boolean negated, SqlExpressionIntercode left,
             List<SqlExpressionIntercode> rights, Restriction restriction)
     {

@@ -13,10 +13,23 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class PrefixedName extends BaseElement
 {
+    /**
+     * Prefix without the trailing colon.
+     */
     private final String prefix;
+
+    /**
+     * Local part after the colon.
+     */
     private final String localName;
 
 
+    /**
+     * Creates the name from its prefix and local part.
+     *
+     * @param prefix the prefix
+     * @param localName the local part
+     */
     public PrefixedName(String prefix, String localName)
     {
         this.prefix = prefix;
@@ -26,6 +39,8 @@ public class PrefixedName extends BaseElement
 
     /**
      * Prefix without the trailing ':'.
+     *
+     * @return prefix without the trailing ':'
      */
     public String getPrefix()
     {
@@ -33,6 +48,11 @@ public class PrefixedName extends BaseElement
     }
 
 
+    /**
+     * Local part after the colon.
+     *
+     * @return local part after the colon
+     */
     public String getLocalName()
     {
         return localName;

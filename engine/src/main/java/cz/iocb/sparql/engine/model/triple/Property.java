@@ -20,16 +20,32 @@ import cz.iocb.sparql.engine.parser.Parser;
  */
 public class Property extends BaseElement implements ComplexElement
 {
+    /**
+     * The predicate.
+     */
     private Verb verb;
+
+    /**
+     * Objects of the predicate.
+     */
     private List<ComplexNode> objects;
 
 
+    /**
+     * Creates an empty property to be filled later.
+     */
     public Property()
     {
         this.objects = new ArrayList<>();
     }
 
 
+    /**
+     * Creates the property with a single object.
+     *
+     * @param verb the predicate
+     * @param object the object node
+     */
     public Property(Verb verb, ComplexNode object)
     {
         this();
@@ -38,6 +54,12 @@ public class Property extends BaseElement implements ComplexElement
     }
 
 
+    /**
+     * Creates the property with the given objects.
+     *
+     * @param verb the predicate
+     * @param objects the objects
+     */
     public Property(Verb verb, Collection<ComplexNode> objects)
     {
         this.verb = verb;
@@ -45,18 +67,33 @@ public class Property extends BaseElement implements ComplexElement
     }
 
 
+    /**
+     * The predicate.
+     *
+     * @return the predicate
+     */
     public Verb getVerb()
     {
         return verb;
     }
 
 
+    /**
+     * Sets the predicate.
+     *
+     * @param verb the predicate
+     */
     public void setVerb(Verb verb)
     {
         this.verb = verb;
     }
 
 
+    /**
+     * Objects of the predicate (modifiable).
+     *
+     * @return objects of the predicate (modifiable)
+     */
     public List<ComplexNode> getObjects()
     {
         return objects;

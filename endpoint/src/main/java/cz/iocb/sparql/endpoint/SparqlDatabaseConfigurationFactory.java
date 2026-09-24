@@ -16,8 +16,21 @@ import cz.iocb.sparql.engine.database.DatabaseSchema;
 
 
 
+/**
+ * JNDI object factory creating the deployment's {@link cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration}: the
+ * class named by the reference is instantiated through its {@code (String service, DataSource, DatabaseSchema)}
+ * constructor, with the data source looked up by the {@code datasource} address and the optional {@code service} IRI
+ * address of the reference.
+ */
 public class SparqlDatabaseConfigurationFactory implements ObjectFactory
 {
+    /**
+     * Creates the factory; instantiated by the JNDI provider.
+     */
+    public SparqlDatabaseConfigurationFactory()
+    {
+    }
+
     @Override
     public Object getObjectInstance(Object object, Name name, Context context, Hashtable<?, ?> environment)
             throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException,

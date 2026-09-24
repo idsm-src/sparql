@@ -11,13 +11,22 @@ import cz.iocb.sparql.engine.mapping.TermMapping;
 
 
 
+/**
+ * Mappings of the low, medium and high expression levels of isoforms.
+ */
 public class Expression
 {
+    /**
+     * Nothing to register: the mapped entities are defined elsewhere.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
     }
 
 
+    /**
+     * Registers the quad mappings of the expression levels.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");

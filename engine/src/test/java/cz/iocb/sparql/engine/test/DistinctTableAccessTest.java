@@ -40,17 +40,30 @@ import cz.iocb.sparql.engine.translator.ServiceException;
  * Checks the deduplication of table accesses over tables that are not unique with respect to the mapped columns.
  *
  * The table {@code synonym} holds the pairs (1,a), (1,a), (1,b), (2,a), (2,a), so a plain multiset access sees five
- * rows, whereas the set of mapped triples has three members. The duplicated pairs differ in the {@code source}
- * column, on which the mappings {@code ex:synonym1} (source 1) and {@code ex:synonym2} (source 2) are restricted.
+ * rows, whereas the set of mapped triples has three members. The duplicated pairs differ in the {@code source} column,
+ * on which the mappings {@code ex:synonym1} (source 1) and {@code ex:synonym2} (source 2) are restricted.
  */
 public class DistinctTableAccessTest
 {
+    /**
+     * Prefix declaration prepended to every query.
+     */
     private static final String prefix = "PREFIX ex: <http://example.org/> ";
 
+    /**
+     * Pool of the test database.
+     */
     private static DataSource connectionPool = null;
+
+    /**
+     * Catalog of the test database, read after the test tables were created.
+     */
     private static DatabaseSchema schema = null;
 
 
+    /**
+     * Creates the {@code distinct_test} schema with the {@code compound} and {@code synonym} tables.
+     */
     @BeforeAll
     static void init() throws SQLException
     {
@@ -64,9 +77,10 @@ public class DistinctTableAccessTest
                     + "label varchar collate \"C\" not null)");
             statement.execute("insert into distinct_test.compound values (1, 'first'), (2, 'second'), (3, 'third')");
 
-            statement.execute("create table distinct_test.synonym (compound int not null references "
-                    + "distinct_test.compound(id), synonym varchar collate \"C\" not null, "
-                    + "source int not null)");
+            statement.execute("""
+                    create table distinct_test.synonym (compound int not null references \
+                    distinct_test.compound(id), synonym varchar collate "C" not null, \
+                    source int not null)""");
             statement.execute("insert into distinct_test.synonym values (1, 'a', 1), (1, 'a', 2), (1, 'b', 1), "
                     + "(2, 'a', 1), (2, 'a', 2)");
         }
@@ -75,6 +89,9 @@ public class DistinctTableAccessTest
     }
 
 
+    /**
+     * Configuration mapping the two tables; {@code distinct} sets the distinct flag of the {@code synonym} mappings.
+     */
     private static SparqlDatabaseConfiguration createConfiguration(boolean distinct) throws SQLException
     {
         SparqlDatabaseConfiguration config = new SparqlDatabaseConfiguration(null, connectionPool, schema, true);
@@ -111,6 +128,9 @@ public class DistinctTableAccessTest
     }
 
 
+    /**
+     * Runs the query against the configuration with the given distinct flag and returns all rows.
+     */
     private static List<List<RdfTerm>> execute(boolean distinct, String query)
             throws SQLException, TranslateExceptions, LimitExceedException, ServiceException
     {
@@ -128,24 +148,36 @@ public class DistinctTableAccessTest
     }
 
 
+    /**
+     * Expected row.
+     */
     private static List<RdfTerm> row(RdfTerm... terms)
     {
         return Arrays.asList(terms);
     }
 
 
+    /**
+     * IRI of the compound with the given id.
+     */
     private static Iri compound(int id)
     {
         return new Iri("http://example.org/compound/" + id);
     }
 
 
+    /**
+     * Expected xsd:string literal.
+     */
     private static TypedLiteral string(String value)
     {
         return new TypedLiteral(value, xsdStringIri);
     }
 
 
+    /**
+     * Expected xsd:integer literal.
+     */
     private static TypedLiteral integer(int value)
     {
         return new TypedLiteral(Integer.toString(value), xsdIntegerIri);
@@ -159,8 +191,7 @@ public class DistinctTableAccessTest
         List<List<RdfTerm>> result = execute(false, "SELECT ?s ?o WHERE { ?s ex:synonym ?o }");
 
         assertThat(result, containsInAnyOrder(row(compound(1), string("a")), row(compound(1), string("a")),
-                row(compound(1), string("b")), row(compound(2), string("a")),
-                row(compound(2), string("a"))));
+                row(compound(1), string("b")), row(compound(2), string("a")), row(compound(2), string("a"))));
     }
 
 
@@ -231,8 +262,8 @@ public class DistinctTableAccessTest
     {
         List<List<RdfTerm>> result = execute(true, "SELECT ?l ?o WHERE { ?s ex:label ?l . ?s ex:synonym ?o }");
 
-        assertThat(result, containsInAnyOrder(row(string("first"), string("a")),
-                row(string("first"), string("b")), row(string("second"), string("a"))));
+        assertThat(result, containsInAnyOrder(row(string("first"), string("a")), row(string("first"), string("b")),
+                row(string("second"), string("a"))));
     }
 
 
@@ -242,8 +273,8 @@ public class DistinctTableAccessTest
     {
         List<List<RdfTerm>> result = execute(true, "SELECT ?l ?o WHERE { ?l ex:labelSynonym ?o }");
 
-        assertThat(result, containsInAnyOrder(row(string("first"), string("a")),
-                row(string("first"), string("b")), row(string("second"), string("a"))));
+        assertThat(result, containsInAnyOrder(row(string("first"), string("a")), row(string("first"), string("b")),
+                row(string("second"), string("a"))));
     }
 
 
@@ -253,9 +284,10 @@ public class DistinctTableAccessTest
     {
         List<List<RdfTerm>> result = execute(false, "SELECT ?l ?o WHERE { ?l ex:labelSynonym ?o }");
 
-        assertThat(result, containsInAnyOrder(row(string("first"), string("a")),
-                row(string("first"), string("a")), row(string("first"), string("b")),
-                row(string("second"), string("a")), row(string("second"), string("a"))));
+        assertThat(result,
+                containsInAnyOrder(row(string("first"), string("a")), row(string("first"), string("a")),
+                        row(string("first"), string("b")), row(string("second"), string("a")),
+                        row(string("second"), string("a"))));
     }
 
 
@@ -321,12 +353,12 @@ public class DistinctTableAccessTest
     @DisplayName("a distinct access not joined on all its columns keeps its multiplicities")
     void distinctAccessWithExtraVariable() throws Exception
     {
-        List<List<RdfTerm>> result = execute(true,
-                "SELECT ?s ?o ?o2 WHERE { ?s ex:synonym ?o . ?s ex:synonym1 ?o2 }");
+        List<List<RdfTerm>> result = execute(true, "SELECT ?s ?o ?o2 WHERE { ?s ex:synonym ?o . ?s ex:synonym1 ?o2 }");
 
-        assertThat(result, containsInAnyOrder(row(compound(1), string("a"), string("a")),
-                row(compound(1), string("a"), string("b")), row(compound(1), string("b"), string("a")),
-                row(compound(1), string("b"), string("b")), row(compound(2), string("a"), string("a"))));
+        assertThat(result,
+                containsInAnyOrder(row(compound(1), string("a"), string("a")),
+                        row(compound(1), string("a"), string("b")), row(compound(1), string("b"), string("a")),
+                        row(compound(1), string("b"), string("b")), row(compound(2), string("a"), string("a"))));
     }
 
 

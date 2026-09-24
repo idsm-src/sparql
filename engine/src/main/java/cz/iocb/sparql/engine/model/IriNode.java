@@ -16,27 +16,67 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class IriNode extends BaseComplexNode implements VarOrIri, Path
 {
+    /**
+     * Grammar rule PN_CHARS_BASE as a regular expression.
+     */
     private static String PN_CHARS_BASE = """
             ([A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\
             \\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD]|\
             [\\uD840-\\uDBBF][\\uDC00–\\uDFFF])""";
+
+    /**
+     * Grammar rule PN_CHARS_U as a regular expression.
+     */
     private static String PN_CHARS_U = "(" + PN_CHARS_BASE + "|_)";
+
+    /**
+     * Grammar rule PN_CHARS as a regular expression.
+     */
     private static String PN_CHARS = "(" + PN_CHARS_U + "|[-0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040])";
+
+    /**
+     * Grammar rule PERCENT as a regular expression.
+     */
     private static String PERCENT = "(%[0-9A-Fa-f][0-9A-Fa-f])";
+
+    /**
+     * Grammar rule PN_LOCAL_ESC as a regular expression.
+     */
     private static String PN_LOCAL_ESC = "(\\\\[-_~.!$&'()*+,;=/?#@%])";
+
+    /**
+     * Grammar rule PLX as a regular expression.
+     */
     private static String PLX = "(" + PERCENT + "|" + PN_LOCAL_ESC + ")";
+
+    /**
+     * Grammar rule PN_LOCAL as a regular expression; a local name must match it to be written as a prefixed name.
+     */
     private static String PN_LOCAL = "((" + PN_CHARS_U + "|[0-9:]|" + PLX + ")((" + PN_CHARS + "|[.:]|" + PLX + ")*("
             + PN_CHARS + "|:|" + PLX + "))?)?";
 
+    /**
+     * Full IRI text.
+     */
     private final String value;
 
 
+    /**
+     * Creates the node for the full IRI text.
+     *
+     * @param value the IRI text
+     */
     public IriNode(String value)
     {
         this.value = value;
     }
 
 
+    /**
+     * Full IRI text.
+     *
+     * @return full IRI text
+     */
     public String getValue()
     {
         return value;
@@ -50,6 +90,15 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
     }
 
 
+    /**
+     * Returns the shortest prefixed name of {@code iri} whose local part is a valid {@code PN_LOCAL}, or null if no
+     * prefix applies.
+     *
+     * @param iri the IRI
+     * @param prefixes prefixes by name
+     * @return the shortest prefixed name of {@code iri} whose local part is a valid {@code PN_LOCAL}, or null if no
+     *         prefix applies
+     */
     public static String toPrefixedIri(String iri, Map<String, String> prefixes)
     {
         String result = null;
@@ -75,6 +124,13 @@ public class IriNode extends BaseComplexNode implements VarOrIri, Path
     }
 
 
+    /**
+     * Renders the IRI for messages: as a prefixed name if a prologue prefix applies, otherwise relative to BASE if
+     * possible, otherwise as {@code <iri>}.
+     *
+     * @param prologue the prologue of the query
+     * @return the rendered IRI
+     */
     public String toString(Prologue prologue)
     {
         if(prologue == null)

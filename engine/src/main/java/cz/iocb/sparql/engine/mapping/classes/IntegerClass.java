@@ -5,8 +5,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntege
 
 
 
+/**
+ * Canonical {@code xsd:integer} literals stored in one {@code numeric} column.
+ */
 public final class IntegerClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public IntegerClass()
     {
         super("integer", xsdIntegerType, "numeric", genInteger);

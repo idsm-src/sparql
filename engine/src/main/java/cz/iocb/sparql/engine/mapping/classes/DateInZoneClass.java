@@ -20,14 +20,33 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical xsd:date values of one fixed timezone offset, stored as a {@code date} only; instances are cached per
+ * offset.
+ */
 public final class DateInZoneClass extends CanonicalLiteralClass implements DateInZone
 {
+    /**
+     * Instances by timezone offset.
+     */
     private static final ConcurrentMap<Integer, DateInZoneClass> instances = new ConcurrentHashMap<>();
 
+    /**
+     * Base class of the same offset keeping the lexical form.
+     */
     private final LiteralClass base;
+
+    /**
+     * Timezone offset in seconds.
+     */
     private final int zone;
 
 
+    /**
+     * Creates the class of the offset; use {@link #get}.
+     *
+     * @param zone the timezone offset in seconds
+     */
     private DateInZoneClass(int zone)
     {
         super("date$" + zone, xsdDateType, List.of("date"),
@@ -38,6 +57,12 @@ public final class DateInZoneClass extends CanonicalLiteralClass implements Date
     }
 
 
+    /**
+     * The class of the given timezone offset (see {@link #getZone}).
+     *
+     * @param zone the timezone offset in seconds
+     * @return the class of the given timezone offset (see {@link #getZone})
+     */
     public static DateInZoneClass get(int zone)
     {
         return instances.computeIfAbsent(zone, DateInZoneClass::new);

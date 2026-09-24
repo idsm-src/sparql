@@ -29,14 +29,41 @@ import cz.iocb.sparql.engine.model.triple.RdfCollection;
 
 
 
+/**
+ * Builds the graph terms of triples: variables, IRIs, literals, blank nodes, collections and blank node property lists
+ * (the latter two still in their syntax-sugar form).
+ */
 public class NodeVisitor extends BaseVisitor<ComplexNode>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param scopes the variable scopes
+     * @param messages the message list to append to
+     */
     public NodeVisitor(SparqlDatabaseConfiguration config, Prologue prologue, VariableScopes scopes,
             List<TranslateMessage> messages)
     {
@@ -70,6 +97,12 @@ public class NodeVisitor extends BaseVisitor<ComplexNode>
     }
 
 
+    /**
+     * Parses a {@code VarOrIri} rule into a variable or an IRI; null if it is neither.
+     *
+     * @param ctx the parse tree node
+     * @return the variable or IRI, or null
+     */
     public VarOrIri parseVarOrIri(VarOrIriContext ctx)
     {
         if(ctx.var() != null)

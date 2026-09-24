@@ -11,24 +11,56 @@ import cz.iocb.sparql.engine.rdf.Variable;
 
 
 
+/**
+ * Bindings of one variable on the two sides of a join, with the pairs of overlapping classes; a class with no
+ * overlapping counterpart is paired with null.
+ */
 public class VariableBindingPair
 {
+    /**
+     * Pair of a left and a right class that may hold a common value (either may be null).
+     */
     public static class ResourceClassPair
     {
+        /**
+         * Class on the left side, or null.
+         */
         private final ResourceClass leftClass;
+
+        /**
+         * Class on the right side, or null.
+         */
         private final ResourceClass rightClass;
 
+        /**
+         * Creates the pair.
+         *
+         * @param leftClass class on the left side, or null
+         * @param rightClass class on the right side, or null
+         */
         public ResourceClassPair(ResourceClass leftClass, ResourceClass rightClass)
         {
             this.leftClass = leftClass;
             this.rightClass = rightClass;
         }
 
+
+        /**
+         * Class on the left side, or null.
+         *
+         * @return class on the left side, or null
+         */
         public final ResourceClass getLeftClass()
         {
             return leftClass;
         }
 
+
+        /**
+         * Class on the right side, or null.
+         *
+         * @return class on the right side, or null
+         */
         public final ResourceClass getRightClass()
         {
             return rightClass;
@@ -36,12 +68,34 @@ public class VariableBindingPair
     }
 
 
+    /**
+     * The variable; may be null.
+     */
     private final Variable variable;
+
+    /**
+     * Binding on the left side, or null.
+     */
     private final VariableBinding leftVariableBinding;
+
+    /**
+     * Binding on the right side, or null.
+     */
     private final VariableBinding rightVariableBinding;
+
+    /**
+     * Pairs of overlapping classes, unmatched classes paired with null.
+     */
     private final List<ResourceClassPair> classes = new ArrayList<>();
 
 
+    /**
+     * Creates the pair, pairing every left class with every overlapping right class.
+     *
+     * @param variable the variable
+     * @param leftVariableBinding binding on the left side, or null
+     * @param rightVariableBinding binding on the right side, or null
+     */
     public VariableBindingPair(Variable variable, VariableBinding leftVariableBinding,
             VariableBinding rightVariableBinding)
     {
@@ -86,18 +140,37 @@ public class VariableBindingPair
     }
 
 
+    /**
+     * Creates the pair without naming the variable.
+     *
+     * @param leftVariableBinding binding on the left side, or null
+     * @param rightVariableBinding binding on the right side, or null
+     */
     public VariableBindingPair(VariableBinding leftVariableBinding, VariableBinding rightVariableBinding)
     {
         this(null, leftVariableBinding, rightVariableBinding);
     }
 
 
+    /**
+     * Adds a class pair.
+     *
+     * @param l class on the left side
+     * @param r class on the right side
+     */
     public void addClasses(ResourceClass l, ResourceClass r)
     {
         classes.add(new ResourceClassPair(l, r));
     }
 
 
+    /**
+     * Pairs for the variables bound on both sides.
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return pairs for the variables bound on both sides
+     */
     public static List<VariableBindingPair> getPairs(VariableBindings left, VariableBindings right)
     {
         Set<Variable> varNames = new HashSet<>(left.getVariables());
@@ -112,6 +185,12 @@ public class VariableBindingPair
     }
 
 
+    /**
+     * False if the variable can never take equal values on both sides, so the join is empty: both sides are always
+     * bound, and every pair of overlapping classes is contradicted by differing constants.
+     *
+     * @return false if the variable can never take equal values on both sides, so the join is empty, true otherwise
+     */
     public boolean isJoinable()
     {
         if(leftVariableBinding == null || rightVariableBinding == null)
@@ -149,6 +228,13 @@ public class VariableBindingPair
     }
 
 
+    /**
+     * False if the columns differ in a constant.
+     *
+     * @param leftCols columns on the left side
+     * @param rightCols columns on the right side
+     * @return false if the columns differ in a constant, true otherwise
+     */
     private static boolean isJoinable(List<Column> leftCols, List<Column> rightCols)
     {
         for(int i = 0; i < leftCols.size(); i++)
@@ -160,24 +246,44 @@ public class VariableBindingPair
     }
 
 
+    /**
+     * The variable; may be null.
+     *
+     * @return the variable; may be null
+     */
     public final Variable getVariable()
     {
         return variable;
     }
 
 
+    /**
+     * Binding on the left side, or null.
+     *
+     * @return binding on the left side, or null
+     */
     public final VariableBinding getLeftVariableBinding()
     {
         return leftVariableBinding;
     }
 
 
+    /**
+     * Binding on the right side, or null.
+     *
+     * @return binding on the right side, or null
+     */
     public final VariableBinding getRightVariableBinding()
     {
         return rightVariableBinding;
     }
 
 
+    /**
+     * Pairs of overlapping classes, unmatched classes paired with null.
+     *
+     * @return pairs of overlapping classes, unmatched classes paired with null
+     */
     public final List<ResourceClassPair> getClasses()
     {
         return classes;

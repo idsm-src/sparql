@@ -17,11 +17,29 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class InExpression extends BaseElement implements Expression
 {
+    /**
+     * Tested expression.
+     */
     private Expression left;
+
+    /**
+     * Expressions to compare against.
+     */
     private List<Expression> right;
+
+    /**
+     * True for NOT IN.
+     */
     private boolean negated;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param left the left side
+     * @param right the right side
+     * @param negated whether the test is negated
+     */
     public InExpression(Expression left, Collection<Expression> right, boolean negated)
     {
         setLeft(left);
@@ -30,30 +48,55 @@ public class InExpression extends BaseElement implements Expression
     }
 
 
+    /**
+     * Tested expression.
+     *
+     * @return tested expression
+     */
     public Expression getLeft()
     {
         return left;
     }
 
 
+    /**
+     * Sets the tested expression.
+     *
+     * @param left the left side
+     */
     public void setLeft(Expression left)
     {
         this.left = left;
     }
 
 
+    /**
+     * Expressions to compare against.
+     *
+     * @return expressions to compare against
+     */
     public List<Expression> getRight()
     {
         return right;
     }
 
 
+    /**
+     * True for NOT IN.
+     *
+     * @return true for NOT IN, false otherwise
+     */
     public boolean isNegated()
     {
         return negated;
     }
 
 
+    /**
+     * Sets whether the test is negated.
+     *
+     * @param negated whether the test is negated
+     */
     public void setNegated(boolean negated)
     {
         this.negated = negated;

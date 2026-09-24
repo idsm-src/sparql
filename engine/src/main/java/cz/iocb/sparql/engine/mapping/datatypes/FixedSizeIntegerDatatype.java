@@ -7,16 +7,36 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Integer datatypes with a bounded range (xsd:byte up to xsd:unsignedLong); the validity pattern is generated from the
+ * range bounds.
+ */
 public abstract sealed class FixedSizeIntegerDatatype extends GenericIntegerDataType
         permits ByteDatatype, UnsignedByteDatatype, ShortDatatype, UnsignedShortDatatype, IntDatatype,
         UnsignedIntDatatype, LongDatatype, UnsignedLongDatatype
 {
+    /**
+     * Creates the datatype for the inclusive range {@code min} to {@code max}.
+     *
+     * @param typeIri the datatype IRI
+     * @param min lexical form of the lowest value
+     * @param max decimal digits of the largest number
+     */
     protected FixedSizeIntegerDatatype(Iri typeIri, String min, String max)
     {
         super(typeIri, generatePattern(new BigInteger(min), new BigInteger(max)));
     }
 
 
+    /**
+     * Pattern of the lexical forms within the range: an optional sign, leading zeros and the digits of a number within
+     * the bound of the given sign.
+     *
+     * @param min the lower bound
+     * @param max the upper bound
+     * @return pattern of the lexical forms within the range: an optional sign, leading zeros and the digits of a number
+     *         within the bound of the given sign
+     */
     private static Pattern generatePattern(BigInteger min, BigInteger max)
     {
         assert min.signum() <= 0 && max.signum() >= 0;
@@ -34,6 +54,9 @@ public abstract sealed class FixedSizeIntegerDatatype extends GenericIntegerData
 
     /**
      * Generates alternatives matching the canonical forms of all integers from zero up to the given limit.
+     *
+     * @param limit the upper bound
+     * @return the resulting text
      */
     private static String generateRange(BigInteger limit)
     {

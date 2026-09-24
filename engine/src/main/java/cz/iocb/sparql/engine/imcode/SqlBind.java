@@ -23,13 +23,36 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Extends every solution of the child with a variable computed by an expression (BIND); an error leaves the variable
+ * unbound.
+ */
 public final class SqlBind extends SqlIntercode
 {
+    /**
+     * Solutions being extended.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Bound variable.
+     */
     private final Variable variable;
+
+    /**
+     * Expression computing the value.
+     */
     private final SqlExpressionIntercode expression;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param variable the bound variable
+     * @param expression the expression
+     * @param child the child node
+     */
     protected SqlBind(VariableBindings bindings, Variable variable, SqlExpressionIntercode expression,
             SqlIntercode child)
     {
@@ -41,6 +64,15 @@ public final class SqlBind extends SqlIntercode
     }
 
 
+    /**
+     * Binds the variable to the expression over the child's solutions.
+     *
+     * @param request the current request
+     * @param variable the bound variable
+     * @param expression the expression
+     * @param child the child node
+     * @return the resulting intermediate code
+     */
     public static SqlIntercode bind(Request request, Variable variable, SqlExpressionIntercode expression,
             SqlIntercode child)
     {
@@ -48,6 +80,17 @@ public final class SqlBind extends SqlIntercode
     }
 
 
+    /**
+     * Binding restricted to the parent's needs; expression columns get fresh names, constants are kept as they are.
+     *
+     * @param request the current request
+     * @param variable the bound variable
+     * @param expression the expression
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @return binding restricted to the parent's needs; expression columns get fresh names, constants are kept as they
+     *         are
+     */
     protected static SqlIntercode bind(Request request, Variable variable, SqlExpressionIntercode expression,
             SqlIntercode child, Restrictions restrictions)
     {

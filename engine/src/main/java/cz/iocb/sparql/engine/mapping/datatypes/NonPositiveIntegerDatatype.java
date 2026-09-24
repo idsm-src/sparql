@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:nonPositiveInteger datatype.
+ */
 public final class NonPositiveIntegerDatatype extends VariableSizeIntegerDataType
 {
+    /**
+     * Creates the datatype.
+     */
     public NonPositiveIntegerDatatype()
     {
         super(xsdNonPositiveIntegerIri, Variant.NONPOSITIVE);

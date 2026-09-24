@@ -13,16 +13,35 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class PrefixDefinition extends BaseElement
 {
+    /**
+     * Prefix name without the trailing colon.
+     */
     private String name;
+
+    /**
+     * IRI the prefix stands for.
+     */
     private IriNode iri;
 
 
+    /**
+     * Creates the definition from the prefix name and IRI text.
+     *
+     * @param name the name
+     * @param iri the IRI
+     */
     public PrefixDefinition(String name, String iri)
     {
         this(name, new IriNode(iri));
     }
 
 
+    /**
+     * Creates the definition from the prefix name and IRI node.
+     *
+     * @param name the name
+     * @param iri the IRI node
+     */
     public PrefixDefinition(String name, IriNode iri)
     {
         setName(name);
@@ -30,12 +49,22 @@ public class PrefixDefinition extends BaseElement
     }
 
 
+    /**
+     * Prefix name without the trailing colon.
+     *
+     * @return prefix name without the trailing colon
+     */
     public String getName()
     {
         return name;
     }
 
 
+    /**
+     * Sets the prefix name, dropping a trailing colon.
+     *
+     * @param name the name
+     */
     public void setName(String name)
     {
         if(name == null)
@@ -48,12 +77,22 @@ public class PrefixDefinition extends BaseElement
     }
 
 
+    /**
+     * IRI the prefix stands for.
+     *
+     * @return IRI the prefix stands for
+     */
     public IriNode getIri()
     {
         return iri;
     }
 
 
+    /**
+     * Sets the IRI the prefix stands for (required).
+     *
+     * @param iri the IRI node
+     */
     public void setIri(IriNode iri)
     {
         if(iri == null)

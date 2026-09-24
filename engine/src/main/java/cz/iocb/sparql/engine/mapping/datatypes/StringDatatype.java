@@ -7,8 +7,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:string datatype.
+ */
 public final class StringDatatype extends StringLiteralDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     protected StringDatatype()
     {
         super(xsdStringIri);

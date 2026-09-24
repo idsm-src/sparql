@@ -9,6 +9,12 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class AskQuery extends Query
 {
+    /**
+     * Creates the query from its prologue and select part.
+     *
+     * @param prologue the prologue of the query
+     * @param select the query body
+     */
     public AskQuery(Prologue prologue, Select select)
     {
         super(prologue, select);

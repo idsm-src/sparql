@@ -16,14 +16,39 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Fixed finite set of IRIs, each mapped to a constant of the SQL column; conversions are CASE expressions.
+ */
 public class EnumUserIriClass extends SimpleUserIriClass
 {
+    /**
+     * Compiled alternative of all member IRIs.
+     */
     private final Pattern pattern;
+
+    /**
+     * Regular expression matching exactly the member IRIs.
+     */
     private final String regexp;
+
+    /**
+     * Stored value of each member IRI.
+     */
     private final Map<Iri, String> values;
+
+    /**
+     * Longest common prefix of the member IRIs.
+     */
     private final String prefix;
 
 
+    /**
+     * Creates the class mapping each IRI to its stored value of the given SQL type.
+     *
+     * @param name the name
+     * @param sqlType the SQL type
+     * @param values stored value of each member IRI
+     */
     public EnumUserIriClass(String name, String sqlType, Map<Iri, String> values)
     {
         super(name, sqlType);

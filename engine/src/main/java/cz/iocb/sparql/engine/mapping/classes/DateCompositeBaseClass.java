@@ -13,8 +13,15 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid xsd:date value as a {@code date}, an {@code int4} timezone offset and its lexical form; the result class of
+ * non-canonical dates.
+ */
 public final class DateCompositeBaseClass extends BaseLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateCompositeBaseClass()
     {
         super("base-date@1c", xsdDateType, List.of("date", "int4", "varchar"), Set.of(box, genScalarDate));

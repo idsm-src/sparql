@@ -15,11 +15,22 @@ import cz.iocb.sparql.engine.rdf.StrBlankNode;
 
 
 
+/**
+ * String blank nodes of one fixed segment, stored as the varchar value only.
+ */
 public class StrBlankNodeInSegmentClass extends StrBlankNodeClass
 {
+    /**
+     * The fixed segment.
+     */
     private final int segment;
 
 
+    /**
+     * Creates the class of the segment.
+     *
+     * @param segment the segment
+     */
     public StrBlankNodeInSegmentClass(int segment)
     {
         super("sblanknode-" + Integer.toHexString(segment), List.of("varchar"),
@@ -95,6 +106,11 @@ public class StrBlankNodeInSegmentClass extends StrBlankNodeClass
     }
 
 
+    /**
+     * The fixed segment.
+     *
+     * @return the fixed segment
+     */
     public int getSegment()
     {
         return segment;

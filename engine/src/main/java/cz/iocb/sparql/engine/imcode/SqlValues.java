@@ -22,13 +22,37 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Inline table of constant solutions (VALUES, or small SERVICE results). Every variable has fixed columns per resource
+ * class; {@code data} holds the column values row by row and {@code resourceClasses} the class of each variable in each
+ * row (null when unbound).
+ */
 public final class SqlValues extends SqlIntercode
 {
+    /**
+     * Values of each non-constant column, row by row.
+     */
     private final LinkedHashMap<Column, List<Column>> data;
+
+    /**
+     * Class of each variable in each row; null when unbound.
+     */
     private final Map<Variable, List<ResourceClass>> resourceClasses;
+
+    /**
+     * Number of rows.
+     */
     private final int size;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param resourceClasses class of each variable in each row
+     * @param data the column values row by row
+     * @param size the number of rows
+     */
     protected SqlValues(VariableBindings bindings, Map<Variable, List<ResourceClass>> resourceClasses,
             LinkedHashMap<Column, List<Column>> data, int size)
     {
@@ -40,6 +64,15 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * Values node over the given bindings and data.
+     *
+     * @param bindings the variable bindings
+     * @param resourceClasses class of each variable in each row
+     * @param data the column values row by row
+     * @param size the number of rows
+     * @return values node over the given bindings and data
+     */
     public static SqlIntercode create(VariableBindings bindings, Map<Variable, List<ResourceClass>> resourceClasses,
             LinkedHashMap<Column, List<Column>> data, int size)
     {
@@ -64,6 +97,11 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * True if no two rows are equal.
+     *
+     * @return true if no two rows are equal, false otherwise
+     */
     public boolean isDistinct()
     {
         for(int i = 0; i < size; i++)
@@ -88,6 +126,14 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * The rows as a disjunction of equality conditions on the given outer bindings, used to merge the values into a
+     * table access.
+     *
+     * @param outerBindings bindings of the access to merge into
+     * @return the rows as a disjunction of equality conditions on the given outer bindings, used to merge the values
+     *         into a table access
+     */
     public Conditions asConditions(VariableBindings outerBindings)
     {
         Conditions conditions = new Conditions(false);
@@ -165,6 +211,11 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * Number of rows.
+     *
+     * @return number of rows
+     */
     public int getSize()
     {
         return size;
@@ -217,6 +268,12 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * The j-th row as a constant-only table access.
+     *
+     * @param j the row index
+     * @return the j-th row as a constant-only table access
+     */
     public SqlIntercode getSlice(int j)
     {
         VariableBindings subBindings = new VariableBindings();
@@ -246,6 +303,14 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * Elements selected by the mask.
+     *
+     * @param <T> the element type
+     * @param list the list to filter
+     * @param mask selection mask of the rows
+     * @return elements selected by the mask
+     */
     static <T> List<T> filterByMask(List<T> list, boolean[] mask)
     {
         List<T> out = new java.util.ArrayList<>(list.size());
@@ -258,6 +323,12 @@ public final class SqlValues extends SqlIntercode
     }
 
 
+    /**
+     * The rows selected by the mask; no solution when none is selected.
+     *
+     * @param mask selection mask of the rows
+     * @return the rows selected by the mask; no solution when none is selected
+     */
     public SqlIntercode strip(boolean[] mask)
     {
         int newSize = 0;

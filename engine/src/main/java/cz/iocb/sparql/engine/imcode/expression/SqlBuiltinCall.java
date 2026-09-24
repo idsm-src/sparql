@@ -149,13 +149,39 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Call of a SPARQL built-in function or aggregate (functions on terms, strings, numerics, dates and hashes, the
+ * aggregates, and the internal {@code card} for {@code COUNT(*)}). The result classes are derived from the classes of
+ * the arguments when the call is created, and the SQL of each class is emitted only when the parent needs it.
+ * {@code RAND} is the only nondeterministic function.
+ */
 public final class SqlBuiltinCall extends SqlExpressionIntercode
 {
+    /**
+     * Lower-case function name.
+     */
     private final String function;
+
+    /**
+     * DISTINCT modifier of an aggregate.
+     */
     private final boolean distinct;
+
+    /**
+     * Arguments in order.
+     */
     private final List<SqlExpressionIntercode> arguments;
 
 
+    /**
+     * Creates the call; {@code RAND} with a materialised result is nondeterministic.
+     *
+     * @param function lower-case function name
+     * @param distinct whether the mapping declares distinct rows
+     * @param arguments the arguments
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlBuiltinCall(String function, boolean distinct, List<SqlExpressionIntercode> arguments,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -172,6 +198,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Creates a call without DISTINCT.
+     *
+     * @param function lower-case function name
+     * @param arguments the arguments
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlBuiltinCall(String function, List<SqlExpressionIntercode> arguments,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -179,6 +213,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Call of the function (lower-case name) with the given arguments; {@code distinct} applies to aggregates.
+     *
+     * @param request the current request
+     * @param function lower-case function name
+     * @param distinct whether the mapping declares distinct rows
+     * @param arguments the arguments
+     * @return call of the function (lower-case name) with the given arguments; {@code distinct} applies to aggregates
+     */
     public static SqlExpressionIntercode create(Request request, String function, boolean distinct,
             List<SqlExpressionIntercode> arguments)
     {
@@ -186,6 +229,18 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Call of the function materialising only the needed result classes; each function derives its result classes and
+     * SQL from the argument classes.
+     *
+     * @param request the current request
+     * @param function lower-case function name
+     * @param distinct whether the mapping declares distinct rows
+     * @param arguments the arguments
+     * @param restriction the result classes the parent needs
+     * @return call of the function materialising only the needed result classes; each function derives its result
+     *         classes and SQL from the argument classes
+     */
     public static SqlExpressionIntercode create(Request request, String function, boolean distinct,
             List<SqlExpressionIntercode> arguments, Restriction restriction)
     {
@@ -2502,6 +2557,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Result class of a string function preserving the string type of its argument (plain string, fixed-tag or general
+     * language string).
+     *
+     * @param resClass the resource class
+     * @return result class of a string function preserving the string type of its argument (plain string, fixed-tag or
+     *         general language string)
+     */
     private static ResourceClass getStringLiteralResultClass(ResourceClass resClass)
     {
         if(isString(resClass))
@@ -2517,6 +2580,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Result class of a string function over an argument of possibly several string types.
+     *
+     * @param left class of the left operand
+     * @return result class of a string function over an argument of possibly several string types
+     */
     private static ResourceClass getStringLiteralResultClass2(ResourceClass left)
     {
         Set<ResourceClass> resClasses = new HashSet<>();
@@ -2546,18 +2615,33 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Lower-case function name.
+     *
+     * @return lower-case function name
+     */
     public String getFunction()
     {
         return function;
     }
 
 
+    /**
+     * Arguments in order.
+     *
+     * @return arguments in order
+     */
     public List<SqlExpressionIntercode> getArguments()
     {
         return arguments;
     }
 
 
+    /**
+     * The single argument; fails for other arities.
+     *
+     * @return the single argument; fails for other arities
+     */
     public SqlExpressionIntercode getArgument()
     {
         if(arguments.size() != 1)
@@ -2567,12 +2651,23 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if the aggregate has the DISTINCT modifier.
+     *
+     * @return true if the aggregate has the DISTINCT modifier, false otherwise
+     */
     public boolean isDistinct()
     {
         return distinct;
     }
 
 
+    /**
+     * Predicate telling whether a class is entirely of the kind tested by the {@code isIRI}-like function.
+     *
+     * @param function lower-case function name
+     * @return predicate telling whether a class is entirely of the kind tested by the {@code isIRI}-like function
+     */
     private static Function<ResourceClass, Boolean> getIsFunction(String function)
     {
         if(function.equals("isiri") || function.equals("isuri"))
@@ -2587,6 +2682,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Predicate telling whether a class may contain terms of the kind tested by the {@code isIRI}-like function.
+     *
+     * @param function lower-case function name
+     * @return predicate telling whether a class may contain terms of the kind tested by the {@code isIRI}-like function
+     */
     private static Function<ResourceClass, Boolean> getHasFunction(String function)
     {
         if(function.equals("isiri") || function.equals("isuri"))
@@ -2601,6 +2702,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if the function is an aggregate (including the internal {@code card}).
+     *
+     * @return true if the function is an aggregate (including the internal {@code card}), false otherwise
+     */
     public boolean isAggregateFunction()
     {
         switch(function)
@@ -2919,6 +3025,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if some pair of argument classes has compatible string types (argument compatibility of string functions).
+     *
+     * @param left the left operand
+     * @param right the right operand
+     * @return true if some pair of argument classes has compatible string types (argument compatibility of string
+     *         functions), false otherwise
+     */
     private static boolean areStringLiteralCompatible(SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
         for(ResourceClass l : left.getResourceClasses())
@@ -2930,6 +3044,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if some pair of primitive parts of the classes has compatible string types.
+     *
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return true if some pair of primitive parts of the classes has compatible string types, false otherwise
+     */
     private static boolean areStringLiteralsCompatible(ResourceClass left, ResourceClass right)
     {
         for(ResourceClass l : estimateAsUnion(left))
@@ -2941,6 +3062,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if the primitive classes are argument compatible: equal fixed tags, a plain string second argument, or both
+     * language-tagged.
+     *
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return true if the primitive classes are argument compatible, false otherwise
+     */
     private static boolean areStringLiteralsCompatibleBase(ResourceClass left, ResourceClass right)
     {
         if(left.getEffectiveClass() instanceof LangStringWithTagClass l
@@ -2960,6 +3089,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
 
+    /**
+     * True if some pair of argument classes has incompatible string types.
+     *
+     * @param left the left operand
+     * @param right the right operand
+     * @return true if some pair of argument classes has incompatible string types, false otherwise
+     */
     private static boolean areStringLiteralIncompatible(SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
         for(ResourceClass l : left.getResourceClasses())
@@ -2971,6 +3107,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True if some pair of primitive parts of the classes has incompatible string types.
+     *
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return true if some pair of primitive parts of the classes has incompatible string types, false otherwise
+     */
     private static boolean areStringLiteralsIncompatible(ResourceClass left, ResourceClass right)
     {
         for(ResourceClass l : estimateAsUnion(left))
@@ -2982,6 +3125,14 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
     }
 
 
+    /**
+     * True unless the primitive classes are compatible by construction: a language string with a plain string, or equal
+     * fixed tags.
+     *
+     * @param left class of the left operand
+     * @param right class of the right operand
+     * @return true unless the primitive classes are compatible by construction, false otherwise
+     */
     private static boolean areStringLiteralsIncompatibleBase(ResourceClass left, ResourceClass right)
     {
         ResourceClass l = left.getEffectiveClass();

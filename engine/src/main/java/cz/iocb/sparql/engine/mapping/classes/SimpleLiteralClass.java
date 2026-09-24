@@ -11,15 +11,30 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical literals of one datatype stored in a single native SQL column. Converts to the box and, when the datatype
+ * has one, to its base class by adding an empty lexical column.
+ */
 public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass implements ResultResourceClass
         permits BooleanClass, ByteClass, UnsignedByteClass, ShortClass, UnsignedShortClass, IntClass, UnsignedIntClass,
         LongClass, UnsignedLongClass, IntegerClass, NonPositiveIntegerClass, NegativeIntegerClass,
         NonNegativeIntegerClass, PositiveIntegerClass, DecimalClass, FloatClass, DoubleClass, DayTimeDurationClass,
         StringClass
 {
+    /**
+     * Base class keeping the lexical form, or null when there is none.
+     */
     private final LiteralClass base;
 
 
+    /**
+     * Creates the class with a single column of the SQL type and the given base class as a superclass.
+     *
+     * @param name the name
+     * @param datatype the datatype
+     * @param sqlType the SQL type
+     * @param base the base class keeping the lexical form
+     */
     protected SimpleLiteralClass(String name, Datatype datatype, String sqlType, LiteralClass base)
     {
         super(name, datatype, List.of(sqlType), Set.of(box, base));
@@ -28,6 +43,13 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass im
     }
 
 
+    /**
+     * Creates the class with a single column of the SQL type and no base class.
+     *
+     * @param name the name
+     * @param datatype the datatype
+     * @param sqlType the SQL type
+     */
     protected SimpleLiteralClass(String name, Datatype datatype, String sqlType)
     {
         super(name, datatype, List.of(sqlType), Set.of(box));

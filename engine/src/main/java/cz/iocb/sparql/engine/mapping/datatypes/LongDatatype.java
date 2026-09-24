@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:long datatype.
+ */
 public final class LongDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public LongDatatype()
     {
         super(xsdLongIri, Long.toString(Long.MIN_VALUE), Long.toString(Long.MAX_VALUE));

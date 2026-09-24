@@ -5,11 +5,23 @@ import java.util.Objects;
 
 
 
+/**
+ * Language-tagged literal ({@code rdf:langString}); the tag is normalised to lower case.
+ */
 public class LangStringLiteral extends Literal
 {
+    /**
+     * Lower-cased language tag.
+     */
     protected final String tag;
 
 
+    /**
+     * Creates the literal; the tag is lower-cased.
+     *
+     * @param value the lexical form
+     * @param tag the language tag
+     */
     public LangStringLiteral(String value, String tag)
     {
         super(value);
@@ -18,6 +30,11 @@ public class LangStringLiteral extends Literal
     }
 
 
+    /**
+     * Lower-cased language tag.
+     *
+     * @return lower-cased language tag
+     */
     public String getTag()
     {
         return tag;

@@ -54,18 +54,65 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Projection with the solution modifiers DISTINCT, ORDER BY, OFFSET and LIMIT. The top-level instance additionally
+ * records how each projected variable is delivered to the result ({@link #getResultDescription}) and is optimised
+ * through {@link #optimize(Request, boolean)}.
+ */
 public final class SqlSelect extends SqlIntercode
 {
+    /**
+     * Projected solutions.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Projected variables in order; null for a sub-select.
+     */
     private final List<Variable> projections;
+
+    /**
+     * ORDER BY variables with their directions.
+     */
     private final LinkedHashMap<Variable, Direction> orderBy;
+
+    /**
+     * Variables ordered by raw columns after the ORDER BY conditions.
+     */
     private final List<Variable> simpleOrderBy;
+
+    /**
+     * OFFSET, or null.
+     */
     private final BigInteger offset;
+
+    /**
+     * LIMIT, or null.
+     */
     private final BigInteger limit;
+
+    /**
+     * DISTINCT modifier.
+     */
     private final boolean distinct;
+
+    /**
+     * Result classes of each projected variable; null for a sub-select.
+     */
     private final Map<Variable, List<ResultResourceClass>> description;
 
 
+    /**
+     * Creates a top-level select.
+     *
+     * @param projections the projected variables
+     * @param child the child node
+     * @param orderBy ORDER BY variables with their directions
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @param simpleOrderBy variables ordered by raw columns after ORDER BY
+     * @param distinct whether the mapping declares distinct rows
+     */
     protected SqlSelect(List<Variable> projections, SqlIntercode child, LinkedHashMap<Variable, Direction> orderBy,
             BigInteger offset, BigInteger limit, List<Variable> simpleOrderBy, boolean distinct)
     {
@@ -93,6 +140,16 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Creates a sub-select.
+     *
+     * @param bindings the variable bindings
+     * @param child the child node
+     * @param distinct whether the mapping declares distinct rows
+     * @param orderBy ORDER BY variables with their directions
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     */
     protected SqlSelect(VariableBindings bindings, SqlIntercode child, boolean distinct,
             LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
@@ -109,6 +166,18 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Sub-select projecting the given variables.
+     *
+     * @param request the current request
+     * @param variables the projected variables
+     * @param child the child node
+     * @param distinct whether the mapping declares distinct rows
+     * @param orderBy ORDER BY variables with their directions
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @return sub-select projecting the given variables
+     */
     public static SqlIntercode create(Request request, Set<Variable> variables, SqlIntercode child, boolean distinct,
             LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
@@ -117,6 +186,17 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Sub-select projecting the given variables without ordering.
+     *
+     * @param request the current request
+     * @param variables the projected variables
+     * @param child the child node
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @param distinct whether the mapping declares distinct rows
+     * @return sub-select projecting the given variables without ordering
+     */
     public static SqlIntercode create(Request request, Set<Variable> variables, SqlIntercode child, BigInteger offset,
             BigInteger limit, boolean distinct)
     {
@@ -124,6 +204,20 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Top-level select. {@code simpleOrderBy} lists variables ordered by their raw columns after the ORDER BY
+     * conditions, which makes paging by OFFSET and LIMIT stable.
+     *
+     * @param request the current request
+     * @param projections the projected variables
+     * @param child the child node
+     * @param distinct whether the mapping declares distinct rows
+     * @param orderBy ORDER BY variables with their directions
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @param simpleOrderBy variables ordered by raw columns after ORDER BY
+     * @return top-level select
+     */
     public static SqlSelect createTopLevel(Request request, List<Variable> projections, SqlIntercode child,
             boolean distinct, LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit,
             List<Variable> simpleOrderBy)
@@ -132,6 +226,18 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Top-level select without simple ordering.
+     *
+     * @param request the current request
+     * @param projections the projected variables
+     * @param child the child node
+     * @param distinct whether the mapping declares distinct rows
+     * @param orderBy ORDER BY variables with their directions
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @return top-level select without simple ordering
+     */
     public static SqlSelect createTopLevel(Request request, List<Variable> projections, SqlIntercode child,
             boolean distinct, LinkedHashMap<Variable, Direction> orderBy, BigInteger offset, BigInteger limit)
     {
@@ -139,6 +245,16 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Top-level select without ordering and DISTINCT.
+     *
+     * @param request the current request
+     * @param projections the projected variables
+     * @param child the child node
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @return top-level select without ordering and DISTINCT
+     */
     public static SqlSelect createTopLevel(Request request, List<Variable> projections, SqlIntercode child,
             BigInteger offset, BigInteger limit)
     {
@@ -146,12 +262,30 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Top-level select without modifiers.
+     *
+     * @param request the current request
+     * @param projections the projected variables
+     * @param child the child node
+     * @return top-level select without modifiers
+     */
     public static SqlSelect createTopLevel(Request request, List<Variable> projections, SqlIntercode child)
     {
         return createTopLevel(request, projections, child, false, new LinkedHashMap<>(), null, null, List.of());
     }
 
 
+    /**
+     * Applies the offset, limit and ordering requested by the caller on top of the query's own: offsets add up, the
+     * limits combine, and when paging is in effect all projected variables are appended to the ordering so that the
+     * pages are stable.
+     *
+     * @param offset the offset, or null
+     * @param limit the upper bound
+     * @param order variables to order the results by, on top of the query's own ORDER BY
+     * @return the resulting select
+     */
     public SqlSelect addExternalLimits(BigInteger offset, BigInteger limit, List<Variable> order)
     {
         if(!isTopLevel() || !simpleOrderBy.isEmpty())
@@ -198,6 +332,14 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * Optimises the top-level select: the child is optimised for the projected and ordering variables, orderings on
+     * unbound variables are dropped, and DISTINCT is pushed into a {@link SqlDistinct} when the ordering allows it.
+     *
+     * @param request the current request
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the resulting select
+     */
     public SqlSelect optimize(Request request, boolean evalServices)
     {
         if(!isTopLevel())
@@ -327,6 +469,7 @@ public final class SqlSelect extends SqlIntercode
             builder.append(" FROM (");
             builder.append(child.translate(request));
             builder.append(") AS tab");
+
         }
         else if(child instanceof SqlUnion union && orderBy.isEmpty() && simpleOrderBy.isEmpty())
         {
@@ -387,6 +530,15 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes it
+     * cannot take), named by the class.
+     *
+     * @param description result classes of each projected variable
+     * @param bindings the variable bindings
+     * @return SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes
+     *         it cannot take), named by the class
+     */
     private static String translateSelectVariables(Map<Variable, List<ResultResourceClass>> description,
             VariableBindings bindings)
     {
@@ -427,6 +579,12 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * SELECT list of a sub-select: the non-constant columns of the bindings, or {@code 1}.
+     *
+     * @param bindings the variable bindings
+     * @return SELECT list of a sub-select: the non-constant columns of the bindings, or {@code 1}
+     */
     private String translateInnerSelectVariables(VariableBindings bindings)
     {
         StringBuilder builder = new StringBuilder();
@@ -442,6 +600,13 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * ORDER BY clause over the sortable representation of the variables, optionally followed by the simple ordering.
+     *
+     * @param withSimple whether to append the simple ordering
+     * @return ORDER BY clause over the sortable representation of the variables, optionally followed by the simple
+     *         ordering
+     */
     private String translateOrderBy(boolean withSimple)
     {
         StringBuilder builder = new StringBuilder();
@@ -676,12 +841,23 @@ public final class SqlSelect extends SqlIntercode
     }
 
 
+    /**
+     * True for the top-level select.
+     *
+     * @return true for the top-level select, false otherwise
+     */
     private boolean isTopLevel()
     {
         return projections != null;
     }
 
 
+    /**
+     * For each projected variable, the result classes in which it is delivered, in column order (top-level only).
+     *
+     * @return for each projected variable, the result classes in which it is delivered, in column order (top-level
+     *         only)
+     */
     public Map<Variable, List<ResultResourceClass>> getResultDescription()
     {
         return description;

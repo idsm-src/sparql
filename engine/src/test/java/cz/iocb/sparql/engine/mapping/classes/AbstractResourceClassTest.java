@@ -30,18 +30,44 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 
 
 
+/**
+ * Base of the tests of one literal class. A subclass supplies the class and a table of lexical forms with the expected
+ * constant columns (an empty list for invalid forms); the tests then check {@code match}, {@code toColumns} and, in the
+ * database, that converting to every superclass and back yields the original columns.
+ */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractResourceClassTest
 {
+    /**
+     * Expected columns of an invalid lexical form.
+     */
     protected static final List<String> invalid = List.of();
 
+    /**
+     * DbUnit connection to the test database.
+     */
     static private IDatabaseConnection conn;
+
+    /**
+     * The tested class.
+     */
     private LiteralClass literalClass;
+
+    /**
+     * Datatype IRI of the tested class.
+     */
     private Iri iri;
 
+    /**
+     * Lexical forms with their expected constant columns (empty for invalid forms).
+     */
     private Map<String, List<Column>> values;
 
 
+    /**
+     * Creates the test; {@code types} are the SQL types of the expected columns, {@code values} maps lexical forms to
+     * the expected column values.
+     */
     public AbstractResourceClassTest(LiteralClass literalClass, List<String> types, Map<String, List<String>> values)
     {
         this.literalClass = literalClass;
@@ -53,6 +79,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * Opens the DbUnit connection.
+     */
     @BeforeAll
     static void init() throws DatabaseUnitException, SQLException
     {
@@ -61,6 +90,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * Every lexical form with whether it is valid.
+     */
     protected Stream<Arguments> toMatchArguments()
     {
         return values.entrySet().stream()
@@ -68,6 +100,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * The class matches exactly the valid lexical forms.
+     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("toMatchArguments")
     void matchTest(Literal literal, boolean expected)
@@ -76,6 +111,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * The valid lexical forms with their expected columns.
+     */
     protected Stream<Arguments> toColumnsArguments()
     {
         return values.entrySet().stream().filter(e -> !e.getValue().isEmpty())
@@ -83,6 +121,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * The class produces the expected constant columns.
+     */
     @ParameterizedTest(name = "{0}")
     @MethodSource("toColumnsArguments")
     void toColumnsTest(Literal literal, List<Column> expected)
@@ -91,6 +132,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * Every superclass with every valid lexical form and all combinations of the conversion flags.
+     */
     protected Stream<Arguments> toGeneralArguments()
     {
         List<Arguments> data = new ArrayList<>();
@@ -106,6 +150,9 @@ public abstract class AbstractResourceClassTest
     }
 
 
+    /**
+     * Converting the columns to the superclass and back gives the original values when evaluated by the database.
+     */
     @ParameterizedTest(name = "{0}({1},{2},{3})")
     @MethodSource("toGeneralArguments")
     void classCastTest(ResourceClass superClass, String value, boolean canBeNull, boolean checkOptional)

@@ -9,14 +9,42 @@ import cz.iocb.sparql.engine.database.Table;
 
 
 
+/**
+ * Quad mapping over a chain of tables, adjacent ones joined on {@link JoinColumns}. Each term position names by index
+ * the table it is taken from (the convenience constructors take graph, subject and predicate from the first table and
+ * the object from the last one), and every table has its own conditions and distinct flag (see
+ * {@link SingleTableQuadMapping}).
+ */
 public class JoinTableQuadMapping extends QuadMapping
 {
+    /**
+     * Columns joining two adjacent tables of the chain (left table columns to right table columns), with the SQL type
+     * of each pair.
+     */
     public static class JoinColumns
     {
+        /**
+         * Columns of the left table.
+         */
         private final List<Column> leftColumns;
+
+        /**
+         * Columns of the right table, matched by position.
+         */
         private final List<Column> rightColumns;
+
+        /**
+         * SQL type of each column pair.
+         */
         private final List<String> types;
 
+        /**
+         * Creates the join on several column pairs.
+         *
+         * @param leftColumns columns of the left table
+         * @param rightColumns columns of the right table
+         * @param types SQL types of the column pairs
+         */
         public JoinColumns(List<Column> leftColumns, List<Column> rightColumns, List<String> types)
         {
             this.leftColumns = leftColumns;
@@ -26,6 +54,14 @@ public class JoinTableQuadMapping extends QuadMapping
             assert leftColumns.size() == rightColumns.size();
         }
 
+
+        /**
+         * Creates the join on a single column pair.
+         *
+         * @param leftColumn column of the left table
+         * @param rightColumn column of the right table
+         * @param type the SQL type
+         */
         public JoinColumns(Column leftColumn, Column rightColumn, String type)
         {
             this.leftColumns = List.of(leftColumn);
@@ -33,16 +69,34 @@ public class JoinTableQuadMapping extends QuadMapping
             this.types = List.of(type);
         }
 
+
+        /**
+         * Columns of the left table.
+         *
+         * @return columns of the left table
+         */
         public List<Column> getLeftColumns()
         {
             return leftColumns;
         }
 
+
+        /**
+         * Columns of the right table, matched by position.
+         *
+         * @return columns of the right table, matched by position
+         */
         public List<Column> getRightColumns()
         {
             return rightColumns;
         }
 
+
+        /**
+         * SQL type of each column pair.
+         *
+         * @return SQL type of each column pair
+         */
         public List<String> getTypes()
         {
             return types;
@@ -76,16 +130,62 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Tables of the chain in join order.
+     */
     private final List<Table> tables;
+
+    /**
+     * Join columns between adjacent tables; one fewer than tables.
+     */
     private final List<JoinColumns> joinColumnsPairs;
+
+    /**
+     * Conditions on each table.
+     */
     private final List<Conditions> conditions;
+
+    /**
+     * Distinct flag of each table.
+     */
     private final List<Boolean> distinct;
+
+    /**
+     * Index of the table the graph is taken from.
+     */
     private final int graphTableIdx;
+
+    /**
+     * Index of the table the subject is taken from.
+     */
     private final int subjectTableIdx;
+
+    /**
+     * Index of the table the predicate is taken from.
+     */
     private final int predicateTableIdx;
+
+    /**
+     * Index of the table the object is taken from.
+     */
     private final int objectTableIdx;
 
 
+    /**
+     * Creates the mapping with explicit table indexes for every position and no distinct flags.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graphTableIdx index of the table providing the graph
+     * @param graph the graph mapping, or null for the default graph
+     * @param subjectTableIdx index of the table providing the subject
+     * @param subject the subject mapping
+     * @param predicateTableIdx index of the table providing the predicate
+     * @param predicate the predicate mapping
+     * @param objectTableIdx index of the table providing the object
+     * @param object the object mapping
+     * @param conditions conditions on each table
+     */
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
             TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
             int objectTableIdx, TermMapping object, List<Conditions> conditions)
@@ -95,6 +195,22 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates the mapping with explicit table indexes for every position.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graphTableIdx index of the table providing the graph
+     * @param graph the graph mapping, or null for the default graph
+     * @param subjectTableIdx index of the table providing the subject
+     * @param subject the subject mapping
+     * @param predicateTableIdx index of the table providing the predicate
+     * @param predicate the predicate mapping
+     * @param objectTableIdx index of the table providing the object
+     * @param object the object mapping
+     * @param conditions conditions on each table
+     * @param distinct distinct flag of each table
+     */
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, int graphTableIdx,
             TermMapping graph, int subjectTableIdx, TermMapping subject, int predicateTableIdx, TermMapping predicate,
             int objectTableIdx, TermMapping object, List<Conditions> conditions, List<Boolean> distinct)
@@ -116,6 +232,17 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates the mapping taking graph, subject and predicate from the first table and the object from the last one.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions conditions on each table
+     */
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
@@ -123,6 +250,19 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates the mapping taking graph, subject and predicate from the first table and the object from the last one,
+     * with distinct flags.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions conditions on each table
+     * @param distinct distinct flag of each table
+     */
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, TermMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
@@ -132,6 +272,17 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates the mapping taking graph, subject and predicate from the first table and the object from the last one,
+     * without conditions.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public JoinTableQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
@@ -170,42 +321,77 @@ public class JoinTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Tables of the chain in join order.
+     *
+     * @return tables of the chain in join order
+     */
     public final List<Table> getTables()
     {
         return tables;
     }
 
 
+    /**
+     * Join columns between adjacent tables.
+     *
+     * @return join columns between adjacent tables
+     */
     public final List<JoinColumns> getJoinColumnsPairs()
     {
         return joinColumnsPairs;
     }
 
 
+    /**
+     * Conditions on each table.
+     *
+     * @return conditions on each table
+     */
     public final List<Conditions> getConditions()
     {
         return conditions;
     }
 
 
+    /**
+     * Distinct flag of each table.
+     *
+     * @return distinct flag of each table
+     */
     public final List<Boolean> getDistinct()
     {
         return distinct;
     }
 
 
+    /**
+     * Index of the table the subject is taken from.
+     *
+     * @return index of the table the subject is taken from
+     */
     public final int getSubjectTableIdx()
     {
         return subjectTableIdx;
     }
 
 
+    /**
+     * Index of the table the predicate is taken from.
+     *
+     * @return index of the table the predicate is taken from
+     */
     public final int getPredicateTableIdx()
     {
         return predicateTableIdx;
     }
 
 
+    /**
+     * Index of the table the object is taken from.
+     *
+     * @return index of the table the object is taken from
+     */
     public final int getObjectTableIdx()
     {
         return objectTableIdx;

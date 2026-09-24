@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:negativeInteger datatype.
+ */
 public final class NegativeIntegerDatatype extends VariableSizeIntegerDataType
 {
+    /**
+     * Creates the datatype.
+     */
     public NegativeIntegerDatatype()
     {
         super(xsdNegativeIntegerIri, Variant.NEGATIVE);

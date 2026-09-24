@@ -26,26 +26,75 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Arithmetic on two numeric operands with numeric type promotion; non-numeric operands are an error.
+ */
 public final class SqlBinaryArithmetic extends SqlBinary
 {
+    /**
+     * Arithmetic operator with its SPARQL spelling and the suffix of its {@code sparql.*} SQL function.
+     */
     public static enum ArithmeticOperator
     {
-        MULTIPLY("*", "mul"), DIVIDE("/", "div"), ADD("+", "add"), SUBTRACT("-", "sub");
+        /**
+         * Multiplication.
+         */
+        MULTIPLY("*", "mul"),
 
+        /**
+         * Division.
+         */
+        DIVIDE("/", "div"),
+
+        /**
+         * Addition.
+         */
+        ADD("+", "add"),
+
+        /**
+         * Subtraction.
+         */
+        SUBTRACT("-", "sub");
+
+        /**
+         * SPARQL spelling.
+         */
         private final String text;
+
+        /**
+         * Suffix of the SQL function.
+         */
         private final String name;
 
+        /**
+         * Creates the operator.
+         *
+         * @param text the text
+         * @param name the name
+         */
         ArithmeticOperator(String text, String name)
         {
             this.text = text;
             this.name = name;
         }
 
+
+        /**
+         * SPARQL spelling of the operator.
+         *
+         * @return SPARQL spelling of the operator
+         */
         public String getText()
         {
             return text;
         }
 
+
+        /**
+         * Suffix of the {@code sparql.*} SQL function implementing the operator.
+         *
+         * @return suffix of the {@code sparql.*} SQL function implementing the operator
+         */
         public String getName()
         {
             return name;
@@ -53,9 +102,21 @@ public final class SqlBinaryArithmetic extends SqlBinary
     }
 
 
+    /**
+     * The operator.
+     */
     private final ArithmeticOperator operator;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     private SqlBinaryArithmetic(ArithmeticOperator operator, SqlExpressionIntercode left, SqlExpressionIntercode right,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -65,6 +126,14 @@ public final class SqlBinaryArithmetic extends SqlBinary
     }
 
 
+    /**
+     * Arithmetic expression over the operands.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @return arithmetic expression over the operands
+     */
     public static SqlExpressionIntercode create(ArithmeticOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right)
     {
@@ -72,6 +141,16 @@ public final class SqlBinaryArithmetic extends SqlBinary
     }
 
 
+    /**
+     * Arithmetic expression materialising only the needed result classes; NULL when no operand classes are numeric.
+     *
+     * @param operator the operator
+     * @param left the left operand
+     * @param right the right operand
+     * @param restriction the result classes the parent needs
+     * @return arithmetic expression materialising only the needed result classes; NULL when no operand classes are
+     *         numeric
+     */
     private static SqlExpressionIntercode create(ArithmeticOperator operator, SqlExpressionIntercode left,
             SqlExpressionIntercode right, Restriction restriction)
     {
@@ -127,6 +206,18 @@ public final class SqlBinaryArithmetic extends SqlBinary
     }
 
 
+    /**
+     * SQL computing the result in the class from the operands promoted to it, one variant per combination of argument
+     * classes.
+     *
+     * @param operator the operator
+     * @param resultClass the result class
+     * @param variants combinations of argument classes
+     * @param left the left operand
+     * @param right the right operand
+     * @return SQL computing the result in the class from the operands promoted to it, one variant per combination of
+     *         argument classes
+     */
     private static List<Column> translate(ArithmeticOperator operator, ResourceClass resultClass,
             Set<List<Set<ResourceClass>>> variants, SqlExpressionIntercode left, SqlExpressionIntercode right)
     {

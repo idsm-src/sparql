@@ -12,15 +12,28 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class Minus extends PatternElement implements Pattern
 {
+    /**
+     * Pattern whose solutions are removed.
+     */
     private final GraphPattern pattern;
 
 
+    /**
+     * Creates the pattern; MINUS brings no variable into scope.
+     *
+     * @param pattern the WHERE clause
+     */
     public Minus(GraphPattern pattern)
     {
         this.pattern = pattern;
     }
 
 
+    /**
+     * Pattern whose solutions are removed.
+     *
+     * @return pattern whose solutions are removed
+     */
     public GraphPattern getPattern()
     {
         return pattern;

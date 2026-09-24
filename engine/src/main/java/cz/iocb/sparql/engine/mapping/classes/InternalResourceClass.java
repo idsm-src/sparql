@@ -9,11 +9,23 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
+/**
+ * Class of engine-internal values that never become RDF terms (e.g. the join keys between the tables of a join
+ * mapping). Every instance is a distinct class disjoint with everything else.
+ */
 public final class InternalResourceClass extends PrimitiveResourceClass
 {
+    /**
+     * Counter making every instance name unique.
+     */
     static private AtomicInteger counter = new AtomicInteger();
 
 
+    /**
+     * Creates a fresh class over the given SQL types.
+     *
+     * @param sqlTypes the SQL types
+     */
     public InternalResourceClass(List<String> sqlTypes)
     {
         super("internal-" + Integer.toHexString(counter.getAndIncrement()), sqlTypes, Set.of());

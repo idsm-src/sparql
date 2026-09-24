@@ -10,8 +10,14 @@ import info.adams.ryu.RyuDouble;
 
 
 
+/**
+ * The xsd:double datatype.
+ */
 public final class DoubleDatatype extends FloatPointDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     protected DoubleDatatype()
     {
         super(xsdDoubleIri);

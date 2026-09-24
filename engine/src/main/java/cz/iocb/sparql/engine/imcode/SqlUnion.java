@@ -22,12 +22,30 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Union (keeping duplicates) of children over the union of their variables; a variable missing in a branch is unbound
+ * there, and the columns of the branches are aligned by resource class.
+ */
 public final class SqlUnion extends SqlIntercode
 {
+    /**
+     * The branches.
+     */
     private final List<SqlIntercode> childs;
+
+    /**
+     * Per branch, the branch column each union column is taken from.
+     */
     private final List<Map<Column, Column>> columnMappings;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param childs the child nodes
+     * @param columnMappings per branch, the branch column each output column is taken from
+     */
     protected SqlUnion(VariableBindings bindings, List<SqlIntercode> childs, List<Map<Column, Column>> columnMappings)
     {
         super(bindings, childs.stream().allMatch(c -> c.isDeterministic()));
@@ -37,6 +55,14 @@ public final class SqlUnion extends SqlIntercode
     }
 
 
+    /**
+     * Union of the branches; branches without solutions are dropped and a single remaining branch is returned as is.
+     *
+     * @param request the current request
+     * @param branches the branches
+     * @return union of the branches; branches without solutions are dropped and a single remaining branch is returned
+     *         as is
+     */
     public static SqlIntercode union(Request request, List<SqlIntercode> branches)
     {
         /* special cases */
@@ -168,6 +194,11 @@ public final class SqlUnion extends SqlIntercode
     }
 
 
+    /**
+     * The branches.
+     *
+     * @return the branches
+     */
     public final List<SqlIntercode> getChilds()
     {
         return childs;

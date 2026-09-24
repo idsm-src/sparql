@@ -16,9 +16,17 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class GroupGraph extends PatternElement implements GraphPattern
 {
+    /**
+     * Patterns of the group, in order.
+     */
     private final List<Pattern> patterns;
 
 
+    /**
+     * Creates the group; the variables of all patterns become in scope.
+     *
+     * @param patterns patterns of the group
+     */
     public GroupGraph(Collection<Pattern> patterns)
     {
         this.patterns = Collections.unmodifiableList(new ArrayList<>(patterns));
@@ -28,6 +36,11 @@ public class GroupGraph extends PatternElement implements GraphPattern
     }
 
 
+    /**
+     * Patterns of the group, in order.
+     *
+     * @return patterns of the group, in order
+     */
     public List<Pattern> getPatterns()
     {
         return patterns;

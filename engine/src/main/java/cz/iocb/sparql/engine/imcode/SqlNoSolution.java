@@ -7,17 +7,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * No solution at all (the identity of union and the zero of join).
+ */
 public final class SqlNoSolution extends SqlIntercode
 {
+    /**
+     * The only instance.
+     */
     static private final SqlNoSolution singleton = new SqlNoSolution();
 
 
+    /**
+     * Creates the singleton.
+     */
     private SqlNoSolution()
     {
         super(new VariableBindings(), true);
     }
 
 
+    /**
+     * The only instance.
+     *
+     * @return the only instance
+     */
     public static SqlNoSolution get()
     {
         return singleton;

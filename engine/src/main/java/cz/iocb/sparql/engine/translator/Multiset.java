@@ -13,13 +13,36 @@ import java.util.function.Consumer;
 
 
 
+/**
+ * Collection counting how many times each element occurs; two multisets are equal when they hold the same elements with
+ * the same counts. Used to compare the children of commutative intermediate code nodes.
+ *
+ * @param <E> the element type
+ */
 public final class Multiset<E> implements Collection<E>, Serializable
 {
+    /**
+     * Mutable occurrence counter.
+     */
     private static final class MutableInt implements Serializable
     {
+        /**
+         * Serialization version.
+         */
         private static final long serialVersionUID = 1L;
 
+        /**
+         * Number of occurrences.
+         */
         int value;
+
+
+        /**
+         * Creates a zero counter.
+         */
+        MutableInt()
+        {
+        }
 
 
         @Override
@@ -43,23 +66,48 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * Serialization version.
+     */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Occurrence counters by element.
+     */
     private final Map<E, MutableInt> map = new HashMap<>();
+
+    /**
+     * Total number of occurrences.
+     */
     private int size = 0;
 
 
+    /**
+     * Creates an empty multiset.
+     */
     public Multiset()
     {
     }
 
 
+    /**
+     * Creates a multiset of the given elements.
+     *
+     * @param elements the elements
+     */
     public Multiset(Collection<E> elements)
     {
         addAll(elements);
     }
 
 
+    /**
+     * Creates a multiset of the given elements.
+     *
+     * @param <E> the element type
+     * @param it the elements to add
+     * @return the new multiset
+     */
     public static <E> Multiset<E> copyOf(Iterable<? extends E> it)
     {
         Multiset<E> ms = new Multiset<>();
@@ -76,6 +124,11 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * Number of distinct elements.
+     *
+     * @return number of distinct elements
+     */
     public int distinctSize()
     {
         return map.size();
@@ -94,6 +147,12 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * Adds all the elements; always true when some element was given.
+     *
+     * @param it the elements to add
+     * @return true if some element was added, false otherwise
+     */
     public boolean addAll(Iterable<? extends E> it)
     {
         boolean changed = false;
@@ -105,6 +164,12 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * Number of occurrences of the element.
+     *
+     * @param element the element
+     * @return number of occurrences of the element
+     */
     public int count(Object element)
     {
         MutableInt box = map.get(element);
@@ -113,6 +178,9 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * Removes one occurrence of the element.
+     */
     @Override
     public boolean remove(Object element)
     {
@@ -266,6 +334,12 @@ public final class Multiset<E> implements Collection<E>, Serializable
     }
 
 
+    /**
+     * True if the counters equal the given ones.
+     *
+     * @param other the counters to compare with
+     * @return true if the counters equal the given ones, false otherwise
+     */
     private boolean mapEquals(Map<?, MutableInt> other)
     {
         if(this.map.size() != other.size())

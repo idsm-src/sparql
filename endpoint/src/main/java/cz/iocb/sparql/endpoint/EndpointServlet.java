@@ -51,34 +51,113 @@ import cz.iocb.sparql.engine.request.Result.ResultType;
 
 
 
+/**
+ * SPARQL 1.1 protocol endpoint. Queries arrive by GET or by POST (URL-encoded form or {@code application/sparql-query})
+ * and the result is serialised in the format chosen from the {@code format} parameter or the Accept header. A GET
+ * without a query serves the bundled YASGUI page to browsers and the service description otherwise; {@code ?info}
+ * returns a JSON summary of prefixes, properties and classes. Init parameters: {@code resource} (JNDI name of the
+ * configuration), {@code fetch-size}, {@code timeout} and {@code max-timeout} (seconds), {@code sql-query-size-limit}.
+ */
 public class EndpointServlet extends HttpServlet
 {
+    /**
+     * Serialization version.
+     */
     private static final long serialVersionUID = 1L;
 
 
+    /**
+     * Supported result serialisations with their MIME type and the result forms they apply to.
+     */
     static enum OutputType
     {
+        /**
+         * No acceptable serialisation.
+         */
         NONE(""),
+
+        /**
+         * SPARQL Query Results XML Format.
+         */
         SPARQL_XML("application/sparql-results+xml", ResultType.SELECT, ResultType.ASK),
+
+        /**
+         * SPARQL Query Results JSON Format.
+         */
         SPARQL_JSON("application/sparql-results+json", ResultType.SELECT, ResultType.ASK),
+
+        /**
+         * RDF/XML.
+         */
         RDF_XML("application/rdf+xml", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * RDF/JSON.
+         */
         RDF_JSON("application/rdf+json", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * N-Triples.
+         */
         NTRIPLES("application/n-triples", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * N-Quads (all triples in the default graph).
+         */
         NQUADS("application/n-quads", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * TriG (all triples in the default graph).
+         */
         TRIG("application/trig", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * Turtle.
+         */
         TURTLE("text/turtle", ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * Tab-separated values.
+         */
         TSV("text/tab-separated-values", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT),
+
+        /**
+         * Comma-separated values.
+         */
         CSV("text/csv", ResultType.SELECT, ResultType.ASK, ResultType.DESCRIBE, ResultType.CONSTRUCT);
 
+        /**
+         * MIME type.
+         */
         private final String mime;
+
+        /**
+         * Result forms the serialisation applies to.
+         */
         private final ResultType[] variants;
 
+        /**
+         * Creates the output type.
+         *
+         * @param mime the MIME type
+         * @param variants result forms the serialisation applies to
+         */
         private OutputType(String mime, ResultType... variants)
         {
             this.mime = mime;
             this.variants = variants;
         }
 
+
+        /**
+         * Output type of the MIME type applicable to the result form (any form when null); {@link #NONE} if there is
+         * none.
+         *
+         * @param mime the MIME type
+         * @param variant the sign variant
+         * @return output type of the MIME type applicable to the result form (any form when null); {@link #NONE} if
+         *         there is none
+         */
         public static OutputType getOutputType(String mime, ResultType variant)
         {
             for(OutputType value : OutputType.values())
@@ -92,6 +171,12 @@ public class EndpointServlet extends HttpServlet
             return NONE;
         }
 
+
+        /**
+         * MIME type of the serialisation.
+         *
+         * @return MIME type of the serialisation
+         */
         public String getMime()
         {
             return mime;
@@ -99,20 +184,69 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Triples grouped by subject and predicate, in insertion order, for graph serialisations.
+     */
     static class Graph extends LinkedHashMap<RdfTerm, LinkedHashMap<RdfTerm, LinkedHashSet<RdfTerm>>>
     {
+        /**
+         * Serialization version.
+         */
         private static final long serialVersionUID = 1L;
+
+
+        /**
+         * Creates an empty graph.
+         */
+        Graph()
+        {
+        }
+
     }
 
 
+    /**
+     * Logger of request processing.
+     */
     private static final Logger logger = LoggerFactory.getLogger(EndpointServlet.class);
 
+    /**
+     * Engine creating the requests.
+     */
     private Engine engine;
+
+    /**
+     * Configuration of the endpoint.
+     */
     private SparqlDatabaseConfiguration sparqlConfig;
+
+    /**
+     * JDBC fetch size ({@code fetch-size} init parameter).
+     */
     private int fetchSize = 1000;
+
+    /**
+     * Default timeout in nanoseconds ({@code timeout} init parameter, seconds).
+     */
     private long timeout = 1000 * 1000000000l;
+
+    /**
+     * Maximum timeout a client may ask for, in nanoseconds ({@code max-timeout} init parameter, seconds).
+     */
     private long maxTimeout = 6000 * 1000000000l;
+
+    /**
+     * Maximum length of the generated SQL; 0 for none ({@code sql-query-size-limit} init parameter).
+     */
     private int sqlSizeLimit = 0;
+
+
+    /**
+     * Creates the servlet; the configuration is read in {@link #init}.
+     */
+    public EndpointServlet()
+    {
+    }
 
 
     @Override
@@ -222,6 +356,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Sets the encoding and CORS headers, and the attachment file name requested by the {@code filename} parameter.
+     *
+     * @param req the HTTP request
+     * @param res the HTTP response
+     */
     private static void setBasicHttpHeaders(HttpServletRequest req, HttpServletResponse res)
     {
         res.setCharacterEncoding("UTF-8");
@@ -237,6 +377,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the configured maximum; the
+     * default when absent or invalid.
+     *
+     * @param req the HTTP request
+     * @return timeout in nanoseconds from the {@code timeout} parameter (seconds), clamped to the configured maximum;
+     *         the default when absent or invalid
+     */
     private long getTimeout(HttpServletRequest req)
     {
         String timeoutParameter = req.getParameter("timeout");
@@ -255,6 +403,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Reconstructs the request URL with its query parameters, for logging.
+     *
+     * @param req the HTTP request
+     * @return the request URL with its query parameters
+     */
     private String getRequestString(HttpServletRequest req)
     {
         StringBuilder builder = new StringBuilder();
@@ -300,6 +454,19 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Prepares and runs the query with the protocol dataset parameters and writes the result in the negotiated format;
+     * errors are reported by HTTP status codes.
+     *
+     * @param req the HTTP request
+     * @param res the HTTP response
+     * @param query the query text
+     * @param defaultGraphs IRIs of the default graphs given by the protocol, or null
+     * @param namedGraphs IRIs of the named graphs given by the protocol, or null
+     * @param timeout time limit in nanoseconds, 0 for none
+     * @param sqlSizeLimit maximum length of the generated SQL, 0 for none
+     * @throws IOException on output errors
+     */
     private void process(HttpServletRequest req, HttpServletResponse res, String query, String[] defaultGraphs,
             String[] namedGraphs, long timeout, int sqlSizeLimit) throws IOException
     {
@@ -548,6 +715,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Serves the bundled YASGUI page with the embedded endpoint script.
+     *
+     * @param res the HTTP response
+     * @throws IOException on output errors
+     */
     private void processHtmlRequest(HttpServletResponse res) throws IOException
     {
         res.setContentType("text/html");
@@ -600,6 +773,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Serves the JSON summary of prefixes, predicates and classes known from constant mappings.
+     *
+     * @param res the HTTP response
+     * @throws IOException on output errors
+     */
     private void processInfoRequest(HttpServletResponse res) throws IOException
     {
         res.setContentType("application/json");
@@ -642,6 +821,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * True for a request with the {@code info} parameter and no query.
+     *
+     * @param req the HTTP request
+     * @return true for a request with the {@code info} parameter and no query, false otherwise
+     */
     private static boolean isInfoRequest(HttpServletRequest req)
     {
         if(req.getParameter("info") != null && req.getParameter("query") == null)
@@ -651,6 +836,12 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * True for a browser request without a query, {@code format} or {@code info} parameter.
+     *
+     * @param req the HTTP request
+     * @return true for a browser request without a query, {@code format} or {@code info} parameter, false otherwise
+     */
     private static boolean isHtmlRequest(HttpServletRequest req)
     {
         if(req.getParameter("info") != null)
@@ -707,6 +898,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Chooses the serialisation: from the {@code format} parameter (short names or a MIME type), else from the Accept
+     * header by quality, else the XML default of the result form.
+     *
+     * @param req the HTTP request
+     * @param form the result form
+     * @return the output type
+     */
     private static OutputType detectOutputType(HttpServletRequest req, ResultType form)
     {
         String format = req.getParameter("format");
@@ -771,6 +970,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Best output type for the result form among the MIME types of an Accept-style list, honouring quality values.
+     *
+     * @param form the result form
+     * @param accepts the Accept header value
+     * @return best output type for the result form among the MIME types of an Accept-style list, honouring quality
+     *         values
+     */
     private static OutputType detectOutputTypeFromMIME(ResultType form, String accepts)
     {
         OutputType type = OutputType.NONE;
@@ -819,6 +1026,15 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes SELECT results in the SPARQL XML format, optionally with the warnings.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @param includeWarnings whether to include the statement warnings
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeSelectXml(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
@@ -909,6 +1125,15 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes SELECT results in the SPARQL JSON format, optionally with the warnings.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @param includeWarnings whether to include the statement warnings
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeSelectJson(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
@@ -992,6 +1217,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes SELECT results as TSV.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeSelectTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         boolean hasHead = false;
@@ -1028,6 +1261,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes SELECT results as CSV.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeSelectCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         boolean hasHead = false;
@@ -1067,6 +1308,15 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an ASK result in the SPARQL XML format, optionally with the warnings.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @param includeWarnings whether to include the statement warnings
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeAskXml(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
@@ -1080,6 +1330,15 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an ASK result in the SPARQL JSON format, optionally with the warnings.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @param includeWarnings whether to include the statement warnings
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeAskJson(PrintWriter out, Result result, boolean includeWarnings)
             throws IOException, SQLException
     {
@@ -1092,6 +1351,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an ASK result as TSV (non-standard).
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeAskTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         result.next();
@@ -1101,6 +1368,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an ASK result as CSV (non-standard).
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeAskCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         result.next();
@@ -1110,6 +1385,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as RDF/XML, grouping triples by subject.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphXml(PrintWriter out, Result result) throws IOException, SQLException
     {
         RdfTerm subject = null;
@@ -1204,6 +1487,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as RDF/JSON; the rows must be ordered by subject and predicate.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphJson(PrintWriter out, Result result) throws IOException, SQLException
     {
         RdfTerm subject = null;
@@ -1261,6 +1552,15 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as Turtle, grouping triples by subject and abbreviating IRIs by the configured prefixes.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @param systemPrefixes prefixes for abbreviating IRIs
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphTurtle(PrintWriter out, Result result, Map<String, String> systemPrefixes)
             throws IOException, SQLException
     {
@@ -1306,6 +1606,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as N-Triples (also used for N-Quads and TriG).
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphTriples(PrintWriter out, Result result) throws IOException, SQLException
     {
         while(result.next())
@@ -1320,6 +1628,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as TSV.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphTsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         out.print("subject\tpredicate\tobject\r\n");
@@ -1336,6 +1652,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a graph result as CSV.
+     *
+     * @param out the output writer
+     * @param result the result to write
+     * @throws IOException on output errors
+     * @throws SQLException on database errors
+     */
     private static void writeGraphCsv(PrintWriter out, Result result) throws IOException, SQLException
     {
         out.print("subject,predicate,object\r\n");
@@ -1352,6 +1676,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a term as a SPARQL JSON result value object.
+     *
+     * @param out the output writer
+     * @param term the RDF term
+     * @throws IOException on output errors
+     */
     private static void writeJsonNode(PrintWriter out, RdfTerm term) throws IOException
     {
         out.print("{ \"type\": ");
@@ -1389,6 +1720,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a term in N-Triples syntax.
+     *
+     * @param out the output writer
+     * @param term the RDF term
+     * @throws IOException on output errors
+     */
     private static void writeTripleNode(PrintWriter out, RdfTerm term) throws IOException
     {
         if(term instanceof Iri iri)
@@ -1420,6 +1758,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a term in Turtle syntax, abbreviating IRIs by the prefixes.
+     *
+     * @param out the output writer
+     * @param term the RDF term
+     * @param prefixes prefixes by name
+     * @throws IOException on output errors
+     */
     private static void writeTripleNode(PrintWriter out, RdfTerm term, Map<String, String> prefixes) throws IOException
     {
         if(term instanceof Iri iri)
@@ -1440,6 +1786,14 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an IRI as a prefixed name when a prefix applies, otherwise in angle brackets.
+     *
+     * @param out the output writer
+     * @param node the AST node
+     * @param prefixes prefixes by name
+     * @throws IOException on output errors
+     */
     private static void writeTripleIri(PrintWriter out, Iri node, Map<String, String> prefixes) throws IOException
     {
         String iri = node.getValue();
@@ -1464,6 +1818,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a term as a CSV field (IRIs and blank nodes as they are, literals by their lexical form).
+     *
+     * @param out the output writer
+     * @param term the RDF term
+     * @throws IOException on output errors
+     */
     private static void writeCsvNode(PrintWriter out, RdfTerm term) throws IOException
     {
         if(term instanceof Iri iri)
@@ -1481,6 +1842,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes text with the XML special characters escaped.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeXmlValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -1501,6 +1869,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes text with the JSON special characters escaped.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeJsonValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -1525,6 +1900,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes text with the TSV control characters escaped.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeTsvValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -1543,6 +1925,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes an IRI as a TSV field in angle brackets, escaping control characters.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeTsvIriValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -1563,6 +1952,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes a literal lexical form as a quoted TSV field with escapes.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeTsvLiteralValue(PrintWriter out, String value) throws IOException
     {
         for(char val : value.toCharArray())
@@ -1583,6 +1979,13 @@ public class EndpointServlet extends HttpServlet
     }
 
 
+    /**
+     * Writes text as a quoted CSV field when it contains special characters.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @throws IOException on output errors
+     */
     private static void writeCsvValue(PrintWriter out, String value) throws IOException
     {
         boolean mustBeQuoted = false;

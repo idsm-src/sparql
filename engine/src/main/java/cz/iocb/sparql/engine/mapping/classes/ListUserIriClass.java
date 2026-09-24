@@ -16,13 +16,34 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs stored as full text whose membership is defined by the values of a table column.
+ */
 public class ListUserIriClass extends SimpleUserIriClass
 {
+    /**
+     * Table listing the member IRIs.
+     */
     private final Table table;
+
+    /**
+     * Column holding the member IRIs.
+     */
     private final TableColumn column;
+
+    /**
+     * Query testing membership of a placeholder IRI.
+     */
     private final String sqlQuery;
 
 
+    /**
+     * Creates the class over the given table column.
+     *
+     * @param name the name
+     * @param table the table
+     * @param column the column
+     */
     public ListUserIriClass(String name, Table table, TableColumn column)
     {
         super(name, "varchar");

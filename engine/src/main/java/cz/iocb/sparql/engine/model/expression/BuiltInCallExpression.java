@@ -19,15 +19,29 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class BuiltInCallExpression extends CallExpression
 {
+    /**
+     * Name of the built-in function as written in the query.
+     */
     private String functionName;
 
 
+    /**
+     * Creates a call without arguments.
+     *
+     * @param functionName name of the built-in function
+     */
     public BuiltInCallExpression(String functionName)
     {
         setFunctionName(functionName);
     }
 
 
+    /**
+     * Creates a call with the given arguments.
+     *
+     * @param functionName name of the built-in function
+     * @param arguments the arguments
+     */
     public BuiltInCallExpression(String functionName, Collection<Expression> arguments)
     {
         super(arguments);
@@ -35,12 +49,22 @@ public class BuiltInCallExpression extends CallExpression
     }
 
 
+    /**
+     * Name of the built-in function as written in the query (case preserved).
+     *
+     * @return name of the built-in function as written in the query (case preserved)
+     */
     public String getFunctionName()
     {
         return functionName;
     }
 
 
+    /**
+     * Sets the name of the built-in function.
+     *
+     * @param functionName name of the built-in function
+     */
     public void setFunctionName(String functionName)
     {
         this.functionName = functionName;
@@ -54,6 +78,11 @@ public class BuiltInCallExpression extends CallExpression
     }
 
 
+    /**
+     * True if the function is one of the SPARQL 1.1 aggregates.
+     *
+     * @return true if the function is one of the SPARQL 1.1 aggregates, false otherwise
+     */
     public boolean isAggregateFunction()
     {
         switch(functionName.toLowerCase())

@@ -105,41 +105,135 @@ import info.adams.ryu.RyuFloat;
 
 
 
+/**
+ * Cursor over the rows of an executed query that turns the SQL columns back into RDF terms: for every projected
+ * variable, the row holds one column group per result class of the variable, and the first non-null group gives the
+ * value. Also enforces the fetch timeout.
+ */
 public class Result implements AutoCloseable
 {
+    /**
+     * Form of the query the result comes from.
+     */
     static public enum ResultType
     {
-        SELECT, ASK, DESCRIBE, CONSTRUCT
+        /**
+         * SELECT query: a table of variable bindings.
+         */
+        SELECT,
+
+        /**
+         * ASK query: a single boolean.
+         */
+        ASK,
+
+        /**
+         * DESCRIBE query: a graph.
+         */
+        DESCRIBE,
+
+        /**
+         * CONSTRUCT query: a graph.
+         */
+        CONSTRUCT
     }
 
 
+    /**
+     * Logger of result processing.
+     */
     private static final Logger logger = LoggerFactory.getLogger(Request.class);
 
+    /**
+     * Microseconds in a day.
+     */
     private static final long USECS_PER_DAY = 86400000000l;
+
+    /**
+     * Microseconds in an hour.
+     */
     private static final long USECS_PER_HOUR = 3600000000l;
+
+    /**
+     * Microseconds in a minute.
+     */
     private static final long USECS_PER_MINUTE = 60000000l;
+
+    /**
+     * Microseconds in a second.
+     */
     private static final long USECS_PER_SEC = 1000000l;
 
+    /**
+     * Java type to read each SQL type with.
+     */
     private static final Map<String, Class<?>> typeMap = Map.ofEntries(Map.entry("bool", Boolean.class),
             Map.entry("char", Character.class), Map.entry("int2", Short.class), Map.entry("int4", Integer.class),
             Map.entry("int8", Long.class), Map.entry("numeric", BigDecimal.class), Map.entry("float8", Double.class),
             Map.entry("float4", Float.class), Map.entry("varchar", String.class), Map.entry("date", LocalDate.class),
             Map.entry("timestamptz", LocalDateTime.class));
 
+    /**
+     * Form of the query.
+     */
     protected final ResultType type;
+
+    /**
+     * Result classes of each projected variable, in column order.
+     */
     protected final Map<Variable, List<ResultResourceClass>> description;
+
+    /**
+     * Position of each variable in a row.
+     */
     protected final Map<Variable, Integer> varNames = new HashMap<>();
+
+    /**
+     * Projected variables in column order.
+     */
     protected final List<Variable> heads = new ArrayList<>();
+
+    /**
+     * Terms of the current row; null entries are unbound.
+     */
     protected RdfTerm[] rowData;
 
+    /**
+     * Underlying JDBC result set.
+     */
     private final ResultSet rs;
 
+    /**
+     * Start of the execution in {@link System#nanoTime} units.
+     */
     private final long begin;
+
+    /**
+     * Time limit of the execution in nanoseconds; 0 for none.
+     */
     private final long timeout;
+
+    /**
+     * Number of rows between timeout checks.
+     */
     private final int checkSize;
+
+    /**
+     * Number of rows fetched so far.
+     */
     private int count = 0;
 
 
+    /**
+     * Creates the cursor over the result set described by the given result classes.
+     *
+     * @param type form of the query
+     * @param description result classes of each projected variable
+     * @param rs the JDBC result set
+     * @param begin start of the execution in {@link System#nanoTime} units
+     * @param timeout time limit in nanoseconds, 0 for none
+     * @throws SQLException on database errors
+     */
     public Result(ResultType type, Map<Variable, List<ResultResourceClass>> description, ResultSet rs, long begin,
             long timeout) throws SQLException
     {
@@ -160,6 +254,12 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Advances to the next row, decoding its terms; false at the end.
+     *
+     * @return true if a row is available, false at the end
+     * @throws SQLException on database errors or when the timeout elapsed (SQL state 57014)
+     */
     public boolean next() throws SQLException
     {
         if(count++ % checkSize == 0 && timeout > 0 && timeout < System.nanoTime() - begin)
@@ -503,12 +603,23 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Form of the query.
+     *
+     * @return form of the query
+     */
     public ResultType getResultType()
     {
         return type;
     }
 
 
+    /**
+     * Warnings raised by the database statement.
+     *
+     * @return warnings raised by the database statement
+     * @throws SQLException on database errors
+     */
     public List<String> getWarnings() throws SQLException
     {
         LinkedList<String> warnings = new LinkedList<>();
@@ -520,24 +631,46 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Projected variables in column order.
+     *
+     * @return projected variables in column order
+     */
     public List<Variable> getHeads()
     {
         return heads;
     }
 
 
+    /**
+     * Position of each projected variable in a row.
+     *
+     * @return position of each projected variable in a row
+     */
     public Map<Variable, Integer> getVariableIndexes()
     {
         return varNames;
     }
 
 
+    /**
+     * Term of the given column of the current row; null if unbound.
+     *
+     * @param idx the column index
+     * @return term of the given column of the current row; null if unbound
+     */
     public RdfTerm get(int idx)
     {
         return rowData[idx];
     }
 
 
+    /**
+     * Term of the variable in the current row; null if unbound or not projected.
+     *
+     * @param var the variable
+     * @return term of the variable in the current row; null if unbound or not projected
+     */
     public RdfTerm get(Variable var)
     {
         Integer idx = varNames.get(var);
@@ -549,6 +682,11 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Copy of the terms of the current row.
+     *
+     * @return copy of the terms of the current row
+     */
     public RdfTerm[] getRow()
     {
         return rowData.clone();
@@ -562,6 +700,12 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Canonical xsd:dayTimeDuration lexical form of a duration in microseconds.
+     *
+     * @param value duration in microseconds
+     * @return canonical xsd:dayTimeDuration lexical form of a duration in microseconds
+     */
     private static String durationToString(long value)
     {
         if(value == 0)
@@ -630,6 +774,15 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Lexical form of a date-time given in UTC with the zone offset in seconds; without an offset when the zone is
+     * {@link Integer#MIN_VALUE}.
+     *
+     * @param value the date-time in UTC
+     * @param zone the timezone offset in seconds
+     * @return lexical form of a date-time given in UTC with the zone offset in seconds; without an offset when the zone
+     *         is {@link Integer#MIN_VALUE}
+     */
     private String dateTimeToString(LocalDateTime value, int zone)
     {
         ZoneOffset offset = ZoneOffset.ofTotalSeconds(zone != Integer.MIN_VALUE ? zone : 0);
@@ -640,6 +793,15 @@ public class Result implements AutoCloseable
     }
 
 
+    /**
+     * Lexical form of a date with the zone offset in seconds; without an offset when the zone is
+     * {@link Integer#MIN_VALUE}.
+     *
+     * @param value the date
+     * @param zone the timezone offset in seconds
+     * @return lexical form of a date with the zone offset in seconds; without an offset when the zone is
+     *         {@link Integer#MIN_VALUE}
+     */
     private static String dateToString(LocalDate value, int zone)
     {
         ZoneOffset offset = ZoneOffset.ofTotalSeconds(zone != Integer.MIN_VALUE ? zone : 0);

@@ -15,8 +15,15 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical xsd:dateTime values as a UTC {@code timestamptz} and an {@code int4} timezone offset; the result class of
+ * canonical date-times.
+ */
 public final class DateTimeCompositeClass extends CanonicalLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateTimeCompositeClass()
     {
         super("datetime@2c", xsdDateTimeType, List.of("timestamptz", "int4"),

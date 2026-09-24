@@ -4,8 +4,16 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Common base of xsd:string and rdf:langString: every lexical form is valid and canonical.
+ */
 public abstract sealed class StringLiteralDatatype extends Datatype permits StringDatatype, LangStringDatatype
 {
+    /**
+     * Creates the datatype.
+     *
+     * @param typeIri the datatype IRI
+     */
     protected StringLiteralDatatype(Iri typeIri)
     {
         super(typeIri);

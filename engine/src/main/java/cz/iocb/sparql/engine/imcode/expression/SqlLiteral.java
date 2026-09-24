@@ -17,17 +17,44 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Constant literal, represented in the class given by its datatype; {@link #trueValue} and {@link #falseValue} are the
+ * shared boolean constants.
+ */
 public final class SqlLiteral extends SqlExpressionIntercode
 {
+    /**
+     * The literal {@code true}.
+     */
     private static final Literal trueLiteral = new TypedLiteral("true", xsdBooleanIri);
+
+    /**
+     * The literal {@code false}.
+     */
     private static final Literal falseLiteral = new TypedLiteral("false", xsdBooleanIri);
 
+    /**
+     * Shared expression of the boolean {@code true}.
+     */
     public static final SqlLiteral trueValue = create(trueLiteral, xsdBoolean);
+
+    /**
+     * Shared expression of the boolean {@code false}.
+     */
     public static final SqlLiteral falseValue = create(falseLiteral, xsdBoolean);
 
+    /**
+     * The literal.
+     */
     private final Literal literal;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param literal the literal
+     * @param map columns per resource class
+     */
     private SqlLiteral(Literal literal, Map<ResourceClass, List<Column>> map)
     {
         super(map, false, true);
@@ -36,12 +63,27 @@ public final class SqlLiteral extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Constant literal expression in the class given by its datatype.
+     *
+     * @param request the current request
+     * @param literal the literal
+     * @return constant literal expression in the class given by its datatype
+     */
     public static SqlExpressionIntercode create(Request request, Literal literal)
     {
         return create(request, literal, Restriction.ALL);
     }
 
 
+    /**
+     * Constant literal expression; the boolean constants are the shared instances.
+     *
+     * @param request the current request
+     * @param literal the literal
+     * @param restriction the result classes the parent needs
+     * @return constant literal expression; the boolean constants are the shared instances
+     */
     private static SqlExpressionIntercode create(Request request, Literal literal, Restriction restriction)
     {
         //TODO: delete these variants after the equals method is used
@@ -59,6 +101,13 @@ public final class SqlLiteral extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Constant literal expression in the given class.
+     *
+     * @param literal the literal
+     * @param resClass the resource class
+     * @return constant literal expression in the given class
+     */
     private static SqlLiteral create(Literal literal, LiteralClass resClass)
     {
         List<Column> columns = resClass.toColumns(literal);
@@ -85,6 +134,11 @@ public final class SqlLiteral extends SqlExpressionIntercode
     }
 
 
+    /**
+     * The literal.
+     *
+     * @return the literal
+     */
     public Literal getLiteral()
     {
         return literal;

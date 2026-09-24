@@ -108,8 +108,15 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Cast of a value to an XSD datatype by its constructor function ({@code xsd:integer(...)} etc.), implemented by the
+ * {@code sparql.cast_as_*_from_*} functions of the extension; a source class that cannot be cast is an error.
+ */
 public final class SqlCast extends SqlUnary
 {
+    /**
+     * Literal classes that can be cast to.
+     */
     private static final Set<LiteralClass> supportedClasses = Set.of(genBoolean, genByte, genUnsignedByte, genShort,
             genUnsignedShort, genInt, genUnsignedInt, genLong, genUnsignedLong, genInteger, genNonPositiveInteger,
             genNegativeInteger, genNonNegativeInteger, genPositiveInteger, genDecimal, genFloat, genDouble,
@@ -118,9 +125,20 @@ public final class SqlCast extends SqlUnary
             xsdNegativeInteger, xsdNonNegativeInteger, xsdPositiveInteger, xsdDecimal, xsdFloat, xsdDouble,
             xsdScalarDateTime, xsdScalarDate, xsdDayTimeDuration, xsdString);
 
+    /**
+     * Target class of the cast.
+     */
     private final LiteralClass resourceClass;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param resourceClass the class to cast to
+     * @param operand the operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlCast(LiteralClass resourceClass, SqlExpressionIntercode operand,
             Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
@@ -130,12 +148,29 @@ public final class SqlCast extends SqlUnary
     }
 
 
+    /**
+     * Cast of the operand to the canonical literal class of a datatype.
+     *
+     * @param resourceClass the class to cast to
+     * @param operand the operand
+     * @return cast of the operand to the canonical literal class of a datatype
+     */
     public static SqlExpressionIntercode create(LiteralClass resourceClass, SqlExpressionIntercode operand)
     {
         return create(resourceClass, operand, Restriction.ALL);
     }
 
 
+    /**
+     * Cast materialising only the needed result; a date or date-time cast of a constant-zone operand yields the class
+     * of that zone.
+     *
+     * @param castClass the class to cast to
+     * @param operand the operand
+     * @param restriction the result classes the parent needs
+     * @return cast materialising only the needed result; a date or date-time cast of a constant-zone operand yields the
+     *         class of that zone
+     */
     public static SqlExpressionIntercode create(LiteralClass castClass, SqlExpressionIntercode operand,
             Restriction restriction)
     {
@@ -204,6 +239,13 @@ public final class SqlCast extends SqlUnary
     }
 
 
+    /**
+     * Date or date-time class of the given constant timezone offset.
+     *
+     * @param castClass the class to cast to
+     * @param zone the timezone offset in seconds
+     * @return date or date-time class of the given constant timezone offset
+     */
     private static LiteralClass createConstantZoneResultClass(ResourceClass castClass, int zone)
     {
         if(castClass.equals(xsdScalarDate))
@@ -216,6 +258,12 @@ public final class SqlCast extends SqlUnary
     }
 
 
+    /**
+     * Timezone offset of a constant-zone date or date-time class.
+     *
+     * @param resClass the resource class
+     * @return timezone offset of a constant-zone date or date-time class
+     */
     private static int extractConstantZone(ResourceClass resClass)
     {
         if(resClass.getEffectiveClass() instanceof DateInZone dateClass)
@@ -264,6 +312,14 @@ public final class SqlCast extends SqlUnary
     }
 
 
+    /**
+     * True if values of {@code from} may be castable to {@code to} according to the XPath casting table.
+     *
+     * @param from the source class
+     * @param to the target class
+     * @return true if values of {@code from} may be castable to {@code to} according to the XPath casting table, false
+     *         otherwise
+     */
     private static boolean isCastable(ResourceClass from, ResourceClass to)
     {
         if(isString(to))
@@ -280,6 +336,13 @@ public final class SqlCast extends SqlUnary
 
 
 
+    /**
+     * True if the cast from {@code from} to {@code to} may fail for some value.
+     *
+     * @param from the source class
+     * @param to the target class
+     * @return true if the cast from {@code from} to {@code to} may fail for some value, false otherwise
+     */
     private static boolean canBeNull(ResourceClass from, ResourceClass to)
     {
         if(isString(to))
@@ -345,6 +408,15 @@ public final class SqlCast extends SqlUnary
     }
 
 
+    /**
+     * SQL expression casting a value of {@code resClass} held in the columns to {@code castClass}.
+     *
+     * @param columns the columns
+     * @param resClass the resource class
+     * @param castClass the class to cast to
+     * @param partCanBeNull whether the source columns may be null
+     * @return SQL expression casting a value of {@code resClass} held in the columns to {@code castClass}
+     */
     public static Column translate(List<Column> columns, ResourceClass resClass, LiteralClass castClass,
             boolean partCanBeNull)
     {

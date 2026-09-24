@@ -14,24 +14,65 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class UnaryExpression extends BaseElement implements Expression
 {
+    /**
+     * Unary operator with its SPARQL spelling ({@link #getText}) and SQL spelling ({@link #getCode}).
+     */
     public enum Operator
     {
-        Not("!", "NOT "), Plus("+", "+"), Minus("-", "-");
+        /**
+         * Logical not.
+         */
+        Not("!", "NOT "),
 
+        /**
+         * Unary plus.
+         */
+        Plus("+", "+"),
+
+        /**
+         * Unary minus.
+         */
+        Minus("-", "-");
+
+        /**
+         * SPARQL spelling.
+         */
         private final String text;
+
+        /**
+         * SQL spelling.
+         */
         private final String code;
 
+        /**
+         * Creates the operator with its SPARQL and SQL spellings.
+         *
+         * @param text the text
+         * @param code the SQL spelling
+         */
         Operator(String text, String code)
         {
             this.text = text;
             this.code = code;
         }
 
+
+        /**
+         * SPARQL spelling of the operator.
+         *
+         * @return SPARQL spelling of the operator
+         */
         public String getText()
         {
             return text;
         }
 
+
+        /**
+         * SQL spelling of the operator.
+         *
+         * @return SQL spelling of the operator
+         */
         public String getCode()
         {
             return code;
@@ -39,10 +80,23 @@ public class UnaryExpression extends BaseElement implements Expression
     }
 
 
+    /**
+     * The operator.
+     */
     private Operator operator;
+
+    /**
+     * The operand.
+     */
     private Expression operand;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operator the operator
+     * @param operand the operand
+     */
     public UnaryExpression(Operator operator, Expression operand)
     {
         setOperator(operator);
@@ -50,24 +104,44 @@ public class UnaryExpression extends BaseElement implements Expression
     }
 
 
+    /**
+     * The operator.
+     *
+     * @return the operator
+     */
     public Operator getOperator()
     {
         return operator;
     }
 
 
+    /**
+     * Sets the operator.
+     *
+     * @param operator the operator
+     */
     public void setOperator(Operator operator)
     {
         this.operator = operator;
     }
 
 
+    /**
+     * The operand.
+     *
+     * @return the operand
+     */
     public Expression getOperand()
     {
         return operand;
     }
 
 
+    /**
+     * Sets the operand.
+     *
+     * @param operand the operand
+     */
     public void setOperand(Expression operand)
     {
         this.operand = operand;

@@ -18,21 +18,37 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class BlankNodePropertyList extends BaseComplexNode implements ComplexNode, ComplexElement
 {
+    /**
+     * Properties of the anonymous node.
+     */
     private final List<Property> properties;
 
 
+    /**
+     * Creates an anonymous node without properties ({@code []}).
+     */
     public BlankNodePropertyList()
     {
         this.properties = new ArrayList<>();
     }
 
 
+    /**
+     * Creates an anonymous node with the given properties.
+     *
+     * @param properties the properties
+     */
     public BlankNodePropertyList(Collection<Property> properties)
     {
         this.properties = new ArrayList<>(properties);
     }
 
 
+    /**
+     * Properties of the anonymous node (modifiable).
+     *
+     * @return properties of the anonymous node (modifiable)
+     */
     public List<Property> getProperties()
     {
         return properties;

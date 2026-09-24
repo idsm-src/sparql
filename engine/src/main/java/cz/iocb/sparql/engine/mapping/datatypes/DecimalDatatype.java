@@ -13,15 +13,28 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:decimal datatype; canonical form always has a fractional part ({@code 1.0}) and no redundant zeros.
+ */
 public final class DecimalDatatype extends Datatype
 {
+    /**
+     * Valid lexical form within the precision of PostgreSQL {@code numeric}, capturing sign, integer and fractional
+     * digits.
+     */
     private static final Pattern validDecimalPattern = Pattern
             .compile(WS + "([+-]?)(?=\\.?[0-9])0*([0-9]{0,131072})(?:\\.([0-9]{0,16383}?)0*)?" + WS);
 
+    /**
+     * Canonical lexical form: no leading or trailing zeros, always a fractional part, no negative zero.
+     */
     private static final Pattern canonicalDecimalPattern = Pattern
             .compile("(?!-0\\.0$)-?(?:0|[1-9][0-9]*)\\.(?:0|[0-9]*[1-9])");
 
 
+    /**
+     * Creates the datatype.
+     */
     public DecimalDatatype()
     {
         super(xsdDecimalIri);

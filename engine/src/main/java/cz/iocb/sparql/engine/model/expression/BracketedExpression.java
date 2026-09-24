@@ -13,20 +13,38 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class BracketedExpression extends BaseElement implements Expression
 {
+    /**
+     * The enclosed expression.
+     */
     private Expression child;
 
+    /**
+     * Creates the expression around the child.
+     *
+     * @param child the enclosed expression
+     */
     public BracketedExpression(Expression child)
     {
         setChild(child);
     }
 
 
+    /**
+     * The enclosed expression.
+     *
+     * @return the enclosed expression
+     */
     public Expression getChild()
     {
         return child;
     }
 
 
+    /**
+     * Sets the enclosed expression.
+     *
+     * @param child the enclosed expression
+     */
     public void setChild(Expression child)
     {
         this.child = child;

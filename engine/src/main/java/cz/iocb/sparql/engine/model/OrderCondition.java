@@ -16,15 +16,42 @@ public class OrderCondition extends BaseElement
      */
     public enum Direction
     {
-        Unspecified(null), Ascending("ASC"), Descending("DESC");
+        /**
+         * No direction given; ascending by default.
+         */
+        Unspecified(null),
 
+        /**
+         * Explicit ASC.
+         */
+        Ascending("ASC"),
+
+        /**
+         * Explicit DESC.
+         */
+        Descending("DESC");
+
+        /**
+         * SPARQL keyword, null when unspecified.
+         */
         private final String text;
 
+        /**
+         * Creates the direction with its keyword.
+         *
+         * @param text the text
+         */
         Direction(String text)
         {
             this.text = text;
         }
 
+
+        /**
+         * SPARQL keyword of the direction; null when unspecified.
+         *
+         * @return SPARQL keyword of the direction; null when unspecified
+         */
         public String getText()
         {
             return text;
@@ -32,16 +59,34 @@ public class OrderCondition extends BaseElement
     }
 
 
+    /**
+     * Sort direction.
+     */
     private Direction direction;
+
+    /**
+     * Sort expression.
+     */
     private Expression expression;
 
 
+    /**
+     * Creates a condition without an explicit direction.
+     *
+     * @param expression the expression
+     */
     public OrderCondition(Expression expression)
     {
         this(Direction.Unspecified, expression);
     }
 
 
+    /**
+     * Creates a condition with the given direction.
+     *
+     * @param direction the sort direction
+     * @param expression the expression
+     */
     public OrderCondition(Direction direction, Expression expression)
     {
         setDirection(direction);
@@ -49,12 +94,22 @@ public class OrderCondition extends BaseElement
     }
 
 
+    /**
+     * Sort direction.
+     *
+     * @return sort direction
+     */
     public Direction getDirection()
     {
         return direction;
     }
 
 
+    /**
+     * Sets the sort direction (required).
+     *
+     * @param direction the sort direction
+     */
     public void setDirection(Direction direction)
     {
         if(direction == null)
@@ -64,12 +119,22 @@ public class OrderCondition extends BaseElement
     }
 
 
+    /**
+     * Sort expression.
+     *
+     * @return sort expression
+     */
     public Expression getExpression()
     {
         return expression;
     }
 
 
+    /**
+     * Sets the sort expression (required).
+     *
+     * @param expression the expression
+     */
     public void setExpression(Expression expression)
     {
         if(expression == null)

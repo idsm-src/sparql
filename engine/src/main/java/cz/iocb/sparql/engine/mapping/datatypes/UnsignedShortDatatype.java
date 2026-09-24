@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:unsignedShort datatype.
+ */
 public final class UnsignedShortDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public UnsignedShortDatatype()
     {
         super(xsdUnsignedShortIri, "0", "65535");

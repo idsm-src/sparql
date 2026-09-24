@@ -11,15 +11,29 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class FunctionCallExpression extends CallExpression
 {
+    /**
+     * IRI of the function.
+     */
     private IriNode function;
 
 
+    /**
+     * Creates a call without arguments.
+     *
+     * @param function IRI of the function
+     */
     public FunctionCallExpression(IriNode function)
     {
         this.function = function;
     }
 
 
+    /**
+     * Creates a call with the given arguments.
+     *
+     * @param function IRI of the function
+     * @param arguments the arguments
+     */
     public FunctionCallExpression(IriNode function, Collection<Expression> arguments)
     {
         super(arguments);
@@ -27,12 +41,22 @@ public class FunctionCallExpression extends CallExpression
     }
 
 
+    /**
+     * IRI of the function.
+     *
+     * @return IRI of the function
+     */
     public IriNode getFunction()
     {
         return function;
     }
 
 
+    /**
+     * Sets the IRI of the function.
+     *
+     * @param function IRI of the function
+     */
     public void setFunction(IriNode function)
     {
         this.function = function;

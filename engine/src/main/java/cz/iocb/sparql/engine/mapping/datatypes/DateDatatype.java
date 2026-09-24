@@ -22,10 +22,20 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:date datatype, limited to the range of PostgreSQL {@code date}. Literals are classified by their timezone
+ * offset (see {@link DateInZoneClass}).
+ */
 public final class DateDatatype extends TemporalDatatype
 {
+    /**
+     * Lexical form of xsd:date with optional timezone.
+     */
     private static final Pattern validFormPattern = Pattern.compile(XSD_DATE_PATTERN);
 
+    /**
+     * Parser of the lexical form (year, month, day, offset).
+     */
     private static final DateTimeFormatter inputFormatter = new DateTimeFormatterBuilder()//
             .appendValue(ChronoField.YEAR, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
@@ -33,6 +43,9 @@ public final class DateDatatype extends TemporalDatatype
             .appendOffset("+HH:MM", "Z")//
             .toFormatter(Locale.ENGLISH);
 
+    /**
+     * Formatter of PostgreSQL {@code date} constants, with the {@code BC} suffix for negative years.
+     */
     private static final DateTimeFormatter outputFormatter = new DateTimeFormatterBuilder()//
             .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
@@ -41,10 +54,21 @@ public final class DateDatatype extends TemporalDatatype
             .toFormatter(Locale.ENGLISH);
 
     //NOTE: limitations given by using the date type in postgres
+
+    /**
+     * Lowest date PostgreSQL can store.
+     */
     private static final LocalDate MIN_VALUE = LocalDate.parse("-4714-11-24Z", inputFormatter);
+
+    /**
+     * Highest date PostgreSQL can store.
+     */
     private static final LocalDate MAX_VALUE = LocalDate.parse("5874897-12-31Z", inputFormatter);
 
 
+    /**
+     * Creates the datatype.
+     */
     protected DateDatatype()
     {
         super(xsdDateIri);
@@ -111,6 +135,12 @@ public final class DateDatatype extends TemporalDatatype
     }
 
 
+    /**
+     * The date of the literal formatted as a PostgreSQL {@code date} constant.
+     *
+     * @param literal the literal
+     * @return the date of the literal formatted as a PostgreSQL {@code date} constant
+     */
     public static String getDate(Literal literal)
     {
         String value = Datatype.getCollapsedForm(literal.getValue()).replace("(\\.[0-9]{6})[0-9]*", "$1");
@@ -123,6 +153,12 @@ public final class DateDatatype extends TemporalDatatype
     }
 
 
+    /**
+     * Timezone offset of the literal in seconds east of UTC; {@link Integer#MIN_VALUE} when it has none.
+     *
+     * @param literal the literal
+     * @return timezone offset of the literal in seconds east of UTC; {@link Integer#MIN_VALUE} when it has none
+     */
     public static int getZone(Literal literal)
     {
         String zone = Datatype.getCollapsedForm(literal.getValue()).replaceFirst(TemporalDatatype.DATE, "");

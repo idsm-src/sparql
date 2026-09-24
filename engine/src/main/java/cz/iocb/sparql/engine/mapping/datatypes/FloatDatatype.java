@@ -10,8 +10,14 @@ import info.adams.ryu.RyuFloat;
 
 
 
+/**
+ * The xsd:float datatype.
+ */
 public final class FloatDatatype extends FloatPointDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     protected FloatDatatype()
     {
         super(xsdFloatIri);

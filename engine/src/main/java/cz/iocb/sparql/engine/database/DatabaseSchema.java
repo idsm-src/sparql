@@ -16,24 +16,59 @@ import javax.sql.DataSource;
 
 
 
+/**
+ * Catalog facts about the target database used by the optimiser: nullable columns, unique keys, foreign keys, column
+ * pairs known never to join, and character columns with a collation that does not order by code points. Read from the
+ * JDBC metadata and the PostgreSQL catalog, or filled in by hand.
+ */
 public class DatabaseSchema
 {
+    /**
+     * Ordered pair.
+     *
+     * @param <T> type of the members
+     */
     public static class Pair<T>
     {
+        /**
+         * First member.
+         */
         protected final T left;
+
+        /**
+         * Second member.
+         */
         protected final T right;
 
+        /**
+         * Creates the pair.
+         *
+         * @param left the first member
+         * @param right the second member
+         */
         public Pair(T left, T right)
         {
             this.left = left;
             this.right = right;
         }
 
+
+        /**
+         * First member.
+         *
+         * @return first member
+         */
         public final T getLeft()
         {
             return left;
         }
 
+
+        /**
+         * Second member.
+         *
+         * @return second member
+         */
         public final T getRight()
         {
             return right;
@@ -61,8 +96,17 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Pair of a parent (referenced) table and a foreign (referencing) table.
+     */
     public static class TablePair extends Pair<Table>
     {
+        /**
+         * Creates the pair of a referenced and a referencing table.
+         *
+         * @param parent the table
+         * @param foreign the table
+         */
         public TablePair(Table parent, Table foreign)
         {
             super(parent, foreign);
@@ -70,8 +114,17 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Pair of a parent table column and the foreign table column referencing it.
+     */
     public static class ColumnPair extends Pair<Column>
     {
+        /**
+         * Creates the pair of a referenced column and the column referencing it.
+         *
+         * @param parent the column
+         * @param foreign the column
+         */
         public ColumnPair(Column parent, Column foreign)
         {
             super(parent, foreign);
@@ -79,11 +132,12 @@ public class DatabaseSchema
     }
 
 
-    /*
-     * SPARQL orders and compares strings by unicode code points, whereas PostgreSQL orders a character
-     * column by its collation, so only the collations that happen to order by code points give the
-     * results the specification asks for. The name of a collation does not say which ones those are
-     * (musl, for instance, orders bytewise under every locale name), so the server is asked directly.
+    /**
+     * Catalog query listing every column of a user table or view that has an explicit collation. SPARQL orders and
+     * compares strings by unicode code points, whereas PostgreSQL orders a character column by its collation, so only
+     * the collations that happen to order by code points give the results the specification asks for. The name of a
+     * collation does not say which ones those are (musl, for instance, orders bytewise under every locale name), so the
+     * server is asked directly.
      */
     private static final String collationQuery = """
             SELECT n.nspname, c.relname, a.attname, a.attcollation::regcollation::text
@@ -94,19 +148,48 @@ public class DatabaseSchema
                 AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')""";
 
+    /**
+     * Query template testing whether a collation orders a sample of strings the same way as the "C" collation.
+     */
     private static final String collationProbeQuery = """
             SELECT array_agg(s ORDER BY s COLLATE %s) = array_agg(s ORDER BY s COLLATE "C")
             FROM (VALUES ('A'), ('a'), ('B'), ('b'), ('Z'), ('z'), ('0'), ('_'), ('-'), (' '), ('E'), ('\u00e9'))
                 AS probe(s)""";
 
 
+    /**
+     * Nullable columns per table.
+     */
     protected final Map<Table, List<Column>> nullableColumns = new HashMap<>();
+
+    /**
+     * Per table, the character columns whose collation does not order by code points, with the collation name.
+     */
     protected final Map<Table, Map<Column, String>> foreignCollations = new HashMap<>();
+
+    /**
+     * Unique keys per table, each as its list of columns.
+     */
     protected final Map<Table, List<List<Column>>> primaryKeys = new HashMap<>();
+
+    /**
+     * Foreign keys per (parent table, foreign table) pair, each as its set of column pairs.
+     */
     protected final Map<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<>();
+
+    /**
+     * Column lists declared never to join, per (left table, right table) pair.
+     */
     protected final Map<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<>();
 
 
+    /**
+     * Reads tables and views, their nullable columns, unique indexes, foreign keys and column collations from the
+     * database.
+     *
+     * @param connectionPool the connection pool of the database
+     * @throws SQLException on database errors
+     */
     public DatabaseSchema(DataSource connectionPool) throws SQLException
     {
         try(Connection connection = connectionPool.getConnection())
@@ -232,6 +315,10 @@ public class DatabaseSchema
      * SPARQL prescribes. The collation is compared against the "C" collation on a sample of strings, because its name
      * alone does not tell: musl, for example, orders bytewise under every locale name, whereas the same name means a
      * locale ordering under glibc.
+     *
+     * @param connection the database connection
+     * @param collation name of the collation
+     * @return true if the collation orders by code points, false otherwise
      */
     protected boolean isCodepointCollation(Connection connection, String collation)
     {
@@ -249,6 +336,11 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Copy constructor.
+     *
+     * @param other the schema to copy
+     */
     public DatabaseSchema(DatabaseSchema other)
     {
         for(Entry<Table, List<Column>> e : other.nullableColumns.entrySet())
@@ -268,6 +360,12 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Declares the column nullable.
+     *
+     * @param table the table
+     * @param column the column
+     */
     public void addNullableColumn(Table table, TableColumn column)
     {
         List<Column> columnList = nullableColumns.get(table);
@@ -282,6 +380,12 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Declares the columns to be a unique key of the table.
+     *
+     * @param table the table
+     * @param columns the columns
+     */
     public void addPrimaryKeys(Table table, List<Column> columns)
     {
         List<List<Column>> primaryKeyList = primaryKeys.get(table);
@@ -296,6 +400,15 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Declares a foreign key: {@code foreignColumns} of {@code foreignTable} reference {@code parentColumns} of
+     * {@code parentTable} (matched by position).
+     *
+     * @param parentTable the referenced table
+     * @param parentColumns columns of the referenced table
+     * @param foreignTable the referencing table
+     * @param foreignColumns the referencing columns
+     */
     public void addForeignKeys(Table parentTable, List<Column> parentColumns, Table foreignTable,
             List<Column> foreignColumns)
     {
@@ -318,6 +431,15 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Declares that the column lists of the two tables (matched by position) never share a value, so an equi-join on
+     * them is empty.
+     *
+     * @param leftTable the left table
+     * @param leftColumns columns of the left table
+     * @param rightTable the right table
+     * @param rightColumns columns of the right table
+     */
     public void addUnjoinableColumns(Table leftTable, List<Column> leftColumns, Table rightTable,
             List<Column> rightColumns)
     {
@@ -340,6 +462,13 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Records that the character column uses a collation that does not order by code points.
+     *
+     * @param table the table
+     * @param column the column
+     * @param collation name of the collation
+     */
     public void addForeignCollation(Table table, TableColumn column, String collation)
     {
         Map<Column, String> columnMap = foreignCollations.get(table);
@@ -357,6 +486,11 @@ public class DatabaseSchema
     /**
      * Returns the collation of the given character column when it does not order by unicode code points, and null when
      * the column orders the way SPARQL prescribes or is not a character column at all.
+     *
+     * @param table the table
+     * @param column the column
+     * @return the collation of the given character column when it does not order by unicode code points, and null when
+     *         the column orders the way SPARQL prescribes or is not a character column at all
      */
     public String getForeignCollation(Table table, Column column)
     {
@@ -364,6 +498,13 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * True if the column may be NULL: never for constants, as declared for expressions, per catalog for table columns.
+     *
+     * @param table the table
+     * @param column the column
+     * @return true if the column may be NULL, false otherwise
+     */
     public boolean isNullableColumn(Table table, Column column)
     {
         return switch(column)
@@ -375,6 +516,13 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * A unique key of the table all of whose columns are among {@code columns}, or null.
+     *
+     * @param table the table
+     * @param columns the columns
+     * @return A unique key of the table all of whose columns are among {@code columns}, or null
+     */
     public List<Column> getCompatibleKey(Table table, Set<Column> columns)
     {
         List<List<Column>> keys = primaryKeys.get(table);
@@ -390,6 +538,17 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * A foreign key from {@code childTable} to {@code parentTable} that contains all the given join pairs and whose
+     * child columns cover {@code extra}, or null. Every child row then has exactly one matching parent row.
+     *
+     * @param parentTable the referenced table
+     * @param childTable the referencing table
+     * @param columns the join column pairs
+     * @param extra child columns that must be covered by the key
+     * @return A foreign key from {@code childTable} to {@code parentTable} that contains all the given join pairs and
+     *         whose child columns cover {@code extra}, or null
+     */
     public Set<ColumnPair> isPartOfForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
             Set<Column> extra)
     {
@@ -413,6 +572,18 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * A foreign key from {@code childTable} to {@code parentTable} all of whose pairs are among the given join pairs
+     * and whose child columns cover, through the pairs, all of {@code parentColumns}, or null. The parent side of the
+     * join can then be dropped.
+     *
+     * @param parentTable the referenced table
+     * @param childTable the referencing table
+     * @param columns the join column pairs
+     * @param parentColumns columns of the referenced table
+     * @return A foreign key from {@code childTable} to {@code parentTable} all of whose pairs are among the given join
+     *         pairs and whose child columns cover, through the pairs, all of {@code parentColumns}, or null
+     */
     public Set<ColumnPair> getCompatibleForeignKey(Table parentTable, Table childTable, Set<ColumnPair> columns,
             Set<Column> parentColumns)
     {
@@ -438,6 +609,14 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * A declared unjoinable column list fully contained in the given join pairs, or null.
+     *
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @param columns the join column pairs
+     * @return A declared unjoinable column list fully contained in the given join pairs, or null
+     */
     public List<ColumnPair> getUnjoinableColumns(Table leftTable, Table rightTable, List<ColumnPair> columns)
     {
         List<List<ColumnPair>> list = getUnjoinableColumns(leftTable, rightTable);
@@ -459,12 +638,26 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * True if the columns contain a unique key of the table.
+     *
+     * @param table the table
+     * @param columns the columns
+     * @return true if the columns contain a unique key of the table, false otherwise
+     */
     public boolean isKey(Table table, Set<Column> columns)
     {
         return getCompatibleKey(table, columns) != null;
     }
 
 
+    /**
+     * Foreign keys from {@code foreignTable} to {@code parentTable}, each as its set of column pairs.
+     *
+     * @param parentTable the referenced table
+     * @param foreignTable the referencing table
+     * @return foreign keys from {@code foreignTable} to {@code parentTable}, each as its set of column pairs
+     */
     public List<Set<ColumnPair>> getForeignKeys(Table parentTable, Table foreignTable)
     {
         if(parentTable == null || foreignTable == null)
@@ -474,6 +667,13 @@ public class DatabaseSchema
     }
 
 
+    /**
+     * Declared unjoinable column lists between the two tables, or null.
+     *
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @return declared unjoinable column lists between the two tables, or null
+     */
     public List<List<ColumnPair>> getUnjoinableColumns(Table leftTable, Table rightTable)
     {
         if(leftTable == null || rightTable == null)

@@ -17,13 +17,27 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Language-tagged strings of one fixed tag, stored as the value only; instances are cached per tag.
+ */
 public final class LangStringWithTagClass extends CanonicalLiteralClass
 {
+    /**
+     * Instances by lower-cased tag.
+     */
     private static final ConcurrentMap<String, LangStringWithTagClass> instances = new ConcurrentHashMap<>();
 
+    /**
+     * The fixed lower-cased tag.
+     */
     private final String tag;
 
 
+    /**
+     * Creates the class of the tag; use {@link #get}.
+     *
+     * @param tag the language tag
+     */
     private LangStringWithTagClass(String tag)
     {
         super("lang-" + tag, rdfLangStringType, List.of("varchar"), Set.of(box, rdfLangString));
@@ -31,6 +45,12 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
     }
 
 
+    /**
+     * The class of the given tag (case-insensitive).
+     *
+     * @param tag the language tag
+     * @return the class of the given tag (case-insensitive)
+     */
     public static LangStringWithTagClass get(String tag)
     {
         return instances.computeIfAbsent(tag.toLowerCase(), LangStringWithTagClass::new);
@@ -105,6 +125,11 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
     }
 
 
+    /**
+     * The fixed lower-cased tag.
+     *
+     * @return the fixed lower-cased tag
+     */
     public String getTag()
     {
         return tag;

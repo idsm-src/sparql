@@ -2,17 +2,33 @@ package cz.iocb.sparql.engine.rdf;
 
 
 
+/**
+ * An IRI term.
+ */
 public final class Iri extends RdfTerm
 {
+    /**
+     * Full IRI text.
+     */
     private final String value;
 
 
+    /**
+     * Creates the IRI.
+     *
+     * @param value the IRI text
+     */
     public Iri(String value)
     {
         this.value = value;
     }
 
 
+    /**
+     * Full IRI text.
+     *
+     * @return full IRI text
+     */
     public String getValue()
     {
         return value;

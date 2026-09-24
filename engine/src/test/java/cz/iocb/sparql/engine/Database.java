@@ -10,11 +10,24 @@ import org.testcontainers.utility.DockerImageName;
 
 
 
+/**
+ * Test database shared by all engine tests: a PostgreSQL 16 container built from {@code src/test/resources/docker},
+ * which clones and compiles the pgsparql extension from the public {@code next} branch on GitHub and loads the NeXtProt
+ * test schemas. Local, unpushed changes of pgsparql are therefore not visible to the tests. The container is started
+ * once per JUnit launcher session by {@link DatabaseLauncherSessionListener}.
+ */
 public class Database
 {
+    /**
+     * Pool connected to the running container; null until {@link #start} has been called.
+     */
     private static DataSource connectionPool;
 
 
+    /**
+     * Builds the image (without cache, so the latest pgsparql is fetched) and starts the container on first call; later
+     * calls are no-ops.
+     */
     public static synchronized void start()
     {
         if(connectionPool == null)
@@ -43,11 +56,17 @@ public class Database
     }
 
 
+    /**
+     * Nothing to do: Testcontainers stops the container with the JVM.
+     */
     public static synchronized void stop()
     {
     }
 
 
+    /**
+     * Pool connected to the test database, valid after {@link #start}.
+     */
     public static DataSource getPool()
     {
         return connectionPool;

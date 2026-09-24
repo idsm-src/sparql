@@ -4,8 +4,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdNonPos
 
 
 
+/**
+ * Any valid {@code xsd:nonPositiveInteger} literal stored as a {@code numeric} value plus its lexical form.
+ */
 public final class NonPositiveIntegerBaseClass extends SimpleLiteralBaseClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     public NonPositiveIntegerBaseClass()
     {
         super("nonpositiveinteger", xsdNonPositiveIntegerType, "numeric");

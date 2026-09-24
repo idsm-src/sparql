@@ -15,8 +15,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Canonical xsd:date values as a {@code date} and an {@code int4} timezone offset; the result class of canonical dates.
+ */
 public final class DateCompositeClass extends CanonicalLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateCompositeClass()
     {
         super("date@2c", xsdDateType, List.of("date", "int4"), Set.of(box, genScalarDate, genDate, xsdScalarDate));

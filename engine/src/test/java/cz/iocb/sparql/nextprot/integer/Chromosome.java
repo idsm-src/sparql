@@ -16,12 +16,26 @@ import cz.iocb.sparql.engine.mapping.classes.MapUserIriClass;
 
 
 
+/**
+ * Mappings of the core NeXtProt entities: entries, isoforms, annotations, evidences, proteoforms, genes, protein
+ * sequences, families and history.
+ */
 public class Chromosome
 {
+    /**
+     * Blank nodes standing for the name records.
+     */
     private static final BlankNodeClass nameBlankNode = new IntBlankNodeInSegmentClass(1);
+
+    /**
+     * Blank nodes standing for the name lists.
+     */
     private static final BlankNodeClass nameListBlankNode = new IntBlankNodeInSegmentClass(2);
 
 
+    /**
+     * Registers the IRI classes of the entities mapped here.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("isoform", "int4", new Table(schema, "isoform_bases"),
@@ -39,6 +53,9 @@ public class Chromosome
     }
 
 
+    /**
+     * Registers the quad mappings of the entities mapped here.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         addIsomorfQuadMapping(config);

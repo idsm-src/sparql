@@ -8,14 +8,41 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Describes how quads are obtained from the database: one {@link TermMapping} per position. A null graph mapping means
+ * the quads belong to the default graph.
+ */
 public abstract class QuadMapping
 {
+    /**
+     * Graph mapping; null for the default graph.
+     */
     private final TermMapping graph;
+
+    /**
+     * Subject mapping.
+     */
     private final TermMapping subject;
+
+    /**
+     * Predicate mapping.
+     */
     private final TermMapping predicate;
+
+    /**
+     * Object mapping.
+     */
     private final TermMapping object;
 
 
+    /**
+     * Creates the mapping; a null graph means the default graph.
+     *
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public QuadMapping(TermMapping graph, TermMapping subject, TermMapping predicate, TermMapping object)
     {
         //TODO: add support for parameterized graph mapping
@@ -27,15 +54,48 @@ public abstract class QuadMapping
     }
 
 
+    /**
+     * The same quads with the graph dropped, i.e. contributed to the default graph.
+     *
+     * @return the same quads with the graph dropped, i.e. contributed to the default graph
+     */
     public abstract QuadMapping asDefaultGraphMapping();
 
 
+    /**
+     * The quads whose graph satisfies {@code graphConditions}, contributed to the default graph (for {@code FROM} on a
+     * parametrised graph).
+     *
+     * @param graphConditions the conditions
+     * @return the quads whose graph satisfies {@code graphConditions}, contributed to the default graph (for {@code
+     *         FROM} on a parametrised graph)
+     */
     public abstract QuadMapping asDefaultGraphMapping(Conditions graphConditions);
 
 
+    /**
+     * The quads whose graph satisfies {@code graphConditions}, kept in their named graph (for {@code FROM NAMED} on a
+     * parametrised graph).
+     *
+     * @param graphConditions the conditions
+     * @return the quads whose graph satisfies {@code graphConditions}, kept in their named graph (for {@code FROM
+     *         NAMED} on a parametrised graph)
+     */
     public abstract QuadMapping asNamedGraphMapping(Conditions graphConditions);
 
 
+    /**
+     * True if the mapping can produce a quad matching the pattern: each term matches its position (a null term matches
+     * only a null graph mapping), and a variable used at two positions has compatible mappings there (equal constants,
+     * or classes that are not disjoint).
+     *
+     * @param request the current request
+     * @param graph the graph term
+     * @param subject the subject term
+     * @param predicate the predicate term
+     * @param object the object term
+     * @return true if the mapping can produce a quad matching the pattern, false otherwise
+     */
     public boolean match(Request request, RdfTerm graph, RdfTerm subject, RdfTerm predicate, RdfTerm object)
     {
         if(!match(request, this.graph, graph))
@@ -72,6 +132,14 @@ public abstract class QuadMapping
     }
 
 
+    /**
+     * True if the term matches the mapping, a null term matching only a null mapping.
+     *
+     * @param request the current request
+     * @param mapping the term mapping
+     * @param term the RDF term
+     * @return true if the term matches the mapping, a null term matching only a null mapping, false otherwise
+     */
     private boolean match(Request request, TermMapping mapping, RdfTerm term)
     {
         if(term == null && mapping == null)
@@ -84,6 +152,18 @@ public abstract class QuadMapping
     }
 
 
+    /**
+     * True unless the same variable is used at both positions and the two mappings cannot produce equal values
+     * (different constants, or disjoint classes).
+     *
+     * @param request the current request
+     * @param term1 the first term
+     * @param term2 the second term
+     * @param map1 mapping of the first term
+     * @param map2 mapping of the second term
+     * @return true unless the same variable is used at both positions and the two mappings cannot produce equal values
+     *         (different constants, or disjoint classes), false otherwise
+     */
     private boolean checkNodeCondition(Request request, RdfTerm term1, RdfTerm term2, TermMapping map1,
             TermMapping map2)
     {
@@ -100,24 +180,44 @@ public abstract class QuadMapping
     }
 
 
+    /**
+     * Graph mapping; null for the default graph.
+     *
+     * @return graph mapping; null for the default graph
+     */
     public final TermMapping getGraph()
     {
         return graph;
     }
 
 
+    /**
+     * Subject mapping.
+     *
+     * @return subject mapping
+     */
     public final TermMapping getSubject()
     {
         return subject;
     }
 
 
+    /**
+     * Predicate mapping.
+     *
+     * @return predicate mapping
+     */
     public final TermMapping getPredicate()
     {
         return predicate;
     }
 
 
+    /**
+     * Object mapping.
+     *
+     * @return object mapping
+     */
     public final TermMapping getObject()
     {
         return object;

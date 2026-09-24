@@ -8,11 +8,24 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * Expression with one operand.
+ */
 public abstract class SqlUnary extends SqlExpressionIntercode
 {
+    /**
+     * The operand.
+     */
     protected final SqlExpressionIntercode operand;
 
 
+    /**
+     * Creates the expression; deterministic if the operand is.
+     *
+     * @param operand the operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     protected SqlUnary(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         super(mappings, canBeNull, operand.isDeterministic());
@@ -29,6 +42,11 @@ public abstract class SqlUnary extends SqlExpressionIntercode
     }
 
 
+    /**
+     * The operand.
+     *
+     * @return the operand
+     */
     public SqlExpressionIntercode getOperand()
     {
         return operand;

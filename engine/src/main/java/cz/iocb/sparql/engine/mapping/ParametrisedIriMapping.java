@@ -7,8 +7,17 @@ import cz.iocb.sparql.engine.mapping.classes.IriClass;
 
 
 
+/**
+ * Column-based mapping of IRIs of an {@link IriClass}.
+ */
 public class ParametrisedIriMapping extends ParametrisedMapping
 {
+    /**
+     * Creates the mapping.
+     *
+     * @param iriClass the IRI class
+     * @param columns the columns
+     */
     public ParametrisedIriMapping(IriClass iriClass, List<Column> columns)
     {
         super(iriClass, columns);
@@ -22,12 +31,22 @@ public class ParametrisedIriMapping extends ParametrisedMapping
     }
 
 
+    /**
+     * The IRI class.
+     *
+     * @return the IRI class
+     */
     public IriClass getResourceClass()
     {
         return (IriClass) resourceClass;
     }
 
 
+    /**
+     * The columns.
+     *
+     * @return the columns
+     */
     public List<Column> getColumns()
     {
         return columns;

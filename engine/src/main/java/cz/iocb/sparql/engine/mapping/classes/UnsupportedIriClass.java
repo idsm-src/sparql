@@ -13,8 +13,16 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * IRIs that belong to no user IRI class, stored as full text. It is never matched against terms directly (the request
+ * assigns it when detection by the user classes fails), and a value of a more general class can be narrowed to it only
+ * when representability need not be checked.
+ */
 public class UnsupportedIriClass extends IriClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected UnsupportedIriClass()
     {
         super("unsupported", List.of("varchar"), Set.of(box, iri));

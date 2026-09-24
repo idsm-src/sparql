@@ -16,15 +16,40 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Set difference (MINUS): the solutions of the left side for which there is no compatible solution of the right side
+ * sharing at least one bound variable.
+ */
 public final class SqlMinus extends SqlIntercode
 {
+    /**
+     * Alias of the left side.
+     */
     private static final Table leftTable = new Table("tab0");
+
+    /**
+     * Alias of the right side.
+     */
     private static final Table rightTable = new Table("tab1");
 
+    /**
+     * Left side, whose solutions are kept.
+     */
     private final SqlIntercode left;
+
+    /**
+     * Right side, whose compatible solutions remove left ones.
+     */
     private final SqlIntercode right;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param left the left side
+     * @param right the right side
+     */
     protected SqlMinus(VariableBindings bindings, SqlIntercode left, SqlIntercode right)
     {
         super(bindings, left.isDeterministic() && right.isDeterministic());
@@ -34,12 +59,29 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * Difference of the two sides.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @return difference of the two sides
+     */
     public static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right)
     {
         return minus(request, left, right, null);
     }
 
 
+    /**
+     * Difference exposing only what the parent needs.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param restrictions what the parent needs of the variables
+     * @return difference exposing only what the parent needs
+     */
     protected static SqlIntercode minus(Request request, SqlIntercode left, SqlIntercode right,
             Restrictions restrictions)
     {
@@ -166,6 +208,17 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * SQL condition that a right solution removes a left one: the shared variables are compatible and at least one of
+     * them is bound on both sides.
+     *
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @return SQL condition that a right solution removes a left one: the shared variables are compatible and at least
+     *         one of them is bound on both sides
+     */
     private String generateCondition(VariableBindings left, VariableBindings right, Table leftTable, Table rightTable)
     {
         String joinCondition = generateJoinCondition(left, right, leftTable, rightTable);
@@ -235,12 +288,22 @@ public final class SqlMinus extends SqlIntercode
     }
 
 
+    /**
+     * Left side, whose solutions are kept.
+     *
+     * @return left side, whose solutions are kept
+     */
     public final SqlIntercode getLeft()
     {
         return left;
     }
 
 
+    /**
+     * Right side, whose compatible solutions remove left ones.
+     *
+     * @return right side, whose compatible solutions remove left ones
+     */
     public final SqlIntercode getRight()
     {
         return right;

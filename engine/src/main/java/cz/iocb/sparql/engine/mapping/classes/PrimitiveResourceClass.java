@@ -7,12 +7,30 @@ import java.util.Set;
 
 
 
+/**
+ * Resource class with a fixed SQL column layout and an explicitly declared set of superclasses. Primitive classes are
+ * the atoms that {@link DerivedClass} combines.
+ */
 public abstract class PrimitiveResourceClass extends ResourceClass
 {
+    /**
+     * SQL types of the columns.
+     */
     protected final List<String> sqlTypes;
+
+    /**
+     * Classes this class converts to, excluding itself.
+     */
     protected final Set<PrimitiveResourceClass> superClasses;
 
 
+    /**
+     * Creates the class with its name, column types and superclasses.
+     *
+     * @param name the name
+     * @param sqlTypes the SQL types
+     * @param superClasses the superclasses
+     */
     protected PrimitiveResourceClass(String name, List<String> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
         super(name);
@@ -22,6 +40,12 @@ public abstract class PrimitiveResourceClass extends ResourceClass
     }
 
 
+    /**
+     * True if the class is the given one or lists it among its superclasses.
+     *
+     * @param resClass the resource class
+     * @return true if the class is the given one or lists it among its superclasses, false otherwise
+     */
     protected boolean isSubclassOf(PrimitiveResourceClass resClass)
     {
         return equals(resClass) || superClasses.contains(resClass);
@@ -35,6 +59,11 @@ public abstract class PrimitiveResourceClass extends ResourceClass
     }
 
 
+    /**
+     * Primitive classes this class can be converted to (the class itself excluded).
+     *
+     * @return primitive classes this class can be converted to (the class itself excluded)
+     */
     public Set<PrimitiveResourceClass> getSuperClasses()
     {
         return superClasses;

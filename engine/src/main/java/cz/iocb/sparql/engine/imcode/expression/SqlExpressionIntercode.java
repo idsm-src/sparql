@@ -77,53 +77,123 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Node of an expression in the intermediate code. Like a variable, an expression has a set of possible resource classes
+ * with the SQL columns computing its value in each ({@link #getMappings}), a nullability (an error in SPARQL is NULL in
+ * SQL) and a determinism flag. Nodes implement {@link #optimize}, which rebuilds the expression over the optimised
+ * bindings of its variables and materialises only the classes the parent needs.
+ */
 public abstract class SqlExpressionIntercode extends SqlBaseClass
 {
+    /**
+     * Which result classes of an expression the parent needs; classes outside are still known but their columns are not
+     * materialised (null).
+     */
     public static class Restriction
     {
+        /**
+         * All classes are needed.
+         */
         public static final Restriction ALL = new Restriction(box);
 
+        /**
+         * All classes are needed (same as {@link #ALL}).
+         */
         public static final Restriction NONE = new Restriction(box);
 
 
+        /**
+         * The needed classes.
+         */
         Set<ResourceClass> set = new HashSet<>();
 
+        /**
+         * Creates the restriction to the classes.
+         *
+         * @param classes the needed classes
+         */
         public Restriction(Set<ResourceClass> classes)
         {
             add(classes);
         }
 
+
+        /**
+         * Creates the restriction to the classes.
+         *
+         * @param classes the needed classes
+         */
         public Restriction(ResourceClass... classes)
         {
             add(Arrays.asList(classes));
         }
 
+
+        /**
+         * Adds needed classes.
+         *
+         * @param classes the needed classes
+         */
         public void add(Collection<ResourceClass> classes)
         {
             if(classes != null)
                 set.addAll(classes);
         }
 
+
+        /**
+         * Adds needed classes.
+         *
+         * @param classes the needed classes
+         */
         public void add(ResourceClass... classes)
         {
             add(Arrays.asList(classes));
         }
 
+
+        /**
+         * True if some needed class overlaps the given one.
+         *
+         * @param resClass the resource class
+         * @return true if some needed class overlaps the given one, false otherwise
+         */
         public boolean contains(ResourceClass resClass)
         {
             return set.stream().anyMatch(r -> !areDisjunct(r, resClass));
         }
 
+
+        /**
+         * True if some needed class overlaps one of the given ones.
+         *
+         * @param resClasses the resource classes
+         * @return true if some needed class overlaps one of the given ones, false otherwise
+         */
         public boolean contains(Set<ResourceClass> resClasses)
         {
             return resClasses.stream().anyMatch(r -> contains(r));
         }
 
+
+        /**
+         * True if the binding materialises exactly the needed classes.
+         *
+         * @param binding the variable binding
+         * @return true if the binding materialises exactly the needed classes, false otherwise
+         */
         public boolean isOptimized(VariableBinding binding)
         {
             return restrict(binding.getMappings()).equals(binding.getMappings());
         }
 
+
+        /**
+         * The mappings with the columns of unneeded classes set to null.
+         *
+         * @param mappings columns per resource class
+         * @return the mappings with the columns of unneeded classes set to null
+         */
         public Map<ResourceClass, List<Column>> restrict(Map<ResourceClass, List<Column>> mappings)
         {
             Map<ResourceClass, List<Column>> result = new HashMap<>();
@@ -136,11 +206,29 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Whether repeated evaluation gives the same value.
+     */
     protected final boolean isDeterministic;
+
+    /**
+     * Variables the expression refers to.
+     */
     protected final Set<Variable> referencedVariables = new HashSet<>();
+
+    /**
+     * Classes, columns and nullability of the value.
+     */
     protected final VariableBinding variableBinding;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     * @param isDeterministic whether the node is deterministic
+     */
     protected SqlExpressionIntercode(Map<ResourceClass, List<Column>> mappings, boolean canBeNull,
             boolean isDeterministic)
     {
@@ -149,28 +237,73 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Variables (with classes) the expression needs from its bindings.
+     *
+     * @return variables (with classes) the expression needs from its bindings
+     */
     public abstract Restrictions getRequirements();
 
 
+    /**
+     * Rebuilds the expression over the given (optimised) variable bindings, materialising only the classes in
+     * {@code restriction}; with {@code evalServices}, patterns nested in EXISTS evaluate their SERVICE stubs.
+     *
+     * @param request the current request
+     * @param bindings the variable bindings
+     * @param restriction the result classes the parent needs
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the resulting expression
+     */
     public abstract SqlExpressionIntercode optimize(Request request, VariableBindings bindings, Restriction restriction,
             boolean evalServices);
 
 
+    /**
+     * Appends a human-readable form; {@code priority} is the precedence of the enclosing operator, deciding whether
+     * parentheses are needed.
+     *
+     * @param builder the builder to append to
+     * @param indent the current indentation of the explanation
+     * @param priority precedence of the enclosing operator
+     */
     protected abstract void generateExplanation(StringBuilder builder, String indent, int priority);
 
 
+    /**
+     * Appends a human-readable form of the expression.
+     *
+     * @param builder the builder to append to
+     * @param indent the current indentation of the explanation
+     */
     public void generateExplanation(StringBuilder builder, String indent)
     {
         generateExplanation(builder, indent, 10);
     }
 
 
+    /**
+     * True if some class overlapping the given ones is computed by an SQL expression rather than a plain column or
+     * constant.
+     *
+     * @param resClasses the resource classes
+     * @return true if some class overlapping the given ones is computed by an SQL expression rather than a plain column
+     *         or constant, false otherwise
+     */
     public boolean hasExpressionColumn(Set<ResourceClass> resClasses)
     {
         return resClasses.stream().anyMatch(r -> hasExpressionColumn(r));
     }
 
 
+    /**
+     * True if some class overlapping the given one is computed by an SQL expression rather than a plain column or
+     * constant, in which case its evaluation should not be duplicated.
+     *
+     * @param resClass the resource class
+     * @return true if some class overlapping the given one is computed by an SQL expression rather than a plain column
+     *         or constant, in which case its evaluation should not be duplicated, false otherwise
+     */
     public boolean hasExpressionColumn(ResourceClass resClass)
     {
         for(Entry<ResourceClass, List<Column>> e : variableBinding.getMappings().entrySet())
@@ -181,6 +314,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * True if the value in {@code sourceClass} can be converted to {@code targetClass} without evaluating an SQL
+     * expression more than once.
+     *
+     * @param sourceClass the class to convert from
+     * @param targetClass the class to convert to
+     * @return true if the value in {@code sourceClass} can be converted to {@code targetClass} without evaluating an
+     *         SQL expression more than once, false otherwise
+     */
     public boolean canSafelyGeneralize(ResourceClass sourceClass, ResourceClass targetClass)
     {
         return sourceClass.getEffectiveClass().equals(targetClass) || sourceClass.isSubclassOf(targetClass)
@@ -188,6 +330,12 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Result class of a unary arithmetic operation: integer, decimal, float or double according to the operand.
+     *
+     * @param operandClass class of the operand
+     * @return result class of a unary arithmetic operation: integer, decimal, float or double according to the operand
+     */
     public static ResourceClass determineResultClass(ResourceClass operandClass)
     {
         if(isDouble(operandClass))
@@ -201,6 +349,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Result class of a binary arithmetic operation by numeric type promotion of the operands.
+     *
+     * @param leftClass class of the left operand
+     * @param rightClass class of the right operand
+     * @return result class of a binary arithmetic operation by numeric type promotion of the operands
+     */
     public static ResourceClass determineResultClass(ResourceClass leftClass, ResourceClass rightClass)
     {
         if(isDouble(leftClass) || isDouble(rightClass))
@@ -214,12 +369,24 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Numeric base classes overlapping the class.
+     *
+     * @param resClass the resource class
+     * @return numeric base classes overlapping the class
+     */
     public static Set<ResourceClass> getNumericClasses(ResourceClass resClass)
     {
         return numericBaseClasses.stream().filter(r -> !areDisjunct(r, resClass)).collect(toCollection(HashSet::new));
     }
 
 
+    /**
+     * Name of the (effective) class as used in the {@code sparql.*} function names of the pgsparql extension.
+     *
+     * @param resClass the resource class
+     * @return name of the (effective) class as used in the {@code sparql.*} function names of the pgsparql extension
+     */
     public static String getLiteralClassName(ResourceClass resClass)
     {
         return switch(resClass.getEffectiveClass())
@@ -271,6 +438,18 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Groups the possible results of an operation given as a map from result class to the argument class combinations
+     * producing it: combinations that would evaluate the same argument expression twice are merged, overlapping result
+     * classes are unioned (stored in {@code unionClass} when given), and results outside the restriction get null
+     * combinations.
+     *
+     * @param arguments the arguments
+     * @param map argument class combinations per result class
+     * @param restriction the result classes the parent needs
+     * @param unionClass class storing the union of overlapping results, or null
+     * @return grouped argument class combinations per result class, null where the result is not needed
+     */
     protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
             List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
             Restriction restriction, PrimitiveResourceClass unionClass)
@@ -365,6 +544,15 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * Groups the possible results without a fixed union class, see
+     * {@link #processResultMap(List, Map, Restriction, PrimitiveResourceClass)}.
+     *
+     * @param arguments the arguments
+     * @param map argument class combinations per result class
+     * @param restriction the result classes the parent needs
+     * @return grouped argument class combinations per result class, null where the result is not needed
+     */
     protected static Map<ResourceClass, Set<List<Set<ResourceClass>>>> processResultMap(
             List<SqlExpressionIntercode> arguments, Map<ResourceClass, Set<List<ResourceClass>>> map,
             Restriction restriction)
@@ -373,96 +561,185 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * SQL condition that the value is NULL.
+     *
+     * @return SQL condition that the value is NULL
+     */
     public String getIsNull()
     {
         return variableBinding.getIsNull();
     }
 
 
+    /**
+     * SQL condition that the value is not NULL.
+     *
+     * @return SQL condition that the value is not NULL
+     */
     public String getIsNotNull()
     {
         return variableBinding.getIsNotNull();
     }
 
 
+    /**
+     * SQL condition that the value has no value of the given class.
+     *
+     * @param resClass the resource class
+     * @return SQL condition that the value has no value of the given class
+     */
     public String getIsNull(ResourceClass resClass)
     {
         return variableBinding.getIsNull(resClass);
     }
 
 
+    /**
+     * SQL condition that the value has a value of the given class.
+     *
+     * @param resClass the resource class
+     * @return SQL condition that the value has a value of the given class
+     */
     public String getIsNotNull(ResourceClass resClass)
     {
         return variableBinding.getIsNotNull(resClass);
     }
 
 
+    /**
+     * Expression yielding the string value when the value is a string literal.
+     *
+     * @return expression yielding the string value when the value is a string literal
+     */
     protected Column getStringLiteral()
     {
         return variableBinding.getStringLiteral();
     }
 
 
+    /**
+     * Expression yielding the string value when the value belongs to one of the string literal classes.
+     *
+     * @param resClasses the resource classes
+     * @return expression yielding the string value when the value belongs to one of the string literal classes
+     */
     protected Column getStringLiteral(Set<ResourceClass> resClasses)
     {
         return variableBinding.getStringLiteral(resClasses);
     }
 
 
+    /**
+     * Expression yielding the numeric value taken in {@code source} promoted to {@code target}.
+     *
+     * @param source the class the value is taken in
+     * @param target the numeric class to promote to
+     * @return expression yielding the numeric value taken in {@code source} promoted to {@code target}
+     */
     protected Column promoteNumericAs(ResourceClass source, ResourceClass target)
     {
         return variableBinding.promoteNumericAs(source, target);
     }
 
 
+    /**
+     * COALESCE of the promotions from the source classes to {@code target}.
+     *
+     * @param set the source classes
+     * @param target the numeric class to promote to
+     * @return COALESCE of the promotions from the source classes to {@code target}
+     */
     public Column promoteNumericAs(Set<ResourceClass> set, ResourceClass target)
     {
         return variableBinding.promoteNumericAs(set, target);
     }
 
 
+    /**
+     * Columns of the value converted to the class, see {@link VariableBinding#deriveMapping(ResourceClass)}.
+     *
+     * @param resClass the resource class
+     * @return columns of the value converted to the class, see {@link VariableBinding#deriveMapping(ResourceClass)}
+     */
     public List<Column> get(ResourceClass resClass)
     {
         return variableBinding.deriveMapping(resClass);
     }
 
 
+    /**
+     * Columns per class; null columns mean the class is not materialised.
+     *
+     * @return columns per class; null columns mean the class is not materialised
+     */
     public Map<ResourceClass, List<Column>> getMappings()
     {
         return variableBinding.getMappings();
     }
 
 
+    /**
+     * Columns of exactly the given class, or null.
+     *
+     * @param resClass the resource class
+     * @return columns of exactly the given class, or null
+     */
     public List<Column> getMapping(ResourceClass resClass)
     {
         return variableBinding.getMapping(resClass);
     }
 
 
+    /**
+     * Classes the value may take.
+     *
+     * @return classes the value may take
+     */
     public Set<ResourceClass> getResourceClasses()
     {
         return variableBinding.getClasses();
     }
 
 
+    /**
+     * True if the expression may evaluate to NULL (an error, or an unbound variable).
+     *
+     * @return true if the expression may evaluate to NULL (an error, or an unbound variable), false otherwise
+     */
     public boolean canBeNull()
     {
         return variableBinding.canBeNull();
     }
 
 
+    /**
+     * Classes, columns and nullability of the value.
+     *
+     * @return classes, columns and nullability of the value
+     */
     public VariableBinding getBinding()
     {
         return variableBinding;
     }
 
 
+    /**
+     * True if repeated evaluation gives the same value.
+     *
+     * @return true if repeated evaluation gives the same value, false otherwise
+     */
     public boolean isDeterministic()
     {
         return isDeterministic;
     }
 
 
+    /**
+     * Variables the expression refers to.
+     *
+     * @return variables the expression refers to
+     */
     public Set<Variable> getReferencedVariables()
     {
         return referencedVariables;

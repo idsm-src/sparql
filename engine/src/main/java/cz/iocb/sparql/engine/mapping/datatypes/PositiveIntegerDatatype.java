@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:positiveInteger datatype.
+ */
 public final class PositiveIntegerDatatype extends VariableSizeIntegerDataType
 {
+    /**
+     * Creates the datatype.
+     */
     public PositiveIntegerDatatype()
     {
         super(xsdPositiveIntegerIri, Variant.POSITIVE);

@@ -5,15 +5,35 @@ import java.util.Objects;
 
 
 
+/**
+ * Blank node with a string value; its label is {@code s}, the segment as eight hexadecimal digits, and the UTF-8 bytes
+ * of the value with every non-alphanumeric byte escaped as {@code -XX}.
+ */
 public class StrBlankNode extends BlankNode
 {
+    /**
+     * Hexadecimal digits for escaping bytes of the label.
+     */
     private static final char[] encodeTable = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd',
             'e', 'f' };
 
+    /**
+     * String value within the segment.
+     */
     private final String value;
+
+    /**
+     * Segment the node belongs to.
+     */
     private final int segment;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param value the value
+     * @param segment the segment
+     */
     public StrBlankNode(String value, int segment)
     {
         this.value = value;
@@ -49,12 +69,22 @@ public class StrBlankNode extends BlankNode
     }
 
 
+    /**
+     * String value within the segment.
+     *
+     * @return string value within the segment
+     */
     public String getValue()
     {
         return value;
     }
 
 
+    /**
+     * Segment the node belongs to.
+     *
+     * @return segment the node belongs to
+     */
     public int getSegment()
     {
         return segment;

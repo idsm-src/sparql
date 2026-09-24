@@ -10,14 +10,23 @@ import cz.iocb.sparql.engine.mapping.classes.StringUserIriClass;
 
 
 
+/**
+ * Mappings of the controlled vocabulary terms and their hierarchy.
+ */
 public class Terminology
 {
+    /**
+     * Registers the IRI class of the terms.
+     */
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new StringUserIriClass("terminology", "http://nextprot.org/rdf/terminology/"));
     }
 
 
+    /**
+     * Registers the quad mappings of the terms.
+     */
     public static void addQuadMappings(SparqlDatabaseConfiguration config)
     {
         ConstantIriMapping graph = config.createIriMapping("<http://nextprot.org/rdf>");

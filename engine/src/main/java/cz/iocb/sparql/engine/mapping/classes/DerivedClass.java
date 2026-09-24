@@ -20,13 +20,35 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 
 
 
+/**
+ * Resource class built from primitive classes by union, intersection and difference. It is kept as a disjunction of
+ * conjunctions of possibly negated primitive classes, and its values are stored in the columns of an effective
+ * primitive class that is a superclass of all its positive members (the box unless something narrower fits).
+ */
 public class DerivedClass extends ResourceClass
 {
+    /**
+     * Disjunctive normal form: each term maps primitive classes to true (member) or false (excluded).
+     */
     private final Set<Map<PrimitiveResourceClass, Boolean>> terms;
+
+    /**
+     * Primitive class whose columns store the values.
+     */
     private final PrimitiveResourceClass effectiveClass;
+
+    /**
+     * Result classes the values may appear in.
+     */
     private final Set<ResultResourceClass> resultClasses;
 
 
+    /**
+     * Creates the class with an explicit effective class.
+     *
+     * @param terms the normal form
+     * @param effectiveClass primitive class storing the values
+     */
     private DerivedClass(Set<Map<PrimitiveResourceClass, Boolean>> terms, PrimitiveResourceClass effectiveClass)
     {
         super(generateName(terms, effectiveClass));
@@ -37,12 +59,26 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Creates the class, selecting the effective class automatically.
+     *
+     * @param terms the normal form
+     */
     private DerivedClass(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         this(terms, selectEfectiveClass(terms));
     }
 
 
+    /**
+     * Union of the classes stored in the columns of {@code effectiveClass}; collapses to a primitive class only when
+     * the union is exactly {@code effectiveClass}.
+     *
+     * @param classes the classes
+     * @param effectiveClass primitive class storing the values
+     * @return union of the classes stored in the columns of {@code effectiveClass}; collapses to a primitive class only
+     *         when the union is exactly {@code effectiveClass}
+     */
     public static ResourceClass unionize(Set<ResourceClass> classes, PrimitiveResourceClass effectiveClass)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> internal = normalize(union(getTerms(classes)));
@@ -56,6 +92,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Union of the classes; a union equal to a single primitive class is returned as that class.
+     *
+     * @param classes the classes
+     * @return union of the classes; a union equal to a single primitive class is returned as that class
+     */
     public static ResourceClass unionize(Set<ResourceClass> classes)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> internal = normalize(union(getTerms(classes)));
@@ -69,12 +111,24 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Union of the classes, see {@link #unionize(Set)}.
+     *
+     * @param classes the classes
+     * @return union of the classes, see {@link #unionize(Set)}
+     */
     public static ResourceClass unionize(ResourceClass... classes)
     {
         return unionize(new HashSet<>(Arrays.asList(classes)));
     }
 
 
+    /**
+     * Intersection of the classes; a result equal to a single primitive class is returned as that class.
+     *
+     * @param classes the classes
+     * @return intersection of the classes; a result equal to a single primitive class is returned as that class
+     */
     public static ResourceClass intersect(Set<ResourceClass> classes)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> internal = normalize(intersection(getTerms(classes)));
@@ -88,12 +142,25 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Intersection of the classes, see {@link #intersect(Set)}.
+     *
+     * @param classes the classes
+     * @return intersection of the classes, see {@link #intersect(Set)}
+     */
     public static ResourceClass intersect(ResourceClass... classes)
     {
         return intersect(new HashSet<>(Arrays.asList(classes)));
     }
 
 
+    /**
+     * The values of {@code a} that are not values of {@code b}.
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return the values of {@code a} that are not values of {@code b}
+     */
     public static ResourceClass subtract(ResourceClass a, ResourceClass b)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> internal = normalize(
@@ -108,24 +175,52 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Disjointness test on the normal forms of the classes (works for derived and primitive classes alike).
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return true if no term belongs to both classes, false otherwise
+     */
     public static boolean areDisjunct(ResourceClass a, ResourceClass b)
     {
         return isEmptyIntersection(getTerms(a), getTerms(b));
     }
 
 
+    /**
+     * Subclass test on the normal forms of the classes (works for derived and primitive classes alike).
+     *
+     * @param a one operand
+     * @param b the other operand
+     * @return true if every value of {@code a} is a value of {@code b}, false otherwise
+     */
     public static boolean isSubclassOf(ResourceClass a, ResourceClass b)
     {
         return isSubclassOf(getTerms(a), getTerms(b));
     }
 
 
+    /**
+     * Over-approximates the classes by the primitive classes occurring positively in them, dropping those that are
+     * subclasses of other members.
+     *
+     * @param classes the classes
+     * @return the approximating primitive classes
+     */
     public static Set<PrimitiveResourceClass> estimateAsUnion(Set<ResourceClass> classes)
     {
         return reduceSubclasses(classes.stream().flatMap(c -> estimateAsUnion(c).stream()).collect(toSet()));
     }
 
 
+    /**
+     * Over-approximates the class by the primitive classes occurring positively in it (negations are ignored), dropping
+     * those that are subclasses of other members.
+     *
+     * @param resClass the resource class
+     * @return the approximating primitive classes
+     */
     public static Set<PrimitiveResourceClass> estimateAsUnion(ResourceClass resClass)
     {
         if(resClass instanceof PrimitiveResourceClass primitive)
@@ -136,6 +231,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Union of normal forms: all terms together.
+     *
+     * @param branches the normal forms to combine
+     * @return the combined normal form
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> union(
             Set<Set<Map<PrimitiveResourceClass, Boolean>>> branches)
     {
@@ -143,6 +244,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Intersection of several normal forms.
+     *
+     * @param branches the normal forms to combine
+     * @return the intersected normal form
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> intersection(
             Set<Set<Map<PrimitiveResourceClass, Boolean>>> branches)
     {
@@ -155,6 +262,13 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Intersection of two normal forms: pairwise conjunction of their terms, dropping contradictory ones.
+     *
+     * @param a one normal form
+     * @param b the other normal form
+     * @return the intersected normal form
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> intersection(Set<Map<PrimitiveResourceClass, Boolean>> a,
             Set<Map<PrimitiveResourceClass, Boolean>> b)
     {
@@ -175,6 +289,13 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Conjunction of two terms; null when a class occurs with opposite signs.
+     *
+     * @param a one term
+     * @param b the other term
+     * @return the intersected normal form
+     */
     private static Map<PrimitiveResourceClass, Boolean> intersection(Map<PrimitiveResourceClass, Boolean> a,
             Map<PrimitiveResourceClass, Boolean> b)
     {
@@ -190,6 +311,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Complement of a normal form (De Morgan): intersection of the negations of its terms.
+     *
+     * @param terms the normal form
+     * @return complement of a normal form (De Morgan): intersection of the negations of its terms
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> complement(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         Set<Set<Map<PrimitiveResourceClass, Boolean>>> branches = new HashSet<>();
@@ -207,6 +334,13 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if every term of {@code left} is covered by the terms of {@code right}.
+     *
+     * @param left the normal form to test
+     * @param right the covering normal form
+     * @return true if every value of {@code a} is a value of {@code b}, false otherwise
+     */
     private static boolean isSubclassOf(Set<Map<PrimitiveResourceClass, Boolean>> left,
             Set<Map<PrimitiveResourceClass, Boolean>> right)
     {
@@ -226,6 +360,17 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if some value of {@code left} lies outside all terms of {@code right} from {@code index} on; recursion
+     * splits {@code left} by the literals of the current right term.
+     *
+     * @param <L> unused type parameter
+     * @param left the term to test
+     * @param right the covering terms
+     * @param index index of the right term to start at
+     * @return true if some value of {@code left} lies outside all terms of {@code right} from {@code index} on, false
+     *         otherwise
+     */
     private static <L> boolean existsOutsideRight(Map<PrimitiveResourceClass, Boolean> left,
             List<Map<PrimitiveResourceClass, Boolean>> right, int index)
     {
@@ -255,6 +400,13 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if no term of {@code a} overlaps a term of {@code b}.
+     *
+     * @param a one normal form
+     * @param b the other normal form
+     * @return true if no term of {@code a} overlaps a term of {@code b}, false otherwise
+     */
     private static boolean isEmptyIntersection(Set<Map<PrimitiveResourceClass, Boolean>> a,
             Set<Map<PrimitiveResourceClass, Boolean>> b)
     {
@@ -267,6 +419,14 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if the conjunction of the two terms is empty; assumes the class hierarchy has the 2-Helly property (pairwise
+     * overlapping literals overlap jointly).
+     *
+     * @param a one term
+     * @param b the other term
+     * @return true if the conjunction of the two terms is empty, false otherwise
+     */
     private static boolean isEmpty(Map<PrimitiveResourceClass, Boolean> a, Map<PrimitiveResourceClass, Boolean> b)
     {
         //NOTE: assume that the 2-helly property holds
@@ -280,6 +440,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if the term is contradictory.
+     *
+     * @param term the term
+     * @return true if the term is contradictory, false otherwise
+     */
     private static boolean isEmpty(Map<PrimitiveResourceClass, Boolean> term)
     {
         //NOTE: assume that the 2-helly property holds
@@ -293,6 +459,14 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * True if two signed classes exclude each other: the same class with opposite signs, a positive subclass with its
+     * negated superclass, or two positive unrelated (hence disjoint) classes.
+     *
+     * @param a one signed class
+     * @param b the other signed class
+     * @return true if two signed classes exclude each other, false otherwise
+     */
     private static boolean isEmpty(Entry<PrimitiveResourceClass, Boolean> a, Entry<PrimitiveResourceClass, Boolean> b)
     {
         if(a.getKey().equals(b.getKey()))
@@ -322,6 +496,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Simplifies a normal form: drops empty and covered terms and redundant literals until nothing changes.
+     *
+     * @param input the normal form
+     * @return the simplified normal form
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> normalize(Set<Map<PrimitiveResourceClass, Boolean>> input)
     {
         Set<Map<PrimitiveResourceClass, Boolean>> terms = prepareTerms(input);
@@ -339,6 +519,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Copies the normal form without its contradictory terms.
+     *
+     * @param input the normal form
+     * @return the normal form without its contradictory terms
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> prepareTerms(
             Set<Map<PrimitiveResourceClass, Boolean>> input)
     {
@@ -352,6 +538,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Removes one term implied by the other terms; true if some was removed.
+     *
+     * @param terms the normal form
+     * @return true if a term was removed, false otherwise
+     */
     private static boolean removeOneCoveredTerm(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         for(Map<PrimitiveResourceClass, Boolean> testedTerm : terms)
@@ -370,6 +562,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Drops one literal whose removal keeps the term within the union; true if some was dropped.
+     *
+     * @param terms the normal form
+     * @return true if a literal was dropped, false otherwise
+     */
     private static boolean removeOneRedundantLiteral(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         for(Map<PrimitiveResourceClass, Boolean> originalTerm : terms)
@@ -392,6 +590,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Removes the classes that are subclasses of other members.
+     *
+     * @param classes the classes
+     * @return the remaining classes
+     */
     private static Set<PrimitiveResourceClass> reduceSubclasses(Set<PrimitiveResourceClass> classes)
     {
         return classes.stream().filter(r -> classes.stream().noneMatch(c -> !r.equals(c) && r.isSubclassOf(c)))
@@ -399,6 +603,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Removes the classes that are superclasses of other members.
+     *
+     * @param classes the classes
+     * @return the remaining classes
+     */
     private static Set<PrimitiveResourceClass> reduceSuperclasses(Set<PrimitiveResourceClass> classes)
     {
         return classes.stream().filter(r -> classes.stream().noneMatch(c -> !r.equals(c) && c.isSubclassOf(r)))
@@ -406,12 +616,24 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Normal forms of the classes.
+     *
+     * @param classes the classes
+     * @return normal forms of the classes
+     */
     private static Set<Set<Map<PrimitiveResourceClass, Boolean>>> getTerms(Set<ResourceClass> classes)
     {
         return classes.stream().map(c -> getTerms(c)).collect(toSet());
     }
 
 
+    /**
+     * Normal form of a class: its own terms for a derived class, a single positive literal for a primitive one.
+     *
+     * @param resClass the resource class
+     * @return normal form of a class: its own terms for a derived class, a single positive literal for a primitive one
+     */
     private static Set<Map<PrimitiveResourceClass, Boolean>> getTerms(ResourceClass resClass)
     {
         if(resClass instanceof DerivedClass compositeClass)
@@ -423,6 +645,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * The primitive class a normal form denotes, or null when it is not a single positive literal.
+     *
+     * @param terms the normal form
+     * @return the primitive class a normal form denotes, or null when it is not a single positive literal
+     */
     private static PrimitiveResourceClass extract(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         if(terms.size() != 1)
@@ -442,6 +670,13 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Name of a derived class: the effective class followed by {@code @} and the normal form.
+     *
+     * @param terms the normal form
+     * @param effectiveClass primitive class storing the values
+     * @return name of a derived class: the effective class followed by {@code @} and the normal form
+     */
     private static String generateName(Set<Map<PrimitiveResourceClass, Boolean>> terms,
             PrimitiveResourceClass effectiveClass)
     {
@@ -452,30 +687,60 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Terms joined by {@code |}, sorted.
+     *
+     * @param terms the normal form
+     * @return terms joined by {@code |}, sorted
+     */
     private static String generateName(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         return terms.stream().map(t -> generateName(t)).sorted().collect(joining("|"));
     }
 
 
+    /**
+     * Literals of a term joined by {@code &}, sorted.
+     *
+     * @param term the term
+     * @return literals of a term joined by {@code &}, sorted
+     */
     private static String generateName(Map<PrimitiveResourceClass, Boolean> term)
     {
         return term.entrySet().stream().map(e -> generateName(e)).sorted().collect(joining("&"));
     }
 
 
+    /**
+     * A literal: the class name, prefixed by {@code !} when negated.
+     *
+     * @param e the signed class
+     * @return A literal: the class name, prefixed by {@code !} when negated
+     */
     private static String generateName(Entry<PrimitiveResourceClass, Boolean> e)
     {
         return (e.getValue() ? "" : "!") + e.getKey().getResourceName();
     }
 
 
+    /**
+     * Result classes of a normal form: the union over its terms.
+     *
+     * @param terms the normal form
+     * @return result classes of a normal form: the union over its terms
+     */
     private static Set<ResultResourceClass> generateResultClasses(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         return terms.stream().flatMap(t -> generateResultClasses(t).stream()).collect(toSet());
     }
 
 
+    /**
+     * Result classes common to all positive classes of the term.
+     *
+     * @param term the term
+     * @return result classes common to all positive classes of the term
+     */
     private static Set<ResultResourceClass> generateResultClasses(Map<PrimitiveResourceClass, Boolean> term)
     {
         Set<ResultResourceClass> result = new HashSet<>(BuiltinClasses.resultClasses);
@@ -488,6 +753,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Most specific common superclass of the positive classes of every term; the box when there is none.
+     *
+     * @param terms the normal form
+     * @return most specific common superclass of the positive classes of every term; the box when there is none
+     */
     private static PrimitiveResourceClass selectEfectiveClass(Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
         Set<PrimitiveResourceClass> candidates = reduceSuperclasses(getEfectiveClassCandidates(terms));
@@ -502,6 +773,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Superclasses common to all terms.
+     *
+     * @param terms the normal form
+     * @return superclasses common to all terms
+     */
     private static Set<PrimitiveResourceClass> getEfectiveClassCandidates(
             Set<Map<PrimitiveResourceClass, Boolean>> terms)
     {
@@ -519,6 +796,12 @@ public class DerivedClass extends ResourceClass
     }
 
 
+    /**
+     * Positive classes of the term with their superclasses, plus the box.
+     *
+     * @param term the term
+     * @return positive classes of the term with their superclasses, plus the box
+     */
     private static Set<PrimitiveResourceClass> getEfectiveClassCandidates(Map<PrimitiveResourceClass, Boolean> term)
     {
         Set<PrimitiveResourceClass> candidates = new HashSet<>(Set.of(box));

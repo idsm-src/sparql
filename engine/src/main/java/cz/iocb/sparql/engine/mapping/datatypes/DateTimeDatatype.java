@@ -23,10 +23,20 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * The xsd:dateTime datatype, limited to the range of PostgreSQL {@code timestamptz} and microsecond precision. Literals
+ * are classified by their timezone offset (see {@link DateTimeInZoneClass}).
+ */
 public final class DateTimeDatatype extends TemporalDatatype
 {
+    /**
+     * Lexical form of xsd:dateTime with optional timezone.
+     */
     private static final Pattern validFormPattern = Pattern.compile(XSD_DATETIME_PATTERN);
 
+    /**
+     * Parser of the lexical form with microsecond precision.
+     */
     private static final DateTimeFormatter inputFormatter = new DateTimeFormatterBuilder()//
             .appendValue(ChronoField.YEAR, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
@@ -38,6 +48,9 @@ public final class DateTimeDatatype extends TemporalDatatype
             .appendOffset("+HH:MM", "Z")//
             .toFormatter(Locale.ENGLISH);
 
+    /**
+     * Formatter of PostgreSQL {@code timestamptz} constants, with the {@code BC} suffix for negative years.
+     */
     private static final DateTimeFormatter outputFormatter = new DateTimeFormatterBuilder()//
             .appendValue(ChronoField.YEAR_OF_ERA, 4, 19, SignStyle.NORMAL).appendLiteral("-")//
             .appendValue(ChronoField.MONTH_OF_YEAR, 2).appendLiteral("-")//
@@ -51,11 +64,21 @@ public final class DateTimeDatatype extends TemporalDatatype
             .toFormatter(Locale.ENGLISH);
 
 
+    /**
+     * Lowest instant PostgreSQL can store.
+     */
     private static final OffsetDateTime MIN_VALUE = OffsetDateTime.parse("-4713-11-24T00:00:00Z", inputFormatter);
+
+    /**
+     * Highest instant PostgreSQL can store.
+     */
     private static final OffsetDateTime MAX_VALUE = OffsetDateTime.parse("294276-12-31T23:59:59.999999Z",
             inputFormatter);
 
 
+    /**
+     * Creates the datatype.
+     */
     protected DateTimeDatatype()
     {
         super(xsdDateTimeIri);
@@ -129,6 +152,14 @@ public final class DateTimeDatatype extends TemporalDatatype
     }
 
 
+    /**
+     * The instant of the literal converted to UTC, formatted as a PostgreSQL {@code timestamptz} constant (a missing
+     * timezone is taken as UTC).
+     *
+     * @param literal the literal
+     * @return the instant of the literal converted to UTC, formatted as a PostgreSQL {@code timestamptz} constant (a
+     *         missing timezone is taken as UTC)
+     */
     public static String getDateTime(Literal literal)
     {
         String value = Datatype.getCollapsedForm(literal.getValue()).replace("(\\.[0-9]{6})0*", "$1");
@@ -140,6 +171,12 @@ public final class DateTimeDatatype extends TemporalDatatype
     }
 
 
+    /**
+     * Timezone offset of the literal in seconds east of UTC; {@link Integer#MIN_VALUE} when it has none.
+     *
+     * @param literal the literal
+     * @return timezone offset of the literal in seconds east of UTC; {@link Integer#MIN_VALUE} when it has none
+     */
     public static int getZone(Literal literal)
     {
         String zone = Datatype.getCollapsedForm(literal.getValue()).replaceFirst(TemporalDatatype.DATETIME, "");

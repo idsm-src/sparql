@@ -7,17 +7,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * The single empty solution (the identity of join); translates to {@code SELECT 1}.
+ */
 public final class SqlEmptySolution extends SqlIntercode
 {
+    /**
+     * The only instance.
+     */
     static private final SqlEmptySolution singleton = new SqlEmptySolution();
 
 
+    /**
+     * Creates the singleton.
+     */
     private SqlEmptySolution()
     {
         super(new VariableBindings(), true);
     }
 
 
+    /**
+     * The only instance.
+     *
+     * @return the only instance
+     */
     public static SqlEmptySolution get()
     {
         return singleton;

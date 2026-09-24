@@ -21,12 +21,29 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 
+/**
+ * Builds {@link LiteralNode}s. Validates language tags and surrogate pairs, assigns xsd:string to plain literals and
+ * the matching xsd numeric or boolean type to shorthand literals.
+ */
 public class LiteralVisitor extends BaseVisitor<LiteralNode>
 {
+    /**
+     * Prologue of the query, used to resolve datatype IRIs.
+     */
     private final Prologue prologue;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param prologue the prologue of the query
+     * @param messages the message list to append to
+     */
     public LiteralVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
@@ -73,6 +90,12 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
     }
 
 
+    /**
+     * Resolves the {@code ECHAR} escapes of a string body.
+     *
+     * @param text the string body
+     * @return the text with the escapes resolved
+     */
     private static String unescape(String text)
     {
         // [160] ECHAR ::= '\' [tbnrf\"']
@@ -81,6 +104,12 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
     }
 
 
+    /**
+     * Strips the surrounding quotes (single, double or triple) and resolves the {@code ECHAR} escapes.
+     *
+     * @param text the quoted string
+     * @return the unquoted text with the escapes resolved
+     */
     public static String unquote(String text)
     {
         if(text.startsWith("\"\"\"") && text.endsWith("\"\"\"") || text.startsWith("'''") && text.endsWith("'''"))
@@ -94,6 +123,12 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
     }
 
 
+    /**
+     * Creates a numeric literal, choosing xsd:double, xsd:decimal or xsd:integer by its notation.
+     *
+     * @param text the numeric literal text
+     * @return the literal node with the assigned datatype
+     */
     private static LiteralNode createNumericLiteral(String text)
     {
         Iri type;
@@ -137,6 +172,13 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
     }
 
 
+    /**
+     * True if the string contains a high surrogate without a following low surrogate, or a lone low surrogate.
+     *
+     * @param str the string to check
+     * @return true if the string contains a high surrogate without a following low surrogate, or a lone low surrogate,
+     *         false otherwise
+     */
     private static boolean containsInvalidSurrogatePairs(String str)
     {
         for(int i = 0; i < str.length(); i++)

@@ -14,5 +14,10 @@ import cz.iocb.sparql.engine.model.base.Element;
  */
 public interface Pattern extends Element
 {
+    /**
+     * Variables the pattern brings into scope (SPARQL 1.1, section 18.2.1), in order of first occurrence.
+     *
+     * @return variables the pattern brings into scope (SPARQL 1.1, section 18.2.1), in order of first occurrence
+     */
     LinkedHashSet<VariableNode> getVariablesInScope();
 }

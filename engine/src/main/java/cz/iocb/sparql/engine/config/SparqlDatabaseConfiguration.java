@@ -84,28 +84,98 @@ import info.adams.ryu.RyuFloat;
 
 
 
+/**
+ * Describes one SPARQL endpoint deployment: prefixes, datatypes, user IRI classes, quad mappings of the database
+ * tables, procedures, extension functions and federated services. Deployments subclass it and register their
+ * definitions in the constructor; the endpoint instantiates it through JNDI, which requires a
+ * {@code (String service, DataSource, DatabaseSchema)} constructor.
+ */
 public class SparqlDatabaseConfiguration
 {
+    /**
+     * IRI of this endpoint's service, or null.
+     */
     protected final Iri serviceIri;
+
+    /**
+     * IRI of the graph holding the service description, or null.
+     */
     protected final Iri descriptionGraphIri;
 
+    /**
+     * Catalog facts of the target database.
+     */
     protected DatabaseSchema databaseSchema;
+
+    /**
+     * Connection pool of the target database.
+     */
     protected DataSource connectionPool;
+
+    /**
+     * Whether named-graph mappings are also added to the default graph.
+     */
     protected boolean autoAddToDefaultGraph;
 
+    /**
+     * Prefixes by name.
+     */
     protected Map<String, String> prefixes = new HashMap<>();
+
+    /**
+     * Datatypes by IRI.
+     */
     protected Map<Iri, Datatype> dataTypeMap = new HashMap<>();
+
+    /**
+     * User IRI classes ordered by check cost.
+     */
     protected List<UserIriClass> iriClasses = new ArrayList<>();
+
+    /**
+     * User IRI classes by name.
+     */
     protected Map<String, UserIriClass> iriClassMap = new HashMap<>();
 
+    /**
+     * This service followed by the imported services.
+     */
     private final List<Iri> services = new ArrayList<>();
+
+    /**
+     * Quad mappings per service.
+     */
     protected Map<Iri, List<QuadMapping>> mappings = new HashMap<>();
+
+    /**
+     * Procedures per service, by IRI.
+     */
     protected Map<Iri, Map<String, ProcedureDefinition>> procedures = new HashMap<>();
+
+    /**
+     * Extension functions per service, by IRI.
+     */
     protected Map<Iri, Map<String, FunctionDefinition>> functions = new HashMap<>();
 
+    /**
+     * Cache of IRI class detections shared by all requests.
+     */
     protected final IriCache iriCache = new IriCache(10000);
 
 
+    /**
+     * Creates a configuration with the built-in datatypes and no mappings.
+     *
+     * @param service IRI of the endpoint's own service, or null
+     * @param descriptionGraph IRI of the graph holding the service description; defaults to
+     *            {@code service#ServiceDescription}
+     * @param connectionPool the connection pool of the database
+     * @param schema the database schema
+     * @param autoAddToDefaultGraph if true, every mapping registered for a named graph is also added to the default
+     *            graph (union default graph)
+     *
+     * @throws SQLException on database errors
+     */
     public SparqlDatabaseConfiguration(String service, String descriptionGraph, DataSource connectionPool,
             DatabaseSchema schema, boolean autoAddToDefaultGraph) throws SQLException
     {
@@ -146,6 +216,15 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Creates a configuration with a union default graph.
+     *
+     * @param service the service IRI
+     * @param descriptionGraph IRI of the service description graph, or null for the default
+     * @param connectionPool the connection pool of the database
+     * @param schema the database schema
+     * @throws SQLException on database errors
+     */
     public SparqlDatabaseConfiguration(String service, String descriptionGraph, DataSource connectionPool,
             DatabaseSchema schema) throws SQLException
     {
@@ -153,6 +232,15 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Creates a configuration whose description graph defaults to {@code service#ServiceDescription}.
+     *
+     * @param service the service IRI
+     * @param connectionPool the connection pool of the database
+     * @param schema the database schema
+     * @param autoAddToDefaultGraph whether named-graph mappings are also added to the default graph
+     * @throws SQLException on database errors
+     */
     public SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema,
             boolean autoAddToDefaultGraph) throws SQLException
     {
@@ -160,6 +248,14 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * JNDI-compatible constructor: union default graph and default description graph.
+     *
+     * @param service the service IRI
+     * @param connectionPool the connection pool of the database
+     * @param schema the database schema
+     * @throws SQLException on database errors
+     */
     protected SparqlDatabaseConfiguration(String service, DataSource connectionPool, DatabaseSchema schema)
             throws SQLException
     {
@@ -167,6 +263,13 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a prefix available to queries and to {@link #createIriMapping(String)}; redefining it with a different
+     * IRI is an error.
+     *
+     * @param prefix the prefix
+     * @param iri IRI of the service
+     */
     public void addPrefix(String prefix, String iri)
     {
         String previous = prefixes.get(prefix);
@@ -179,6 +282,11 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a datatype; redefining its IRI with a different datatype is an error.
+     *
+     * @param dataType the datatype
+     */
     public void addDatatype(Datatype dataType)
     {
         Datatype previous = dataTypeMap.get(dataType.getTypeIri());
@@ -194,6 +302,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a user IRI class. Classes are kept ordered by {@link UserIriClass#getCheckCost}, so IRI class detection
+     * tries the cheap ones first.
+     *
+     * @param iriClass the user IRI class
+     */
     public void addIriClass(UserIriClass iriClass)
     {
         UserIriClass previous = iriClassMap.get(iriClass.getResourceName());
@@ -212,36 +326,76 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Column-based IRI mapping of the class over the given column specifications (see {@link #getColumn}).
+     *
+     * @param iriClass the user IRI class
+     * @param columns the columns
+     * @return column-based IRI mapping of the class over the given column specifications (see {@link #getColumn})
+     */
     public TermMapping createIriMapping(IriClass iriClass, String... columns)
     {
         return new ParametrisedIriMapping(iriClass, getColumns(columns));
     }
 
 
+    /**
+     * Column-based IRI mapping of the class over the given columns.
+     *
+     * @param iriClass the user IRI class
+     * @param columns the columns
+     * @return column-based IRI mapping of the class over the given columns
+     */
     public TermMapping createIriMapping(IriClass iriClass, List<Column> columns)
     {
         return new ParametrisedIriMapping(iriClass, columns);
     }
 
 
+    /**
+     * Column-based IRI mapping of the named class over the given columns.
+     *
+     * @param iriClass the user IRI class
+     * @param columns the columns
+     * @return column-based IRI mapping of the named class over the given columns
+     */
     public TermMapping createIriMapping(String iriClass, List<Column> columns)
     {
         return new ParametrisedIriMapping(getIriClass(iriClass), columns);
     }
 
 
+    /**
+     * Column-based IRI mapping of the named class over the given column specifications (see {@link #getColumn}).
+     *
+     * @param iriClassName name of the user IRI class
+     * @param columns the columns
+     * @return column-based IRI mapping of the named class over the given column specifications (see {@link #getColumn})
+     */
     public TermMapping createIriMapping(String iriClassName, String... columns)
     {
         return new ParametrisedIriMapping(getIriClass(iriClassName), getColumns(columns));
     }
 
 
+    /**
+     * Constant IRI mapping whose IRI class and columns are detected lazily.
+     *
+     * @param iri IRI of the service
+     * @return constant IRI mapping whose IRI class and columns are detected lazily
+     */
     public ConstantIriMapping createIriMapping(Iri iri)
     {
         return new ConstantIriMapping(iri);
     }
 
 
+    /**
+     * Constant IRI mapping from {@code <iri>} or from a prefixed name resolved by the registered prefixes.
+     *
+     * @param value the specification text
+     * @return constant IRI mapping from {@code <iri>} or from a prefixed name resolved by the registered prefixes
+     */
     public ConstantIriMapping createIriMapping(String value)
     {
         String iri = null;
@@ -269,66 +423,134 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Column-based blank node mapping over the given column specifications (see {@link #getColumn}).
+     *
+     * @param blankNodeClass the blank node class
+     * @param columns the columns
+     * @return column-based blank node mapping over the given column specifications (see {@link #getColumn})
+     */
     public TermMapping createBlankNodeMapping(BlankNodeClass blankNodeClass, String... columns)
     {
         return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(columns));
     }
 
 
+    /**
+     * Column-based literal mapping over the given column specifications (see {@link #getColumn}).
+     *
+     * @param literalClass the literal class
+     * @param columns the columns
+     * @return column-based literal mapping over the given column specifications (see {@link #getColumn})
+     */
     public TermMapping createLiteralMapping(LiteralClass literalClass, String... columns)
     {
         return new ParametrisedLiteralMapping(literalClass, getColumns(columns));
     }
 
 
+    /**
+     * Constant literal mapping in the given class.
+     *
+     * @param literalClass the literal class
+     * @param literal the literal
+     * @return constant literal mapping in the given class
+     */
     public TermMapping createLiteralMapping(LiteralClass literalClass, Literal literal)
     {
         return new ConstantLiteralMapping(literalClass, literal);
     }
 
 
+    /**
+     * Constant xsd:string literal mapping.
+     *
+     * @param value the specification text
+     * @return constant xsd:string literal mapping
+     */
     public TermMapping createLiteralMapping(String value)
     {
         return new ConstantLiteralMapping(xsdString, new TypedLiteral(value, xsdStringIri));
     }
 
 
+    /**
+     * Constant xsd:boolean literal mapping.
+     *
+     * @param value the specification text
+     * @return constant xsd:boolean literal mapping
+     */
     public TermMapping createLiteralMapping(boolean value)
     {
         return new ConstantLiteralMapping(xsdBoolean, new TypedLiteral(Boolean.toString(value), xsdBooleanIri));
     }
 
 
+    /**
+     * Constant xsd:short literal mapping.
+     *
+     * @param value the specification text
+     * @return constant xsd:short literal mapping
+     */
     public TermMapping createLiteralMapping(short value)
     {
         return new ConstantLiteralMapping(xsdShort, new TypedLiteral(Short.toString(value), xsdShortIri));
     }
 
 
+    /**
+     * Constant xsd:int literal mapping.
+     *
+     * @param value the specification text
+     * @return constant xsd:int literal mapping
+     */
     public TermMapping createLiteralMapping(int value)
     {
         return new ConstantLiteralMapping(xsdInt, new TypedLiteral(Integer.toString(value), xsdIntIri));
     }
 
 
+    /**
+     * Constant xsd:long literal mapping.
+     *
+     * @param value the specification text
+     * @return constant xsd:long literal mapping
+     */
     public TermMapping createLiteralMapping(long value)
     {
         return new ConstantLiteralMapping(xsdLong, new TypedLiteral(Long.toString(value), xsdLongIri));
     }
 
 
+    /**
+     * Constant xsd:float literal mapping in the shortest round-trip lexical form.
+     *
+     * @param value the specification text
+     * @return constant xsd:float literal mapping in the shortest round-trip lexical form
+     */
     public TermMapping createLiteralMapping(float value)
     {
         return new ConstantLiteralMapping(xsdFloat, new TypedLiteral(RyuFloat.floatToString(value), xsdFloatIri));
     }
 
 
+    /**
+     * Constant xsd:double literal mapping in the shortest round-trip lexical form.
+     *
+     * @param value the specification text
+     * @return constant xsd:double literal mapping in the shortest round-trip lexical form
+     */
     public TermMapping createLiteralMapping(double value)
     {
         return new ConstantLiteralMapping(xsdDouble, new TypedLiteral(RyuDouble.doubleToString(value), xsdDoubleIri));
     }
 
 
+    /**
+     * Registers a service IRI with no mappings, procedures or functions yet.
+     *
+     * @param service the service IRI
+     */
     protected void addEmptyService(Iri service)
     {
         services.add(service);
@@ -338,6 +560,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Adds a mapping to the given service, registering the service if new; duplicates are ignored.
+     *
+     * @param service the service IRI
+     * @param mapping the quad mapping
+     */
     private void addQuadMapping(Iri service, QuadMapping mapping)
     {
         if(!services.contains(service))
@@ -350,6 +578,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Adds a procedure to the given service, registering the service if new.
+     *
+     * @param service the service IRI
+     * @param procedure the procedure definition
+     */
     private void addProcedure(Iri service, ProcedureDefinition procedure)
     {
         if(!services.contains(service))
@@ -359,6 +593,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Adds a function to the given service, registering the service if new.
+     *
+     * @param service the service IRI
+     * @param function the function
+     */
     private void addFunction(Iri service, FunctionDefinition function)
     {
         if(!services.contains(service))
@@ -373,6 +613,9 @@ public class SparqlDatabaseConfiguration
      * collation. A mapped column with any other collation would therefore make ORDER BY and the relational operators
      * return a different order than the specification prescribes, and a different one than the same term gets when the
      * engine keeps it boxed in sparql.rdfbox.
+     *
+     * @param tables the tables
+     * @param terms the term mappings to check
      */
     private void checkColumnCollations(List<Table> tables, TermMapping... terms)
     {
@@ -397,6 +640,19 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a single-table quad mapping of this service (see {@link SingleTableQuadMapping}). With
+     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. Mapped character columns
+     * must use a code-point collation.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     * @param distinct distinct flag of each table
+     */
     public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object, Conditions conditions, boolean distinct)
     {
@@ -411,6 +667,16 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a single-table quad mapping without the distinct flag.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     */
     public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object, Conditions conditions)
     {
@@ -418,6 +684,15 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers an unconditional single-table quad mapping.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object)
     {
@@ -425,6 +700,14 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a quad made of constants only (no table).
+     *
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public void addQuadMapping(ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object)
     {
@@ -432,6 +715,20 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a join quad mapping of this service (see {@link JoinTableQuadMapping}): graph, subject and predicate
+     * come from the first table, the object from the last one. With {@code autoAddToDefaultGraph}, a named-graph
+     * mapping is also added to the default graph.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     * @param distinct distinct flag of each table
+     */
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
@@ -447,6 +744,17 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a join quad mapping without distinct flags.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     */
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions)
     {
@@ -455,6 +763,16 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers an unconditional join quad mapping.
+     *
+     * @param tables the tables
+     * @param joinColumnsPairs join columns between adjacent tables
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public void addQuadMapping(List<Table> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object)
     {
@@ -463,6 +781,19 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a two-table join mapping joined on one column pair of the given SQL type.
+     *
+     * @param subjectTable table of the subject
+     * @param objectTable table of the object
+     * @param subjectTableJoinColumn join column of the subject table
+     * @param objectTableJoinColumn join column of the object table
+     * @param type SQL type of the join columns
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object)
@@ -473,6 +804,21 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a two-table join mapping joined on one column pair, with conditions on each table.
+     *
+     * @param subjectTable table of the subject
+     * @param objectTable table of the object
+     * @param subjectTableJoinColumn join column of the subject table
+     * @param objectTableJoinColumn join column of the object table
+     * @param type SQL type of the join columns
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param subjectCondition conditions on the subject table
+     * @param objectCondition conditions on the object table
+     */
     public void addQuadMapping(Table subjectTable, Table objectTable, String subjectTableJoinColumn,
             String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object, Conditions subjectCondition, Conditions objectCondition)
@@ -484,18 +830,36 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Registers a procedure of this service.
+     *
+     * @param procedure the procedure definition
+     */
     public void addProcedure(ProcedureDefinition procedure)
     {
         procedures.get(serviceIri).put(procedure.getProcedureName(), procedure);
     }
 
 
+    /**
+     * Registers an extension function of this service.
+     *
+     * @param function the function
+     */
     public void addFunction(FunctionDefinition function)
     {
         functions.get(serviceIri).put(function.getFunctionName(), function);
     }
 
 
+    /**
+     * Imports another configuration: its datatypes and IRI classes are added, and its mappings, procedures and
+     * functions become available under its service IRIs (for SERVICE patterns) or, with {@code merge}, its own service
+     * is merged into this one together with its prefixes.
+     *
+     * @param other the configuration to import
+     * @param merge whether to merge the other service into this one
+     */
     public void addService(SparqlDatabaseConfiguration other, boolean merge)
     {
         if(merge)
@@ -524,6 +888,11 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Adds the quads of the SPARQL 1.1 service description (features, result formats, extension functions and procedure
+     * properties) to the description graph. Requires the {@code rdf}, {@code sd}, {@code ent} and {@code format}
+     * prefixes.
+     */
     public void addBasicServiceDescription()
     {
         //FIXME: code depends on prefix definitions
@@ -591,6 +960,13 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Parses a column specification: {@code (expression)} is an SQL expression, {@code 'literal'::type} a typed
+     * constant, anything else a column name.
+     *
+     * @param value the specification text
+     * @return the parsed column
+     */
     public static Column getColumn(String value)
     {
         if(value.startsWith("("))
@@ -603,6 +979,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Parses column specifications, see {@link #getColumn}.
+     *
+     * @param values the column specifications
+     * @return the parsed columns
+     */
     public static List<Column> getColumns(String... values)
     {
         List<Column> columns = new ArrayList<>(values.length);
@@ -614,48 +996,90 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * IRI of this endpoint's service, or null.
+     *
+     * @return IRI of this endpoint's service, or null
+     */
     public Iri getServiceIri()
     {
         return serviceIri;
     }
 
 
+    /**
+     * CONSTRUCT query returning the service description graph.
+     *
+     * @return CONSTRUCT query returning the service description graph
+     */
     public String getServiceDescriptionQuery()
     {
         return "construct {?s ?p ?o} where { graph " + descriptionGraphIri + " {?s ?p ?o}}";
     }
 
 
+    /**
+     * This service (first) and the imported federated services.
+     *
+     * @return this service (first) and the imported federated services
+     */
     public List<Iri> getServices()
     {
         return services;
     }
 
 
+    /**
+     * Prefixes by name.
+     *
+     * @return prefixes by name
+     */
     public Map<String, String> getPrefixes()
     {
         return prefixes;
     }
 
 
+    /**
+     * All registered datatypes.
+     *
+     * @return all registered datatypes
+     */
     public Collection<Datatype> getDatatypes()
     {
         return dataTypeMap.values();
     }
 
 
+    /**
+     * Datatype of the IRI, or null if not registered.
+     *
+     * @param iri IRI of the service
+     * @return datatype of the IRI, or null if not registered
+     */
     public Datatype getDatatype(Iri iri)
     {
         return dataTypeMap.get(iri);
     }
 
 
+    /**
+     * User IRI classes ordered by check cost.
+     *
+     * @return user IRI classes ordered by check cost
+     */
     public List<UserIriClass> getIriClasses()
     {
         return iriClasses;
     }
 
 
+    /**
+     * User IRI class of the given name; fails if unknown.
+     *
+     * @param name the name
+     * @return user IRI class of the given name; fails if unknown
+     */
     public UserIriClass getIriClass(String name)
     {
         UserIriClass iriClass = iriClassMap.get(name);
@@ -667,42 +1091,82 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Quad mappings of the given service.
+     *
+     * @param iri IRI of the service
+     * @return quad mappings of the given service
+     */
     public List<QuadMapping> getMappings(Iri iri)
     {
         return mappings.get(iri);
     }
 
 
+    /**
+     * Procedures of the given service, by IRI.
+     *
+     * @param iri IRI of the service
+     * @return procedures of the given service, by IRI
+     */
     public Map<String, ProcedureDefinition> getProcedures(Iri iri)
     {
         return procedures.get(iri);
     }
 
 
+    /**
+     * Extension functions of the given service, by IRI.
+     *
+     * @param iri IRI of the service
+     * @return extension functions of the given service, by IRI
+     */
     public Map<String, FunctionDefinition> getFunctions(Iri iri)
     {
         return functions.get(iri);
     }
 
 
+    /**
+     * Catalog facts of the target database.
+     *
+     * @return catalog facts of the target database
+     */
     public DatabaseSchema getDatabaseSchema()
     {
         return databaseSchema;
     }
 
 
+    /**
+     * Connection pool of the target database.
+     *
+     * @return connection pool of the target database
+     */
     public DataSource getConnectionPool()
     {
         return connectionPool;
     }
 
 
+    /**
+     * Configuration-wide cache of IRI class detections shared by all requests.
+     *
+     * @return configuration-wide cache of IRI class detections shared by all requests
+     */
     public final IriCache getIriCache()
     {
         return iriCache;
     }
 
 
+    /**
+     * Condition {@code column = v1 OR column = v2 ...} over column specifications (see {@link #getColumn}).
+     *
+     * @param column the column specification
+     * @param values the column specifications
+     * @return condition {@code column = v1 OR column = v2 ...} over column specifications (see {@link #getColumn})
+     */
     public Conditions createAreEqualCondition(String column, String... values)
     {
         Conditions result = new Conditions(false);
@@ -718,6 +1182,13 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Condition {@code column != v1 AND column != v2 ...} over column specifications (see {@link #getColumn}).
+     *
+     * @param column the column specification
+     * @param values the column specifications
+     * @return condition {@code column != v1 AND column != v2 ...} over column specifications (see {@link #getColumn})
+     */
     public Conditions createAreNotEqualCondition(String column, String... values)
     {
         Condition condition = new Condition();
@@ -729,6 +1200,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Condition {@code column IS NOT NULL}.
+     *
+     * @param column the column specification
+     * @return condition {@code column IS NOT NULL}
+     */
     public Conditions createIsNotNullCondition(String column)
     {
         Condition condition = new Condition();
@@ -737,6 +1214,12 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * Condition {@code column IS NULL}.
+     *
+     * @param column the column specification
+     * @return condition {@code column IS NULL}
+     */
     public Conditions createIsNullCondition(String column)
     {
         Condition condition = new Condition();

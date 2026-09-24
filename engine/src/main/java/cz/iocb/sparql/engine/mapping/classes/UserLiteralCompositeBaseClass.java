@@ -10,8 +10,15 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid literal of any user datatype: a {@code sparql.ubox} value, the datatype IRI and the lexical form; the
+ * result class of non-canonical user literals. Not usable for matching constants.
+ */
 public final class UserLiteralCompositeBaseClass extends BaseLiteralClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected UserLiteralCompositeBaseClass()
     {
         super("base-user", null, List.of("sparql.ubox", "varchar", "varchar"), Set.of(box));

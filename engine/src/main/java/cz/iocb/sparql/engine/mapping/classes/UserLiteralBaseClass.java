@@ -13,11 +13,24 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid literal of one user datatype stored in its PostgreSQL user type plus its lexical form.
+ */
 public final class UserLiteralBaseClass extends BaseLiteralClass
 {
+    /**
+     * PostgreSQL user type of the values.
+     */
     protected UserType sqlType;
 
 
+    /**
+     * Creates the class over the user type.
+     *
+     * @param name the name
+     * @param sqlType the PostgreSQL user type
+     * @param datatype the user datatype
+     */
     public UserLiteralBaseClass(String name, UserType sqlType, UserDatatype datatype)
     {
         super(name, datatype, List.of(sqlType.name(), "varchar"), Set.of(box, genUserType));

@@ -26,17 +26,52 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Left outer join implementing OPTIONAL: every solution of the left side is kept, extended by the compatible solutions
+ * of the right side that satisfy the conditions, or by unbound variables when there is none.
+ */
 public final class SqlLeftJoin extends SqlIntercode
 {
+    /**
+     * Alias of the left side.
+     */
     private static final Table leftTable = new Table("tab0");
+
+    /**
+     * Alias of the right side.
+     */
     private static final Table rightTable = new Table("tab1");
 
+    /**
+     * Left side, always kept.
+     */
     private final SqlIntercode left;
+
+    /**
+     * Right side, optional.
+     */
     private final SqlIntercode right;
+
+    /**
+     * Join conditions from the filters of the optional pattern.
+     */
     private final List<SqlExpressionIntercode> conditions;
+
+    /**
+     * For each output column, the side column it is taken from.
+     */
     private final Map<Column, Column> columnMap;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions
+     * @param columnMap the column map
+     */
     protected SqlLeftJoin(VariableBindings bindings, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions, Map<Column, Column> columnMap)
     {
@@ -50,6 +85,15 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Left join with the given filter conditions of the optional pattern.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions
+     * @return left join with the given filter conditions of the optional pattern
+     */
     public static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions)
     {
@@ -57,6 +101,18 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Left join exposing only what the parent needs; constant columns of the right side are turned into real columns so
+     * they can be tested for NULL.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions
+     * @param restrictions what the parent needs of the variables
+     * @return left join exposing only what the parent needs; constant columns of the right side are turned into real
+     *         columns so they can be tested for NULL
+     */
     protected static SqlIntercode leftJoin(Request request, SqlIntercode left, SqlIntercode right,
             List<SqlExpressionIntercode> conditions, Restrictions restrictions)
     {
@@ -80,6 +136,14 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * False if the sides can never match or a condition is always false or an error.
+     *
+     * @param left the left side
+     * @param right the right side
+     * @param conditions the conditions
+     * @return false if the sides can never match or a condition is always false or an error
+     */
     private static boolean isJoinable(SqlIntercode left, SqlIntercode right, List<SqlExpressionIntercode> conditions)
     {
         if(conditions.stream().anyMatch(f -> f.equals(SqlNull.get()) || f.equals(falseValue)
@@ -90,6 +154,12 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * The bindings with every variable marked as possibly unbound.
+     *
+     * @param bindings the variable bindings
+     * @return the bindings with every variable marked as possibly unbound
+     */
     private static VariableBindings setCanBeNull(VariableBindings bindings)
     {
         VariableBindings result = new VariableBindings();
@@ -101,6 +171,16 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Bindings under which the join conditions are evaluated: the variables of both sides addressed through the aliases
+     * of the join.
+     *
+     * @param request the current request
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @return bindings under which the join conditions are evaluated: the variables of both sides addressed through the
+     *         aliases of the join
+     */
     public static VariableBindings getExpressionVariableBindings(Request request, VariableBindings left,
             VariableBindings right)
     {
@@ -252,6 +332,16 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Optimises the conditions over the joined bindings, dropping those that are always true.
+     *
+     * @param request the current request
+     * @param conditions the conditions
+     * @param left bindings of the left side
+     * @param right bindings of the right side
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the optimised conditions
+     */
     private static List<SqlExpressionIntercode> optimize(Request request, List<SqlExpressionIntercode> conditions,
             VariableBindings left, VariableBindings right, boolean evalServices)
     {
@@ -310,18 +400,33 @@ public final class SqlLeftJoin extends SqlIntercode
     }
 
 
+    /**
+     * Left side, always kept.
+     *
+     * @return left side, always kept
+     */
     public final SqlIntercode getLeft()
     {
         return left;
     }
 
 
+    /**
+     * Right side, optional.
+     *
+     * @return right side, optional
+     */
     public final SqlIntercode getRight()
     {
         return right;
     }
 
 
+    /**
+     * Join conditions from the filters of the optional pattern.
+     *
+     * @return join conditions from the filters of the optional pattern
+     */
     public final List<SqlExpressionIntercode> getConditions()
     {
         return conditions;

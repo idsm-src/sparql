@@ -56,14 +56,41 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Translates AST expressions into {@link SqlExpressionIntercode} over the given variable bindings. Logical operands are
+ * wrapped in the effective boolean value, a function IRI naming a datatype becomes a cast, and EXISTS patterns are
+ * translated by the parent visitor.
+ */
 public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionIntercode>
 {
+    /**
+     * Current request.
+     */
     private final Request request;
+
+    /**
+     * Bindings of the variables the expressions may refer to.
+     */
     private final VariableBindings bindings;
+
+    /**
+     * Translator used for nested patterns (EXISTS) and the current service.
+     */
     private final TranslateVisitor parent;
+
+    /**
+     * Prologue of the query (BASE for IRI()).
+     */
     private final Prologue prologue;
 
 
+    /**
+     * Creates the visitor over the given bindings.
+     *
+     * @param request the current request
+     * @param bindings the variable bindings
+     * @param parent translator allocating fresh variables
+     */
     public ExpressionTranslateVisitor(Request request, VariableBindings bindings, TranslateVisitor parent)
     {
         this.request = request;

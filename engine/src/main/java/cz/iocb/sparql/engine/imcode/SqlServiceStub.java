@@ -52,26 +52,87 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Placeholder of a federated SERVICE call. During the first optimisation pass it only tracks its bindings; in the
+ * second pass ({@code evalServices}) {@link #eval} sends the pattern to the remote endpoint and the stub is replaced by
+ * the received solutions. It cannot be translated to SQL itself.
+ */
 public final class SqlServiceStub extends SqlIntercode
 {
+    /**
+     * State shared by the copies of one stub created during optimisation.
+     */
     private static class SharedState
     {
+        /**
+         * Evaluated results by context.
+         */
         public Map<SqlIntercode, SqlIntercode> results = new HashMap<>();
+
+
+        /**
+         * Creates an empty state.
+         */
+        SharedState()
+        {
+        }
+
     }
 
 
+    /**
+     * User-Agent header sent to remote endpoints.
+     */
     private static final String userAgent;
 
+    /**
+     * Maximum number of HTTP redirects followed.
+     */
     private static final int serviceRedirectLimit = 3;
+
+    /**
+     * Maximum number of context solutions sent in one call.
+     */
     private static final int serviceContextLimit = 1000;
+
+    /**
+     * Maximum number of solutions accepted from the endpoint.
+     */
     private static final int serviceResultLimit = 10000000;
 
+    /**
+     * Solutions the call is evaluated for.
+     */
     private final SqlIntercode context;
+
+    /**
+     * Endpoint IRI.
+     */
     private final RdfTerm name;
+
+    /**
+     * Variables of the pattern by their name in the sent query.
+     */
     private final Map<String, Variable> serviceVariables;
+
+    /**
+     * SPARQL text of the pattern.
+     */
     private final String serviceCode;
+
+    /**
+     * SILENT modifier.
+     */
     private final boolean silent;
+
+    /**
+     * Class of the blank nodes received from the endpoint.
+     */
     private final StrBlankNodeInSegmentClass blankNodeClass;
+
+    /**
+     * State shared with the other copies of the stub.
+     */
     private final SharedState state;
 
 
@@ -87,6 +148,18 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param name the endpoint IRI
+     * @param serviceCode SPARQL text of the pattern
+     * @param serviceVariables variables of the pattern by their name in the sent query
+     * @param context solutions the call is evaluated for
+     * @param blankNodeClass the blank node class
+     * @param silent the SILENT modifier
+     * @param state state shared by the copies of the stub
+     */
     protected SqlServiceStub(VariableBindings bindings, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
             boolean silent, SharedState state)
@@ -103,6 +176,18 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    /**
+     * Stub with fresh shared state; the received values may take any configured class.
+     *
+     * @param request the current request
+     * @param name the endpoint IRI
+     * @param serviceCode SPARQL text of the pattern
+     * @param serviceVariables variables of the pattern by their name in the sent query
+     * @param context solutions the call is evaluated for
+     * @param blankNodeClass the blank node class
+     * @param silent the SILENT modifier
+     * @return stub with fresh shared state; the received values may take any configured class
+     */
     public static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
             boolean silent)
@@ -112,6 +197,20 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    /**
+     * Stub with the given shared state, exposing only what the parent needs.
+     *
+     * @param request the current request
+     * @param name the endpoint IRI
+     * @param serviceCode SPARQL text of the pattern
+     * @param serviceVariables variables of the pattern by their name in the sent query
+     * @param context solutions the call is evaluated for
+     * @param blankNodeClass the blank node class
+     * @param silent the SILENT modifier
+     * @param restrictions what the parent needs of the variables
+     * @param state state shared by the copies of the stub
+     * @return stub with the given shared state, exposing only what the parent needs
+     */
     protected static SqlIntercode create(Request request, RdfTerm name, String serviceCode,
             Map<String, Variable> serviceVariables, SqlIntercode context, StrBlankNodeInSegmentClass blankNodeClass,
             boolean silent, Restrictions restrictions, SharedState state)
@@ -212,6 +311,18 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    /**
+     * Evaluates the call for the solutions of {@code context}: the SPARQL text extended by VALUES of the shared
+     * variables is sent over the SPARQL protocol (in chunks when the context is large), the XML results are collected
+     * by a {@link StoredResultHandler}, and the result joined with the context is returned. Results are cached per
+     * context in the state shared by the stubs of one call; a failing endpoint is an error unless the service is
+     * SILENT.
+     *
+     * @param request the current request
+     * @param context solutions the call is evaluated for
+     * @param restrictions what the parent needs of the variables
+     * @return the received solutions joined with the context
+     */
     public SqlIntercode eval(Request request, SqlIntercode context, Restrictions restrictions)
     {
         if(state.results.containsKey(context))
@@ -558,18 +669,33 @@ public final class SqlServiceStub extends SqlIntercode
     }
 
 
+    /**
+     * Variables of the SERVICE pattern by their name in the sent query.
+     *
+     * @return variables of the SERVICE pattern by their name in the sent query
+     */
     public Map<String, Variable> getServiceVariables()
     {
         return serviceVariables;
     }
 
 
+    /**
+     * SPARQL text of the SERVICE pattern.
+     *
+     * @return SPARQL text of the SERVICE pattern
+     */
     public String getServiceCode()
     {
         return serviceCode;
     }
 
 
+    /**
+     * Solutions the call is evaluated for.
+     *
+     * @return solutions the call is evaluated for
+     */
     public SqlIntercode getContext()
     {
         return context;

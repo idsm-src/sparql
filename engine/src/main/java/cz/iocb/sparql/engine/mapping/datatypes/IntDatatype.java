@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:int datatype.
+ */
 public final class IntDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public IntDatatype()
     {
         super(xsdIntIri, Integer.toString(Integer.MIN_VALUE), Integer.toString(Integer.MAX_VALUE));

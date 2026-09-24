@@ -7,17 +7,31 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * The constant NULL, i.e. an expression that always raises a SPARQL error.
+ */
 public final class SqlNull extends SqlExpressionIntercode
 {
+    /**
+     * The only instance.
+     */
     static private final SqlNull singleton = new SqlNull();
 
 
+    /**
+     * Creates the singleton.
+     */
     private SqlNull()
     {
         super(Map.of(), true, true);
     }
 
 
+    /**
+     * The only instance.
+     *
+     * @return the only instance
+     */
     public static SqlExpressionIntercode get()
     {
         return singleton;

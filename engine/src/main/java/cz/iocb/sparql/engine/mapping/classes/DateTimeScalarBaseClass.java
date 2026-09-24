@@ -12,8 +12,14 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Any valid xsd:dateTime value as a {@code sparql.zoneddatetime} column plus its lexical form.
+ */
 public final class DateTimeScalarBaseClass extends BaseLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected DateTimeScalarBaseClass()
     {
         super("base-datetime@1c", xsdDateTimeType, List.of("sparql.zoneddatetime", "varchar"),

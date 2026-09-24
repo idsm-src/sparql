@@ -11,15 +11,28 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Literals of one datatype in any valid lexical form: the native SQL value plus a varchar lexical column.
+ */
 public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass implements ResultResourceClass
         permits BooleanBaseClass, ByteBaseClass, UnsignedByteBaseClass, ShortBaseClass, UnsignedShortBaseClass,
         IntBaseClass, UnsignedIntBaseClass, LongBaseClass, UnsignedLongBaseClass, IntegerBaseClass,
         NonPositiveIntegerBaseClass, NegativeIntegerBaseClass, NonNegativeIntegerBaseClass, PositiveIntegerBaseClass,
         DecimalBaseClass, FloatBaseClass, DoubleBaseClass, DayTimeDurationBaseClass
 {
+    /**
+     * Name used in the {@code sparql.rdfbox_*} function names.
+     */
     private final String fname;
 
 
+    /**
+     * Creates the class named {@code base-name} with the value column of the SQL type and a varchar lexical column.
+     *
+     * @param name the name
+     * @param datatype the datatype
+     * @param sqlType the SQL type
+     */
     protected SimpleLiteralBaseClass(String name, Datatype datatype, String sqlType)
     {
         super("base-" + name, datatype, List.of(sqlType, "varchar"), Set.of(box));

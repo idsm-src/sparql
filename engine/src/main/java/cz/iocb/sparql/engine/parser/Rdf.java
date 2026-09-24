@@ -7,6 +7,9 @@ package cz.iocb.sparql.engine.parser;
  */
 public abstract class Rdf
 {
+    /**
+     * Not instantiable.
+     */
     private Rdf()
     {
     }

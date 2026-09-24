@@ -11,8 +11,17 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Mapping of a position to table columns; matches every term representable in its resource class.
+ */
 public abstract class ParametrisedMapping extends TermMapping
 {
+    /**
+     * Creates the mapping.
+     *
+     * @param resourceClass the resource class
+     * @param columns the columns
+     */
     protected ParametrisedMapping(ResourceClass resourceClass, List<Column> columns)
     {
         super(resourceClass, columns);
@@ -26,6 +35,12 @@ public abstract class ParametrisedMapping extends TermMapping
     }
 
 
+    /**
+     * Replaces each column by its counterpart in {@code columnMap} (left to right).
+     *
+     * @param columnMap the column map
+     * @return the remapped columns
+     */
     public List<Column> remapColumns(List<ColumnPair> columnMap)
     {
         List<Column> remappedColumns = new ArrayList<>();

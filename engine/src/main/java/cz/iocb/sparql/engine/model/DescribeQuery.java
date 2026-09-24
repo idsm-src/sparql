@@ -10,9 +10,19 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class DescribeQuery extends Query
 {
+    /**
+     * Resources to describe: variables or IRIs.
+     */
     private final LinkedList<VarOrIri> resources;
 
 
+    /**
+     * Creates the query from its prologue, described resources and select part.
+     *
+     * @param prologue the prologue of the query
+     * @param resources resources to describe
+     * @param select the query body
+     */
     public DescribeQuery(Prologue prologue, LinkedList<VarOrIri> resources, Select select)
     {
         super(prologue, select);
@@ -27,6 +37,11 @@ public class DescribeQuery extends Query
     }
 
 
+    /**
+     * Resources to describe: variables or IRIs.
+     *
+     * @return resources to describe: variables or IRIs
+     */
     public LinkedList<VarOrIri> getResources()
     {
         return resources;

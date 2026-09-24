@@ -8,11 +8,23 @@ import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
 
 
 
+/**
+ * Disjunction of {@link Condition}s, i.e. a condition in disjunctive normal form. No disjunct means false, a disjunct
+ * without predicates means true.
+ */
 public class Conditions
 {
+    /**
+     * The disjuncts.
+     */
     private Set<Condition> conditions = new HashSet<>();
 
 
+    /**
+     * Creates the constant condition {@code true} or {@code false}.
+     *
+     * @param value the constant truth value
+     */
     public Conditions(boolean value)
     {
         if(value)
@@ -20,30 +32,57 @@ public class Conditions
     }
 
 
+    /**
+     * Copy constructor.
+     *
+     * @param other the disjunction to add
+     */
     public Conditions(Conditions other)
     {
         conditions.addAll(other.conditions);
     }
 
 
+    /**
+     * Creates the disjunction of a single condition.
+     *
+     * @param condition the disjunct
+     */
     public Conditions(Condition condition)
     {
         conditions.add(condition);
     }
 
 
+    /**
+     * Adds a disjunct.
+     *
+     * @param condition the disjunct
+     */
     public void add(Condition condition)
     {
         conditions.add(condition);
     }
 
 
+    /**
+     * Adds all disjuncts of the other disjunction.
+     *
+     * @param other the disjunction to add
+     */
     public void add(Conditions other)
     {
         conditions.addAll(other.conditions);
     }
 
 
+    /**
+     * Conjunction of the disjunction with a single condition, distributed over the disjuncts.
+     *
+     * @param left the left condition
+     * @param right the right condition
+     * @return conjunction of the disjunction with a single condition, distributed over the disjuncts
+     */
     public static Conditions and(Conditions left, Condition right)
     {
         Conditions result = new Conditions(false);
@@ -55,6 +94,13 @@ public class Conditions
     }
 
 
+    /**
+     * Conjunction, distributed over the disjuncts.
+     *
+     * @param left the left condition
+     * @param right the right condition
+     * @return conjunction, distributed over the disjuncts
+     */
     public static Conditions and(Conditions left, Conditions right)
     {
         Conditions result = new Conditions(false);
@@ -67,6 +113,13 @@ public class Conditions
     }
 
 
+    /**
+     * Disjunction.
+     *
+     * @param left the left condition
+     * @param right the right condition
+     * @return disjunction
+     */
     public static Conditions or(Conditions left, Conditions right)
     {
         if(left.isTrue() || right.isTrue())
@@ -81,6 +134,12 @@ public class Conditions
     }
 
 
+    /**
+     * Conjunction of all the disjunctions.
+     *
+     * @param conditions the conditions
+     * @return conjunction of all the disjunctions
+     */
     public static Conditions and(Conditions... conditions)
     {
         Conditions result = new Conditions(true);
@@ -92,6 +151,12 @@ public class Conditions
     }
 
 
+    /**
+     * Disjunction of all the disjunctions.
+     *
+     * @param conditions the conditions
+     * @return disjunction of all the disjunctions
+     */
     public static Conditions or(Conditions... conditions)
     {
         Conditions result = new Conditions(true);
@@ -103,30 +168,57 @@ public class Conditions
     }
 
 
+    /**
+     * True if some disjunct is trivially true.
+     *
+     * @return true if some disjunct is trivially true
+     */
     public boolean isTrue()
     {
         return conditions.stream().anyMatch(c -> c.isTrue());
     }
 
 
+    /**
+     * True if every disjunct is contradictory.
+     *
+     * @return true if every disjunct is contradictory, false otherwise
+     */
     public boolean isFalse()
     {
         return conditions.stream().allMatch(c -> c.isFalse());
     }
 
 
+    /**
+     * Table columns equal to {@code col} in some disjunct.
+     *
+     * @param col the column
+     * @return table columns equal to {@code col} in some disjunct
+     */
     public Set<Column> getEqualTableColumns(Column col)
     {
         return conditions.stream().flatMap(c -> c.getEqualTableColumns(col).stream()).collect(toSet());
     }
 
 
+    /**
+     * Columns equal to {@code col} in some disjunct.
+     *
+     * @param col the column
+     * @return columns equal to {@code col} in some disjunct
+     */
     public Set<Column> getEqualColumns(Column col)
     {
         return conditions.stream().flatMap(c -> c.getEqualColumns(col).stream()).collect(toSet());
     }
 
 
+    /**
+     * All non-constant columns referenced by any disjunct.
+     *
+     * @return all non-constant columns referenced by any disjunct
+     */
     public Set<Column> getNonConstantColumns()
     {
         return conditions.stream().flatMap(c -> c.getNonConstantColumns().stream()).collect(toSet());
@@ -150,12 +242,22 @@ public class Conditions
     }
 
 
+    /**
+     * The disjuncts.
+     *
+     * @return the disjuncts
+     */
     public Set<Condition> getConditions()
     {
         return Collections.unmodifiableSet(conditions);
     }
 
 
+    /**
+     * Columns required to be not null by every disjunct.
+     *
+     * @return columns required to be not null by every disjunct
+     */
     public Set<Column> getIsNotNull()
     {
         if(conditions.isEmpty())
@@ -175,6 +277,11 @@ public class Conditions
     }
 
 
+    /**
+     * Columns required to be null by every disjunct.
+     *
+     * @return columns required to be null by every disjunct
+     */
     public Set<Column> getIsNull()
     {
         if(conditions.isEmpty())
@@ -194,6 +301,11 @@ public class Conditions
     }
 
 
+    /**
+     * Equalities holding in every disjunct.
+     *
+     * @return the resulting set
+     */
     public Set<ColumnComparison> getAreEqual()
     {
         if(conditions.isEmpty())
@@ -213,6 +325,11 @@ public class Conditions
     }
 
 
+    /**
+     * Inequalities holding in every disjunct.
+     *
+     * @return the resulting set
+     */
     public Set<ColumnComparison> getAreNotEqual()
     {
         if(conditions.isEmpty())

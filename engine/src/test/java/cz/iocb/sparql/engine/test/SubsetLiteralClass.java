@@ -13,11 +13,22 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Literal class standing in for a deployment-defined subclass of a built-in literal class: it stores the same values in
+ * the same columns as the original class, but is a distinct, more specific class. {@link SparqlTest} maps the literals
+ * of the test data to these classes to exercise the conversions between a class and its superclasses.
+ */
 public class SubsetLiteralClass extends CanonicalLiteralClass
 {
+    /**
+     * The built-in class this class is a subclass of.
+     */
     private final SimpleLiteralClass original;
 
 
+    /**
+     * Creates the subclass of {@code org}, named {@code <org>_sub}.
+     */
     public SubsetLiteralClass(SimpleLiteralClass org)
     {
         Set<PrimitiveResourceClass> superClasses = new HashSet<>();

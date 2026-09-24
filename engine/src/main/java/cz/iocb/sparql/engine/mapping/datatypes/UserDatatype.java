@@ -12,13 +12,35 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 
+/**
+ * Datatype defined by a deployment and backed by a PostgreSQL user type. It creates its own canonical and base literal
+ * classes; subclasses define validity and canonicalisation of the lexical forms.
+ */
 public abstract non-sealed class UserDatatype extends Datatype
 {
+    /**
+     * Class of all valid literals with their lexical form.
+     */
     private final LiteralClass baseClass;
+
+    /**
+     * Class of the canonical literals.
+     */
     private final LiteralClass canonicalClass;
+
+    /**
+     * Class of the valid but non-canonical literals.
+     */
     private final ResourceClass nonCanonicalClass;
 
 
+    /**
+     * Creates the datatype with literal classes named {@code name} and {@code base-name} over the SQL type.
+     *
+     * @param typeIri the datatype IRI
+     * @param name the name
+     * @param type the PostgreSQL user type
+     */
     protected UserDatatype(Iri typeIri, String name, UserType type)
     {
         super(typeIri);

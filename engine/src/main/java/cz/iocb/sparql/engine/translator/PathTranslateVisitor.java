@@ -64,25 +64,67 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Translates a triple pattern, possibly with a property path, into intermediate code over the quad mappings of the
+ * current service: plain predicates become unions of table accesses over the matching mappings, alternatives unions,
+ * sequences joins through fresh variables, repetitions recursive code and negated property sets filtered accesses.
+ */
 public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 {
+    /**
+     * Term bound to a position of a table access, with the mapping providing it.
+     *
+     * @param term the RDF term
+     * @param mapping the term mapping
+     */
     private static record MappedTerm(RdfTerm term, TermMapping mapping)
     {
     }
 
 
+    /**
+     * Name prefix of the fresh variables.
+     */
     private static final String variablePrefix = "@pathvar";
 
+    /**
+     * Current request.
+     */
     private final Request request;
 
+    /**
+     * Translator allocating fresh variables.
+     */
     private final TranslateVisitor parent;
+
+    /**
+     * Quad mappings in effect.
+     */
     private final List<QuadMapping> mappings;
 
+    /**
+     * Graph of the pattern being translated; null for the default graph.
+     */
     private RdfTerm graph = null;
+
+    /**
+     * Subject of the path element being translated.
+     */
     private RdfTerm subject = null;
+
+    /**
+     * Object of the path element being translated.
+     */
     private RdfTerm object = null;
 
 
+    /**
+     * Creates the visitor over the given mappings.
+     *
+     * @param request the current request
+     * @param parent translator allocating fresh variables
+     * @param mappings the quad mappings
+     */
     public PathTranslateVisitor(Request request, TranslateVisitor parent, List<QuadMapping> mappings)
     {
         this.request = request;
@@ -91,6 +133,15 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates the pattern {@code subject predicate object} in the given graph (null for the default graph).
+     *
+     * @param graph the graph term
+     * @param subject the subject term
+     * @param predicate the predicate
+     * @param object the object term
+     * @return the resulting intermediate code
+     */
     public SqlIntercode translate(RdfTerm graph, RdfTerm subject, Verb predicate, RdfTerm object)
     {
         if(predicate instanceof Path)
@@ -104,6 +155,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates a path element between the given subject and object; a null element or term yields no solution.
+     *
+     * @param element the element
+     * @param subject the subject term
+     * @param object the object term
+     * @return the resulting intermediate code
+     */
     SqlIntercode visitElement(Element element, RdfTerm subject, RdfTerm object)
     {
         if(element == null || subject == null || object == null)
@@ -270,6 +329,12 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates a plain predicate: the union of the table accesses of all mappings matching the pattern.
+     *
+     * @param predicate the predicate: an IRI or a variable
+     * @return the resulting intermediate code
+     */
     public SqlIntercode visit(VarOrIri predicate)
     {
         RdfTerm predicateTerm = getTerm(predicate);
@@ -290,6 +355,15 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates {@code !(iri1|iri2|...)}: every mapping whose predicate can differ from all listed IRIs, with the
+     * predicate constrained accordingly.
+     *
+     * @param subject the subject term
+     * @param negatedIriSet IRIs excluded by the negated property set
+     * @param object the object term
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateNegatedPath(RdfTerm subject, List<Iri> negatedIriSet, RdfTerm object)
     {
         List<SqlIntercode> unionList = new ArrayList<>();
@@ -349,6 +423,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates the zero-length path: the subject equals the object, ranging over all nodes of the graph when both are
+     * variables.
+     *
+     * @param subject the subject term
+     * @param object the object term
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateZeroPath(RdfTerm subject, RdfTerm object)
     {
         if(subject instanceof Variable subjectVar && object instanceof Variable objectVar)
@@ -397,6 +479,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Translates one quad mapping into a table access (or a join of table accesses for join mappings) binding the terms
+     * of the pattern.
+     *
+     * @param qmapping the quad mapping
+     * @param graph the graph term
+     * @param subject the subject term
+     * @param predicate the predicate term
+     * @param object the object term
+     * @param predicateConditions conditions on the predicate columns
+     * @return the resulting intermediate code
+     */
     private SqlIntercode translateMapping(QuadMapping qmapping, RdfTerm graph, RdfTerm subject, RdfTerm predicate,
             RdfTerm object, Conditions predicateConditions)
     {
@@ -474,6 +568,18 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Table access binding the mapped terms: constants become conditions, repeated variables become equalities, and
+     * mapped columns of variables are exposed as bindings.
+     *
+     * @param request the current request
+     * @param table the table
+     * @param extraCondition additional conditions on the table
+     * @param maps terms bound to the mapped positions
+     * @param distinct whether the mapping declares distinct rows
+     * @return table access binding the mapped terms: constants become conditions, repeated variables become equalities,
+     *         and mapped columns of variables are exposed as bindings
+     */
     private static SqlIntercode getTableAccess(Request request, Table table, Conditions extraCondition,
             List<MappedTerm> maps, boolean distinct)
     {
@@ -541,6 +647,16 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Expression testing that the two terms denote the same RDF term (or not).
+     *
+     * @param request the current request
+     * @param term1 the first term
+     * @param term2 the second term
+     * @param not whether the test is negated
+     * @param bindings the variable bindings
+     * @return expression testing that the two terms denote the same RDF term (or not)
+     */
     private static SqlExpressionIntercode getComparisonExpression(Request request, RdfTerm term1, RdfTerm term2,
             boolean not, VariableBindings bindings)
     {
@@ -556,6 +672,14 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
     }
 
 
+    /**
+     * Expression evaluating the term: a variable reference or a constant.
+     *
+     * @param request the current request
+     * @param term the RDF term
+     * @param bindings the variable bindings
+     * @return expression evaluating the term: a variable reference or a constant
+     */
     private static SqlExpressionIntercode getExpression(Request request, RdfTerm term, VariableBindings bindings)
     {
         return switch(term)

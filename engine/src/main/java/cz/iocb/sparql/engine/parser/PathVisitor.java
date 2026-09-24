@@ -24,12 +24,29 @@ import cz.iocb.sparql.engine.model.triple.SequencePath;
 
 
 
+/**
+ * Builds property {@link Path}s. Alternatives and sequences with a single element collapse to that element; {@code a}
+ * becomes {@code rdf:type}.
+ */
 public class PathVisitor extends BaseVisitor<Path>
 {
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param prologue the prologue of the query
+     * @param messages the message list to append to
+     */
     public PathVisitor(Prologue prologue, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
@@ -37,6 +54,12 @@ public class PathVisitor extends BaseVisitor<Path>
     }
 
 
+    /**
+     * Visits each context as a path.
+     *
+     * @param pathSequenceContexts the path element contexts
+     * @return the parsed paths
+     */
     private List<Path> visitPathList(List<? extends ParserRuleContext> pathSequenceContexts)
     {
         return pathSequenceContexts.stream().map(this::visit).toList();

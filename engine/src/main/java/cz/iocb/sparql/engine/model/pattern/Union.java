@@ -16,9 +16,17 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class Union extends PatternElement implements Pattern
 {
+    /**
+     * Branches of the union.
+     */
     private final List<GraphPattern> patterns;
 
 
+    /**
+     * Creates the union; the variables of all branches become in scope.
+     *
+     * @param patterns the branches
+     */
     public Union(Collection<GraphPattern> patterns)
     {
         this.patterns = Collections.unmodifiableList(new ArrayList<>(patterns));
@@ -28,6 +36,11 @@ public class Union extends PatternElement implements Pattern
     }
 
 
+    /**
+     * Branches of the union.
+     *
+     * @return branches of the union
+     */
     public List<GraphPattern> getPatterns()
     {
         return patterns;

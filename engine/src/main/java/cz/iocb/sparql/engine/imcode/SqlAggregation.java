@@ -29,13 +29,37 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * GROUP BY over the group variables with the aggregate expressions computed per group; without group variables all
+ * solutions form one group.
+ */
 public final class SqlAggregation extends SqlIntercode
 {
+    /**
+     * Solutions being grouped.
+     */
     private final SqlIntercode child;
+
+    /**
+     * Grouping variables.
+     */
     private final Set<Variable> groupVariables;
+
+    /**
+     * Aggregate expression of each result variable.
+     */
     private final Map<Variable, SqlExpressionIntercode> aggregations;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param bindings the variable bindings
+     * @param isDeterministic whether the node is deterministic
+     * @param groupVariables the grouping variables
+     * @param aggregations aggregate expression of each result variable
+     * @param child the child node
+     */
     protected SqlAggregation(VariableBindings bindings, boolean isDeterministic, Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
@@ -47,6 +71,15 @@ public final class SqlAggregation extends SqlIntercode
     }
 
 
+    /**
+     * Aggregation of the child, binding each aggregate expression to its variable.
+     *
+     * @param request the current request
+     * @param groupVariables the grouping variables
+     * @param aggregations aggregate expression of each result variable
+     * @param child the child node
+     * @return aggregation of the child, binding each aggregate expression to its variable
+     */
     public static SqlIntercode aggregate(Request request, Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child)
     {
@@ -54,6 +87,18 @@ public final class SqlAggregation extends SqlIntercode
     }
 
 
+    /**
+     * Aggregation of the child restricted to the parent's needs; a result variable is deterministic only if its
+     * aggregate is.
+     *
+     * @param request the current request
+     * @param groupVariables the grouping variables
+     * @param aggregations aggregate expression of each result variable
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @return aggregation of the child restricted to the parent's needs; a result variable is deterministic only if its
+     *         aggregate is
+     */
     protected static SqlIntercode aggregate(Request request, Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions)
     {
@@ -231,6 +276,17 @@ public final class SqlAggregation extends SqlIntercode
     }
 
 
+    /**
+     * Optimises the aggregates over the child's bindings, drops those the parent does not need, and turns {@code
+     * COUNT(x)} of a never-null argument and {@code COUNT(DISTINCT key)} over a table key into a plain row count.
+     *
+     * @param request the current request
+     * @param aggregations aggregate expression of each result variable
+     * @param child the child node
+     * @param restrictions what the parent needs of the variables
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the optimised aggregates by result variable
+     */
     private Map<Variable, SqlExpressionIntercode> optimizeAggregations(Request request,
             Map<Variable, SqlExpressionIntercode> aggregations, SqlIntercode child, Restrictions restrictions,
             boolean evalServices)
@@ -268,6 +324,14 @@ public final class SqlAggregation extends SqlIntercode
     }
 
 
+    /**
+     * Restrictions for the child: the grouping variables plus the requirements of the needed aggregates.
+     *
+     * @param groupVariables the grouping variables
+     * @param aggregations aggregate expression of each result variable
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for the child: the grouping variables plus the requirements of the needed aggregates
+     */
     private static Restrictions getChildRestrictions(Set<Variable> groupVariables,
             Map<Variable, SqlExpressionIntercode> aggregations, Restrictions restrictions)
     {

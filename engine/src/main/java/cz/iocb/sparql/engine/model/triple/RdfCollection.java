@@ -22,21 +22,37 @@ import cz.iocb.sparql.engine.parser.Parser;
  */
 public class RdfCollection extends BaseComplexNode implements ComplexNode, ComplexElement
 {
+    /**
+     * Members of the collection in order.
+     */
     private final List<ComplexNode> nodes;
 
 
+    /**
+     * Creates the empty collection ({@code ()}, i.e. {@code rdf:nil}).
+     */
     public RdfCollection()
     {
         this.nodes = new ArrayList<>();
     }
 
 
+    /**
+     * Creates the collection of the given members.
+     *
+     * @param nodes the members
+     */
     public RdfCollection(Collection<ComplexNode> nodes)
     {
         this.nodes = new ArrayList<>(nodes);
     }
 
 
+    /**
+     * Members of the collection in order (modifiable).
+     *
+     * @return members of the collection in order (modifiable)
+     */
     public List<ComplexNode> getNodes()
     {
         return nodes;

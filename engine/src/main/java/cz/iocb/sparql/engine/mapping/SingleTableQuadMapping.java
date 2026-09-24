@@ -5,13 +5,38 @@ import cz.iocb.sparql.engine.database.Table;
 
 
 
+/**
+ * Quad mapping over a single table (or none, for quads made of constants only), restricted by {@code conditions}. With
+ * {@code distinct}, the table is declared to hold no two rows equal in the mapped columns, so the access needs no
+ * deduplication when the whole set of mapped columns is selected.
+ */
 public class SingleTableQuadMapping extends QuadMapping
 {
+    /**
+     * The table; null for constant-only quads.
+     */
     private final Table table;
+
+    /**
+     * Conditions restricting the rows.
+     */
     private final Conditions conditions;
+
+    /**
+     * True if the mapped columns hold no duplicate rows.
+     */
     private final boolean distinct;
 
 
+    /**
+     * Creates an unconditional mapping.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     */
     public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object)
     {
@@ -19,6 +44,16 @@ public class SingleTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates a mapping restricted by conditions.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     */
     public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions)
     {
@@ -26,6 +61,17 @@ public class SingleTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * Creates a mapping restricted by conditions, with the distinct flag.
+     *
+     * @param table the table
+     * @param graph the graph mapping, or null for the default graph
+     * @param subject the subject mapping
+     * @param predicate the predicate mapping
+     * @param object the object mapping
+     * @param conditions the conditions
+     * @param distinct whether the mapping declares distinct rows
+     */
     public SingleTableQuadMapping(Table table, TermMapping graph, TermMapping subject, TermMapping predicate,
             TermMapping object, Conditions conditions, boolean distinct)
     {
@@ -60,18 +106,33 @@ public class SingleTableQuadMapping extends QuadMapping
     }
 
 
+    /**
+     * The table; null for constant-only quads.
+     *
+     * @return the table; null for constant-only quads
+     */
     public final Table getTable()
     {
         return table;
     }
 
 
+    /**
+     * Conditions restricting the rows.
+     *
+     * @return conditions restricting the rows
+     */
     public final Conditions getConditions()
     {
         return conditions;
     }
 
 
+    /**
+     * True if the mapped columns hold no duplicate rows.
+     *
+     * @return true if the mapped columns hold no duplicate rows, false otherwise
+     */
     public final boolean isDistinct()
     {
         return distinct;

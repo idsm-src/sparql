@@ -19,15 +19,47 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
+/**
+ * Rewrites the expressions of a grouped select (projections, HAVING, ORDER BY): every aggregate call is replaced by a
+ * fresh variable, and a variable not in GROUP BY by a fresh variable bound to {@code SAMPLE} of it. {@code
+ * COUNT(*)} becomes the internal {@code card} function (over the in-scope variables when DISTINCT). The replacements
+ * are collected in {@link #getAggregations}.
+ */
 public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expression>
 {
+    /**
+     * Name prefix of the fresh variables.
+     */
     private static final String variablePrefix = "@aggregationvar";
+
+    /**
+     * Translator allocating fresh variables.
+     */
     private final TranslateVisitor parent;
+
+    /**
+     * Fresh variables and the aggregates they stand for.
+     */
     private final LinkedHashMap<VariableNode, BuiltInCallExpression> aggregations = new LinkedHashMap<>();
+
+    /**
+     * Variables in scope of the WHERE clause that are not grouped ({@code COUNT(DISTINCT *)} counts over them).
+     */
     private final Set<VariableNode> scopeVars;
+
+    /**
+     * Grouped variables, usable directly.
+     */
     private final Set<VariableNode> groupVars;
 
 
+    /**
+     * Creates the rewriter for one grouped select.
+     *
+     * @param parent translator allocating fresh variables
+     * @param scopeVars in-scope variables that are not grouped
+     * @param groupVars the grouped variables
+     */
     public ExpressionAggregationRewriteVisitor(TranslateVisitor parent, Set<VariableNode> scopeVars,
             Set<VariableNode> groupVars)
     {
@@ -160,6 +192,11 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     }
 
 
+    /**
+     * Fresh variables and the aggregate expressions they stand for, in order of creation.
+     *
+     * @return fresh variables and the aggregate expressions they stand for, in order of creation
+     */
     public LinkedHashMap<VariableNode, BuiltInCallExpression> getAggregations()
     {
         return aggregations;

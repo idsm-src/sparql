@@ -11,9 +11,18 @@ import cz.iocb.sparql.engine.model.triple.RdfCollection;
 
 /**
  * Abstract visitor for {@link ComplexElement}s.
+ *
+ * @param <T> the result type of the visit
  */
 public abstract class ComplexElementVisitor<T> extends ElementVisitor<T>
 {
+    /**
+     * Creates the visitor.
+     */
+    protected ComplexElementVisitor()
+    {
+    }
+
     @Override
     public T visitElement(Element element)
     {
@@ -26,6 +35,12 @@ public abstract class ComplexElementVisitor<T> extends ElementVisitor<T>
     }
 
 
+    /**
+     * Visits a complex element; returns null for a null element.
+     *
+     * @param element the element to visit
+     * @return the result of the visit, or null for a null element
+     */
     public T visitElement(ComplexElement element)
     {
         if(element == null)
@@ -35,24 +50,48 @@ public abstract class ComplexElementVisitor<T> extends ElementVisitor<T>
     }
 
 
+    /**
+     * Visits a complex triple; returns the default result unless overridden.
+     *
+     * @param complexTriple the visited element
+     * @return the result of the visit
+     */
     public T visit(ComplexTriple complexTriple)
     {
         return defaultResult();
     }
 
 
+    /**
+     * Visits an RDF collection; returns the default result unless overridden.
+     *
+     * @param rdfCollection the visited element
+     * @return the result of the visit
+     */
     public T visit(RdfCollection rdfCollection)
     {
         return defaultResult();
     }
 
 
+    /**
+     * Visits a blank node property list; returns the default result unless overridden.
+     *
+     * @param blankNodePropertyList the visited element
+     * @return the result of the visit
+     */
     public T visit(BlankNodePropertyList blankNodePropertyList)
     {
         return defaultResult();
     }
 
 
+    /**
+     * Visits a property; returns the default result unless overridden.
+     *
+     * @param property the visited element
+     * @return the result of the visit
+     */
     public T visit(Property property)
     {
         return defaultResult();

@@ -40,9 +40,23 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
 
+/**
+ * Serialises the AST of a SERVICE pattern back to SPARQL text to be sent to the remote endpoint.
+ */
 public class ServiceTranslateVisitor extends ElementVisitor<Void>
 {
+    /**
+     * Generated SPARQL text.
+     */
     private StringBuilder builder = new StringBuilder();
+
+
+    /**
+     * Creates the visitor with an empty output.
+     */
+    public ServiceTranslateVisitor()
+    {
+    }
 
 
     @Override
@@ -584,6 +598,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
     }
 
 
+    /**
+     * SPARQL text of the pattern.
+     *
+     * @param graphPattern the pattern to serialise
+     * @return SPARQL text of the pattern
+     */
     public String getResultCode(GraphPattern graphPattern)
     {
         visitElement(graphPattern);

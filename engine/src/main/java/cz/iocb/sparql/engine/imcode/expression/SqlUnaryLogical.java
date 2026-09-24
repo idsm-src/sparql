@@ -19,11 +19,25 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Logical NOT of an effective boolean value.
+ */
 public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpression
 {
+    /**
+     * Values the expression can take besides an error.
+     */
     private final NonConstantBooleanValue value;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param operand the operand
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     * @param value values the expression can take besides an error
+     */
     private SqlUnaryLogical(SqlExpressionIntercode operand, Map<ResourceClass, List<Column>> mappings,
             boolean canBeNull, NonConstantBooleanValue value)
     {
@@ -33,12 +47,25 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
     }
 
 
+    /**
+     * Negation of a boolean operand.
+     *
+     * @param operand the operand
+     * @return negation of a boolean operand
+     */
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand)
     {
         return create(operand, Restriction.ALL);
     }
 
 
+    /**
+     * Negation materialising only when needed; constants are folded.
+     *
+     * @param operand the operand
+     * @param restriction the result classes the parent needs
+     * @return negation materialising only when needed; constants are folded
+     */
     public static SqlExpressionIntercode create(SqlExpressionIntercode operand, Restriction restriction)
     {
         if(operand.equals(SqlNull.get()))
@@ -65,6 +92,12 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
     }
 
 
+    /**
+     * SQL negating the boolean value of the operand.
+     *
+     * @param operand the operand
+     * @return SQL negating the boolean value of the operand
+     */
     private static List<Column> translate(SqlExpressionIntercode operand)
     {
         return List.of(new ExpressionColumn("(not " + operand.get(genBoolean).get(0) + ")", operand.canBeNull()));

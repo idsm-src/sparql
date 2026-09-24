@@ -12,8 +12,14 @@ import cz.iocb.sparql.engine.rdf.IntBlankNode;
 
 
 
+/**
+ * Integer blank nodes as separate {@code int4} value and segment columns; the result class of integer blank nodes.
+ */
 public final class IntBlankNodeCompositeClass extends IntBlankNodeClass implements ResultResourceClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected IntBlankNodeCompositeClass()
     {
         super("iblanknode@2c", List.of("int4", "int4"), Set.of(box, intScalarBlankNode));

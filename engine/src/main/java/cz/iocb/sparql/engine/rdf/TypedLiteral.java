@@ -4,11 +4,23 @@ import java.util.Objects;
 
 
 
+/**
+ * Literal with an explicit datatype IRI.
+ */
 public class TypedLiteral extends Literal
 {
+    /**
+     * Datatype IRI.
+     */
     private final Iri type;
 
 
+    /**
+     * Creates the literal.
+     *
+     * @param value the lexical form
+     * @param typeIri the datatype IRI
+     */
     public TypedLiteral(String value, Iri typeIri)
     {
         super(value);

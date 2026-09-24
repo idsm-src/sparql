@@ -11,10 +11,22 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public final class VariableNode extends BaseComplexNode implements VarOrIri, Verb, VariableOrBlankNode
 {
+    /**
+     * Name without the leading {@code ?} or {@code $}.
+     */
     private final String name;
+
+    /**
+     * Scope the variable is bound in, or null.
+     */
     private final String scope;
 
 
+    /**
+     * Creates a variable without a scope; a leading {@code ?} or {@code $} is stripped from the name.
+     *
+     * @param name the variable name
+     */
     public VariableNode(String name)
     {
         if(name.startsWith("$") || name.startsWith("?"))
@@ -25,6 +37,12 @@ public final class VariableNode extends BaseComplexNode implements VarOrIri, Ver
     }
 
 
+    /**
+     * Creates a variable bound in the given scope; a leading {@code ?} or {@code $} is stripped from the name.
+     *
+     * @param scope name of the scope
+     * @param name the variable name
+     */
     public VariableNode(String scope, String name)
     {
         if(name.startsWith("$") || name.startsWith("?"))
@@ -35,12 +53,24 @@ public final class VariableNode extends BaseComplexNode implements VarOrIri, Ver
     }
 
 
+    /**
+     * Name without the leading {@code ?} or {@code $}.
+     *
+     * @return name without the leading {@code ?} or {@code $}
+     */
     public String getName()
     {
         return name;
     }
 
 
+    /**
+     * Name of the scope the variable is bound in (see {@link cz.iocb.sparql.engine.parser.VariableScopes}), or null.
+     * Variables with the same name but different scopes are distinct variables.
+     *
+     * @return name of the scope the variable is bound in (see {@link cz.iocb.sparql.engine.parser.VariableScopes}), or
+     *         null
+     */
     public String getScope()
     {
         return scope;

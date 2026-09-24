@@ -35,13 +35,37 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Natural join of several children on their shared variables. Optimisation flattens nested joins, merges accesses to
+ * the same table or along keys ({@link SqlTableAccess}), distributes the join over unions, evaluates nondeterministic
+ * children last, and decides the evaluation of SERVICE stubs by row estimates when service reordering is enabled.
+ */
 public final class SqlJoin extends SqlIntercode
 {
+    /**
+     * Alias of each child.
+     */
     private final List<Table> tables;
+
+    /**
+     * Joined children.
+     */
     private final List<SqlIntercode> childs;
+
+    /**
+     * For each output column, the child column it is taken from.
+     */
     private final Map<Column, Column> columnMap;
 
 
+    /**
+     * Creates the node.
+     *
+     * @param childs the child nodes
+     * @param tables the tables
+     * @param bindings the variable bindings
+     * @param columnMap the column map
+     */
     protected SqlJoin(List<SqlIntercode> childs, List<Table> tables, VariableBindings bindings,
             Map<Column, Column> columnMap)
     {
@@ -53,18 +77,41 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Join of two children.
+     *
+     * @param request the current request
+     * @param left the left side
+     * @param right the right side
+     * @return join of two children
+     */
     public static SqlIntercode join(Request request, SqlIntercode left, SqlIntercode right)
     {
         return join(request, List.of(left, right), null);
     }
 
 
+    /**
+     * Join of the children.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @return join of the children
+     */
     protected static SqlIntercode join(Request request, List<SqlIntercode> childs)
     {
         return join(request, childs, null);
     }
 
 
+    /**
+     * Join of the children exposing only what the parent needs.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @return join of the children exposing only what the parent needs
+     */
     protected static SqlIntercode join(Request request, List<SqlIntercode> childs, Restrictions restrictions)
     {
         List<Table> tables = IntStream.range(0, childs.size()).mapToObj(i -> new Table("tab" + i)).toList();
@@ -254,6 +301,12 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Flattens nested joins into their children.
+     *
+     * @param input child columns
+     * @return the flattened children
+     */
     private static List<SqlIntercode> flatChilds(List<SqlIntercode> input)
     {
         List<SqlIntercode> output = new ArrayList<>();
@@ -276,6 +329,17 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Joins the optimised deterministic children with the nondeterministic ones, distributing over a nondeterministic
+     * union so that its branches are joined separately.
+     *
+     * @param request the current request
+     * @param deterministic the deterministic children
+     * @param nondeterministic the nondeterministic children
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @return the joined children
+     */
     private static List<SqlIntercode> mergeChilds(Request request, List<SqlIntercode> deterministic,
             List<SqlIntercode> nondeterministic, Restrictions restrictions, boolean reduced)
     {
@@ -305,6 +369,16 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Optimises each child with the restrictions implied by the parent and by the other children.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @param evalServices whether SERVICE stubs are evaluated
+     * @return the optimised children
+     */
     public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
             boolean reduced, boolean evalServices)
     {
@@ -317,6 +391,16 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Optimises each child with the restrictions implied by the parent and by the other children, without evaluating
+     * services.
+     *
+     * @param request the current request
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param reduced whether duplicate solutions may be dropped
+     * @return the optimised children
+     */
     public static List<SqlIntercode> optimize(Request request, List<SqlIntercode> childs, Restrictions restrictions,
             boolean reduced)
     {
@@ -324,6 +408,15 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Simplifies the children: propagates no-solution, drops empty solutions, detects unjoinable children, pushes
+     * constants and VALUES into table accesses and merges table accesses joined along keys.
+     *
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param schema the database schema
+     * @return the simplified children
+     */
     private static List<SqlIntercode> reduceJoin(List<SqlIntercode> childs, Restrictions restrictions,
             DatabaseSchema schema)
     {
@@ -550,6 +643,15 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Replaces a distinct union of table accesses joined with another access to a related table by the merged access,
+     * when the distinct part only restricts the rows of that access.
+     *
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @param schema the database schema
+     * @return the simplified children
+     */
     private static List<SqlIntercode> reduceDistinctUnion(List<SqlIntercode> childs, Restrictions restrictions,
             DatabaseSchema schema)
     {
@@ -588,6 +690,15 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * True if all variables shared by the distinct pattern and the candidate are always bound in a single common class
+     * and cover all non-constant columns of the distinct pattern.
+     *
+     * @param distinct the distinct node
+     * @param candidate the access joined with the distinct pattern
+     * @return true if all variables shared by the distinct pattern and the candidate are always bound in a single
+     *         common class and cover all non-constant columns of the distinct pattern, false otherwise
+     */
     private static boolean canBeDistinctUnionReduced(SqlDistinct distinct, SqlIntercode candidate)
     {
         Set<Column> columns = new HashSet<>();
@@ -619,6 +730,16 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Merges the distinct table access into the candidate access when the join along shared columns or a foreign key
+     * pins the distinct rows; null otherwise.
+     *
+     * @param schema the database schema
+     * @param candidate the access joined with the distinct pattern
+     * @param distinct the deduplicated access
+     * @param restrictions what the parent needs of the variables
+     * @return the merged access, or null
+     */
     private static SqlIntercode tryReduceDistinct(DatabaseSchema schema, SqlTableAccess candidate,
             SqlTableAccess distinct, Restrictions restrictions)
     {
@@ -697,6 +818,14 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Restrictions for one child given the other children.
+     *
+     * @param child the child node
+     * @param childs the child nodes
+     * @param restrictions what the parent needs of the variables
+     * @return restrictions for one child given the other children
+     */
     private static Restrictions getRestrictions(SqlIntercode child, List<SqlIntercode> childs,
             Restrictions restrictions)
     {
@@ -707,6 +836,14 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Alternatives of joined components denoted by the child: the branches of a union, the expansion of a join, or the
+     * child itself.
+     *
+     * @param child the child node
+     * @return alternatives of joined components denoted by the child: the branches of a union, the expansion of a join,
+     *         or the child itself
+     */
     private static List<List<SqlIntercode>> expand(SqlIntercode child)
     {
         if(child instanceof SqlUnion union)
@@ -718,6 +855,14 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Alternatives of joined components of a join of the children (cartesian combination of the children's
+     * alternatives), dropping unjoinable ones.
+     *
+     * @param childs the child nodes
+     * @return alternatives of joined components of a join of the children (cartesian combination of the children's
+     *         alternatives), dropping unjoinable ones
+     */
     private static List<List<SqlIntercode>> expandJoin(List<SqlIntercode> childs)
     {
         List<List<SqlIntercode>> result = List.of(List.of());
@@ -752,6 +897,12 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * Alternatives of joined components of a union of the children.
+     *
+     * @param childs the child nodes
+     * @return alternatives of joined components of a union of the children
+     */
     private static List<List<SqlIntercode>> expandUnion(List<SqlIntercode> childs)
     {
         List<List<SqlIntercode>> result = new ArrayList<>();
@@ -764,6 +915,11 @@ public final class SqlJoin extends SqlIntercode
     }
 
 
+    /**
+     * The joined children.
+     *
+     * @return the joined children
+     */
     public final List<SqlIntercode> getChilds()
     {
         return childs;

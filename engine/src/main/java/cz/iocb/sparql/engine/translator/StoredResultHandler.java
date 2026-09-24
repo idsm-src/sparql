@@ -32,27 +32,84 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Result handler that keeps small results as a VALUES list and stores large ones in a temporary table (created and
+ * filled in batches while the solutions arrive), which is then accessed as an ordinary table.
+ */
 public class StoredResultHandler extends ResultHandler
 {
+    /**
+     * Counter making temporary table names unique.
+     */
     private static AtomicInteger tableIdx = new AtomicInteger(0);
+
+    /**
+     * Rows inserted per batch.
+     */
     private static int batchSize = 1000;
+
+    /**
+     * Results with fewer rows stay a VALUES list instead of a table; must not exceed the batch size.
+     */
     private static int minTableSize = 1000; // has to be less than or equal to batchSize
 
+    /**
+     * Pending asynchronous work.
+     */
     private final List<Future<Boolean>> futures = new ArrayList<>();
 
+    /**
+     * Temporary table, created on the first flush.
+     */
     private Table table;
+
+    /**
+     * Table columns with their SQL types.
+     */
     private LinkedHashMap<Column, String> columns = new LinkedHashMap<>();
 
+    /**
+     * Bindings of the received variables.
+     */
     private final VariableBindings bindings = new VariableBindings();
+
+    /**
+     * Number of rows in which each variable is bound.
+     */
     private final Map<Variable, Integer> counts = new HashMap<>();
+
+    /**
+     * Columns constant over all rows so far, with their value.
+     */
     private final Map<Column, Column> constants = new HashMap<>();
 
+    /**
+     * Class of each variable in each row of the current batch.
+     */
     Map<Variable, List<ResourceClass>> resourceClasses = new HashMap<>();
+
+    /**
+     * Column values of the current batch.
+     */
     private final LinkedHashMap<Column, List<Column>> data = new LinkedHashMap<>();
+
+    /**
+     * Total number of rows received.
+     */
     int rowCount;
+
+    /**
+     * Number of rows in the current batch.
+     */
     int batchCount;
 
 
+    /**
+     * Creates the handler.
+     *
+     * @param request the current request
+     * @param restrictions what the parent needs of the variables
+     */
     public StoredResultHandler(Request request, Restrictions restrictions)
     {
         super(request, restrictions);
@@ -228,6 +285,12 @@ public class StoredResultHandler extends ResultHandler
     }
 
 
+    /**
+     * SQL text of a value column, {@code NULL} for a missing one.
+     *
+     * @param column the value column, or null
+     * @return SQL text of a value column, {@code NULL} for a missing one
+     */
     private final static String getColumnAsString(Column column)
     {
         if(column == null)
@@ -237,6 +300,11 @@ public class StoredResultHandler extends ResultHandler
     }
 
 
+    /**
+     * Writes the current batch into the temporary table, creating the table first if needed.
+     *
+     * @throws SQLException on database errors
+     */
     private void flushValues() throws SQLException
     {
         if(table == null)

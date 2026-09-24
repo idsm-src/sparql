@@ -14,11 +14,24 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * Reference to a variable of the surrounding bindings; NULL when the variable is not bound there at all.
+ */
 public final class SqlVariable extends SqlExpressionIntercode
 {
+    /**
+     * The variable.
+     */
     private final Variable variable;
 
 
+    /**
+     * Creates the expression.
+     *
+     * @param variable the variable
+     * @param mappings columns per resource class
+     * @param canBeNull whether the value may be null
+     */
     private SqlVariable(Variable variable, Map<ResourceClass, List<Column>> mappings, boolean canBeNull)
     {
         super(mappings, canBeNull, true);
@@ -28,12 +41,25 @@ public final class SqlVariable extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Reference to the variable of the binding; NULL for a null binding.
+     *
+     * @param binding the variable binding
+     * @return reference to the variable of the binding; NULL for a null binding
+     */
     public static SqlExpressionIntercode create(VariableBinding binding)
     {
         return create(binding, Restriction.ALL);
     }
 
 
+    /**
+     * Reference materialising only the needed classes.
+     *
+     * @param binding the variable binding
+     * @param restriction the result classes the parent needs
+     * @return reference materialising only the needed classes
+     */
     private static SqlExpressionIntercode create(VariableBinding binding, Restriction restriction)
     {
         if(binding == null)
@@ -80,6 +106,11 @@ public final class SqlVariable extends SqlExpressionIntercode
     }
 
 
+    /**
+     * The variable.
+     *
+     * @return the variable
+     */
     public Variable getVariable()
     {
         return variable;

@@ -16,21 +16,37 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class SequencePath extends BaseElement implements Path
 {
+    /**
+     * Paths in traversal order.
+     */
     private List<Path> children;
 
 
+    /**
+     * Creates an empty sequence to be filled later.
+     */
     public SequencePath()
     {
         this.children = new ArrayList<>();
     }
 
 
+    /**
+     * Creates the sequence of the given paths.
+     *
+     * @param children the child paths
+     */
     public SequencePath(Collection<Path> children)
     {
         this.children = new ArrayList<>(children);
     }
 
 
+    /**
+     * Paths in traversal order (modifiable).
+     *
+     * @return paths in traversal order (modifiable)
+     */
     public List<Path> getChildren()
     {
         return children;

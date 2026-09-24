@@ -17,21 +17,37 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  */
 public class AlternativePath extends BaseElement implements Path
 {
+    /**
+     * Alternative paths.
+     */
     private List<Path> children;
 
 
+    /**
+     * Creates an empty alternative to be filled later.
+     */
     public AlternativePath()
     {
         this.children = new ArrayList<>();
     }
 
 
+    /**
+     * Creates the alternative of the given paths.
+     *
+     * @param children the child paths
+     */
     public AlternativePath(Collection<Path> children)
     {
         this.children = new ArrayList<>(children);
     }
 
 
+    /**
+     * Alternative paths (modifiable).
+     *
+     * @return alternative paths (modifiable)
+     */
     public List<Path> getChildren()
     {
         return children;

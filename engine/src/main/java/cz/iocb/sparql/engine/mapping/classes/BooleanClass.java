@@ -5,8 +5,14 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBoolea
 
 
 
+/**
+ * Canonical {@code xsd:boolean} literals stored in one {@code bool} column.
+ */
 public final class BooleanClass extends SimpleLiteralClass
 {
+    /**
+     * Creates the singleton instance, see {@link BuiltinClasses}.
+     */
     protected BooleanClass()
     {
         super("boolean", xsdBooleanType, "bool", genBoolean);

@@ -9,8 +9,14 @@ import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 
 
 
+/**
+ * The xsd:unsignedLong datatype.
+ */
 public final class UnsignedLongDatatype extends FixedSizeIntegerDatatype
 {
+    /**
+     * Creates the datatype.
+     */
     public UnsignedLongDatatype()
     {
         super(xsdUnsignedLongIri, "0", "18446744073709551615");

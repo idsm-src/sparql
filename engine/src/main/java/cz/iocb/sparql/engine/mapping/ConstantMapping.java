@@ -10,11 +10,24 @@ import cz.iocb.sparql.engine.request.Request;
 
 
 
+/**
+ * Mapping of a position to a fixed RDF term; matches that term only.
+ */
 public abstract class ConstantMapping extends TermMapping
 {
+    /**
+     * The constant term.
+     */
     protected final RdfTerm value;
 
 
+    /**
+     * Creates the mapping.
+     *
+     * @param value the term
+     * @param resourceClass the resource class
+     * @param columns the columns
+     */
     protected ConstantMapping(RdfTerm value, ResourceClass resourceClass, List<Column> columns)
     {
         super(resourceClass, columns);
@@ -22,6 +35,11 @@ public abstract class ConstantMapping extends TermMapping
     }
 
 
+    /**
+     * The constant term.
+     *
+     * @return the constant term
+     */
     public RdfTerm getValue()
     {
         return value;

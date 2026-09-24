@@ -28,13 +28,36 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 
+/**
+ * EXISTS and NOT EXISTS: true if the pattern, joined with the current solution through the shared variables of the
+ * given bindings, has a solution.
+ */
 public final class SqlExists extends SqlExpressionIntercode
 {
+    /**
+     * True for NOT EXISTS.
+     */
     private final boolean negated;
+
+    /**
+     * Tested pattern.
+     */
     private final SqlIntercode pattern;
+
+    /**
+     * Bindings of the surrounding solution.
+     */
     private final VariableBindings bindings;
 
 
+    /**
+     * Creates the expression; it is deterministic if the pattern is.
+     *
+     * @param negated whether the test is negated
+     * @param pattern the tested pattern
+     * @param mappings columns per resource class
+     * @param bindings the variable bindings
+     */
     protected SqlExists(boolean negated, SqlIntercode pattern, Map<ResourceClass, List<Column>> mappings,
             VariableBindings bindings)
     {
@@ -48,6 +71,15 @@ public final class SqlExists extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Existence test of the pattern within the given surrounding bindings.
+     *
+     * @param request the current request
+     * @param negated whether the test is negated
+     * @param pattern the tested pattern
+     * @param bindings the variable bindings
+     * @return existence test of the pattern within the given surrounding bindings
+     */
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings)
     {
@@ -55,6 +87,16 @@ public final class SqlExists extends SqlExpressionIntercode
     }
 
 
+    /**
+     * Existence test materialising only when needed; a pattern without solutions makes it constant.
+     *
+     * @param request the current request
+     * @param negated whether the test is negated
+     * @param pattern the tested pattern
+     * @param bindings the variable bindings
+     * @param restriction the result classes the parent needs
+     * @return existence test materialising only when needed; a pattern without solutions makes it constant
+     */
     public static SqlExpressionIntercode create(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings, Restriction restriction)
     {
@@ -133,6 +175,17 @@ public final class SqlExists extends SqlExpressionIntercode
     }
 
 
+    /**
+     * SQL boolean expression testing the existence of a solution of the pattern compatible with the surrounding
+     * bindings.
+     *
+     * @param request the current request
+     * @param negated whether the test is negated
+     * @param pattern the tested pattern
+     * @param bindings the variable bindings
+     * @return SQL boolean expression testing the existence of a solution of the pattern compatible with the surrounding
+     *         bindings
+     */
     public static List<Column> translate(Request request, boolean negated, SqlIntercode pattern,
             VariableBindings bindings)
     {

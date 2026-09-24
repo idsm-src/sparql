@@ -6,23 +6,47 @@ import java.util.Set;
 
 
 
+/**
+ * A column reference, constant or SQL expression usable in generated SQL. The natural ordering puts constants first,
+ * then table columns, then expressions.
+ */
 public abstract class Column implements Comparable<Column>
 {
+    /**
+     * SQL text of the column: the bare name, the constant or the expression.
+     */
     protected final String value;
 
 
+    /**
+     * Creates the column with its SQL text.
+     *
+     * @param value SQL text of the column
+     */
     protected Column(String value)
     {
         this.value = value;
     }
 
 
+    /**
+     * SQL text of the column without quoting.
+     *
+     * @return SQL text of the column without quoting
+     */
     public String getName()
     {
         return value;
     }
 
 
+    /**
+     * This column qualified by the table (or alias); constants are returned unchanged, expressions cannot be qualified.
+     *
+     * @param table the table
+     * @return this column qualified by the table (or alias); constants are returned unchanged, expressions cannot be
+     *         qualified
+     */
     public abstract Column fromTable(Table table);
 
 
@@ -48,6 +72,12 @@ public abstract class Column implements Comparable<Column>
     }
 
 
+    /**
+     * Rank of the column kind for ordering: constants, then table columns, then expressions.
+     *
+     * @param column the column
+     * @return rank of the column kind for ordering: constants, then table columns, then expressions
+     */
     private static int order(Column column)
     {
         return switch(column)
@@ -68,6 +98,14 @@ public abstract class Column implements Comparable<Column>
     }
 
 
+    /**
+     * Column yielding the first non-null of the given columns: a constant if one is present, the only column, or a
+     * {@code COALESCE} expression.
+     *
+     * @param cols the columns
+     * @return column yielding the first non-null of the given columns: a constant if one is present, the only column,
+     *         or a {@code COALESCE} expression
+     */
     public static Column coalesce(Set<? extends Column> cols)
     {
         List<? extends Column> list = cols.stream().sorted().toList();

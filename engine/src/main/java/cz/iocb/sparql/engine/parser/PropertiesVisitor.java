@@ -26,14 +26,40 @@ import cz.iocb.sparql.engine.model.triple.Verb;
 
 
 
+/**
+ * Builds the {@link Property} list (predicate with its objects) of a triples-same-subject rule.
+ */
 class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 {
+    /**
+     * Configuration of the endpoint.
+     */
     private final SparqlDatabaseConfiguration config;
+
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param config the endpoint configuration
+     * @param prologue the prologue of the query
+     * @param scopes the variable scopes
+     * @param messages the message list to append to
+     */
     public PropertiesVisitor(SparqlDatabaseConfiguration config, Prologue prologue, VariableScopes scopes,
             List<TranslateMessage> messages)
     {
@@ -44,6 +70,13 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     }
 
 
+    /**
+     * Parses the verb: a property path, a variable, or an unnamed variable when the rule matched neither.
+     *
+     * @param verbPathCtx the property path context, or null
+     * @param verbSimpleCtx the variable verb context, or null
+     * @return the verb
+     */
     private Verb parseVerb(VerbPathContext verbPathCtx, VerbSimpleContext verbSimpleCtx)
     {
         if(verbPathCtx == null && verbSimpleCtx == null)
@@ -60,6 +93,12 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     }
 
 
+    /**
+     * Parses the objects of a path property list.
+     *
+     * @param ctx the parse tree node
+     * @return the object nodes
+     */
     private List<ComplexNode> parseNodes(ObjectListPathContext ctx)
     {
         if(ctx == null)
@@ -71,6 +110,12 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     }
 
 
+    /**
+     * Parses the objects of a plain property list.
+     *
+     * @param ctx the parse tree node
+     * @return the object nodes
+     */
     private List<ComplexNode> parseNodes(ObjectListContext ctx)
     {
         if(ctx == null)
@@ -82,6 +127,12 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     }
 
 
+    /**
+     * Parses one verb with its objects.
+     *
+     * @param ctx the parse tree node
+     * @return the property
+     */
     private Property parseProperty(PropertyListPathNotEmptyListContext ctx)
     {
         Verb verb = parseVerb(ctx.verbPath(), ctx.verbSimple());
@@ -135,13 +186,34 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 }
 
 
+/**
+ * Builds the verb of a plain (non-path) property list; {@code a} becomes {@code rdf:type}.
+ */
 class VerbVisitor extends BaseVisitor<Verb>
 {
+    /**
+     * Prologue of the query.
+     */
     private final Prologue prologue;
+
+    /**
+     * Variable scopes of the query.
+     */
     private final VariableScopes scopes;
+
+    /**
+     * Messages collected during parsing.
+     */
     private final List<TranslateMessage> messages;
 
 
+    /**
+     * Creates the visitor.
+     *
+     * @param prologue the prologue of the query
+     * @param scopes the variable scopes
+     * @param messages the message list to append to
+     */
     public VerbVisitor(Prologue prologue, VariableScopes scopes, List<TranslateMessage> messages)
     {
         this.prologue = prologue;
