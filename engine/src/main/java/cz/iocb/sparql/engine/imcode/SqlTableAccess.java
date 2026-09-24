@@ -971,7 +971,7 @@ public final class SqlTableAccess extends SqlIntercode
                                     "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END"));
                     }
 
-                    modified = columns;
+                    columns = modified;
                 }
 
                 boolean canBeNull = rightBinding.canBeNull() || extraCondition != null;
