@@ -368,9 +368,40 @@ public class SparqlDatabaseConfiguration
     }
 
 
+    /**
+     * SPARQL orders and compares strings by unicode code points, whereas PostgreSQL orders a character column by its
+     * collation. A mapped column with any other collation would therefore make ORDER BY and the relational operators
+     * return a different order than the specification prescribes, and a different one than the same term gets when the
+     * engine keeps it boxed in sparql.rdfbox.
+     */
+    private void checkColumnCollations(List<Table> tables, TermMapping... terms)
+    {
+        for(TermMapping term : terms)
+        {
+            if(!(term instanceof ParametrisedMapping) || term.getColumns(null) == null)
+                continue;
+
+            for(Column column : term.getColumns(null))
+            {
+                for(Table table : tables)
+                {
+                    String collation = databaseSchema.getForeignCollation(table, column);
+
+                    if(collation != null)
+                        throw new IllegalArgumentException("column " + table + "." + column + " uses the " + collation
+                                + " collation, but SPARQL orders and compares strings by unicode code"
+                                + " points; declare the column with the \"C\" collation");
+                }
+            }
+        }
+    }
+
+
     public void addQuadMapping(Table table, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
             TermMapping object, Conditions conditions, boolean distinct)
     {
+        checkColumnCollations(table == null ? List.of() : List.of(table), subject, predicate, object);
+
         mappings.get(serviceIri)
                 .add(new SingleTableQuadMapping(table, graph, subject, predicate, object, conditions, distinct));
 
@@ -405,6 +436,8 @@ public class SparqlDatabaseConfiguration
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
+        checkColumnCollations(tables, subject, predicate, object);
+
         mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
                 object, conditions, distinct));
 

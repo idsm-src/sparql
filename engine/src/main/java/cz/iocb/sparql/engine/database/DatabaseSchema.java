@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,7 +79,29 @@ public class DatabaseSchema
     }
 
 
+    /*
+     * SPARQL orders and compares strings by unicode code points, whereas PostgreSQL orders a character
+     * column by its collation, so only the collations that happen to order by code points give the
+     * results the specification asks for. The name of a collation does not say which ones those are
+     * (musl, for instance, orders bytewise under every locale name), so the server is asked directly.
+     */
+    private static final String collationQuery = """
+            SELECT n.nspname, c.relname, a.attname, a.attcollation::regcollation::text
+            FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE a.attcollation <> 0 AND a.attnum > 0 AND NOT a.attisdropped
+                AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')""";
+
+    private static final String collationProbeQuery = """
+            SELECT array_agg(s ORDER BY s COLLATE %s) = array_agg(s ORDER BY s COLLATE "C")
+            FROM (VALUES ('A'), ('a'), ('B'), ('b'), ('Z'), ('z'), ('0'), ('_'), ('-'), (' '), ('E'), ('\u00e9'))
+                AS probe(s)""";
+
+
     protected final Map<Table, List<Column>> nullableColumns = new HashMap<>();
+    protected final Map<Table, Map<Column, String>> foreignCollations = new HashMap<>();
     protected final Map<Table, List<List<Column>>> primaryKeys = new HashMap<>();
     protected final Map<TablePair, List<Set<ColumnPair>>> foreignKeys = new HashMap<>();
     protected final Map<TablePair, List<List<ColumnPair>>> unjoinableColumns = new HashMap<>();
@@ -174,6 +197,54 @@ public class DatabaseSchema
                     }
                 }
             }
+
+
+            List<String[]> collatedColumns = new ArrayList<>();
+
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet collations = statement.executeQuery(collationQuery))
+                {
+                    while(collations.next())
+                        collatedColumns.add(new String[] { collations.getString(1), collations.getString(2),
+                                collations.getString(3), collations.getString(4) });
+                }
+            }
+
+            Map<String, Boolean> checkedCollations = new HashMap<>();
+
+            for(String[] collatedColumn : collatedColumns)
+            {
+                String collation = collatedColumn[3];
+
+                if(checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
+                    continue;
+
+                addForeignCollation(new Table(collatedColumn[0], collatedColumn[1]), new TableColumn(collatedColumn[2]),
+                        collation);
+            }
+        }
+    }
+
+
+    /**
+     * Returns whether the given PostgreSQL collation orders strings by unicode code points, which is the ordering that
+     * SPARQL prescribes. The collation is compared against the "C" collation on a sample of strings, because its name
+     * alone does not tell: musl, for example, orders bytewise under every locale name, whereas the same name means a
+     * locale ordering under glibc.
+     */
+    protected boolean isCodepointCollation(Connection connection, String collation)
+    {
+        try(Statement statement = connection.createStatement())
+        {
+            try(ResultSet result = statement.executeQuery(collationProbeQuery.formatted(collation)))
+            {
+                return result.next() && result.getBoolean(1);
+            }
+        }
+        catch(SQLException e)
+        {
+            throw new SQLRuntimeException(e);
         }
     }
 
@@ -182,6 +253,9 @@ public class DatabaseSchema
     {
         for(Entry<Table, List<Column>> e : other.nullableColumns.entrySet())
             nullableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
+
+        for(Entry<Table, Map<Column, String>> e : other.foreignCollations.entrySet())
+            foreignCollations.put(e.getKey(), new HashMap<>(e.getValue()));
 
         for(Entry<Table, List<List<Column>>> e : other.primaryKeys.entrySet())
             primaryKeys.put(e.getKey(), new ArrayList<>(e.getValue()));
@@ -263,6 +337,30 @@ public class DatabaseSchema
             columnPairs.add(new ColumnPair(leftColumns.get(i), rightColumns.get(i)));
 
         unjoinableList.add(columnPairs);
+    }
+
+
+    public void addForeignCollation(Table table, TableColumn column, String collation)
+    {
+        Map<Column, String> columnMap = foreignCollations.get(table);
+
+        if(columnMap == null)
+        {
+            columnMap = new HashMap<>();
+            foreignCollations.put(table, columnMap);
+        }
+
+        columnMap.put(column, collation);
+    }
+
+
+    /**
+     * Returns the collation of the given character column when it does not order by unicode code points, and null when
+     * the column orders the way SPARQL prescribes or is not a character column at all.
+     */
+    public String getForeignCollation(Table table, Column column)
+    {
+        return foreignCollations.getOrDefault(table, Map.of()).get(column);
     }
 
 
