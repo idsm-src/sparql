@@ -905,6 +905,6 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(operator, left, right);
+        return Objects.hash(operator.name(), left, right);
     }
 }

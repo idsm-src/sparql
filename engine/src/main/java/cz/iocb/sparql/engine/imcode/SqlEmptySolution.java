@@ -92,6 +92,6 @@ public final class SqlEmptySolution extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return System.identityHashCode(singleton);
+        return SqlEmptySolution.class.getName().hashCode();
     }
 }

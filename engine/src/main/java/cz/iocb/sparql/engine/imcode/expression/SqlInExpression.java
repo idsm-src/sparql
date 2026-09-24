@@ -130,7 +130,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
         @Override
         protected int getHashCode()
         {
-            return System.identityHashCode(this);
+            return columnMap.hashCode();
         }
 
         @Override

@@ -312,6 +312,6 @@ public final class SqlBinaryArithmetic extends SqlBinary
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(operator, left, right);
+        return Objects.hash(operator.name(), left, right);
     }
 }

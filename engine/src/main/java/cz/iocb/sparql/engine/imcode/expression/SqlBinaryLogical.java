@@ -289,6 +289,6 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
     @Override
     protected int getHashCode()
     {
-        return Objects.hash(operator, left, right);
+        return Objects.hash(operator.name(), left, right);
     }
 }

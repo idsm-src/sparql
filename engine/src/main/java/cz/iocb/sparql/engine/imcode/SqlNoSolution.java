@@ -92,6 +92,6 @@ public final class SqlNoSolution extends SqlIntercode
     @Override
     protected int getHashCode()
     {
-        return System.identityHashCode(singleton);
+        return SqlNoSolution.class.getName().hashCode();
     }
 }

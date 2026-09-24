@@ -4,12 +4,10 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiter
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.Pair;
@@ -321,10 +319,10 @@ public final class SqlDistinct extends SqlIntercode
     private static List<SqlIntercode> expandUnionByConstantColumns(Request request, SqlUnion union,
             Set<Variable> distinctVariables)
     {
-        Map<SqlIntercode, List<Column>> values = new IdentityHashMap<>();
+        List<List<Column>> values = new ArrayList<>();
 
-        for(SqlIntercode child : union.getChilds())
-            values.put(child, new ArrayList<>());
+        for(int i = 0; i < union.getChilds().size(); i++)
+            values.add(new ArrayList<>());
 
         for(Variable var : distinctVariables)
         {
@@ -343,15 +341,16 @@ public final class SqlDistinct extends SqlIntercode
 
                 for(int i = 0; i < rc.getColumnCount(); i++)
                     if(counts[i] == union.getChilds().size())
-                        for(SqlIntercode child : union.getChilds())
-                            values.get(child).add(child.getMapping(var, rc).get(i));
+                        for(int j = 0; j < union.getChilds().size(); j++)
+                            values.get(j).add(union.getChilds().get(j).getMapping(var, rc).get(i));
             }
         }
 
-        Map<List<Column>, List<SqlIntercode>> rev = new HashMap<>();
+        // keep the order of the branches, so that the generated code does not depend on object identities
+        Map<List<Column>, List<SqlIntercode>> rev = new LinkedHashMap<>();
 
-        for(Entry<SqlIntercode, List<Column>> e : values.entrySet())
-            rev.computeIfAbsent(e.getValue(), _ -> new ArrayList<>()).add(e.getKey());
+        for(int j = 0; j < union.getChilds().size(); j++)
+            rev.computeIfAbsent(values.get(j), _ -> new ArrayList<>()).add(union.getChilds().get(j));
 
         List<SqlIntercode> list = new ArrayList<>();
 

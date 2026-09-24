@@ -79,6 +79,6 @@ public final class SqlNull extends SqlExpressionIntercode
     @Override
     protected int getHashCode()
     {
-        return System.identityHashCode(this);
+        return SqlNull.class.getName().hashCode();
     }
 }
