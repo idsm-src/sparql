@@ -120,42 +120,42 @@ public class SparqlTest
     /**
      * Class of the blank nodes of the test data.
      */
-    private static final StrBlankNodeInSegmentClass bnodeClass = new StrBlankNodeInSegmentClass(0);
+    static final StrBlankNodeInSegmentClass bnodeClass = new StrBlankNodeInSegmentClass(0);
 
     /**
      * Replacement of each built-in literal class by a {@link SubsetLiteralClass}, used by the subset literal family.
      */
-    private static final Map<ResourceClass, ResourceClass> literalClassMap = new HashMap<>();
+    static final Map<ResourceClass, ResourceClass> literalClassMap = new HashMap<>();
 
     /**
      * Pool of the test database.
      */
-    private static DataSource connectionPool = null;
+    static DataSource connectionPool = null;
 
     /**
      * Catalog of the test database.
      */
-    private static DatabaseSchema schema = null;
+    static DatabaseSchema schema = null;
 
     /**
      * All manifests merged into one model.
      */
-    private static Model model = null;
+    static Model model = null;
 
     /**
      * Engine over the NeXtProt string configuration.
      */
-    private static Engine stringEngine = null;
+    static Engine stringEngine = null;
 
     /**
      * Engine over the NeXtProt integer configuration.
      */
-    private static Engine integerEngine = null;
+    static Engine integerEngine = null;
 
     /**
      * Engine over the NeXtProt combined configuration.
      */
-    private static Engine combinedEngine = null;
+    static Engine combinedEngine = null;
 
 
     /**
@@ -396,7 +396,7 @@ public class SparqlTest
     /**
      * Names and texts of the {@code mf:PositiveSyntaxTest11} entries of the manifests.
      */
-    private static List<Arguments> getPositiveSyntaxTests() throws URISyntaxException, IOException
+    static List<Arguments> getPositiveSyntaxTests() throws URISyntaxException, IOException
     {
         List<Arguments> queries = new LinkedList<>();
 
@@ -435,7 +435,7 @@ public class SparqlTest
     /**
      * Names and texts of the {@code mf:NegativeSyntaxTest11} entries of the manifests.
      */
-    private static List<Arguments> getNegativeSyntaxTests() throws URISyntaxException, IOException
+    static List<Arguments> getNegativeSyntaxTests() throws URISyntaxException, IOException
     {
         List<Arguments> queries = new LinkedList<>();
 
@@ -474,7 +474,7 @@ public class SparqlTest
     /**
      * Names and texts of the {@code mf:QueryEvaluationTest} entries, used for syntax checking only.
      */
-    private static List<Arguments> getQueryEvaluationSyntaxTests() throws URISyntaxException, IOException
+    static List<Arguments> getQueryEvaluationSyntaxTests() throws URISyntaxException, IOException
     {
         List<Arguments> queries = new LinkedList<>();
 
@@ -515,7 +515,7 @@ public class SparqlTest
      * Names, texts, data quads (default and named graphs) and expected results of the {@code mf:QueryEvaluationTest}
      * entries.
      */
-    private static List<Arguments> getQueryEvaluationTests()
+    static List<Arguments> getQueryEvaluationTests()
             throws URISyntaxException, IOException, ParserConfigurationException, SAXException
     {
         List<Arguments> queries = new LinkedList<>();
@@ -581,7 +581,7 @@ public class SparqlTest
     /**
      * Queries of {@code nextprot/queryset.sparql}, each introduced by a {@code ### id ###} line.
      */
-    private static List<Arguments> getNextProtTests() throws URISyntaxException, IOException
+    static List<Arguments> getNextProtTests() throws URISyntaxException, IOException
     {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         InputStream in = cl.getResourceAsStream("nextprot/queryset.sparql");
@@ -623,7 +623,7 @@ public class SparqlTest
     /**
      * Quads of a Turtle data file, in the default graph or in the graph named by the file.
      */
-    private static List<Quad> getQuads(RDFNode data, boolean isDefault)
+    static List<Quad> getQuads(RDFNode data, boolean isDefault)
     {
         RDFNode graph = isDefault ? null : data;
 
@@ -647,7 +647,7 @@ public class SparqlTest
     /**
      * Constant term mapping of a Jena node, see {@link #getMapping(RDFNode, SparqlDatabaseConfiguration, Map)}.
      */
-    private static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
+    static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config)
     {
         return getMapping(node, config, Map.of());
     }
@@ -658,7 +658,7 @@ public class SparqlTest
      * datatype assigns (replaced according to {@code map}), blank nodes the test blank node class; null for a null
      * node.
      */
-    private static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
+    static TermMapping getMapping(RDFNode node, SparqlDatabaseConfiguration config,
             Map<ResourceClass, ResourceClass> map)
     {
         if(node == null)
@@ -700,7 +700,7 @@ public class SparqlTest
     /**
      * Expected rows of a test, read from a Turtle graph or a SPARQL XML result file.
      */
-    private static List<List<RdfTerm>> getResult(RDFNode result)
+    static List<List<RdfTerm>> getResult(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
         if(result.toString().endsWith(".ttl"))
@@ -713,7 +713,7 @@ public class SparqlTest
     /**
      * Triples of an expected Turtle graph as rows of subject, predicate and object.
      */
-    private static List<List<RdfTerm>> getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
+    static List<List<RdfTerm>> getResultFromTTL(RDFNode result) throws IOException, URISyntaxException
     {
         List<List<RdfTerm>> results = new ArrayList<>();
 
@@ -735,7 +735,7 @@ public class SparqlTest
     /**
      * Engine term of a Jena node; blank nodes lose their label since labels are not compared.
      */
-    private static RdfTerm getNode(RDFNode node)
+    static RdfTerm getNode(RDFNode node)
     {
         if(node == null)
             return null;
@@ -755,7 +755,7 @@ public class SparqlTest
     /**
      * Rows of an expected SPARQL XML result; an ASK result becomes a single boolean row.
      */
-    private static List<List<RdfTerm>> getResultFromXML(RDFNode result)
+    static List<List<RdfTerm>> getResultFromXML(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
         List<List<RdfTerm>> results = new ArrayList<>();
