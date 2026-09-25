@@ -666,6 +666,19 @@ public final class SqlSelect extends SqlIntercode
 
 
     /**
+     * True if the SQL condition is the constant {@code true} or {@code false}, as returned by the null tests of
+     * {@link VariableBinding} when they are decided by constant columns.
+     *
+     * @param condition the SQL condition
+     * @return true if the SQL condition is the constant {@code true} or {@code false}, false otherwise
+     */
+    private static boolean isConstantCondition(String condition)
+    {
+        return condition.equals("true") || condition.equals("false");
+    }
+
+
+    /**
      * ORDER BY clause over the sortable representation of the variables, optionally followed by the simple ordering.
      *
      * @param withSimple whether to append the simple ordering
@@ -715,8 +728,8 @@ public final class SqlSelect extends SqlIntercode
                 sortSet = Map.of(box, sortSet.values().stream().flatMap(r -> r.stream()).collect(toSet()));
 
 
-            // order unbounded
-            if(binding.canBeNull())
+            // order unbounded (a constant condition does not order anything and is not allowed in ORDER BY)
+            if(binding.canBeNull() && !isConstantCondition(binding.getIsNotNull()))
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
@@ -728,7 +741,8 @@ public final class SqlSelect extends SqlIntercode
             }
 
             // order blank nodes
-            if(sortSet.get(scalarBlankNode) != null)
+            if(sortSet.get(scalarBlankNode) != null
+                    && !isConstantCondition(binding.getIsNull(unionize(sortSet.get(scalarBlankNode)))))
             {
                 appendComma(builder, hasOrderCondition);
                 hasOrderCondition = true;
