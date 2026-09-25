@@ -66,4 +66,11 @@ public class ConstantColumn extends Column
     {
         return type;
     }
+
+
+    @Override
+    public boolean canBeNull()
+    {
+        return literal == null;
+    }
 }

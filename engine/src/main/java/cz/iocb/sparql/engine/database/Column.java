@@ -50,6 +50,19 @@ public abstract class Column implements Comparable<Column>
     public abstract Column fromTable(Table table);
 
 
+    /**
+     * True if the value of the column may be NULL. A table column is nullable unless it was created with the knowledge
+     * that its values are not null (see {@link TableColumn#TableColumn(String, boolean)}), an expression column unless
+     * declared otherwise, and a constant column only if it is the NULL constant.
+     *
+     * @return true if the value of the column may be NULL, false otherwise
+     */
+    public boolean canBeNull()
+    {
+        return true;
+    }
+
+
     @Override
     public int hashCode()
     {

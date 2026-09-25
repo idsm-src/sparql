@@ -270,7 +270,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
 
-        return SqlTableAccess.create(table, varBindings).optimize(request, restrictions, false, false);
+        return SqlTableAccess.create(request, table, varBindings).optimize(request, restrictions, false, false);
     }
 
 

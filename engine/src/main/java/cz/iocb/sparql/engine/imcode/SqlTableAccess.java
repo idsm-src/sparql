@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.IntPredicate;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ColumnPair;
 import cz.iocb.sparql.engine.database.Condition;
@@ -42,6 +43,11 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  */
 public final class SqlTableAccess extends SqlIntercode
 {
+    /**
+     * Database schema the table belongs to; null for constants only.
+     */
+    private final DatabaseSchema schema;
+
     /**
      * Accessed table; null for constants only.
      */
@@ -77,11 +83,12 @@ public final class SqlTableAccess extends SqlIntercode
      * @param reduced whether duplicate solutions may be dropped
      * @param distinctColumns columns over which deduplication is requested
      */
-    protected SqlTableAccess(SourceTable table, Conditions conditions, VariableBindings internal, boolean reduced,
-            Set<Column> distinctColumns)
+    protected SqlTableAccess(DatabaseSchema schema, SourceTable table, Conditions conditions, VariableBindings internal,
+            boolean reduced, Set<Column> distinctColumns)
     {
-        super(getExternalVariableBindings(internal, conditions), true);
+        super(getExternalVariableBindings(schema, table, internal, conditions), true);
 
+        this.schema = schema;
         this.table = table;
         this.conditions = conditions;
         this.internal = internal;
@@ -94,6 +101,7 @@ public final class SqlTableAccess extends SqlIntercode
      * Access exposing the given bindings, restricted by the conditions, with a deduplication request over
      * {@code distinctColumns}.
      *
+     * @param request the current request
      * @param table the table
      * @param conditions the conditions
      * @param internal bindings in terms of the table's own columns
@@ -102,53 +110,125 @@ public final class SqlTableAccess extends SqlIntercode
      * @return access exposing the given bindings, restricted by the conditions, with a deduplication request over
      *         {@code distinctColumns}
      */
-    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal,
-            boolean reduced, Set<Column> distinctColumns)
+    public static SqlIntercode create(Request request, SourceTable table, Conditions conditions,
+            VariableBindings internal, boolean reduced, Set<Column> distinctColumns)
     {
-        return new SqlTableAccess(table, conditions, internal, reduced, distinctColumns);
+        return create(request.getConfiguration().getDatabaseSchema(), table, conditions, internal, reduced,
+                distinctColumns);
     }
 
 
     /**
      * Access exposing the given bindings, restricted by the conditions.
      *
+     * @param request the current request
      * @param table the table
      * @param conditions the conditions
      * @param internal bindings in terms of the table's own columns
      * @param reduced whether duplicate solutions may be dropped
      * @return access exposing the given bindings, restricted by the conditions
      */
-    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal,
-            boolean reduced)
+    public static SqlIntercode create(Request request, SourceTable table, Conditions conditions,
+            VariableBindings internal, boolean reduced)
     {
-        return create(table, conditions, internal, reduced, Set.of());
+        return create(request, table, conditions, internal, reduced, Set.of());
     }
 
 
     /**
      * Access exposing the given bindings, restricted by the conditions.
      *
+     * @param request the current request
      * @param table the table
      * @param conditions the conditions
      * @param internal bindings in terms of the table's own columns
      * @return access exposing the given bindings, restricted by the conditions
      */
-    public static SqlIntercode create(SourceTable table, Conditions conditions, VariableBindings internal)
+    public static SqlIntercode create(Request request, SourceTable table, Conditions conditions,
+            VariableBindings internal)
     {
-        return create(table, conditions, internal, false);
+        return create(request, table, conditions, internal, false);
     }
 
 
     /**
      * Unrestricted access exposing the given bindings.
      *
+     * @param request the current request
      * @param table the table
      * @param internal bindings in terms of the table's own columns
      * @return unrestricted access exposing the given bindings
      */
-    public static SqlIntercode create(SourceTable table, VariableBindings internal)
+    public static SqlIntercode create(Request request, SourceTable table, VariableBindings internal)
     {
-        return create(table, new Conditions(true), internal, false);
+        return create(request, table, new Conditions(true), internal, false);
+    }
+
+
+    /**
+     * Access exposing the given bindings, restricted by the conditions, with a deduplication request over
+     * {@code distinctColumns}; the variant for the merges of accesses, which know the schema but not the request.
+     *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether duplicate solutions may be dropped
+     * @param distinctColumns columns over which deduplication is requested
+     * @return access exposing the given bindings, restricted by the conditions, with a deduplication request over
+     *         {@code distinctColumns}
+     */
+    static SqlIntercode create(DatabaseSchema schema, SourceTable table, Conditions conditions,
+            VariableBindings internal, boolean reduced, Set<Column> distinctColumns)
+    {
+        return new SqlTableAccess(schema, table, conditions, internal, reduced, distinctColumns);
+    }
+
+
+    /**
+     * Access exposing the given bindings, restricted by the conditions.
+     *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @param reduced whether duplicate solutions may be dropped
+     * @return access exposing the given bindings, restricted by the conditions
+     */
+    static SqlIntercode create(DatabaseSchema schema, SourceTable table, Conditions conditions,
+            VariableBindings internal, boolean reduced)
+    {
+        return create(schema, table, conditions, internal, reduced, Set.of());
+    }
+
+
+    /**
+     * Access exposing the given bindings, restricted by the conditions.
+     *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
+     * @param conditions the conditions
+     * @param internal bindings in terms of the table's own columns
+     * @return access exposing the given bindings, restricted by the conditions
+     */
+    static SqlIntercode create(DatabaseSchema schema, SourceTable table, Conditions conditions,
+            VariableBindings internal)
+    {
+        return create(schema, table, conditions, internal, false);
+    }
+
+
+    /**
+     * Unrestricted access exposing the given bindings.
+     *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
+     * @param internal bindings in terms of the table's own columns
+     * @return unrestricted access exposing the given bindings
+     */
+    static SqlIntercode create(DatabaseSchema schema, SourceTable table, VariableBindings internal)
+    {
+        return create(schema, table, new Conditions(true), internal, false);
     }
 
 
@@ -160,7 +240,8 @@ public final class SqlTableAccess extends SqlIntercode
      * @return bindings for the parent: equated columns replaced by their representative, expressions by generated
      *         columns
      */
-    private static VariableBindings getExternalVariableBindings(VariableBindings bindings, Conditions conditions)
+    private static VariableBindings getExternalVariableBindings(DatabaseSchema schema, SourceTable table,
+            VariableBindings bindings, Conditions conditions)
     {
         Map<Column, Column> representants = selectColumnRepresentants(conditions);
         Map<Column, Column> expressions = new HashMap<>();
@@ -172,7 +253,8 @@ public final class SqlTableAccess extends SqlIntercode
             VariableBinding binding = new VariableBinding(variableBinding.getVariable(), variableBinding.canBeNull());
 
             for(Entry<ResourceClass, List<Column>> map : variableBinding.getMappings().entrySet())
-                binding.addMapping(map.getKey(), selectColumns(representants, expressions, map.getValue()));
+                binding.addMapping(map.getKey(),
+                        selectColumns(schema, table, conditions, representants, expressions, map.getValue()));
 
             result.add(binding);
         }
@@ -234,8 +316,8 @@ public final class SqlTableAccess extends SqlIntercode
      * @param columns the columns
      * @return the replaced columns
      */
-    private static List<Column> selectColumns(Map<Column, Column> set, Map<Column, Column> expressions,
-            List<Column> columns)
+    private static List<Column> selectColumns(DatabaseSchema schema, SourceTable table, Conditions conditions,
+            Map<Column, Column> set, Map<Column, Column> expressions, List<Column> columns)
     {
         if(columns == null)
             return null;
@@ -246,12 +328,19 @@ public final class SqlTableAccess extends SqlIntercode
         {
             column = set.get(column) != null ? set.get(column) : column;
 
+            // the exposed columns carry the knowledge whether their values may be null
+            boolean canBeNull = !isKnownNotNull(schema, table, conditions, column);
+
             if(column instanceof ExpressionColumn)
             {
                 if(!expressions.containsKey(column))
-                    expressions.put(column, new TableColumn("#expr-" + expressions.size()));
+                    expressions.put(column, new TableColumn("#expr-" + expressions.size(), canBeNull));
 
                 column = expressions.get(column);
+            }
+            else if(column instanceof TableColumn && !canBeNull)
+            {
+                column = new TableColumn(column.getName(), false);
             }
 
             assert column != null;
@@ -260,6 +349,49 @@ public final class SqlTableAccess extends SqlIntercode
         }
 
         return optimized;
+    }
+
+
+    /**
+     * True if the column may be NULL in the rows of the table: a NULL constant, an expression that may be null, or a
+     * table column that is nullable in the schema. Without a schema (or a table) every column not known to be not null
+     * by itself may be null.
+     *
+     * @param schema the database schema, or null
+     * @param table the table, or null
+     * @param column the column
+     * @return true if the column may be NULL in the rows of the table, false otherwise
+     */
+    public static boolean mayBeNull(DatabaseSchema schema, SourceTable table, Column column)
+    {
+        if(!column.canBeNull())
+            return false;
+
+        if(schema == null || table == null)
+            return true;
+
+        return schema.isNullableColumn(table, column);
+    }
+
+
+    /**
+     * Predicate for {@link Condition#addAreEqual(List, List, java.util.function.IntPredicate)}: the position of the
+     * class needs the null-safe equality when it is optional and both compared columns may be NULL in the table. When
+     * either of them cannot be NULL, the strict equality has the same meaning and is preferred, since it can use
+     * indexes and hash joins.
+     *
+     * @param schema the database schema, or null
+     * @param table the table, or null
+     * @param resClass the resource class of the columns
+     * @param cols1 the first columns
+     * @param cols2 the second columns
+     * @return the predicate
+     */
+    public static IntPredicate needsNullSafeEquality(DatabaseSchema schema, SourceTable table, ResourceClass resClass,
+            List<Column> cols1, List<Column> cols2)
+    {
+        return i -> resClass.isOptionalColumn(i) && mayBeNull(schema, table, cols1.get(i))
+                && mayBeNull(schema, table, cols2.get(i));
     }
 
 
@@ -348,7 +480,24 @@ public final class SqlTableAccess extends SqlIntercode
      */
     boolean isKnownNotNull(DatabaseSchema schema, Column column)
     {
-        if(!schema.isNullableColumn(table, column))
+        return isKnownNotNull(schema, table, conditions, column);
+    }
+
+
+    /**
+     * True if the column is known to be not null in the rows selected by the conditions from the table, see
+     * {@link #isKnownNotNull(DatabaseSchema, Column)}.
+     *
+     * @param schema the database schema, or null
+     * @param table the table, or null
+     * @param conditions the conditions
+     * @param column the column
+     * @return true if the column is known to be not null, false otherwise
+     */
+    private static boolean isKnownNotNull(DatabaseSchema schema, SourceTable table, Conditions conditions,
+            Column column)
+    {
+        if(!mayBeNull(schema, table, column))
             return true;
 
         if(conditions.getIsNotNull().contains(column))
@@ -769,7 +918,8 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> leftCols = leftBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(leftCols, rightCols, pairedClass.getLeftClass()::isOptionalColumn);
+                    joinCondition.addAreEqual(leftCols, rightCols,
+                            needsNullSafeEquality(schema, left.table, pairedClass.getLeftClass(), leftCols, rightCols));
                 }
             }
         }
@@ -794,9 +944,11 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private static SqlIntercode joinWithValues(SqlTableAccess left, SqlValues right, Restrictions restrictions)
     {
-        Conditions conditions = Conditions.and(left.conditions, right.asConditions(left.getVariableBindings()));
+        Conditions conditions = Conditions.and(left.conditions,
+                right.asConditions(left.schema, left.table, left.getVariableBindings()));
 
-        return create(left.table, conditions, left.internal.restrict(restrictions), left.reduced, left.distinctColumns);
+        return create(left.schema, left.table, conditions, left.internal.restrict(restrictions), left.reduced,
+                left.distinctColumns);
     }
 
 
@@ -908,7 +1060,8 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> leftCols = leftBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(leftCols, rightCols, pairedClass.getLeftClass()::isOptionalColumn);
+                    joinCondition.addAreEqual(leftCols, rightCols, needsNullSafeEquality(left.schema, left.table,
+                            pairedClass.getLeftClass(), leftCols, rightCols));
                 }
             }
         }
@@ -921,7 +1074,8 @@ public final class SqlTableAccess extends SqlIntercode
         if(conditions.isFalse())
             return SqlNoSolution.get();
 
-        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced, distinctColumns);
+        return new SqlTableAccess(left.schema, left.table, conditions, bindings, left.reduced && right.reduced,
+                distinctColumns);
     }
 
 
@@ -963,8 +1117,10 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> childCols = childBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> parentCols = parentBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(childCols, remap(map, parentCols),
-                            pairedClass.getLeftClass()::isOptionalColumn);
+                    List<Column> remapped = remap(map, parentCols);
+
+                    joinCondition.addAreEqual(childCols, remapped, needsNullSafeEquality(child.schema, child.table,
+                            pairedClass.getLeftClass(), childCols, remapped));
                 }
             }
         }
@@ -978,7 +1134,7 @@ public final class SqlTableAccess extends SqlIntercode
             return SqlNoSolution.get();
 
         // each child row has exactly one parent row, so only the deduplication of the child remains
-        return new SqlTableAccess(child.table, conditions, bindings, child.reduced && parent.reduced,
+        return new SqlTableAccess(child.schema, child.table, conditions, bindings, child.reduced && parent.reduced,
                 child.distinctColumns);
     }
 
@@ -1034,7 +1190,7 @@ public final class SqlTableAccess extends SqlIntercode
 
         bindings = bindings.restrict(restrictions);
 
-        return new SqlTableAccess(left.table, conditions, bindings, left.reduced && right.reduced,
+        return new SqlTableAccess(left.schema, left.table, conditions, bindings, left.reduced && right.reduced,
                 union(left.distinctColumns, right.distinctColumns));
     }
 
@@ -1076,7 +1232,7 @@ public final class SqlTableAccess extends SqlIntercode
             bindings.add(new VariableBinding(binding.getVariable(), binding.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(parent.table, conditions, bindings, true, parent.distinctColumns);
+        return new SqlTableAccess(parent.schema, parent.table, conditions, bindings, true, parent.distinctColumns);
     }
 
 
@@ -1100,7 +1256,7 @@ public final class SqlTableAccess extends SqlIntercode
             bindings.add(new VariableBinding(binding.getVariable(), binding.getMappings(), canBeNull));
         }
 
-        return new SqlTableAccess(left.table, conditions, bindings, true,
+        return new SqlTableAccess(left.schema, left.table, conditions, bindings, true,
                 union(left.distinctColumns, right.distinctColumns));
     }
 
@@ -1392,7 +1548,7 @@ public final class SqlTableAccess extends SqlIntercode
         if(this.reduced == reduced && optimizedBindings.equals(internal) && optimizedDistinct == distinctColumns)
             return this;
 
-        return create(table, conditions, optimizedBindings, reduced, optimizedDistinct);
+        return create(schema, table, conditions, optimizedBindings, reduced, optimizedDistinct);
     }
 
 

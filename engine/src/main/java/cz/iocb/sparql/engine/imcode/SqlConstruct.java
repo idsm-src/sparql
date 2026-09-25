@@ -504,7 +504,7 @@ public final class SqlConstruct extends SqlIntercode
                 }
             }
 
-            return SqlTableAccess.create(acc.getTable(), conditions, internal, true, acc.getDistinctColumns())
+            return SqlTableAccess.create(request, acc.getTable(), conditions, internal, true, acc.getDistinctColumns())
                     .optimize(request, restrictions, reduced, evalServices);
         }
 

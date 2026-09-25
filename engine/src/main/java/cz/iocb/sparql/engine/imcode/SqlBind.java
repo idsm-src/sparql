@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
@@ -105,8 +106,8 @@ public final class SqlBind extends SqlIntercode
 
             for(int i = 0; i < e.getKey().getColumnCount(); i++)
             {
-                if(e.getValue().get(i) instanceof ExpressionColumn)
-                    list.add(names.get(i));
+                if(e.getValue().get(i) instanceof ExpressionColumn expr)
+                    list.add(new TableColumn(names.get(i).getName(), expr.canBeNull()));
                 else
                     list.add(e.getValue().get(i));
             }
@@ -175,8 +176,9 @@ public final class SqlBind extends SqlIntercode
             VariableBindings internal = new VariableBindings(access.getInternalVariableBindings());
             internal.add(new VariableBinding(variable, binding.getMappings(), binding.canBeNull()));
 
-            return SqlTableAccess.create(access.getTable(), access.getConditions(), internal, access.getReduced(),
-                    access.getDistinctColumns()).optimize(request, restrictions, reduced, evalServices);
+            return SqlTableAccess.create(request, access.getTable(), access.getConditions(), internal,
+                    access.getReduced(), access.getDistinctColumns())
+                    .optimize(request, restrictions, reduced, evalServices);
         }
 
 

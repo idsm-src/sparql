@@ -72,6 +72,7 @@ public class ExpressionColumn extends Column
      *
      * @return true if the expression may evaluate to NULL, false otherwise
      */
+    @Override
     public boolean canBeNull()
     {
         return canBeNull;

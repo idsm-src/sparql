@@ -371,6 +371,12 @@ public class JoinTableQuadMapping extends QuadMapping
      *
      * @return index of the table the subject is taken from
      */
+    public final int getGraphTableIdx()
+    {
+        return graphTableIdx;
+    }
+
+
     public final int getSubjectTableIdx()
     {
         return subjectTableIdx;

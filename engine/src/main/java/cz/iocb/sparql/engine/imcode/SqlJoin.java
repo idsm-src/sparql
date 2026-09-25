@@ -465,8 +465,11 @@ public final class SqlJoin extends SqlIntercode
                             if(v.getMapping(o.getClasses().iterator().next()) != null)
                             {
                                 ResourceClass r = o.getClasses().iterator().next();
+                                List<Column> values = o.getMapping(r);
+                                List<Column> columns = v.getMapping(r);
 
-                                cnd.addAreEqual(o.getMapping(r), v.getMapping(r), r::isOptionalColumn);
+                                cnd.addAreEqual(values, columns, SqlTableAccess.needsNullSafeEquality(schema,
+                                        access.getTable(), r, values, columns));
                                 skip.put(e.getKey(), o);
                             }
                         }
@@ -489,8 +492,8 @@ public final class SqlJoin extends SqlIntercode
                                 internal.add(access.getInternalVariableBinding(variable));
                         }
 
-                        optChilds.set(i, SqlTableAccess.create(access.getTable(), cnds, internal, access.getReduced(),
-                                access.getDistinctColumns()));
+                        optChilds.set(i, SqlTableAccess.create(schema, access.getTable(), cnds, internal,
+                                access.getReduced(), access.getDistinctColumns()));
                     }
                 }
             }
@@ -590,12 +593,14 @@ public final class SqlJoin extends SqlIntercode
                                     Column rightCol = rightCols.get(c);
                                     boolean optional = pairedClass.getLeftClass().isOptionalColumn(c);
 
-                                    if(leftCol instanceof ConstantColumn && optional)
+                                    if(leftCol instanceof ConstantColumn && optional && leftCol.canBeNull()
+                                            && SqlTableAccess.mayBeNull(schema, right.getTable(), rightCol))
                                         additionalRight.addAreNotDistinct(leftCol, rightCol);
                                     else if(leftCol instanceof ConstantColumn)
                                         additionalRight.addAreEqual(leftCol, rightCol);
 
-                                    if(rightCol instanceof ConstantColumn && optional)
+                                    if(rightCol instanceof ConstantColumn && optional && rightCol.canBeNull()
+                                            && SqlTableAccess.mayBeNull(schema, left.getTable(), leftCol))
                                         additionalLeft.addAreNotDistinct(leftCol, rightCol);
                                     else if(rightCol instanceof ConstantColumn)
                                         additionalLeft.addAreEqual(leftCol, rightCol);

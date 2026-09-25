@@ -23,6 +23,7 @@ import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
+import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -643,7 +644,7 @@ public abstract class SqlIntercode extends SqlBaseClass
                     List<Column> columns = selectColumns(resClass, mappings);
 
                     variableBinding.addMapping(resClass, getMappedColuns(
-                            resClass.createColumns(request.getColumnMap(), variable), columns, columnMap));
+                            resClass.createColumns(request.getColumnMap(), variable), columns, columnMap, false));
                 }
             }
         }
@@ -670,8 +671,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                 List<Column> columns = coalesceVariants(resClass.getColumnCount(), variants);
 
-                variableBinding.addMapping(resClass,
-                        getMappedColuns(resClass.createColumns(request.getColumnMap(), variable), columns, columnMap));
+                variableBinding.addMapping(resClass, getMappedColuns(
+                        resClass.createColumns(request.getColumnMap(), variable), columns, columnMap, true));
             }
         }
 
@@ -688,10 +689,24 @@ public abstract class SqlIntercode extends SqlBaseClass
      */
     private static List<Column> selectColumns(ResourceClass resClass, List<List<Column>> mappings)
     {
-        return IntStream
-                .range(0, resClass.getColumnCount()).mapToObj(i -> mappings.stream().map(m -> m.get(i))
-                        .filter(c -> c instanceof ConstantColumn).findFirst().orElse(mappings.getFirst().get(i)))
-                .toList();
+        List<Column> columns = new ArrayList<>(resClass.getColumnCount());
+
+        for(int i = 0; i < resClass.getColumnCount(); i++)
+        {
+            int position = i;
+
+            Column column = mappings.stream().map(m -> m.get(position)).filter(c -> c instanceof ConstantColumn)
+                    .findFirst().orElse(mappings.getFirst().get(i));
+
+            // the joined columns are equal, so the value is not null when any of them is not null
+            if(column instanceof ExpressionColumn && column.canBeNull()
+                    && mappings.stream().anyMatch(m -> !m.get(position).canBeNull()))
+                column = new ExpressionColumn(column.getName(), false);
+
+            columns.add(column);
+        }
+
+        return columns;
     }
 
 
@@ -704,7 +719,8 @@ public abstract class SqlIntercode extends SqlBaseClass
      * @param map the column map
      * @return the output columns
      */
-    private static List<Column> getMappedColuns(List<Column> output, List<Column> input, Map<Column, Column> map)
+    private static List<Column> getMappedColuns(List<Column> output, List<Column> input, Map<Column, Column> map,
+            boolean canBeNull)
     {
         List<Column> mapping = new ArrayList<>();
 
@@ -722,7 +738,8 @@ public abstract class SqlIntercode extends SqlBaseClass
 
                 if(column == null)
                 {
-                    column = output.get(i);
+                    // the exposed column keeps the knowledge that the accessed value is not null
+                    column = new TableColumn(output.get(i).getName(), canBeNull || access.canBeNull());
                     map.put(access, column);
                 }
 
@@ -964,11 +981,15 @@ public abstract class SqlIntercode extends SqlBaseClass
                 }
                 else if(leftCol instanceof ConstantColumn c && c.getValue() == null)
                 {
-                    compare.add("(" + rightCol + " IS NULL)");
+                    compare.add(rightCol.canBeNull() ? "(" + rightCol + " IS NULL)" : "false");
                 }
                 else if(rightCol instanceof ConstantColumn c && c.getValue() == null)
                 {
-                    compare.add("(" + leftCol + " IS NULL)");
+                    compare.add(leftCol.canBeNull() ? "(" + leftCol + " IS NULL)" : "false");
+                }
+                else if(!leftCol.canBeNull() || !rightCol.canBeNull())
+                {
+                    compare.add(type.equal(leftCol, rightCol));
                 }
                 else
                 {

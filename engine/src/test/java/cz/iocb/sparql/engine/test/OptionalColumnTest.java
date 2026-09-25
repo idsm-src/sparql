@@ -6,6 +6,8 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdString
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -21,6 +23,7 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.DatabaseTable;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
+import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -28,8 +31,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
 import cz.iocb.sparql.engine.request.Request;
+import cz.iocb.sparql.engine.request.Request.PreparedQuery;
 import cz.iocb.sparql.engine.request.Result;
 import cz.iocb.sparql.engine.translator.ServiceException;
+import cz.iocb.sparql.engine.translator.TranslateVisitor;
 
 
 
@@ -68,6 +73,12 @@ public class OptionalColumnTest
                     + "synonym varchar collate \"C\" not null)");
             statement.execute("insert into optional_test.synonym values (1, null, 'uno'), (3, 1, 'tres uno'), "
                     + "(3, null, 'tres')");
+
+            // the optional column of the class is not nullable in this table
+            statement.execute("create table optional_test.alias (id int not null, sub int not null, "
+                    + "alias varchar collate \"C\" not null)");
+            statement.execute(
+                    "insert into optional_test.alias values (3, 1, 'III/1'), (3, 2, 'III/2'), " + "(2, 0, 'II/0')");
         }
 
         schema = new DatabaseSchema(connectionPool);
@@ -85,6 +96,26 @@ public class OptionalColumnTest
 
         config.addQuadMapping(synonym, graph, config.createIriMapping("item", "id", "sub"),
                 config.createIriMapping("ex:synonym"), config.createLiteralMapping(xsdString, "synonym"));
+
+        DatabaseTable alias = new DatabaseTable("optional_test", "alias");
+
+        config.addQuadMapping(alias, graph, config.createIriMapping("item", "id", "sub"),
+                config.createIriMapping("ex:alias"), config.createLiteralMapping(xsdString, "alias"));
+    }
+
+
+    private static String translate(String query) throws SQLException, TranslateExceptions, ServiceException
+    {
+        Engine engine = new Engine(config);
+
+        try(Request request = engine.getRequest())
+        {
+            PreparedQuery prepared = request.prepareQuery(prefix + query, null);
+
+            SqlSelect imcode = new TranslateVisitor(request).translate(prepared.getSyntaxTree(), null, null, List.of());
+
+            return imcode.optimize(request, false).optimize(request, true).translate(request);
+        }
     }
 
 
@@ -310,5 +341,61 @@ public class OptionalColumnTest
                 + "BIND(<http://example.org/item/2> AS ?s) } UNION { ?s ex:synonym ?y } }");
 
         assertThat(result, containsInAnyOrder(row(item(2)), row(item(1)), row(item(3, 1)), row(item(3))));
+    }
+
+
+    @Test
+    @DisplayName("a join with a table where the optional column is not nullable")
+    void joinWithNotNullOptional() throws Exception
+    {
+        List<List<RdfTerm>> result = execute("SELECT ?s ?l ?a WHERE { ?s ex:label ?l . ?s ex:alias ?a }");
+
+        assertThat(result, containsInAnyOrder(row(item(3, 1), string("three one"), string("III/1")),
+                row(item(3, 2), string("three two"), string("III/2"))));
+
+        result = execute("SELECT ?l ?a WHERE { ?s ex:label ?l . ?t ex:alias ?a FILTER(sameTerm(?s, ?t)) }");
+
+        assertThat(result, containsInAnyOrder(row(string("three one"), string("III/1")),
+                row(string("three two"), string("III/2"))));
+    }
+
+
+    @Test
+    @DisplayName("a constant without the optional part cannot match a not nullable column")
+    void constantWithoutSuffixOnNotNull() throws Exception
+    {
+        List<List<RdfTerm>> result = execute("SELECT ?a WHERE { <http://example.org/item/3> ex:alias ?a }");
+
+        assertThat(result, containsInAnyOrder());
+
+        // the impossible access is recognised at translation time
+        assertThat(translate("SELECT ?a WHERE { <http://example.org/item/3> ex:alias ?a }"),
+                not(containsString("\"alias\"")));
+    }
+
+
+    @Test
+    @DisplayName("the null-safe equality is generated only when both sides may be null")
+    void generatedEquality() throws Exception
+    {
+        assertThat(translate("SELECT ?l ?y WHERE { ?s ex:label ?l . ?s ex:synonym ?y }"),
+                containsString("IS NOT DISTINCT FROM"));
+
+        assertThat(translate("SELECT ?l ?a WHERE { ?s ex:label ?l . ?s ex:alias ?a }"),
+                not(containsString("IS NOT DISTINCT FROM")));
+
+        assertThat(translate("SELECT ?l ?a WHERE { ?s ex:label ?l . ?t ex:alias ?a FILTER(?s = ?t) }"),
+                not(containsString("IS NOT DISTINCT FROM")));
+
+        assertThat(translate("SELECT ?l ?y WHERE { ?s ex:label ?l . ?t ex:synonym ?y FILTER(?s = ?t) }"),
+                containsString("IS NOT DISTINCT FROM"));
+
+        // the knowledge survives a union of accesses to the not nullable column
+        assertThat(translate("SELECT ?y WHERE { { ?s ex:alias ?a } UNION { ?s ex:alias ?b } ?s ex:synonym ?y }"),
+                not(containsString("IS NOT DISTINCT FROM")));
+
+        // but not a union with an access to the nullable one
+        assertThat(translate("SELECT ?y WHERE { { ?s ex:alias ?a } UNION { ?s ex:label ?l } ?s ex:synonym ?y }"),
+                containsString("IS NOT DISTINCT FROM"));
     }
 }

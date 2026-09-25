@@ -428,9 +428,9 @@ public class DatabaseSchema
     {
         return switch(column)
         {
-            case ConstantColumn _ -> false;
+            case ConstantColumn col -> col.canBeNull();
             case ExpressionColumn col -> col.canBeNull();
-            default -> nullableColumns.getOrDefault(table, List.of()).contains(column);
+            default -> column.canBeNull() && nullableColumns.getOrDefault(table, List.of()).contains(column);
         };
     }
 

@@ -27,7 +27,9 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.imcode.SqlAggregation;
 import cz.iocb.sparql.engine.imcode.SqlBind;
 import cz.iocb.sparql.engine.imcode.SqlConstruct;
@@ -51,6 +53,7 @@ import cz.iocb.sparql.engine.imcode.SqlNoSolution;
 import cz.iocb.sparql.engine.imcode.SqlProcedureCall;
 import cz.iocb.sparql.engine.imcode.SqlSelect;
 import cz.iocb.sparql.engine.imcode.SqlServiceStub;
+import cz.iocb.sparql.engine.imcode.SqlTableAccess;
 import cz.iocb.sparql.engine.imcode.SqlUnion;
 import cz.iocb.sparql.engine.imcode.SqlValues;
 import cz.iocb.sparql.engine.imcode.expression.SqlBuiltinCall;
@@ -62,7 +65,9 @@ import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.JoinTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.QuadMapping;
+import cz.iocb.sparql.engine.mapping.SingleTableQuadMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
@@ -1398,14 +1403,34 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
 
     /**
+     * Table providing the graph term of the mapping, or null if it is unknown.
+     *
+     * @param source the quad mapping
+     * @return table providing the graph term of the mapping, or null if it is unknown
+     */
+    private static SourceTable getGraphTable(QuadMapping source)
+    {
+        return switch(source)
+        {
+            case SingleTableQuadMapping single -> single.getTable();
+            case JoinTableQuadMapping join -> join.getTables().get(join.getGraphTableIdx());
+            default -> null;
+        };
+    }
+
+
+    /**
      * Condition restricting the graph term of the mapping to the given IRIs.
      *
      * @param graphMap the graph term mapping
      * @param iris IRIs the graph may take
      * @return condition restricting the graph term of the mapping to the given IRIs
      */
-    private Conditions getGraphCondition(TermMapping graphMap, Set<Iri> iris)
+    private Conditions getGraphCondition(QuadMapping source, TermMapping graphMap, Set<Iri> iris)
     {
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
+        SourceTable table = getGraphTable(source);
+
         ResourceClass resClass = graphMap.getResourceClass(request);
         List<Column> cols = graphMap.getColumns(request);
 
@@ -1413,8 +1438,11 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
 
         for(Iri iri : iris)
         {
+            List<Column> values = resClass.toColumns(request.getStatement(), iri);
+
             Condition condition = new Condition();
-            condition.addAreEqual(cols, resClass.toColumns(request.getStatement(), iri), resClass::isOptionalColumn);
+            condition.addAreEqual(cols, values,
+                    SqlTableAccess.needsNullSafeEquality(schema, table, resClass, cols, values));
             conditions = Conditions.or(conditions, new Conditions(condition));
         }
 
@@ -1462,12 +1490,12 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     Set<Iri> validDefaults = defaults.stream().filter(i -> graphMap.match(request, i)).collect(toSet());
 
                     if(!validDefaults.isEmpty())
-                        mappings.add(source.asDefaultGraphMapping(getGraphCondition(graphMap, validDefaults)));
+                        mappings.add(source.asDefaultGraphMapping(getGraphCondition(source, graphMap, validDefaults)));
 
                     Set<Iri> validNamed = named.stream().filter(i -> graphMap.match(request, i)).collect(toSet());
 
                     if(!validNamed.isEmpty())
-                        mappings.add(source.asNamedGraphMapping(getGraphCondition(graphMap, validNamed)));
+                        mappings.add(source.asNamedGraphMapping(getGraphCondition(source, graphMap, validNamed)));
                 }
             }
         }

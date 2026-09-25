@@ -618,7 +618,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 else if(other.getClasses().iterator().next().equals(resourceClass))
                 {
                     List<Column> current = other.getMapping(resourceClass);
-                    condition.addAreEqual(columns, current, resourceClass::isOptionalColumn);
+                    condition.addAreEqual(columns, current,
+                            SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, current));
                 }
                 else
                 {
@@ -630,7 +631,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             else if(mapping instanceof ParametrisedMapping)
             {
                 List<Column> values = request.getColumns(mapping.getResourceClass(request), term);
-                condition.addAreEqual(columns, values, resourceClass::isOptionalColumn);
+                condition.addAreEqual(columns, values,
+                        SqlTableAccess.needsNullSafeEquality(schema, table, resourceClass, columns, values));
             }
         }
 
@@ -643,7 +645,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             distinctColumns.addAll(condition.getNonConstantColumns());
         }
 
-        return SqlTableAccess.create(table, Conditions.and(extraCondition, condition), bindings, false,
+        return SqlTableAccess.create(request, table, Conditions.and(extraCondition, condition), bindings, false,
                 distinctColumns);
     }
 

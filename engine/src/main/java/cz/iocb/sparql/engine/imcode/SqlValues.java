@@ -15,6 +15,8 @@ import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -136,7 +138,7 @@ public final class SqlValues extends SqlIntercode
      * @return the rows as a disjunction of equality conditions on the given outer bindings, used to merge the values
      *         into a table access
      */
-    public Conditions asConditions(VariableBindings outerBindings)
+    public Conditions asConditions(DatabaseSchema schema, SourceTable table, VariableBindings outerBindings)
     {
         Conditions conditions = new Conditions(false);
 
@@ -165,7 +167,8 @@ public final class SqlValues extends SqlIntercode
                             values.add(data.get(mapping.getValue().get(j)).get(i));
                     }
 
-                    condition.addAreEqual(outerCollumns, values, mapping.getKey()::isOptionalColumn);
+                    condition.addAreEqual(outerCollumns, values, SqlTableAccess.needsNullSafeEquality(schema, table,
+                            mapping.getKey(), outerCollumns, values));
                 }
             }
 
@@ -312,7 +315,7 @@ public final class SqlValues extends SqlIntercode
             }
         }
 
-        return SqlTableAccess.create(null, subBindings);
+        return SqlTableAccess.create((DatabaseSchema) null, null, subBindings);
     }
 
 

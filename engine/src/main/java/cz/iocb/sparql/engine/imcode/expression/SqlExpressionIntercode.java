@@ -603,9 +603,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             if(!resClass.isOptionalColumn(i))
                 conditions.add(type.equal(l, r));
             else if(isNullConstant(l))
-                conditions.add("(" + r + " IS NULL)");
+                conditions.add(r.canBeNull() ? "(" + r + " IS NULL)" : "false");
             else if(isNullConstant(r))
-                conditions.add("(" + l + " IS NULL)");
+                conditions.add(l.canBeNull() ? "(" + l + " IS NULL)" : "false");
+            else if(!l.canBeNull() || !r.canBeNull())
+                conditions.add(type.equal(l, r));
             else
                 conditions.add(type.notDistinct(l, r));
         }
@@ -636,9 +638,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             if(!resClass.isOptionalColumn(i))
                 conditions.add("(" + l + " != " + r + ")");
             else if(isNullConstant(l))
-                conditions.add("(" + r + " IS NOT NULL)");
+                conditions.add(r.canBeNull() ? "(" + r + " IS NOT NULL)" : "true");
             else if(isNullConstant(r))
-                conditions.add("(" + l + " IS NOT NULL)");
+                conditions.add(l.canBeNull() ? "(" + l + " IS NOT NULL)" : "true");
+            else if(!l.canBeNull() || !r.canBeNull())
+                conditions.add("(" + l + " != " + r + ")");
             else
                 conditions.add(type.distinct(l, r));
         }
