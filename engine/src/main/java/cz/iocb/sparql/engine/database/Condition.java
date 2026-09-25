@@ -4,13 +4,21 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.IntPredicate;
 
 
 
 /**
- * Conjunction of simple predicates over columns: {@code IS NULL}, {@code IS NOT NULL}, {@code =} and {@code !=}.
- * Equalities are kept transitively closed, and a column compared by {@code =} or {@code !=} drops its
- * {@code IS NOT NULL} predicate as redundant.
+ * Conjunction of simple predicates over columns: {@code IS NULL}, {@code IS NOT NULL}, {@code =},
+ * {@code IS NOT DISTINCT FROM} and {@code !=}.
+ *
+ * Columns compared by {@code =} or {@code IS NOT DISTINCT FROM} form equivalence classes that are kept transitively
+ * closed. Whether a pair of a class is rendered as the strict {@code =} or as the null-safe
+ * {@code IS NOT DISTINCT FROM} is not a property of the pair but of the class: as soon as some member of a class is
+ * known to be not null (it is required to be not null, it is compared by {@code =} or {@code !=}, or it is a non-null
+ * constant), all members are not null and every pair of the class is strict. A class containing a NULL constant
+ * requires its members to be null instead. A column compared by {@code =} or {@code !=} drops its {@code IS NOT NULL}
+ * predicate as redundant. Contradictory predicates are stored as they are and detected by {@link #isFalse()}.
  */
 public class Condition
 {
@@ -131,9 +139,16 @@ public class Condition
     final Set<Column> isNull = new HashSet<>();
 
     /**
-     * Column pairs required to be equal.
+     * Column pairs required to be equal by the strict {@code =}, i.e. pairs of equivalence classes known to be not
+     * null.
      */
     final Set<ColumnComparison> areEqual = new HashSet<>();
+
+    /**
+     * Column pairs required to be equal by the null-safe {@code IS NOT DISTINCT FROM}, i.e. pairs of equivalence
+     * classes not known to be not null.
+     */
+    final Set<ColumnComparison> areNotDistinct = new HashSet<>();
 
     /**
      * Column pairs required to be different.
@@ -159,42 +174,124 @@ public class Condition
         isNotNull.addAll(condition.isNotNull);
         isNull.addAll(condition.isNull);
         areEqual.addAll(condition.areEqual);
+        areNotDistinct.addAll(condition.areNotDistinct);
         areNotEqual.addAll(condition.areNotEqual);
     }
 
 
     /**
-     * Requires the column to be not null; constants are ignored.
+     * True if the column is a NULL constant.
+     *
+     * @param column the column
+     * @return true if the column is a NULL constant, false otherwise
+     */
+    private static boolean isNullConstant(Column column)
+    {
+        return column instanceof ConstantColumn constant && constant.getValue() == null;
+    }
+
+
+    /**
+     * True if the column is known to be not null: it is a non-null constant, it is required to be not null, or it is
+     * compared by {@code =} or {@code !=}.
+     *
+     * @param column the column
+     * @return true if the column is known to be not null, false otherwise
+     */
+    private boolean isKnownNotNull(Column column)
+    {
+        if(column instanceof ConstantColumn)
+            return !isNullConstant(column);
+
+        if(isNotNull.contains(column))
+            return true;
+
+        if(areEqual.stream().anyMatch(p -> p.contains(column)))
+            return true;
+
+        if(areNotEqual.stream().anyMatch(p -> p.contains(column)))
+            return true;
+
+        return false;
+    }
+
+
+    /**
+     * Makes the null-safe equalities of the equivalence class of the column strict, because the column is known to be
+     * not null; the not-null predicates of the class become redundant.
+     *
+     * @param column the column
+     */
+    private void promote(Column column)
+    {
+        Set<ColumnComparison> pairs = new HashSet<>();
+
+        for(Column member : getEqualColumns(column))
+            areNotDistinct.stream().filter(p -> p.contains(member)).forEach(pairs::add);
+
+        if(pairs.isEmpty())
+            return;
+
+        areNotDistinct.removeAll(pairs);
+        areEqual.addAll(pairs);
+
+        for(ColumnComparison pair : pairs)
+        {
+            isNotNull.remove(pair.getLeft());
+            isNotNull.remove(pair.getRight());
+        }
+    }
+
+
+    /**
+     * Requires the column to be not null; constants are ignored. The null-safe equalities of its equivalence class
+     * become strict.
      *
      * @param column the column
      */
     public void addIsNotNull(Column column)
     {
-        if(!(column instanceof ConstantColumn))
+        if(column instanceof ConstantColumn)
+            return;
+
+        if(areNotDistinct.stream().anyMatch(p -> p.contains(column)))
+            promote(column);
+        else
             isNotNull.add(column);
     }
 
 
     /**
-     * Requires the column to be null.
+     * Requires the column to be null; a NULL constant is ignored as it always holds.
      *
      * @param column the column
      */
     public void addIsNull(Column column)
     {
-        isNull.add(column);
+        if(!isNullConstant(column))
+            isNull.add(column);
     }
 
 
     /**
-     * Requires the columns to be equal, also to everything already equal to either of them; their not-null predicates
-     * become redundant.
+     * Requires the columns to be equal by the strict {@code =}, also to everything already equal to either of them;
+     * their not-null predicates become redundant. A NULL constant can never be equal, such a predicate is kept and
+     * makes the condition false.
      *
      * @param col1 the first column
      * @param col2 the second column
      */
     public void addAreEqual(Column col1, Column col2)
     {
+        if(isNullConstant(col1) || isNullConstant(col2))
+        {
+            areEqual.add(new ColumnComparison(col1, col2));
+            return;
+        }
+
+        if(col1.equals(col2))
+            return;
+
         Set<Column> cols1 = getEqualColumns(col1);
         Set<Column> cols2 = getEqualColumns(col2);
 
@@ -205,11 +302,62 @@ public class Condition
 
         isNotNull.remove(col1);
         isNotNull.remove(col2);
+
+        promote(col1);
     }
 
 
     /**
-     * Requires the columns to be different; their not-null predicates become redundant.
+     * Requires the columns to be equal by the null-safe {@code IS NOT DISTINCT FROM}, also to everything already equal
+     * to either of them. When some member of the resulting equivalence class is known to be not null, the class is
+     * strict and the requirement is the same as {@link #addAreEqual(Column, Column)}. When one of the columns is a NULL
+     * constant, the members of the class are required to be null instead.
+     *
+     * @param col1 the first column
+     * @param col2 the second column
+     */
+    public void addAreNotDistinct(Column col1, Column col2)
+    {
+        if(col1.equals(col2))
+            return;
+
+        if(isNullConstant(col1) || isNullConstant(col2))
+        {
+            Column column = isNullConstant(col1) ? col2 : col1;
+
+            for(Column member : getEqualColumns(column))
+                addIsNull(member);
+
+            return;
+        }
+
+        Set<Column> cols1 = getEqualColumns(col1);
+        Set<Column> cols2 = getEqualColumns(col2);
+
+        boolean strict = cols1.stream().anyMatch(c -> isKnownNotNull(c))
+                || cols2.stream().anyMatch(c -> isKnownNotNull(c));
+
+        for(Column c1 : cols1)
+            for(Column c2 : cols2)
+                if(!c1.equals(c2))
+                    (strict ? areEqual : areNotDistinct).add(new ColumnComparison(c1, c2));
+
+        if(strict)
+        {
+            for(Column c : cols1)
+                isNotNull.remove(c);
+
+            for(Column c : cols2)
+                isNotNull.remove(c);
+
+            promote(col1);
+        }
+    }
+
+
+    /**
+     * Requires the columns to be different; their not-null predicates become redundant and the null-safe equalities of
+     * their equivalence classes become strict.
      *
      * @param col1 the first column
      * @param col2 the second column
@@ -219,11 +367,14 @@ public class Condition
         areNotEqual.add(new ColumnComparison(col1, col2));
         isNotNull.remove(col1);
         isNotNull.remove(col2);
+
+        promote(col1);
+        promote(col2);
     }
 
 
     /**
-     * Requires the columns to be pairwise equal (matched by position).
+     * Requires the columns to be pairwise equal by the strict {@code =} (matched by position).
      *
      * @param cols1 the first columns
      * @param cols2 the second columns
@@ -234,6 +385,27 @@ public class Condition
 
         for(int i = 0; i < cols1.size(); i++)
             addAreEqual(cols1.get(i), cols2.get(i));
+    }
+
+
+    /**
+     * Requires the columns representing terms to be pairwise equal (matched by position): by the strict {@code =} at
+     * the determining positions and by the null-safe {@code IS NOT DISTINCT FROM} at the optional positions.
+     *
+     * @param cols1 the first columns
+     * @param cols2 the second columns
+     * @param optional tells whether the position is optional (see
+     *            {@code cz.iocb.sparql.engine.mapping.classes.ResourceClass#isOptionalColumn})
+     */
+    public void addAreEqual(List<Column> cols1, List<Column> cols2, IntPredicate optional)
+    {
+        assert cols1.size() == cols2.size();
+
+        for(int i = 0; i < cols1.size(); i++)
+            if(optional.test(i))
+                addAreNotDistinct(cols1.get(i), cols2.get(i));
+            else
+                addAreEqual(cols1.get(i), cols2.get(i));
     }
 
 
@@ -255,6 +427,9 @@ public class Condition
 
         for(ColumnComparison p : condition.areEqual)
             addAreEqual(p.getLeft(), p.getRight());
+
+        for(ColumnComparison p : condition.areNotDistinct)
+            addAreNotDistinct(p.getLeft(), p.getRight());
     }
 
 
@@ -295,6 +470,9 @@ public class Condition
         if(!areEqual.isEmpty())
             return false;
 
+        if(!areNotDistinct.isEmpty())
+            return false;
+
         if(!areNotEqual.isEmpty())
             return false;
 
@@ -303,8 +481,9 @@ public class Condition
 
 
     /**
-     * True if the condition is contradictory: a column both null and not null or compared while null, a constant
-     * required to be null, a comparison both equal and not equal, or a column equal to two different constants.
+     * True if the condition is contradictory: a column both null and not null or compared while null, a non-null
+     * constant required to be null, a NULL constant compared by {@code =}, a comparison both equal and not equal, or a
+     * column equal to two different constants.
      *
      * @return true if the condition is contradictory, false otherwise
      */
@@ -316,13 +495,16 @@ public class Condition
         if(isNull.stream().anyMatch(c -> c instanceof ConstantColumn))
             return true;
 
+        if(areEqual.stream().anyMatch(p -> isNullConstant(p.getLeft()) || isNullConstant(p.getRight())))
+            return true;
+
         if(areEqual.stream().anyMatch(p -> isNull.contains(p.getLeft()) || isNull.contains(p.getRight())))
             return true;
 
         if(areNotEqual.stream().anyMatch(p -> isNull.contains(p.getLeft()) || isNull.contains(p.getRight())))
             return true;
 
-        if(areNotEqual.stream().anyMatch(p -> areEqual.contains(p)))
+        if(areNotEqual.stream().anyMatch(p -> areEqual.contains(p) || areNotDistinct.contains(p)))
             return true;
 
         if(areNotEqual.stream().anyMatch(p -> p.getLeft().equals(p.getRight())))
@@ -355,7 +537,8 @@ public class Condition
 
 
     /**
-     * Table columns equal to {@code col} (including {@code col} itself if it is a table column).
+     * Table columns equal to {@code col} by {@code =} or {@code IS NOT DISTINCT FROM} (including {@code col} itself if
+     * it is a table column).
      *
      * @param col the column
      * @return table columns equal to {@code col} (including {@code col} itself if it is a table column)
@@ -367,15 +550,14 @@ public class Condition
         if(col instanceof TableColumn)
             set.add(col);
 
-        areEqual.stream().filter(p -> p.contains(col)).map(p -> p.getOther(col)).filter(c -> c instanceof TableColumn)
-                .forEach(c -> set.add(c));
+        getEqualColumns(col).stream().filter(c -> c instanceof TableColumn).forEach(c -> set.add(c));
 
         return set;
     }
 
 
     /**
-     * Columns equal to {@code col}, including {@code col} itself.
+     * Columns equal to {@code col} by {@code =} or {@code IS NOT DISTINCT FROM}, including {@code col} itself.
      *
      * @param col the column
      * @return columns equal to {@code col}, including {@code col} itself
@@ -386,6 +568,7 @@ public class Condition
         set.add(col);
 
         areEqual.stream().filter(p -> p.contains(col)).map(p -> p.getOther(col)).forEach(c -> set.add(c));
+        areNotDistinct.stream().filter(p -> p.contains(col)).map(p -> p.getOther(col)).forEach(c -> set.add(c));
 
         return set;
     }
@@ -403,11 +586,11 @@ public class Condition
         isNotNull.stream().filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
         isNull.stream().filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
 
-        areNotEqual.stream().map(p -> p.getLeft()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
-        areNotEqual.stream().map(p -> p.getRight()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
-
-        areEqual.stream().map(p -> p.getLeft()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
-        areEqual.stream().map(p -> p.getRight()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
+        for(Set<ColumnComparison> pairs : List.of(areNotEqual, areEqual, areNotDistinct))
+        {
+            pairs.stream().map(p -> p.getLeft()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
+            pairs.stream().map(p -> p.getRight()).filter(c -> !(c instanceof ConstantColumn)).forEach(columns::add);
+        }
 
         return columns;
     }
@@ -416,7 +599,8 @@ public class Condition
     @Override
     public int hashCode()
     {
-        return isNotNull.hashCode() + isNull.hashCode() + areEqual.hashCode() + areNotEqual.hashCode();
+        return isNotNull.hashCode() + isNull.hashCode() + areEqual.hashCode() + areNotDistinct.hashCode()
+                + areNotEqual.hashCode();
     }
 
 
@@ -438,6 +622,9 @@ public class Condition
             return false;
 
         if(!areEqual.equals(other.areEqual))
+            return false;
+
+        if(!areNotDistinct.equals(other.areNotDistinct))
             return false;
 
         if(!areNotEqual.equals(other.areNotEqual))
@@ -470,13 +657,37 @@ public class Condition
 
 
     /**
-     * Column pairs required to be equal.
+     * Column pairs required to be equal by the strict {@code =}.
      *
-     * @return column pairs required to be equal
+     * @return column pairs required to be equal by the strict {@code =}
      */
     public Set<ColumnComparison> getAreEqual()
     {
         return Collections.unmodifiableSet(areEqual);
+    }
+
+
+    /**
+     * Column pairs required to be equal by the null-safe {@code IS NOT DISTINCT FROM}.
+     *
+     * @return column pairs required to be equal by the null-safe {@code IS NOT DISTINCT FROM}
+     */
+    public Set<ColumnComparison> getAreNotDistinct()
+    {
+        return Collections.unmodifiableSet(areNotDistinct);
+    }
+
+
+    /**
+     * Column pairs required to be equal, by the strict or by the null-safe equality.
+     *
+     * @return column pairs required to be equal, by the strict or by the null-safe equality
+     */
+    public Set<ColumnComparison> getEquivalences()
+    {
+        Set<ColumnComparison> result = new HashSet<>(areEqual);
+        result.addAll(areNotDistinct);
+        return Collections.unmodifiableSet(result);
     }
 
 

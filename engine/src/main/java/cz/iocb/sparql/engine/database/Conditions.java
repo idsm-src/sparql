@@ -326,6 +326,30 @@ public class Conditions
 
 
     /**
+     * Null-safe equalities holding in every disjunct.
+     *
+     * @return the resulting set
+     */
+    public Set<ColumnComparison> getAreNotDistinct()
+    {
+        if(conditions.isEmpty())
+            return Collections.unmodifiableSet(new HashSet<>());
+
+        Set<ColumnComparison> result = null;
+
+        for(Condition condition : conditions)
+        {
+            if(result == null)
+                result = new HashSet<>(condition.getAreNotDistinct());
+            else
+                result.retainAll(condition.getAreNotDistinct());
+        }
+
+        return Collections.unmodifiableSet(result);
+    }
+
+
+    /**
      * Inequalities holding in every disjunct.
      *
      * @return the resulting set

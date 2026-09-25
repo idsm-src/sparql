@@ -195,9 +195,9 @@ public final class SqlTableAccess extends SqlIntercode
         for(Condition condition : conditions.getConditions())
         {
             if(equals == null)
-                equals = new HashSet<>(condition.getAreEqual());
+                equals = new HashSet<>(condition.getEquivalences());
             else
-                equals.retainAll(condition.getAreEqual());
+                equals.retainAll(condition.getEquivalences());
         }
 
         if(equals == null)
@@ -695,6 +695,9 @@ public final class SqlTableAccess extends SqlIntercode
 
             for(ColumnComparison p : cnd.getAreEqual())
                 condition.addAreEqual(p.getLeft(), p.getRight());
+
+            for(ColumnComparison p : cnd.getAreNotDistinct())
+                condition.addAreNotDistinct(p.getLeft(), p.getRight());
 
             for(ColumnComparison p : cnd.getAreNotEqual())
                 condition.addAreNotEqual(p.getLeft(), p.getRight());
@@ -1278,6 +1281,9 @@ public final class SqlTableAccess extends SqlIntercode
         for(ColumnComparison e : conditions.getAreEqual())
             result.addAreEqual(remap(map, e.getLeft()), remap(map, e.getRight()));
 
+        for(ColumnComparison e : conditions.getAreNotDistinct())
+            result.addAreNotDistinct(remap(map, e.getLeft()), remap(map, e.getRight()));
+
         for(ColumnComparison p : conditions.getAreNotEqual())
             result.addAreNotEqual(remap(map, p.getLeft()), remap(map, p.getRight()));
 
@@ -1435,6 +1441,16 @@ public final class SqlTableAccess extends SqlIntercode
 
                     builder.append(pair.getLeft());
                     builder.append(" = ");
+                    builder.append(pair.getRight());
+                }
+
+                for(ColumnComparison pair : condition.getAreNotDistinct())
+                {
+                    appendAnd(builder, hasCondition);
+                    hasCondition = true;
+
+                    builder.append(pair.getLeft());
+                    builder.append(" IS NOT DISTINCT FROM ");
                     builder.append(pair.getRight());
                 }
 
@@ -1610,6 +1626,17 @@ public final class SqlTableAccess extends SqlIntercode
                     hasCondition = true;
                     builder.append(pair.getLeft().getName());
                     builder.append(" = ");
+                    builder.append(pair.getRight().getName());
+                }
+
+                for(ColumnComparison pair : condition.getAreNotDistinct())
+                {
+                    if(hasCondition)
+                        builder.append(" and ");
+
+                    hasCondition = true;
+                    builder.append(pair.getLeft().getName());
+                    builder.append(" is not distinct from ");
                     builder.append(pair.getRight().getName());
                 }
 
