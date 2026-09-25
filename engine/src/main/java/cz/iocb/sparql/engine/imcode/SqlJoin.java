@@ -466,7 +466,7 @@ public final class SqlJoin extends SqlIntercode
                             {
                                 ResourceClass r = o.getClasses().iterator().next();
 
-                                cnd.addAreEqual(o.getMapping(r), v.getMapping(r));
+                                cnd.addAreEqual(o.getMapping(r), v.getMapping(r), r::isOptionalColumn);
                                 skip.put(e.getKey(), o);
                             }
                         }
@@ -588,11 +588,16 @@ public final class SqlJoin extends SqlIntercode
                                 {
                                     Column leftCol = leftCols.get(c);
                                     Column rightCol = rightCols.get(c);
+                                    boolean optional = pairedClass.getLeftClass().isOptionalColumn(c);
 
-                                    if(leftCol instanceof ConstantColumn)
+                                    if(leftCol instanceof ConstantColumn && optional)
+                                        additionalRight.addAreNotDistinct(leftCol, rightCol);
+                                    else if(leftCol instanceof ConstantColumn)
                                         additionalRight.addAreEqual(leftCol, rightCol);
 
-                                    if(rightCol instanceof ConstantColumn)
+                                    if(rightCol instanceof ConstantColumn && optional)
+                                        additionalLeft.addAreNotDistinct(leftCol, rightCol);
+                                    else if(rightCol instanceof ConstantColumn)
                                         additionalLeft.addAreEqual(leftCol, rightCol);
                                 }
                             }
@@ -766,6 +771,10 @@ public final class SqlJoin extends SqlIntercode
             parentColumns.addAll(distinct.getInternalVariableBindings().getNonConstantColumns());
 
             if(!columns.stream().map(p -> p.getLeft()).collect(toSet()).containsAll(parentColumns))
+                return null;
+
+            // the candidate is dropped, which requires that each of its rows has the referenced row
+            if(!columns.stream().allMatch(p -> candidate.isKnownNotNull(schema, p.getRight())))
                 return null;
 
             List<Set<ColumnPair>> keys = schema.getForeignKeys(distinct.getTable(), candidate.getTable());

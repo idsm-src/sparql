@@ -1414,7 +1414,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
         for(Iri iri : iris)
         {
             Condition condition = new Condition();
-            condition.addAreEqual(cols, resClass.toColumns(request.getStatement(), iri));
+            condition.addAreEqual(cols, resClass.toColumns(request.getStatement(), iri), resClass::isOptionalColumn);
             conditions = Conditions.or(conditions, new Conditions(condition));
         }
 

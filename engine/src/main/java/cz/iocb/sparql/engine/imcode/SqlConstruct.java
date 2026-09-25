@@ -830,13 +830,16 @@ public final class SqlConstruct extends SqlIntercode
     {
         Conditions conditions = new Conditions(false);
 
-        for(List<Column> cols : binding.getMappings().values())
+        for(Entry<ResourceClass, List<Column>> entry : binding.getMappings().entrySet())
         {
+            ResourceClass resClass = entry.getKey();
+            List<Column> cols = entry.getValue();
+
             Condition condition = new Condition();
 
-            for(Column column : cols)
-                if(schema.isNullableColumn(table, column))
-                    condition.addIsNotNull(column);
+            for(int i = 0; i < cols.size(); i++)
+                if(!resClass.isOptionalColumn(i) && schema.isNullableColumn(table, cols.get(i)))
+                    condition.addIsNotNull(cols.get(i));
 
             conditions.add(condition);
         }

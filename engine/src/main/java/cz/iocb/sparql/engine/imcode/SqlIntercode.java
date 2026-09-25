@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.Restriction;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -950,11 +951,29 @@ public abstract class SqlIntercode extends SqlBaseClass
             {
                 Column leftCol = genLeftCols.get(i);
                 Column rightCol = genRightCols.get(i);
+                SqlType type = unionClass.getSqlTypes().get(i);
 
-                if(!(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn))
-                    compare.add(leftCol + " = " + rightCol);
-                else if(!leftCol.equals(rightCol))
-                    compare.add("false");
+                if(leftCol instanceof ConstantColumn && rightCol instanceof ConstantColumn)
+                {
+                    if(!leftCol.equals(rightCol))
+                        compare.add("false");
+                }
+                else if(!unionClass.isOptionalColumn(i))
+                {
+                    compare.add(type.equal(leftCol, rightCol));
+                }
+                else if(leftCol instanceof ConstantColumn c && c.getValue() == null)
+                {
+                    compare.add("(" + rightCol + " IS NULL)");
+                }
+                else if(rightCol instanceof ConstantColumn c && c.getValue() == null)
+                {
+                    compare.add("(" + leftCol + " IS NULL)");
+                }
+                else
+                {
+                    compare.add(type.notDistinct(leftCol, rightCol));
+                }
             }
 
             if(compare.isEmpty())

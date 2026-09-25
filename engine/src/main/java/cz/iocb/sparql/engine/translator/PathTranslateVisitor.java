@@ -602,9 +602,10 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             ResourceClass resourceClass = mapping.getResourceClass(request);
             List<Column> columns = mapping.getColumns(request);
 
-            for(Column column : columns)
-                if(schema.isNullableColumn(table, column))
-                    condition.addIsNotNull(column);
+            // the term is present when its determining columns are not null; the optional ones may be null
+            for(int i = 0; i < columns.size(); i++)
+                if(!resourceClass.isOptionalColumn(i) && schema.isNullableColumn(table, columns.get(i)))
+                    condition.addIsNotNull(columns.get(i));
 
             if(term instanceof Variable variable)
             {
@@ -617,7 +618,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
                 else if(other.getClasses().iterator().next().equals(resourceClass))
                 {
                     List<Column> current = other.getMapping(resourceClass);
-                    condition.addAreEqual(columns, current);
+                    condition.addAreEqual(columns, current, resourceClass::isOptionalColumn);
                 }
                 else
                 {
@@ -629,7 +630,7 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
             else if(mapping instanceof ParametrisedMapping)
             {
                 List<Column> values = request.getColumns(mapping.getResourceClass(request), term);
-                condition.addAreEqual(columns, values);
+                condition.addAreEqual(columns, values, resourceClass::isOptionalColumn);
             }
         }
 

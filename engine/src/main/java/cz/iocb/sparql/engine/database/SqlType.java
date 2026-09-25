@@ -218,6 +218,36 @@ public class SqlType
     }
 
 
+    /**
+     * SQL condition that two not-null values of the type are identical, i.e. represent the same RDF term part. The
+     * default is the {@code =} operator of the type; a type whose {@code =} is coarser than the identity (or not
+     * hashable or mergeable) may use another operator. The conditions are parenthesised, so that they can be combined
+     * with any operator.
+     *
+     * @param left the left value
+     * @param right the right value
+     * @return SQL condition that two not-null values of the type are identical
+     */
+    public String equal(Column left, Column right)
+    {
+        return "(" + left + " = " + right + ")";
+    }
+
+
+    /**
+     * SQL condition that two values of the type are identical or both NULL, the null-safe variant of
+     * {@link #equal(Column, Column)}.
+     *
+     * @param left the left value
+     * @param right the right value
+     * @return SQL condition that two values of the type are identical or both NULL
+     */
+    public String notDistinct(Column left, Column right)
+    {
+        return "(" + left + " IS NOT DISTINCT FROM " + right + ")";
+    }
+
+
     @Override
     public final String toString()
     {

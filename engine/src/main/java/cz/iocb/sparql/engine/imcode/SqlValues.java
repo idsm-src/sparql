@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.imcode;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toMap;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -154,13 +155,17 @@ public final class SqlValues extends SqlIntercode
                 {
                     List<Column> outerCollumns = outerBinding.getMapping(mapping.getKey());
 
+                    List<Column> values = new ArrayList<>(outerCollumns.size());
+
                     for(int j = 0; j < outerCollumns.size(); j++)
                     {
                         if(mapping.getValue().get(j) instanceof ConstantColumn)
-                            condition.addAreEqual(outerCollumns.get(j), mapping.getValue().get(j));
+                            values.add(mapping.getValue().get(j));
                         else
-                            condition.addAreEqual(outerCollumns.get(j), data.get(mapping.getValue().get(j)).get(i));
+                            values.add(data.get(mapping.getValue().get(j)).get(i));
                     }
+
+                    condition.addAreEqual(outerCollumns, values, mapping.getKey()::isOptionalColumn);
                 }
             }
 

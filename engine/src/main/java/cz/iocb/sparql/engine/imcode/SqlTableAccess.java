@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.imcode;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -336,9 +337,50 @@ public final class SqlTableAccess extends SqlIntercode
      * @param schema the database schema
      * @return true if a key of the table covers the distinct columns, false otherwise
      */
+    /**
+     * True if the column is known to be not null in the rows of the access: it is not nullable in the schema, or the
+     * conditions require it to be not null or compare it by a strict operator in every disjunct. Only such columns can
+     * be matched against unique keys, since a unique index does not make rows with NULL key values unique.
+     *
+     * @param schema the database schema
+     * @param column the column
+     * @return true if the column is known to be not null in the rows of the access, false otherwise
+     */
+    boolean isKnownNotNull(DatabaseSchema schema, Column column)
+    {
+        if(!schema.isNullableColumn(table, column))
+            return true;
+
+        if(conditions.getIsNotNull().contains(column))
+            return true;
+
+        if(conditions.getAreEqual().stream().anyMatch(p -> p.contains(column)))
+            return true;
+
+        if(conditions.getAreNotEqual().stream().anyMatch(p -> p.contains(column)))
+            return true;
+
+        return false;
+    }
+
+
+    /**
+     * The columns of the given set known to be not null, see {@link #isKnownNotNull(DatabaseSchema, Column)}.
+     *
+     * @param schema the database schema
+     * @param columns the columns
+     * @return the columns of the given set known to be not null
+     */
+    private Set<Column> getKnownNotNull(DatabaseSchema schema, Set<Column> columns)
+    {
+        return columns.stream().filter(c -> isKnownNotNull(schema, c)).collect(toSet());
+    }
+
+
     private boolean isDistinctImpliedByKey(DatabaseSchema schema)
     {
-        return table == null || schema.getCompatibleKey(table, getCoveredColumns(distinctColumns)) != null;
+        return table == null
+                || schema.getCompatibleKey(table, getKnownNotNull(schema, getCoveredColumns(distinctColumns))) != null;
     }
 
 
@@ -348,9 +390,10 @@ public final class SqlTableAccess extends SqlIntercode
         if(table == null)
             return true;
 
+        DatabaseSchema schema = request.getConfiguration().getDatabaseSchema();
         Set<Column> columns = getCoveredVariableColumns(selected);
 
-        if(request.getConfiguration().getDatabaseSchema().getCompatibleKey(table, columns) != null)
+        if(schema.getCompatibleKey(table, getKnownNotNull(schema, columns)) != null)
             return true;
 
         // the access deduplicates its rows itself, unless the duplicates do not matter to its parent
@@ -474,7 +517,7 @@ public final class SqlTableAccess extends SqlIntercode
      */
     private static boolean canBeJoinedByPrimaryKey(DatabaseSchema schema, SqlTableAccess left, SqlTableAccess right)
     {
-        Set<Column> columns = getJoinColumns(left, right);
+        Set<Column> columns = left.getKnownNotNull(schema, getJoinColumns(left, right));
 
         return schema.getCompatibleKey(left.table, columns) != null;
     }
@@ -564,7 +607,9 @@ public final class SqlTableAccess extends SqlIntercode
         if(!parent.distinctColumns.isEmpty())
             return null;
 
-        Set<ColumnPair> columns = getJoinColumnPairs(parent, child);
+        // the parent is dropped, which requires that each child row has the referenced parent row
+        Set<ColumnPair> columns = getJoinColumnPairs(parent, child).stream()
+                .filter(p -> child.isKnownNotNull(schema, p.getRight())).collect(toSet());
 
         Set<Column> parentColumns = new HashSet<>();
         parentColumns.addAll(parent.conditions.getNonConstantColumns());
@@ -648,6 +693,10 @@ public final class SqlTableAccess extends SqlIntercode
             }
         }
 
+        // the child is dropped, which requires that each child row has the referenced parent row
+        if(!columns.stream().allMatch(p -> child.isKnownNotNull(schema, p.getRight())))
+            return null;
+
         Set<Column> childColumns = new HashSet<>();
         childColumns.addAll(child.getVariableBindings().getNonConstantColumns());
 
@@ -720,7 +769,7 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> leftCols = leftBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(leftCols, rightCols);
+                    joinCondition.addAreEqual(leftCols, rightCols, pairedClass.getLeftClass()::isOptionalColumn);
                 }
             }
         }
@@ -859,7 +908,7 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> leftCols = leftBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> rightCols = rightBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(leftCols, rightCols);
+                    joinCondition.addAreEqual(leftCols, rightCols, pairedClass.getLeftClass()::isOptionalColumn);
                 }
             }
         }
@@ -914,7 +963,8 @@ public final class SqlTableAccess extends SqlIntercode
                     List<Column> childCols = childBinding.getMapping(pairedClass.getLeftClass());
                     List<Column> parentCols = parentBinding.getMapping(pairedClass.getRightClass());
 
-                    joinCondition.addAreEqual(childCols, remap(map, parentCols));
+                    joinCondition.addAreEqual(childCols, remap(map, parentCols),
+                            pairedClass.getLeftClass()::isOptionalColumn);
                 }
             }
         }
