@@ -143,7 +143,7 @@ public final class DateDatatype extends TemporalDatatype
      */
     public static String getDate(Literal literal)
     {
-        String value = Datatype.getCollapsedForm(literal.getValue()).replace("(\\.[0-9]{6})[0-9]*", "$1");
+        String value = Datatype.getCollapsedForm(literal.getValue()).replaceFirst("(\\.[0-9]{6})0*", "$1");
 
         if(!value.matches(".*" + TemporalDatatype.ZONE))
             value = value + "Z";

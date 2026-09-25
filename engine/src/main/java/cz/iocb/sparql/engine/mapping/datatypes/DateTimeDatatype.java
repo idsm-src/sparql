@@ -143,7 +143,7 @@ public final class DateTimeDatatype extends TemporalDatatype
     {
         assert isValidForm(value);
 
-        value = Datatype.getCollapsedForm(value).replace("(\\.[0-9]{6})0*", "$1");
+        value = Datatype.getCollapsedForm(value).replaceFirst("(\\.[0-9]{6})0*", "$1");
 
         if(!value.matches(".*" + TemporalDatatype.ZONE))
             return OffsetDateTime.parse(value + "Z", inputFormatter).format(inputFormatter).replaceFirst("Z$", "");
@@ -162,7 +162,7 @@ public final class DateTimeDatatype extends TemporalDatatype
      */
     public static String getDateTime(Literal literal)
     {
-        String value = Datatype.getCollapsedForm(literal.getValue()).replace("(\\.[0-9]{6})0*", "$1");
+        String value = Datatype.getCollapsedForm(literal.getValue()).replaceFirst("(\\.[0-9]{6})0*", "$1");
 
         if(!value.matches(".*" + TemporalDatatype.ZONE))
             value = value + "Z";
