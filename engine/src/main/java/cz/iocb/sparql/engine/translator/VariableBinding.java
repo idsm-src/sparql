@@ -288,62 +288,199 @@ public class VariableBinding
 
 
     /**
-     * SQL condition that the variable is unbound (all columns null).
+     * Column whose nullness decides whether a value of the class is present in the given columns: the first
+     * non-constant column at a determining position (see {@link ResourceClass#isOptionalColumn}). Null when there is no
+     * such column, i.e. when the presence is decided by the constants alone.
      *
-     * @return SQL condition that the variable is unbound (all columns null)
+     * @param resClass the resource class
+     * @param columns the columns representing values of the class
+     * @return the witness column, or null if the presence is decided by the constants alone
+     */
+    public static Column getNullWitness(ResourceClass resClass, List<Column> columns)
+    {
+        for(int i = 0; i < columns.size(); i++)
+            if(!resClass.isOptionalColumn(i) && !(columns.get(i) instanceof ConstantColumn))
+                return columns.get(i);
+
+        return null;
+    }
+
+
+    /**
+     * Column whose null test decides whether a value of the class is present in the given columns, or the constant
+     * result of the test ({@code Boolean.TRUE} when the class is absent because a determining column is a NULL
+     * constant, {@code Boolean.FALSE} when the class is present because the determining columns are constants).
+     *
+     * @param resClass the resource class
+     * @param columns the columns representing values of the class
+     * @return the witness column, or the constant result of the null test as a {@link Boolean}
+     */
+    private static Object getNullTest(ResourceClass resClass, List<Column> columns)
+    {
+        for(int i = 0; i < columns.size(); i++)
+            if(!resClass.isOptionalColumn(i) && columns.get(i) instanceof ConstantColumn constant
+                    && constant.getValue() == null)
+                return Boolean.TRUE;
+
+        Column witness = getNullWitness(resClass, columns);
+
+        return witness == null ? Boolean.FALSE : witness;
+    }
+
+
+    /**
+     * SQL condition that no value of the class is present in the given columns: {@code true} or {@code false} when the
+     * determining columns are constants, the null test of the witness column otherwise.
+     *
+     * @param resClass the resource class
+     * @param columns the columns representing values of the class
+     * @param table the table the columns are accessed through, or null
+     * @return SQL condition that no value of the class is present in the given columns
+     */
+    private static String getIsNull(ResourceClass resClass, List<Column> columns, Table table)
+    {
+        return switch(getNullTest(resClass, columns))
+        {
+            case Boolean b -> b.toString();
+            case Column witness -> witness.fromTable(table) + " IS NULL";
+            default -> throw new IllegalStateException();
+        };
+    }
+
+
+    /**
+     * SQL condition that a value of the class is present in the given columns, the negation of
+     * {@link #getIsNull(ResourceClass, List, Table)}.
+     *
+     * @param resClass the resource class
+     * @param columns the columns representing values of the class
+     * @param table the table the columns are accessed through, or null
+     * @return SQL condition that a value of the class is present in the given columns
+     */
+    private static String getIsNotNull(ResourceClass resClass, List<Column> columns, Table table)
+    {
+        return switch(getNullTest(resClass, columns))
+        {
+            case Boolean b -> Boolean.toString(!b);
+            case Column witness -> witness.fromTable(table) + " IS NOT NULL";
+            default -> throw new IllegalStateException();
+        };
+    }
+
+
+    /**
+     * Conjunction of the conditions: {@code false} if some condition is {@code false}, {@code true} if none remains
+     * otherwise, the remaining conditions joined by {@code AND} in parentheses otherwise.
+     *
+     * @param conditions the conditions
+     * @return the conjunction
+     */
+    private static String and(Stream<String> conditions)
+    {
+        List<String> list = conditions.filter(c -> !c.equals("true")).sorted().toList();
+
+        if(list.contains("false"))
+            return "false";
+
+        if(list.isEmpty())
+            return "true";
+
+        return list.stream().collect(joining(" AND ", "(", ")"));
+    }
+
+
+    /**
+     * Disjunction of the conditions: {@code true} if some condition is {@code true}, {@code false} if none remains
+     * otherwise, the remaining conditions joined by {@code OR} in parentheses otherwise.
+     *
+     * @param conditions the conditions
+     * @return the disjunction
+     */
+    private static String or(Stream<String> conditions)
+    {
+        List<String> list = conditions.filter(c -> !c.equals("false")).sorted().toList();
+
+        if(list.contains("true"))
+            return "true";
+
+        if(list.isEmpty())
+            return "false";
+
+        return list.stream().collect(joining(" OR ", "(", ")"));
+    }
+
+
+    /**
+     * SQL condition that the variable is unbound: no value of any of its classes is present, tested on the witness
+     * columns of the classes.
+     *
+     * @param table the table the columns are accessed through, or null
+     * @return SQL condition that the variable is unbound
+     */
+    public String getIsNull(Table table)
+    {
+        return and(mappings.entrySet().stream().filter(e -> e.getValue() != null)
+                .map(e -> getIsNull(e.getKey(), e.getValue(), table)));
+    }
+
+
+    /**
+     * SQL condition that the variable is unbound, see {@link #getIsNull(Table)}.
+     *
+     * @return SQL condition that the variable is unbound
      */
     public String getIsNull()
     {
-        //TODO: add support for different null strategy
-        //TODO: ignore constant columns (null vs non-null)
-
-        return mappings.values().stream().flatMap(l -> l.stream()).map(c -> c + " IS NULL")
-                .collect(joining(" AND ", "(", ")"));
+        return getIsNull((Table) null);
     }
 
 
     /**
-     * SQL condition that the variable is bound (some column not null).
+     * SQL condition that the variable is bound: a value of some of its classes is present, tested on the witness
+     * columns of the classes.
      *
-     * @return SQL condition that the variable is bound (some column not null)
+     * @param table the table the columns are accessed through, or null
+     * @return SQL condition that the variable is bound
+     */
+    public String getIsNotNull(Table table)
+    {
+        return or(mappings.entrySet().stream().filter(e -> e.getValue() != null)
+                .map(e -> getIsNotNull(e.getKey(), e.getValue(), table)));
+    }
+
+
+    /**
+     * SQL condition that the variable is bound, see {@link #getIsNotNull(Table)}.
+     *
+     * @return SQL condition that the variable is bound
      */
     public String getIsNotNull()
     {
-        //TODO: add support for different null strategy
-        //TODO: ignore constant columns (null vs non-null)
-
-        return mappings.values().stream().flatMap(l -> l.stream()).map(c -> c + " IS NOT NULL")
-                .collect(joining(" OR ", "(", ")"));
+        return getIsNotNull((Table) null);
     }
 
 
     /**
-     * SQL condition that the variable has no value of the given class.
+     * SQL condition that the variable has no value of the given class, tested on the witness column of the class.
      *
      * @param resClass the resource class
      * @return SQL condition that the variable has no value of the given class
      */
     public String getIsNull(ResourceClass resClass)
     {
-        //TODO: add support for different null strategy
-        //TODO: ignore constant columns (null vs non-null)
-
-        return deriveMapping(resClass).stream().map(c -> c + " IS NULL").collect(joining(" AND ", "(", ")"));
+        return and(Stream.of(getIsNull(resClass, deriveMapping(resClass), null)));
     }
 
 
     /**
-     * SQL condition that the variable has a value of the given class.
+     * SQL condition that the variable has a value of the given class, tested on the witness column of the class.
      *
      * @param resClass the resource class
      * @return SQL condition that the variable has a value of the given class
      */
     public String getIsNotNull(ResourceClass resClass)
     {
-        //TODO: add support for different null strategy
-        //TODO: ignore constant columns (null vs non-null)
-
-        return deriveMapping(resClass).stream().map(c -> c + " IS NOT NULL").collect(joining(" OR ", "(", ")"));
+        return or(Stream.of(getIsNotNull(resClass, deriveMapping(resClass), null)));
     }
 
 

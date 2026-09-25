@@ -923,26 +923,10 @@ public abstract class SqlIntercode extends SqlBaseClass
         Set<String> condition = new HashSet<>();
 
         if(leftBinding.canBeNull())
-        {
-            Set<Column> cols = leftBinding.getNonConstantColumns();
-
-            if(cols.isEmpty())
-                condition.add("true");
-            else
-                condition.add(
-                        cols.stream().map(c -> c.fromTable(leftTable) + " IS NULL").sorted().collect(joining(" AND ")));
-        }
+            condition.add(leftBinding.getIsNull(leftTable));
 
         if(rightBinding.canBeNull())
-        {
-            Set<Column> cols = rightBinding.getNonConstantColumns();
-
-            if(cols.isEmpty())
-                condition.add("true");
-            else
-                condition.add(cols.stream().map(c -> c.fromTable(rightTable) + " IS NULL").sorted()
-                        .collect(joining(" AND ")));
-        }
+            condition.add(rightBinding.getIsNull(rightTable));
 
         for(ResourceClassPair pairedClass : pair.getClasses())
         {

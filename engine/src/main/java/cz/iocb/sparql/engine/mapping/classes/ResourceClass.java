@@ -121,6 +121,22 @@ public abstract class ResourceClass
 
 
     /**
+     * True if the column at the given position may be NULL while the term is bound. The other (determining) columns
+     * decide whether a term is present: they are either all NULL, in which case the term is unbound and the optional
+     * columns are NULL too, or all not NULL. A class has at least one determining column, and its mapping of columns to
+     * terms must stay injective when an optional column is NULL, so that terms can be compared and deduplicated column
+     * by column.
+     *
+     * @param index position of the column
+     * @return true if the column at the given position may be NULL while the term is bound, false otherwise
+     */
+    public boolean isOptionalColumn(int index)
+    {
+        return false;
+    }
+
+
+    /**
      * Convert the given columns of this resource class into the columns of the selected target resource class.
      *
      * @param targetClass the resource class to which is converted

@@ -577,22 +577,7 @@ public final class SqlConstruct extends SqlIntercode
                     appendAnd(builder, hasFilter);
                     hasFilter = true;
 
-                    builder.append("(");
-
-                    boolean hasVariant = false;
-
-                    for(List<Column> cols : binding.getMappings().values())
-                    {
-                        appendOr(builder, hasVariant);
-                        hasVariant = true;
-
-                        builder.append(cols.stream().map(c -> c + " IS NOT NULL").collect(joining(" AND ", "(", ")")));
-                    }
-
-                    if(!hasVariant)
-                        builder.append("false");
-
-                    builder.append(")");
+                    builder.append(binding.getIsNotNull());
                 }
             }
         }

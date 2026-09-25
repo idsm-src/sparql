@@ -886,6 +886,13 @@ public class DerivedClass extends ResourceClass
 
 
     @Override
+    public boolean isOptionalColumn(int index)
+    {
+        return effectiveClass.isOptionalColumn(index);
+    }
+
+
+    @Override
     public int hashCode()
     {
         return terms.hashCode();

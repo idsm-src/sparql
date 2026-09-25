@@ -243,29 +243,13 @@ public final class SqlMinus extends SqlIntercode
             StringBuilder builder = new StringBuilder();
 
             if(leftBinding.canBeNull())
-            {
-                Set<Column> columns = leftBinding.getNonConstantColumns();
-                assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
-
-                builder.append("(");
-                builder.append(columns.stream().map(c -> c.fromTable(leftTable) + " IS NOT NULL").sorted()
-                        .collect(joining(" OR ")));
-                builder.append(")");
-            }
+                builder.append(leftBinding.getIsNotNull(leftTable));
 
             if(leftBinding.canBeNull() && rightBinding.canBeNull())
                 builder.append(" AND ");
 
             if(rightBinding.canBeNull())
-            {
-                Set<Column> columns = rightBinding.getNonConstantColumns();
-                assert !columns.isEmpty(); //NOTE: the variable can be null => no column can be constant
-
-                builder.append("(");
-                builder.append(columns.stream().map(c -> c.fromTable(rightTable) + " IS NOT NULL").sorted()
-                        .collect(joining(" OR ")));
-                builder.append(")");
-            }
+                builder.append(rightBinding.getIsNotNull(rightTable));
 
             condition.add(builder.toString());
         }
