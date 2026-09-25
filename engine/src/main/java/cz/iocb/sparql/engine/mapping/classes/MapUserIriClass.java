@@ -237,7 +237,7 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
+            String sql = sqlQuery.replace("?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -258,7 +258,7 @@ public class MapUserIriClass extends SimpleUserIriClass
 
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
+            String sql = sqlQuery.replace("?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {

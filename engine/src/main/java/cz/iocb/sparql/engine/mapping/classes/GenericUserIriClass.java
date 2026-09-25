@@ -165,7 +165,7 @@ public class GenericUserIriClass extends UserIriClass
 
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
+            String sql = sqlQuery.replace("?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
@@ -255,7 +255,7 @@ public class GenericUserIriClass extends UserIriClass
     {
         try
         {
-            String sql = sqlQuery.replaceAll("\\?", string(iri.getValue()));
+            String sql = sqlQuery.replace("?", string(iri.getValue()));
 
             try(ResultSet result = statement.executeQuery(sql))
             {
