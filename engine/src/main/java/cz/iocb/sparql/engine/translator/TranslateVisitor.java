@@ -26,8 +26,8 @@ import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.imcode.SqlAggregation;
@@ -1122,7 +1122,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
                     else
                     {
                         for(int j = 0; j < resClass.getColumnCount(); j++)
-                            classColumns.get(j).add(new ConstantColumn(null, resClass.getSqlTypes().get(j)));
+                            classColumns.get(j).add(new NullColumn(resClass.getSqlTypes().get(j)));
                     }
                 }
 

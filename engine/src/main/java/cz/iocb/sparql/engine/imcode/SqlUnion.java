@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -147,7 +148,7 @@ public final class SqlUnion extends SqlIntercode
                     if(binding == null)
                     {
                         for(int i = 0; i < resourceClass.getColumnCount(); i++)
-                            cols.get(i).add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
+                            cols.get(i).add(new NullColumn(resourceClass.getSqlTypes().get(i)));
                     }
                     else
                     {

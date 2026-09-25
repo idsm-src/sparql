@@ -3,31 +3,27 @@ package cz.iocb.sparql.engine.database;
 
 
 /**
- * Typed SQL constant {@code 'literal'::type} (or {@code NULL::type}); the type is written under its canonical name.
+ * Typed SQL constant: a {@link ValueColumn} {@code 'literal'::type} or a {@link NullColumn} {@code NULL::type}; the
+ * type is written under its canonical name. Constants are not projected by the generated queries and are compared at
+ * translation time by their text.
  */
-public class ConstantColumn extends Column
+public abstract sealed class ConstantColumn extends Column permits NullColumn, ValueColumn
 {
-    /**
-     * Unquoted literal value; null for NULL.
-     */
-    private final String literal;
-
     /**
      * SQL type of the constant.
      */
     private final SqlType type;
 
+
     /**
      * Creates the constant.
      *
-     * @param literal the literal value, null for NULL
+     * @param value the SQL text of the constant
      * @param type the SQL type
      */
-    public ConstantColumn(String literal, SqlType type)
+    protected ConstantColumn(String value, SqlType type)
     {
-        super((literal == null ? "NULL" : "'" + literal.replaceAll("'", "''") + "'") + "::" + type);
-
-        this.literal = literal;
+        super(value);
         this.type = type;
     }
 
@@ -47,17 +43,6 @@ public class ConstantColumn extends Column
 
 
     /**
-     * The unquoted literal value; null for a NULL constant.
-     *
-     * @return the unquoted literal value; null for a NULL constant
-     */
-    public String getValue()
-    {
-        return literal;
-    }
-
-
-    /**
      * SQL type of the constant.
      *
      * @return SQL type of the constant
@@ -65,12 +50,5 @@ public class ConstantColumn extends Column
     public SqlType getType()
     {
         return type;
-    }
-
-
-    @Override
-    public boolean canBeNull()
-    {
-        return literal == null;
     }
 }

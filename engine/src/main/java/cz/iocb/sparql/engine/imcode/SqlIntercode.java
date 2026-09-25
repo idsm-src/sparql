@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -979,11 +980,11 @@ public abstract class SqlIntercode extends SqlBaseClass
                 {
                     compare.add(type.equal(leftCol, rightCol));
                 }
-                else if(leftCol instanceof ConstantColumn c && c.getValue() == null)
+                else if(leftCol instanceof NullColumn)
                 {
                     compare.add(rightCol.canBeNull() ? "(" + rightCol + " IS NULL)" : "false");
                 }
-                else if(rightCol instanceof ConstantColumn c && c.getValue() == null)
+                else if(rightCol instanceof NullColumn)
                 {
                     compare.add(leftCol.canBeNull() ? "(" + leftCol + " IS NULL)" : "false");
                 }

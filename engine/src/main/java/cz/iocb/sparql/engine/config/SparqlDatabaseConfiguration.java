@@ -51,12 +51,13 @@ import javax.sql.DataSource;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Condition;
 import cz.iocb.sparql.engine.database.Conditions;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
@@ -1018,7 +1019,7 @@ public class SparqlDatabaseConfiguration
 
     /**
      * Parses a column specification: {@code (expression)} is an SQL expression, {@code 'literal'::type} a typed
-     * constant, anything else a column name.
+     * constant, {@code null::type} (in any letter case) a typed NULL constant, anything else a column name.
      *
      * @param value the specification text
      * @return the parsed column
@@ -1028,8 +1029,10 @@ public class SparqlDatabaseConfiguration
         if(value.startsWith("("))
             return new ExpressionColumn(value);
         else if(value.matches("'.*'::[_a-zA-Z0-9.]+"))
-            return new ConstantColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
+            return new ValueColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
                     SqlType.of(value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1")));
+        else if(value.matches("(?i)null::[_a-zA-Z0-9.]+"))
+            return new NullColumn(SqlType.of(value.replaceFirst("^(?i)null::([_a-zA-Z0-9.]+)$", "$1")));
         else
             return new TableColumn(value);
     }

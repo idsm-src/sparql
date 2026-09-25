@@ -23,11 +23,11 @@ public class ConditionTest
 
     private static final Column c = new TableColumn("c");
 
-    private static final Column one = new ConstantColumn("1", INT4);
+    private static final Column one = new ValueColumn("1", INT4);
 
-    private static final Column two = new ConstantColumn("2", INT4);
+    private static final Column two = new ValueColumn("2", INT4);
 
-    private static final Column nul = new ConstantColumn(null, INT4);
+    private static final Column nul = new NullColumn(INT4);
 
 
     private static ColumnComparison pair(Column l, Column r)

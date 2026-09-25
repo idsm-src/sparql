@@ -14,6 +14,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.TableColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode;
@@ -385,7 +386,7 @@ public final class SqlProcedureCall extends SqlIntercode
         VariableBinding binding = child.getVariableBindings().get(variable);
 
         if(binding == null)
-            return resClass.getSqlTypes().stream().map(t -> (Column) new ConstantColumn(null, t)).toList();
+            return resClass.getSqlTypes().stream().map(t -> (Column) new NullColumn(t)).toList();
 
         return binding.deriveMapping(resClass);
     }

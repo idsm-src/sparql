@@ -187,7 +187,7 @@ public class Condition
      */
     private static boolean isNullConstant(Column column)
     {
-        return column instanceof ConstantColumn constant && constant.getValue() == null;
+        return column instanceof NullColumn;
     }
 
 

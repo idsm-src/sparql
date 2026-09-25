@@ -10,7 +10,7 @@ import java.util.Set;
  * A column reference, constant or SQL expression usable in generated SQL. The natural ordering puts constants first,
  * then table columns, then expressions.
  */
-public abstract class Column implements Comparable<Column>
+public abstract sealed class Column implements Comparable<Column> permits TableColumn, ExpressionColumn, ConstantColumn
 {
     /**
      * SQL text of the column: the bare name, the constant or the expression.
@@ -98,7 +98,6 @@ public abstract class Column implements Comparable<Column>
             case ConstantColumn _ -> 0;
             case TableColumn _ -> 1;
             case ExpressionColumn _ -> 2;
-            default -> Integer.MAX_VALUE;
         };
     }
 

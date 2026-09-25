@@ -125,8 +125,8 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BuiltinClasses;
@@ -1204,8 +1204,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     }
                     else if(resourceClass == null && argumentIsString && !argument.canBeNull())
                     {
-                        List<Column> result = !restriction.contains(unsupportedType) ? null : List.of(
-                                argument.get(xsdString).get(0), new ConstantColumn(iri.getIri().getValue(), VARCHAR));
+                        List<Column> result = !restriction.contains(unsupportedType) ? null : List
+                                .of(argument.get(xsdString).get(0), new ValueColumn(iri.getIri().getValue(), VARCHAR));
 
                         return new SqlBuiltinCall(function, arguments, singletonMap(unsupportedType, result),
                                 canBeNull);

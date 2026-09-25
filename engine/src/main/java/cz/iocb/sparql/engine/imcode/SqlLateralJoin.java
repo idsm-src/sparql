@@ -13,6 +13,7 @@ import java.util.Set;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.request.Request;
@@ -393,8 +394,7 @@ public final class SqlLateralJoin extends SqlIntercode
                     if(column instanceof ConstantColumn)
                         continue;
 
-                    Column value = provided != null ? provided.get(i) :
-                            new ConstantColumn(null, resClass.getSqlTypes().get(i));
+                    Column value = provided != null ? provided.get(i) : new NullColumn(resClass.getSqlTypes().get(i));
 
                     if(!value.equals(column))
                         supplements.put(column, value);

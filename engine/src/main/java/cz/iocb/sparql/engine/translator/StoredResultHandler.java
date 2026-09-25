@@ -17,8 +17,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseTable;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -239,7 +239,7 @@ public class StoredResultHandler extends ResultHandler
 
                 if(columns.contains(entry.getKey()))
                     values.put(entry.getKey(), entry.getValue().stream().limit(rowCount)
-                            .map(c -> c != null ? c : new ConstantColumn(null, type)).toList());
+                            .map(c -> c != null ? c : new NullColumn(type)).toList());
             }
 
 

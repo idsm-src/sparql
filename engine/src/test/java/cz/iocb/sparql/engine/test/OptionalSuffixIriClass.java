@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
@@ -66,7 +66,7 @@ public class OptionalSuffixIriClass extends UserIriClass
         if(!matcher.matches())
             throw new IllegalArgumentException();
 
-        Column sub = matcher.group(2) == null ? new ConstantColumn(null, INT4) : constant(matcher.group(2), INT4);
+        Column sub = matcher.group(2) == null ? new NullColumn(INT4) : constant(matcher.group(2), INT4);
 
         return List.of(constant(matcher.group(1), INT4), sub);
     }

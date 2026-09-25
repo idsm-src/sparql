@@ -5,7 +5,7 @@ package cz.iocb.sparql.engine.database;
 /**
  * Named column of a table, rendered double-quoted.
  */
-public class TableColumn extends Column
+public final class TableColumn extends Column
 {
     /**
      * Whether the values of the column may be NULL.

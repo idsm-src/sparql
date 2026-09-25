@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -227,7 +227,7 @@ public class StringUserIriClass extends SimpleUserIriClass
     @Override
     public String getPrefix(List<Column> columns)
     {
-        if(columns.get(0) instanceof ConstantColumn col)
+        if(columns.get(0) instanceof ValueColumn col)
             return (prefix != null ? prefix : "") + col.getValue() + (suffix != null ? suffix : "");
 
         return prefix;

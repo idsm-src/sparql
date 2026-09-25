@@ -8,7 +8,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
+import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -80,6 +80,6 @@ public final class IriScalarClass extends IriClass implements ResultResourceClas
     @Override
     public String getPrefix(List<Column> columns)
     {
-        return columns.get(0) instanceof ConstantColumn col ? col.getValue() : "";
+        return columns.get(0) instanceof ValueColumn col ? col.getValue() : "";
     }
 }

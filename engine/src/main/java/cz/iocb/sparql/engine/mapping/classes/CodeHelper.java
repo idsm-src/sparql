@@ -2,9 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import java.util.Locale;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
+import cz.iocb.sparql.engine.database.ValueColumn;
 
 
 
@@ -42,7 +42,7 @@ public class CodeHelper
      */
     public static Column constant(Object value, SqlType type)
     {
-        return new ConstantColumn(value.toString(), type);
+        return new ValueColumn(value.toString(), type);
     }
 
 

@@ -5,7 +5,7 @@ package cz.iocb.sparql.engine.database;
 /**
  * Arbitrary SQL expression.
  */
-public class ExpressionColumn extends Column
+public final class ExpressionColumn extends Column
 {
     /**
      * Whether the expression may evaluate to NULL.

@@ -25,6 +25,7 @@ import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SourceTable;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
@@ -392,7 +393,7 @@ public final class SqlConstruct extends SqlIntercode
                     if(binding == null)
                     {
                         for(int i = 0; i < resourceClass.getColumnCount(); i++)
-                            cols.get(i).add(new ConstantColumn(null, resourceClass.getSqlTypes().get(i)));
+                            cols.get(i).add(new NullColumn(resourceClass.getSqlTypes().get(i)));
                     }
                     else
                     {

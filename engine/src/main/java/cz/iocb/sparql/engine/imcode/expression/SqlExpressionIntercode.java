@@ -24,8 +24,8 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
-import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -576,7 +576,7 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      */
     private static boolean isNullConstant(Column column)
     {
-        return column instanceof ConstantColumn constant && constant.getValue() == null;
+        return column instanceof NullColumn;
     }
 
 

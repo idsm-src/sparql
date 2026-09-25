@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.NullColumn;
 import cz.iocb.sparql.engine.database.Table;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Variable;
@@ -247,7 +248,7 @@ public class VariableBinding
         }
 
         if(variants.isEmpty())
-            return targetClass.getSqlTypes().stream().map(s -> (Column) new ConstantColumn(null, s)).toList();
+            return targetClass.getSqlTypes().stream().map(s -> (Column) new NullColumn(s)).toList();
 
         if(variants.size() == 1)
             return variants.get(0);
@@ -318,8 +319,7 @@ public class VariableBinding
     private static Object getNullTest(ResourceClass resClass, List<Column> columns)
     {
         for(int i = 0; i < columns.size(); i++)
-            if(!resClass.isOptionalColumn(i) && columns.get(i) instanceof ConstantColumn constant
-                    && constant.getValue() == null)
+            if(!resClass.isOptionalColumn(i) && columns.get(i) instanceof NullColumn)
                 return Boolean.TRUE;
 
         Column witness = getNullWitness(resClass, columns);
