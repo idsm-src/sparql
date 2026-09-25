@@ -313,11 +313,13 @@ public final class SqlAggregation extends SqlIntercode
                 opt.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
 
 
-        /* change count(distinct var) on count(*) if possible  */
+        /* change count(distinct var) on count(*) if possible; a key does not make rows with NULL key values unique */
         if(child instanceof SqlTableAccess tab && tab.getTable() != null)
             for(Map.Entry<Variable, SqlExpressionIntercode> entry : opt.entrySet())
                 if(entry.getValue() instanceof SqlBuiltinCall call && call.getFunction().equals("count")
                         && call.isDistinct() && call.getArguments().get(0) instanceof SqlVariable var
+                        && var.getBinding().getNonConstantColumns().stream()
+                                .allMatch(c -> tab.isKnownNotNull(schema, c))
                         && schema.isKey(tab.getTable(), var.getBinding().getNonConstantColumns()))
                     opt.put(entry.getKey(), SqlBuiltinCall.create(request, "card", false, List.of()));
 

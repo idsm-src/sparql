@@ -24,7 +24,9 @@ import java.util.Objects;
 import java.util.Set;
 import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
+import cz.iocb.sparql.engine.database.ConstantColumn;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.imcode.SqlBaseClass;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
@@ -566,6 +568,85 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
      *
      * @return SQL condition that the value is NULL
      */
+    /**
+     * True if the column is a NULL constant.
+     *
+     * @param column the column
+     * @return true if the column is a NULL constant, false otherwise
+     */
+    private static boolean isNullConstant(Column column)
+    {
+        return column instanceof ConstantColumn constant && constant.getValue() == null;
+    }
+
+
+    /**
+     * SQL conditions, one per position, that two column tuples of the class represent the same term: the identity of
+     * the type at the determining positions, its null-safe variant (or {@code IS NULL} against a NULL constant) at the
+     * optional ones. Their conjunction is the identity of the terms.
+     *
+     * @param resClass the resource class of the columns
+     * @param left the columns of the left term
+     * @param right the columns of the right term
+     * @return SQL conditions, one per position, that two column tuples of the class represent the same term
+     */
+    public static List<String> getIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
+    {
+        List<String> conditions = new ArrayList<>(left.size());
+
+        for(int i = 0; i < left.size(); i++)
+        {
+            Column l = left.get(i);
+            Column r = right.get(i);
+            SqlType type = resClass.getSqlTypes().get(i);
+
+            if(!resClass.isOptionalColumn(i))
+                conditions.add(type.equal(l, r));
+            else if(isNullConstant(l))
+                conditions.add("(" + r + " IS NULL)");
+            else if(isNullConstant(r))
+                conditions.add("(" + l + " IS NULL)");
+            else
+                conditions.add(type.notDistinct(l, r));
+        }
+
+        return conditions;
+    }
+
+
+    /**
+     * SQL conditions, one per position, that two column tuples of the class represent different terms, the negations of
+     * {@link #getIdentityConditions}. Their disjunction is the non-identity of the terms.
+     *
+     * @param resClass the resource class of the columns
+     * @param left the columns of the left term
+     * @param right the columns of the right term
+     * @return SQL conditions, one per position, that two column tuples of the class represent different terms
+     */
+    public static List<String> getNonIdentityConditions(ResourceClass resClass, List<Column> left, List<Column> right)
+    {
+        List<String> conditions = new ArrayList<>(left.size());
+
+        for(int i = 0; i < left.size(); i++)
+        {
+            Column l = left.get(i);
+            Column r = right.get(i);
+            SqlType type = resClass.getSqlTypes().get(i);
+
+            if(!resClass.isOptionalColumn(i))
+                conditions.add("(" + l + " != " + r + ")");
+            else if(isNullConstant(l))
+                conditions.add("(" + r + " IS NOT NULL)");
+            else if(isNullConstant(r))
+                conditions.add("(" + l + " IS NOT NULL)");
+            else
+                conditions.add(type.distinct(l, r));
+        }
+
+        return conditions;
+    }
+
+
     public String getIsNull()
     {
         return variableBinding.getIsNull();

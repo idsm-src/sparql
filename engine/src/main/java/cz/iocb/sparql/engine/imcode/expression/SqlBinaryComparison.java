@@ -726,6 +726,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 List<Column> cl = left.get(cmp);
                 List<Column> cr = right.get(cmp);
 
+                if(operator == EQUAL)
+                    yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "(", ")"));
+                else if(operator == NOT_EQUAL && cmp.getColumnCount() > 1)
+                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(joining(" OR ", "(", ")"));
+
                 yield IntStream.range(0, cmp.getColumnCount())
                         .mapToObj(i -> cl.get(i) + " " + operator.getText() + " " + cr.get(i))
                         .collect(joining(" AND ", "(", ")"));
@@ -746,11 +751,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 List<Column> cr = right.get(cmp);
 
                 if(operator == EQUAL)
-                    yield IntStream.range(0, cmp.getColumnCount()).mapToObj(i -> cl.get(i) + " = " + cr.get(i))
-                            .collect(joining(" AND ", "NULLIF(", ", false)"));
+                    yield getIdentityConditions(cmp, cl, cr).stream().collect(joining(" AND ", "NULLIF(", ", false)"));
                 else if(operator == NOT_EQUAL)
-                    yield IntStream.range(0, cmp.getColumnCount()).mapToObj(i -> cl.get(i) + " != " + cr.get(i))
-                            .collect(joining(" OR ", "NULLIF(", ", true)"));
+                    yield getNonIdentityConditions(cmp, cl, cr).stream().collect(joining(" OR ", "NULLIF(", ", true)"));
                 throw new IllegalArgumentException();
             }
 

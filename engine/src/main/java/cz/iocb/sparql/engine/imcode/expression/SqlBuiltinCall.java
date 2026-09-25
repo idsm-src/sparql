@@ -309,8 +309,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     builder.append("1");
                 }
                 else if(argument.canBeNull() && columns.size() > 1
-                        && columns.stream().anyMatch(c -> c instanceof ExpressionColumn))
+                        && columns.stream().anyMatch(c -> c instanceof ExpressionColumn)
+                        || distinct && columns.size() > 1 && argument.getResourceClasses().stream()
+                                .anyMatch(r -> IntStream.range(0, r.getColumnCount()).anyMatch(r::isOptionalColumn)))
                 {
+                    // rows with a NULL field are never equal, so terms with optional columns are counted as one value
                     ResourceClass resClass = getExpressionClass(argument.getResourceClasses());
                     builder.append(argument.get(resClass).get(0));
                 }
@@ -669,8 +672,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     //FIXME: use correct compare operator, when unionClass is rdfbox
 
-                    variants.add(IntStream.range(0, unionClass.getColumnCount())
-                            .mapToObj(i -> lcols.get(i) + " = " + rcols.get(i)).collect(joining(" AND ", "(", ")")));
+                    variants.add(getIdentityConditions(unionClass, lcols, rcols).stream()
+                            .collect(joining(" AND ", "(", ")")));
                 }
 
                 List<Column> result = List

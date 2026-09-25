@@ -248,6 +248,20 @@ public class SqlType
     }
 
 
+    /**
+     * SQL condition that two values of the type are not identical, or exactly one of them is NULL, the negation of
+     * {@link #notDistinct(Column, Column)}.
+     *
+     * @param left the left value
+     * @param right the right value
+     * @return SQL condition that two values of the type are not identical, or exactly one of them is NULL
+     */
+    public String distinct(Column left, Column right)
+    {
+        return "(" + left + " IS DISTINCT FROM " + right + ")";
+    }
+
+
     @Override
     public final String toString()
     {
