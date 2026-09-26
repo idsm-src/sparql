@@ -77,9 +77,9 @@ public class SqlType
     public static final SqlType TIMESTAMPTZ = builtin("timestamptz", LocalDateTime.class, "timestamp with time zone");
 
     /**
-     * The universal RDF term type {@code sparql.rdfbox} of the pgsparql extension.
+     * The universal RDF term type {@code sparql.rdfbox} of the pgsparql extension, read from a result as its text form.
      */
-    public static final SqlType RDFBOX = builtin("sparql.rdfbox", null);
+    public static final SqlType RDFBOX = builtin("sparql.rdfbox", String.class);
 
     /**
      * The boxed user literal value type {@code sparql.ubox} of the pgsparql extension.

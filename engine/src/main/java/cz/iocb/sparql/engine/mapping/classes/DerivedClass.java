@@ -38,11 +38,6 @@ public class DerivedClass extends ResourceClass
      */
     private final PrimitiveResourceClass effectiveClass;
 
-    /**
-     * Result classes the values may appear in.
-     */
-    private final Set<ResultResourceClass> resultClasses;
-
 
     /**
      * Creates the class with an explicit effective class.
@@ -56,7 +51,6 @@ public class DerivedClass extends ResourceClass
 
         this.terms = terms;
         this.effectiveClass = effectiveClass;
-        this.resultClasses = generateResultClasses(terms);
     }
 
 
@@ -725,36 +719,6 @@ public class DerivedClass extends ResourceClass
 
 
     /**
-     * Result classes of a normal form: the union over its terms.
-     *
-     * @param terms the normal form
-     * @return result classes of a normal form: the union over its terms
-     */
-    private static Set<ResultResourceClass> generateResultClasses(Set<Map<PrimitiveResourceClass, Boolean>> terms)
-    {
-        return terms.stream().flatMap(t -> generateResultClasses(t).stream()).collect(toSet());
-    }
-
-
-    /**
-     * Result classes common to all positive classes of the term.
-     *
-     * @param term the term
-     * @return result classes common to all positive classes of the term
-     */
-    private static Set<ResultResourceClass> generateResultClasses(Map<PrimitiveResourceClass, Boolean> term)
-    {
-        Set<ResultResourceClass> result = new HashSet<>(BuiltinClasses.resultClasses);
-
-        for(Entry<PrimitiveResourceClass, Boolean> lit : term.entrySet())
-            if(lit.getValue())
-                result.retainAll(lit.getKey().getResultResourceClasses());
-
-        return result;
-    }
-
-
-    /**
      * Most specific common superclass of the positive classes of every term; the box when there is none.
      *
      * @param terms the normal form
@@ -831,7 +795,7 @@ public class DerivedClass extends ResourceClass
     @Override
     public Set<ResultResourceClass> getResultResourceClasses()
     {
-        return resultClasses;
+        return effectiveClass.getResultResourceClasses();
     }
 
 

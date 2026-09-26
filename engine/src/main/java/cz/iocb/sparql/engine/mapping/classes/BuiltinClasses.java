@@ -4,7 +4,6 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import java.util.List;
-import java.util.Set;
 
 
 
@@ -306,17 +305,6 @@ public class BuiltinClasses
      * Literals of unknown datatypes or with invalid lexical forms.
      */
     public static final UnsupportedLiteralClass unsupportedType = new UnsupportedLiteralClass();
-
-    /**
-     * All classes in which values can appear in a query result.
-     */
-    public static final Set<ResultResourceClass> resultClasses = Set.of(iri, intBlankNode, strBlankNode, xsdBoolean,
-            genBoolean, xsdByte, genByte, xsdUnsignedByte, genUnsignedByte, xsdShort, genShort, xsdUnsignedShort,
-            genUnsignedShort, xsdInt, genInt, xsdUnsignedInt, genUnsignedInt, xsdLong, genLong, xsdUnsignedLong,
-            genUnsignedLong, xsdInteger, genInteger, xsdNonPositiveInteger, genNonPositiveInteger, xsdNegativeInteger,
-            genNegativeInteger, xsdNonNegativeInteger, genNonNegativeInteger, xsdPositiveInteger, genPositiveInteger,
-            xsdDecimal, genDecimal, xsdFloat, genFloat, xsdDouble, genDouble, xsdDateTime, genDateTime, xsdDate,
-            genDate, xsdDayTimeDuration, genDayTimeDuration, xsdString, rdfLangString, unsupportedType);
 
     /**
      * Valid but non-canonical xsd:boolean literals.

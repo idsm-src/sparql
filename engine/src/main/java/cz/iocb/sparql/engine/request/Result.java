@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.mapping.classes.BooleanBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.BooleanClass;
 import cz.iocb.sparql.engine.mapping.classes.ByteBaseClass;
@@ -76,6 +77,7 @@ import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.NonPositiveIntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerClass;
+import cz.iocb.sparql.engine.mapping.classes.RdfBoxClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
@@ -271,7 +273,7 @@ public class Result implements AutoCloseable
         {
             for(ResultResourceClass rc : entry.getValue())
             {
-                Object value = rs.getObject(i++, ((ResourceClass) rc).getSqlTypes().get(0).getJavaClass());
+                Object value = getValue(rs, i++, ((ResourceClass) rc).getSqlTypes().get(0));
 
                 if(value == null)
                 {
@@ -281,6 +283,11 @@ public class Result implements AutoCloseable
 
                 rowData[idx] = switch(rc)
                 {
+                    case RdfBoxClass _ ->
+                    {
+                        yield RdfBoxParser.parse((String) value);
+                    }
+
                     case IriScalarClass _ ->
                     {
                         yield new Iri((String) value);
@@ -591,6 +598,25 @@ public class Result implements AutoCloseable
         }
 
         return true;
+    }
+
+
+    /**
+     * Reads the column as the Java class of its SQL type. Text is read through {@link ResultSet#getString}, as the
+     * driver converts only its own types by class, so that the text form of a {@code sparql.rdfbox} can be read too.
+     *
+     * @param rs the result set
+     * @param index position of the column
+     * @param type SQL type of the column
+     * @return the value, or null if the column is NULL
+     * @throws SQLException on database errors
+     */
+    private static Object getValue(ResultSet rs, int index, SqlType type) throws SQLException
+    {
+        if(type.getJavaClass() == String.class)
+            return rs.getString(index);
+
+        return rs.getObject(index, type.getJavaClass());
     }
 
 
