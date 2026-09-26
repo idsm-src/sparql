@@ -564,11 +564,6 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
 
 
     /**
-     * SQL condition that the value is NULL.
-     *
-     * @return SQL condition that the value is NULL
-     */
-    /**
      * True if the column is a NULL constant.
      *
      * @param column the column
@@ -651,6 +646,11 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
     }
 
 
+    /**
+     * SQL condition that the value is NULL.
+     *
+     * @return SQL condition that the value is NULL
+     */
     public String getIsNull()
     {
         return variableBinding.getIsNull();

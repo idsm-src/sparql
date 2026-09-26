@@ -713,11 +713,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
     /**
      * Maps child columns to the output columns, reusing an output column already assigned to the same child column;
-     * constants pass through.
+     * constants pass through. Unless the variable may be unbound, an output column keeps the knowledge that the child
+     * column is not null.
      *
      * @param output fresh output columns
      * @param input child columns
      * @param map the column map
+     * @param canBeNull whether the variable may be unbound
      * @return the output columns
      */
     private static List<Column> getMappedColuns(List<Column> output, List<Column> input, Map<Column, Column> map,

@@ -75,8 +75,10 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Creates the node; the exposed bindings use one representative per set of columns equated by the conditions.
+     * Creates the node; the exposed bindings use one representative per set of columns equated by the conditions and
+     * carry the knowledge whether their values may be null.
      *
+     * @param schema the database schema, or null for a constant-only access
      * @param table the table
      * @param conditions the conditions
      * @param internal bindings in terms of the table's own columns
@@ -233,8 +235,11 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Bindings for the parent: equated columns replaced by their representative, expressions by generated columns.
+     * Bindings for the parent: equated columns replaced by their representative, expressions by generated columns, each
+     * carrying the knowledge whether its values may be null.
      *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
      * @param bindings the variable bindings
      * @param conditions the conditions
      * @return bindings for the parent: equated columns replaced by their representative, expressions by generated
@@ -309,8 +314,12 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Replaces the columns by their representatives and expressions by generated columns (allocated on first use).
+     * Replaces the columns by their representatives and expressions by generated columns (allocated on first use); the
+     * resulting columns carry the knowledge whether their values may be null.
      *
+     * @param schema the database schema, or null for a constant-only access
+     * @param table the table, or null for a constant-only access
+     * @param conditions the conditions
      * @param set representative of each equated column
      * @param expressions generated columns of expressions, extended on demand
      * @param columns the columns
@@ -463,13 +472,6 @@ public final class SqlTableAccess extends SqlIntercode
 
 
     /**
-     * Returns whether the deduplication requested by {@link #distinctColumns} is implied by a key of the table, in
-     * which case the request can be dropped.
-     *
-     * @param schema the database schema
-     * @return true if a key of the table covers the distinct columns, false otherwise
-     */
-    /**
      * True if the column is known to be not null in the rows of the access: it is not nullable in the schema, or the
      * conditions require it to be not null or compare it by a strict operator in every disjunct. Only such columns can
      * be matched against unique keys, since a unique index does not make rows with NULL key values unique.
@@ -526,6 +528,13 @@ public final class SqlTableAccess extends SqlIntercode
     }
 
 
+    /**
+     * Returns whether the deduplication requested by {@link #distinctColumns} is implied by a key of the table, in
+     * which case the request can be dropped.
+     *
+     * @param schema the database schema
+     * @return true if a key of the table covers the distinct columns, false otherwise
+     */
     private boolean isDistinctImpliedByKey(DatabaseSchema schema)
     {
         return table == null

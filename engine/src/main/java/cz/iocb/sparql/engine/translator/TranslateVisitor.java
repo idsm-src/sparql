@@ -1422,6 +1422,7 @@ public class TranslateVisitor extends ElementVisitor<SqlIntercode>
     /**
      * Condition restricting the graph term of the mapping to the given IRIs.
      *
+     * @param source the quad mapping
      * @param graphMap the graph term mapping
      * @param iris IRIs the graph may take
      * @return condition restricting the graph term of the mapping to the given IRIs
