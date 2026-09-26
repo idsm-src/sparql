@@ -259,6 +259,17 @@ public enum MessageType
     partialSurrogatePair(ERROR, "Literal contains a codepoint that is half of a surrogate pair"),
 
     /**
+     * The base direction of a language-tagged literal is neither {@code ltr} nor {@code rtl}.
+     */
+    invalidBaseDirection(ERROR, "Base direction '%s' is not valid, it must be either 'ltr' or 'rtl'."),
+
+    /**
+     * A reifier or an annotation block follows the object of a triple whose predicate is a property path other than an
+     * IRI or a variable.
+     */
+    invalidAnnotationPropertyPath(ERROR, "Reifier or annotation syntax cannot be used with a property path."),
+
+    /**
      * A literal uses a datatype unknown to the configuration.
      */
     unsupportedDatatype(WARNING, "datatype '%s' is not supported"),
@@ -276,7 +287,12 @@ public enum MessageType
     /**
      * A language tag does not conform to BCP 47.
      */
-    invalidLanguageTag(WARNING, "language tag '%s' is not valid");
+    invalidLanguageTag(WARNING, "language tag '%s' is not valid"),
+
+    /**
+     * The label of a VERSION declaration is not one of the SPARQL version labels.
+     */
+    unknownVersionLabel(WARNING, "version label '%s' is not recognized");
 
 
     /**

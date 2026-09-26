@@ -30,7 +30,7 @@ public class Triple extends PatternElement implements BasicPattern
 
 
     /**
-     * Creates the triple; variables at any position become in scope.
+     * Creates the triple; variables at any position, including those nested in triple terms, become in scope.
      *
      * @param subject the subject node
      * @param predicate the predicate
@@ -43,14 +43,35 @@ public class Triple extends PatternElement implements BasicPattern
         this.object = object;
 
 
-        if(subject instanceof VariableNode variable)
-            variablesInScope.add(variable);
+        addVariablesInScope(subject);
 
         if(predicate instanceof VariableNode variable)
             variablesInScope.add(variable);
 
-        if(object instanceof VariableNode variable)
+        addVariablesInScope(object);
+    }
+
+
+    /**
+     * Adds the node to the variables in scope if it is a variable, or the variables it contains if it is a triple term.
+     *
+     * @param node the subject or object node
+     */
+    private void addVariablesInScope(Node node)
+    {
+        if(node instanceof VariableNode variable)
+        {
             variablesInScope.add(variable);
+        }
+        else if(node instanceof TripleTermNode tripleTerm)
+        {
+            addVariablesInScope(tripleTerm.getSubject());
+
+            if(tripleTerm.getPredicate() instanceof VariableNode variable)
+                variablesInScope.add(variable);
+
+            addVariablesInScope(tripleTerm.getObject());
+        }
     }
 
 

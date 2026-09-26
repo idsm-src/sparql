@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern that filters results to those that satisfy a constraint ( {@link #getConstraint}).
  *
  * <p>
- * Corresponds to the rule [68] Filter in the SPARQL grammar.
+ * Corresponds to the rule [74] Filter in the SPARQL grammar.
  */
 public class Filter extends PatternElement implements Pattern
 {

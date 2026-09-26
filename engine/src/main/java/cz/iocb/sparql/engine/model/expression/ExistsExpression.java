@@ -11,7 +11,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * ({@link #isNegated}).
  *
  * <p>
- * Corresponds to the rules [125] ExistsFunc and [126] NotExistsFunc in the SPARQL grammar.
+ * Corresponds to the rules [145] ExistsFunc and [146] NotExistsFunc in the SPARQL grammar.
  */
 public class ExistsExpression extends BaseElement implements Expression
 {

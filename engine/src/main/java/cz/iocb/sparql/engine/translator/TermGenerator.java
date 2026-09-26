@@ -6,6 +6,7 @@ import cz.iocb.sparql.engine.model.VariableOrBlankNode;
 import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.triple.BlankNode;
 import cz.iocb.sparql.engine.model.triple.Node;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -34,6 +35,7 @@ public class TermGenerator
      *
      * @param node the subject node
      * @return term of a subject, predicate or object node; null for a null node
+     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
      */
     public static RdfTerm getTerm(Node node)
     {
@@ -46,6 +48,8 @@ public class TermGenerator
             case LiteralNode literal -> getLiteral(literal);
             case VariableNode var -> getVariable(var);
             case BlankNode bnode -> getVariable(bnode);
+            //TODO: SPARQL 1.2
+            case TripleTermNode _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
             default -> throw new IllegalArgumentException();
         };
     }
@@ -71,11 +75,17 @@ public class TermGenerator
      *
      * @param literal the literal node
      * @return literal term of the node; null for a null node
+     * @throws UnsupportedOperationException for a literal with a base direction, which the translator does not support
+     *             yet
      */
     public static Literal getLiteral(LiteralNode literal)
     {
         if(literal == null)
             return null;
+
+        //TODO: SPARQL 1.2
+        if(literal.getDirection() != null)
+            throw new UnsupportedOperationException("literals with a base direction are not supported yet");
 
         if(literal.getTag() != null)
             return new LangStringLiteral(literal.getValue(), literal.getTag());

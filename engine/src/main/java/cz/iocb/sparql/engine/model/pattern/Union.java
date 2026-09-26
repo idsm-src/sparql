@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern used to compute set union of a list of patterns ({@link #getPatterns} ).
  *
  * <p>
- * Corresponds to the rule [67] GroupOrUnionGraphPattern in the SPARQL grammar, with at least one {@code UNION}.
+ * Corresponds to the rule [73] GroupOrUnionGraphPattern in the SPARQL grammar, with at least one {@code UNION}.
  */
 public class Union extends PatternElement implements Pattern
 {

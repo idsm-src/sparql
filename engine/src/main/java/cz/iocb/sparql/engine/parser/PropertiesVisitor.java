@@ -5,6 +5,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Stream;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
+import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.error.TranslateMessage;
 import cz.iocb.sparql.engine.grammar.SparqlParser.IriContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ObjectListContext;
@@ -19,7 +20,9 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.VerbPathContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VerbSimpleContext;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.model.Prologue;
+import cz.iocb.sparql.engine.model.VarOrIri;
 import cz.iocb.sparql.engine.model.VariableNode;
+import cz.iocb.sparql.engine.model.triple.AnnotatedNode;
 import cz.iocb.sparql.engine.model.triple.ComplexNode;
 import cz.iocb.sparql.engine.model.triple.Property;
 import cz.iocb.sparql.engine.model.triple.Verb;
@@ -27,7 +30,8 @@ import cz.iocb.sparql.engine.model.triple.Verb;
 
 
 /**
- * Builds the {@link Property} list (predicate with its objects) of a triples-same-subject rule.
+ * Builds the {@link Property} list (predicate with its objects) of a triples-same-subject rule, reporting annotations
+ * of objects whose predicate is a property path.
  */
 class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 {
@@ -128,6 +132,25 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
 
 
     /**
+     * Reports the annotations of the objects when the verb is a property path other than an IRI or a variable, as the
+     * reifier and annotation syntax is only permitted after a triple with a simple predicate.
+     *
+     * @param verb the predicate
+     * @param nodes the object nodes
+     */
+    private void checkAnnotations(Verb verb, List<ComplexNode> nodes)
+    {
+        if(verb instanceof VarOrIri)
+            return;
+
+        for(ComplexNode node : nodes)
+            if(node instanceof AnnotatedNode annotatedNode)
+                messages.add(new TranslateMessage(MessageType.invalidAnnotationPropertyPath,
+                        annotatedNode.getAnnotations().get(0).getRange()));
+    }
+
+
+    /**
      * Parses one verb with its objects.
      *
      * @param ctx the parse tree node
@@ -138,6 +161,8 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
         Verb verb = parseVerb(ctx.verbPath(), ctx.verbSimple());
         List<ComplexNode> nodes = parseNodes(ctx.objectListPath());
 
+        checkAnnotations(verb, nodes);
+
         return withRange(new Property(verb, nodes), ctx);
     }
 
@@ -147,6 +172,8 @@ class PropertiesVisitor extends BaseVisitor<Stream<Property>>
     {
         Verb verb = parseVerb(ctx.verbPath(), ctx.verbSimple());
         List<ComplexNode> nodes = parseNodes(ctx.objectListPath());
+
+        checkAnnotations(verb, nodes);
 
         Property head = new Property(verb, nodes);
         Stream<Property> tail = ctx.propertyListPathNotEmptyList().stream().map(this::parseProperty);

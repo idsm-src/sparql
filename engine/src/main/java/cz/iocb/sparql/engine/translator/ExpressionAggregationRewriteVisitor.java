@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import cz.iocb.sparql.engine.model.IriNode;
+import cz.iocb.sparql.engine.model.VarOrIri;
 import cz.iocb.sparql.engine.model.VariableNode;
 import cz.iocb.sparql.engine.model.expression.BinaryExpression;
 import cz.iocb.sparql.engine.model.expression.BracketedExpression;
@@ -15,6 +16,8 @@ import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
 import cz.iocb.sparql.engine.model.expression.InExpression;
 import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.triple.Node;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
@@ -171,6 +174,18 @@ public class ExpressionAggregationRewriteVisitor extends ElementVisitor<Expressi
     public Expression visit(LiteralNode literal)
     {
         return literal;
+    }
+
+
+    @Override
+    public Expression visit(TripleTermNode tripleTerm)
+    {
+        Node subject = (Node) visitElement(tripleTerm.getSubject());
+        VarOrIri predicate = (VarOrIri) visitElement(tripleTerm.getPredicate());
+        Node object = (Node) visitElement(tripleTerm.getObject());
+        Expression result = new TripleTermNode(subject, predicate, object);
+        result.setRange(tripleTerm.getRange());
+        return result;
     }
 
 

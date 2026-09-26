@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Path that cannot be traversed.
  *
  * <p>
- * Corresponds to the case with {@code !} of the rule [94] PathPrimary in the SPARQL grammar.
+ * Corresponds to the case with {@code !} of the rule [100] PathPrimary in the SPARQL grammar.
  */
 public class NegatedPath extends BaseElement implements Path
 {

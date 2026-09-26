@@ -36,6 +36,7 @@ import cz.iocb.sparql.engine.model.triple.NegatedPath;
 import cz.iocb.sparql.engine.model.triple.RepeatedPath;
 import cz.iocb.sparql.engine.model.triple.SequencePath;
 import cz.iocb.sparql.engine.model.triple.Triple;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 
@@ -477,6 +478,12 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
         {
             builder.append('@');
             builder.append(literal.getTag());
+
+            if(literal.getDirection() != null)
+            {
+                builder.append("--");
+                builder.append(literal.getDirection());
+            }
         }
         else if(literal.getType() != null)
         {
@@ -511,6 +518,21 @@ public class ServiceTranslateVisitor extends ElementVisitor<Void>
         builder.append(" ");
         visitElement(triple.getObject());
         builder.append(".");
+
+        return null;
+    }
+
+
+    @Override
+    public Void visit(TripleTermNode tripleTerm)
+    {
+        builder.append(" <<( ");
+        visitElement(tripleTerm.getSubject());
+        builder.append(" ");
+        visitElement(tripleTerm.getPredicate());
+        builder.append(" ");
+        visitElement(tripleTerm.getObject());
+        builder.append(" )>> ");
 
         return null;
     }

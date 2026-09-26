@@ -50,6 +50,7 @@ import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
 import cz.iocb.sparql.engine.model.expression.InExpression;
 import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.request.Request;
@@ -237,6 +238,14 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     public SqlExpressionIntercode visit(LiteralNode literal)
     {
         return SqlLiteral.create(request, getLiteral(literal));
+    }
+
+
+    @Override
+    public SqlExpressionIntercode visit(TripleTermNode tripleTerm)
+    {
+        //TODO: SPARQL 1.2
+        throw new UnsupportedOperationException("triple terms are not supported yet");
     }
 
 

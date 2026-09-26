@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Path that has to be traversed in the opposite direction.
  *
  * <p>
- * Corresponds to the case with {@code ^} of the rule [92] PathEltOrInverse in the SPARQL grammar.
+ * Corresponds to the case with {@code ^} of the rule [98] PathEltOrInverse in the SPARQL grammar.
  */
 public class InversePath extends BaseElement implements Path
 {

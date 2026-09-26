@@ -33,7 +33,7 @@ query
     ;
 
 prologue
-    : (baseDecl | prefixDecl)*
+    : (baseDecl | prefixDecl | versionDecl)*
     ;
 
 baseDecl
@@ -42,6 +42,14 @@ baseDecl
 
 prefixDecl
     : PREFIX PNAME_NS IRIREF
+    ;
+
+versionDecl
+    : VERSION versionSpecifier
+    ;
+
+versionSpecifier
+    : STRING_LITERAL1 | STRING_LITERAL2
     ;
 
 selectQuery
@@ -288,7 +296,7 @@ dataBlockValues
     ;
 
 dataBlockValue
-    : iri | rdfLiteral | numericLiteral | booleanLiteral | UNDEF
+    : iri | rdfLiteral | numericLiteral | booleanLiteral | UNDEF | tripleTermData
     ;
 
 minusGraphPattern
@@ -324,7 +332,11 @@ constructTemplate
     ;
 
 triplesSameSubject
-    : varOrTerm propertyListNotEmpty | triplesNode propertyList 
+    : varOrTerm propertyListNotEmpty | triplesNode propertyList | reifiedTripleBlock
+    ;
+
+reifiedTripleBlock
+    : reifiedTriple propertyList
     ;
  
 propertyList
@@ -344,11 +356,15 @@ objectList
     ;
 
 object
-    : graphNode
+    : graphNode annotation
     ;
 
 triplesSameSubjectPath
-    : varOrTerm propertyListPathNotEmpty | triplesNodePath propertyListPath
+    : varOrTerm propertyListPathNotEmpty | triplesNodePath propertyListPath | reifiedTripleBlockPath
+    ;
+
+reifiedTripleBlockPath
+    : reifiedTriple propertyListPath
     ;
   
 propertyListPath
@@ -376,7 +392,7 @@ objectListPath
     ;
 
 objectPath
-    : graphNodePath
+    : graphNodePath annotationPath
     ;
 
 path
@@ -443,16 +459,76 @@ collectionPath
     : '(' graphNodePath+ ')'
     ;
     
+annotationPath
+    : (reifier | annotationBlockPath)*
+    ;
+
+annotationBlockPath
+    : '{|' propertyListPathNotEmpty '|}'
+    ;
+
+annotation
+    : (reifier | annotationBlock)*
+    ;
+
+annotationBlock
+    : '{|' propertyListNotEmpty '|}'
+    ;
+
 graphNode
-    : varOrTerm | triplesNode
+    : varOrTerm | triplesNode | reifiedTriple
     ;
 
 graphNodePath
-    : varOrTerm | triplesNodePath
+    : varOrTerm | triplesNodePath | reifiedTriple
     ;
 
 varOrTerm
-    : var | graphTerm
+    : var | graphTerm | tripleTerm
+    ;
+
+reifiedTriple
+    : '<<' reifiedTripleSubject verb reifiedTripleObject reifier? '>>'
+    ;
+
+reifiedTripleSubject
+    : var | iri | rdfLiteral | numericLiteral | booleanLiteral | blankNode | reifiedTriple | tripleTerm
+    ;
+
+reifiedTripleObject
+    : var | iri | rdfLiteral | numericLiteral | booleanLiteral | blankNode | reifiedTriple | tripleTerm
+    ;
+
+tripleTerm
+    : '<<(' tripleTermSubject verb tripleTermObject ')>>'
+    ;
+
+tripleTermSubject
+    : var | iri | rdfLiteral | numericLiteral | booleanLiteral | blankNode | tripleTerm
+    ;
+
+tripleTermObject
+    : var | iri | rdfLiteral | numericLiteral | booleanLiteral | blankNode | tripleTerm
+    ;
+
+tripleTermData
+    : '<<(' tripleTermDataSubject (iri | A) tripleTermDataObject ')>>'
+    ;
+
+tripleTermDataSubject
+    : iri
+    ;
+
+tripleTermDataObject
+    : iri | rdfLiteral | numericLiteral | booleanLiteral | tripleTermData
+    ;
+
+reifier
+    : '~' varOrReifierId?
+    ;
+
+varOrReifierId
+    : var | iri | blankNode
     ;
 
 varOrIri
@@ -490,11 +566,24 @@ unaryLiteralExpression
     ;
 
 unaryExpression
-    : op=('!'|'+'|'-')? primaryExpression
+    : '!' unaryExpression
+    | op=('+'|'-')? primaryExpression
     ;
 
 primaryExpression
-    : '(' expression ')' | builtInCall | iriRefOrFunction | rdfLiteral | numericLiteral | booleanLiteral | var
+    : '(' expression ')' | builtInCall | iriRefOrFunction | rdfLiteral | numericLiteral | booleanLiteral | var | exprTripleTerm
+    ;
+
+exprTripleTerm
+    : '<<(' exprTripleTermSubject verb exprTripleTermObject ')>>'
+    ;
+
+exprTripleTermSubject
+    : iri | var
+    ;
+
+exprTripleTermObject
+    : iri | rdfLiteral | numericLiteral | booleanLiteral | var | exprTripleTerm
     ;
 
 builtInCall
@@ -502,6 +591,7 @@ builtInCall
     | STR '(' expression ')'
     | LANG '(' expression ')'
     | LANGMATCHES '(' expression ',' expression ')'
+    | LANGDIR '(' expression ')'
     | DATATYPE '(' expression ')'
     | BOUND '(' var ')'
     | IRI '(' expression ')'
@@ -543,6 +633,7 @@ builtInCall
     | COALESCE '(' expressionList? ')'
     | IF '(' expression ',' expression ',' expression ')'
     | STRLANG '(' expression ',' expression ')'
+    | STRLANGDIR '(' expression ',' expression ',' expression ')'
     | STRDT '(' expression ',' expression ')'
     | SAMETERM '(' expression ',' expression ')'
     | ISIRI '(' expression ')'
@@ -550,9 +641,16 @@ builtInCall
     | ISBLANK '(' expression ')'
     | ISLITERAL '(' expression ')'
     | ISNUMERIC '(' expression ')'
+    | HASLANG '(' expression ')'
+    | HASLANGDIR '(' expression ')'
     | regexExpression
     | existsFunction
     | notExistsFunction
+    | ISTRIPLE '(' expression ')'
+    | TRIPLE '(' expression ',' expression ',' expression ')'
+    | SUBJECT '(' expression ')'
+    | PREDICATE '(' expression ')'
+    | OBJECT '(' expression ')'
     ;
 
 regexExpression
@@ -590,7 +688,7 @@ iriRefOrFunction
     ;
 
 rdfLiteral
-    : string (LANGTAG | ('^^' iri))?
+    : string (LANG_DIR | ('^^' iri))?
     ;
 
 numericLiteral

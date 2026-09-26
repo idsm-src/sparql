@@ -22,8 +22,8 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 /**
- * Builds {@link LiteralNode}s. Validates language tags and surrogate pairs, assigns xsd:string to plain literals and
- * the matching xsd numeric or boolean type to shorthand literals.
+ * Builds {@link LiteralNode}s. Validates language tags, base directions and surrogate pairs, assigns xsd:string to
+ * plain literals and the matching xsd numeric or boolean type to shorthand literals.
  */
 public class LiteralVisitor extends BaseVisitor<LiteralNode>
 {
@@ -59,9 +59,13 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
         if(containsInvalidSurrogatePairs(value))
             messages.add(new TranslateMessage(MessageType.partialSurrogatePair, Range.compute(ctx.string())));
 
-        if(ctx.LANGTAG() != null)
+        if(ctx.LANG_DIR() != null)
         {
-            String tag = ctx.LANGTAG().getText().substring(1);
+            String langDir = ctx.LANG_DIR().getText().substring(1);
+            int separator = langDir.indexOf("--");
+            String tag = separator < 0 ? langDir : langDir.substring(0, separator);
+            String direction = separator < 0 ? null : langDir.substring(separator + 2);
+            Range range = Range.compute(ctx.LANG_DIR().getSymbol(), ctx.LANG_DIR().getSymbol());
 
             if(!tag.matches("""
                     ([A-Za-z]{2,3}(-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8})\
@@ -69,10 +73,12 @@ public class LiteralVisitor extends BaseVisitor<LiteralNode>
                     (-[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+)*(-x(-[A-Za-z0-9]{1,8})+)?|x(-[A-Za-z0-9]{1,8})+\
                     |i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn\
                     |i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE"""))
-                messages.add(new TranslateMessage(MessageType.invalidLanguageTag,
-                        Range.compute(ctx.LANGTAG().getSymbol(), ctx.LANGTAG().getSymbol()), tag));
+                messages.add(new TranslateMessage(MessageType.invalidLanguageTag, range, tag));
 
-            return new LiteralNode(value, tag);
+            if(direction != null && !direction.equals("ltr") && !direction.equals("rtl"))
+                messages.add(new TranslateMessage(MessageType.invalidBaseDirection, range, direction));
+
+            return new LiteralNode(value, tag, direction);
         }
         else if(ctx.iri() != null)
         {

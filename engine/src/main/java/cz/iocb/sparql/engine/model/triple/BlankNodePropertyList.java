@@ -14,7 +14,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Describes an anonymous blank node with zero or more properties ( {@link #getProperties}).
  *
  * <p>
- * Corresponds to rules [101] BlankNodePropertyListPath and [163] ANON in the SPARQL grammar.
+ * Corresponds to rules [106] BlankNodePropertyListPath and [184] ANON in the SPARQL grammar.
  */
 public class BlankNodePropertyList extends BaseComplexNode implements ComplexNode, ComplexElement
 {

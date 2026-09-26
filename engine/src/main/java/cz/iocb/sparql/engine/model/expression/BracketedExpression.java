@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Represents an expression ({@link #getChild}) enclosed in brackets.
  *
  * <p>
- * Corresponds to the rule [120] BrackettedExpression in the SPARQL grammar.
+ * Corresponds to the rule [140] BrackettedExpression in the SPARQL grammar.
  */
 public class BracketedExpression extends BaseElement implements Expression
 {

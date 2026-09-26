@@ -18,7 +18,7 @@ import cz.iocb.sparql.engine.parser.Parser;
  * This is a {@link ComplexElement}, so it won't appear in the output of the {@link Parser}.
  *
  * <p>
- * Corresponds to rules [103] CollectionPath and [161] NIL in the SPARQL grammar.
+ * Corresponds to rules [108] CollectionPath and [182] NIL in the SPARQL grammar.
  */
 public class RdfCollection extends BaseComplexNode implements ComplexNode, ComplexElement
 {

@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern that assigns a value ({@link #getExpression}) to a variable ( {@link #getVariable}).
  *
  * <p>
- * Corresponds to the rule [60] Bind in the SPARQL grammar.
+ * Corresponds to the rule [64] Bind in the SPARQL grammar.
  */
 public class Bind extends PatternElement implements Pattern
 {

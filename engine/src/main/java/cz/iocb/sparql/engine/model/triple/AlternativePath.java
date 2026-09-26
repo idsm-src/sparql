@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Path that can be traversed using any of the given paths ({@link #getChildren} ).
  *
  * <p>
- * Corresponds to the rule [89] PathAlternative, with at least one {@code |} and to the {@code |} part of [95]
+ * Corresponds to the rule [95] PathAlternative, with at least one {@code |} and to the {@code |} part of [101]
  * PathNegatedPropertySet in the SPARQL grammar.
  */
 public class AlternativePath extends BaseElement implements Path

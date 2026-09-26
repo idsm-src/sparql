@@ -10,14 +10,15 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
 
 /**
  * Represents a literal: a lexical value ({@link #getValue}) with either a datatype IRI ({@link #getType}) or a language
- * tag ({@link #getTag}). Numeric and boolean shorthand forms get the corresponding xsd datatype.
+ * tag ({@link #getTag}), the latter optionally with a base direction ({@link #getDirection}). Numeric and boolean
+ * shorthand forms get the corresponding xsd datatype.
  *
  * <p>
  * Corresponds to the following rules in the SPARQL grammar:
  * <ul>
- * <li>[129] RDFLiteral
- * <li>[130] NumericLiteral
- * <li>[134] BooleanLiteral
+ * <li>[149] RDFLiteral
+ * <li>[150] NumericLiteral
+ * <li>[154] BooleanLiteral
  * </ul>
  */
 public class LiteralNode extends BaseComplexNode implements Expression, Node
@@ -37,6 +38,11 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
      */
     private final String tag;
 
+    /**
+     * Base direction of a language-tagged literal, null when not specified.
+     */
+    private final String direction;
+
 
     /**
      * Creates a language-tagged literal.
@@ -46,9 +52,23 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
      */
     public LiteralNode(String value, String tag)
     {
+        this(value, tag, null);
+    }
+
+
+    /**
+     * Creates a language-tagged literal with a base direction.
+     *
+     * @param value the lexical form
+     * @param tag the language tag
+     * @param direction the base direction ({@code ltr} or {@code rtl}), or null
+     */
+    public LiteralNode(String value, String tag, String direction)
+    {
         this.value = value;
         this.type = null;
         this.tag = tag;
+        this.direction = direction;
     }
 
 
@@ -63,6 +83,7 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
         this.value = value;
         this.type = type;
         this.tag = null;
+        this.direction = null;
     }
 
 
@@ -99,6 +120,19 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
     }
 
 
+    /**
+     * Base direction ({@code ltr} or {@code rtl}) of a language-tagged literal, without the leading {@code --}; null
+     * when not specified or for typed literals.
+     *
+     * @return base direction ({@code ltr} or {@code rtl}) of a language-tagged literal, without the leading {@code --};
+     *         null when not specified or for typed literals
+     */
+    public String getDirection()
+    {
+        return direction;
+    }
+
+
     @Override
     public <T> T accept(ElementVisitor<T> visitor)
     {
@@ -109,7 +143,7 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
     @Override
     public int hashCode()
     {
-        return Objects.hash(value, type, tag);
+        return Objects.hash(value, type, tag, direction);
     }
 
 
@@ -131,6 +165,9 @@ public class LiteralNode extends BaseComplexNode implements Expression, Node
             return false;
 
         if(!Objects.equals(tag, other.tag))
+            return false;
+
+        if(!Objects.equals(direction, other.direction))
             return false;
 
         return true;

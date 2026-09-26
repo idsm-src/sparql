@@ -6,7 +6,7 @@ package cz.iocb.sparql.engine.model.triple;
  * Path that describes allowed routes between nodes in the graph.
  *
  * <p>
- * Corresponds to the rule [84] VerbPath in the SPARQL grammar.
+ * Corresponds to the rule [90] VerbPath in the SPARQL grammar.
  */
 public interface Path extends Verb
 {

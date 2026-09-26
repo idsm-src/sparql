@@ -30,6 +30,8 @@ BASE : ('B'|'b')('A'|'a')('S'|'s')('E'|'e');
 
 PREFIX : ('P'|'p')('R'|'r')('E'|'e')('F'|'f')('I'|'i')('X'|'x');
 
+VERSION : ('V'|'v')('E'|'e')('R'|'r')('S'|'s')('I'|'i')('O'|'o')('N'|'n');
+
 SELECT : ('S'|'s')('E'|'e')('L'|'l')('E'|'e')('C'|'c')('T'|'t');
 
 DISTINCT : ('D'|'d')('I'|'i')('S'|'s')('T'|'t')('I'|'i')('N'|'n')('C'|'c')('T'|'t');
@@ -77,6 +79,8 @@ STR : ('S'|'s')('T'|'t')('R'|'r');
 LANG : ('L'|'l')('A'|'a')('N'|'n')('G'|'g');
 
 LANGMATCHES : ('L'|'l')('A'|'a')('N'|'n')('G'|'g')('M'|'m')('A'|'a')('T'|'t')('C'|'c')('H'|'h')('E'|'e')('S'|'s');
+
+LANGDIR : ('L'|'l')('A'|'a')('N'|'n')('G'|'g')('D'|'d')('I'|'i')('R'|'r');
 
 DATATYPE : ('D'|'d')('A'|'a')('T'|'t')('A'|'a')('T'|'t')('Y'|'y')('P'|'p')('E'|'e');
 
@@ -225,10 +229,26 @@ COALESCE : ('C'|'c')('O'|'o')('A'|'a')('L'|'l')('E'|'e')('S'|'s')('C'|'c')('E'|'
 IF : ('I'|'i')('F'|'f');
 
 STRLANG : ('S'|'s')('T'|'t')('R'|'r')('L'|'l')('A'|'a')('N'|'n')('G'|'g');
+
+STRLANGDIR : ('S'|'s')('T'|'t')('R'|'r')('L'|'l')('A'|'a')('N'|'n')('G'|'g')('D'|'d')('I'|'i')('R'|'r');
     
 STRDT : ('S'|'s')('T'|'t')('R'|'r')('D'|'d')('T'|'t');
     
-ISNUMERIC : ('I'|'i')('S'|'s')('N'|'n')('U'|'u')('M'|'m')('E'|'e')('R'|'r')('I'|'i')('C'|'c');	
+ISNUMERIC : ('I'|'i')('S'|'s')('N'|'n')('U'|'u')('M'|'m')('E'|'e')('R'|'r')('I'|'i')('C'|'c');
+
+HASLANG : ('H'|'h')('A'|'a')('S'|'s')('L'|'l')('A'|'a')('N'|'n')('G'|'g');
+
+HASLANGDIR : ('H'|'h')('A'|'a')('S'|'s')('L'|'l')('A'|'a')('N'|'n')('G'|'g')('D'|'d')('I'|'i')('R'|'r');
+
+ISTRIPLE : ('I'|'i')('S'|'s')('T'|'t')('R'|'r')('I'|'i')('P'|'p')('L'|'l')('E'|'e');
+
+TRIPLE : ('T'|'t')('R'|'r')('I'|'i')('P'|'p')('L'|'l')('E'|'e');
+
+SUBJECT : ('S'|'s')('U'|'u')('B'|'b')('J'|'j')('E'|'e')('C'|'c')('T'|'t');
+
+PREDICATE : ('P'|'p')('R'|'r')('E'|'e')('D'|'d')('I'|'i')('C'|'c')('A'|'a')('T'|'t')('E'|'e');
+
+OBJECT : ('O'|'o')('B'|'b')('J'|'j')('E'|'e')('C'|'c')('T'|'t');
 
 COUNT : ('C'|'c')('O'|'o')('U'|'u')('N'|'n')('T'|'t');
     
@@ -266,7 +286,7 @@ VAR1 : '?' VARNAME;
 
 VAR2 : '$' VARNAME;
 
-LANGTAG : '@' ('A'..'Z'|'a'..'z')+ (MINUS_SIGN ('A'..'Z'|'a'..'z'|DIGIT)+)*;
+LANG_DIR : '@' ('A'..'Z'|'a'..'z')+ (MINUS_SIGN ('A'..'Z'|'a'..'z'|DIGIT)+)* (MINUS_SIGN MINUS_SIGN ('A'..'Z'|'a'..'z')+)?;
 
 INTEGER : DIGIT+;
 
@@ -356,6 +376,20 @@ COMMENT : '#' .*? (EOL|EOF) -> channel(99);
 
 fragment
 EOL : '\n' | '\r';
+
+OPEN_TRIPLE_TERM : '<<(';
+
+CLOSE_TRIPLE_TERM : ')>>';
+
+OPEN_REIFIED_TRIPLE : '<<';
+
+CLOSE_REIFIED_TRIPLE : '>>';
+
+OPEN_ANNOTATION : '{|';
+
+CLOSE_ANNOTATION : '|}';
+
+TILDE : '~';
 
 REFERENCE : '^^';
 

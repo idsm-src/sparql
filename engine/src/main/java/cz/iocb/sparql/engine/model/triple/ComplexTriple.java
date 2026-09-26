@@ -19,7 +19,7 @@ import cz.iocb.sparql.engine.parser.Parser;
  * Only {@link Triple}s can appear in the output of {@link Parser}, never {@link ComplexTriple}s.
  *
  * <p>
- * Corresponds to the rule [81] TriplesSameSubjectPath in the SPARQL grammar.
+ * Corresponds to the rule [87] TriplesSameSubjectPath in the SPARQL grammar.
  */
 public class ComplexTriple extends BaseElement implements ComplexElement
 {

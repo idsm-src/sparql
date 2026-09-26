@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * ({@link #getOperator}).
  *
  * <p>
- * Corresponds to the rule [118] UnaryExpression in the SPARQL grammar, except for the case with no operator.
+ * Corresponds to the rule [135] UnaryExpression in the SPARQL grammar, except for the case with no operator.
  */
 public class UnaryExpression extends BaseElement implements Expression
 {

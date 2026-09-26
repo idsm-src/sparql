@@ -8,7 +8,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern used to contain a pattern that may not succeed ({@link #getPattern}).
  *
  * <p>
- * Corresponds to the rule [57] OptionalGraphPattern in the SPARQL grammar.
+ * Corresponds to the rule [61] OptionalGraphPattern in the SPARQL grammar.
  */
 public class Optional extends PatternElement implements Pattern
 {

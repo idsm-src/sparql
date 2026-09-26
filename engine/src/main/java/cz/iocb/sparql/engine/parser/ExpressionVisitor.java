@@ -18,8 +18,10 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.ConditionalAndExpressionContex
 import cz.iocb.sparql.engine.grammar.SparqlParser.ConditionalOrExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ConstraintContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ExistsFunctionContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.ExprTripleTermContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ExpressionListContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.FunctionCallContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.IriContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.IriRefOrFunctionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.MultiplicativeExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.NotExistsFunctionContext;
@@ -39,6 +41,7 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnaryNegationExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.UnarySignedLiteralExpressionContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VarContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.VerbContext;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -57,6 +60,8 @@ import cz.iocb.sparql.engine.model.expression.FunctionCallExpression;
 import cz.iocb.sparql.engine.model.expression.InExpression;
 import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.expression.UnaryExpression;
+import cz.iocb.sparql.engine.model.triple.Node;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 
 
@@ -250,25 +255,20 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
 
 
     @Override
-    public UnaryExpression visitUnaryExpression(UnaryExpressionContext ctx)
+    public Expression visitUnaryExpression(UnaryExpressionContext ctx)
     {
-        UnaryExpression.Operator operator;
-        switch(ctx.op.getText())
-        {
-            case "!":
-                operator = UnaryExpression.Operator.Not;
-                break;
-            case "+":
-                operator = UnaryExpression.Operator.Plus;
-                break;
-            case "-":
-                operator = UnaryExpression.Operator.Minus;
-                break;
-            default:
-                throw new AssertionError();
-        }
+        if(ctx.unaryExpression() != null)
+            return new UnaryExpression(UnaryExpression.Operator.Not, visit(ctx.unaryExpression()));
 
-        return new UnaryExpression(operator, visit(ctx.primaryExpression()));
+        Expression operand = visit(ctx.primaryExpression());
+
+        if(ctx.op == null)
+            return operand;
+
+        UnaryExpression.Operator operator = ctx.op.getText().equals("+") ? UnaryExpression.Operator.Plus :
+                UnaryExpression.Operator.Minus;
+
+        return new UnaryExpression(operator, operand);
     }
 
 
@@ -530,6 +530,41 @@ public class ExpressionVisitor extends BaseVisitor<Expression>
             return iri;
 
         return parseFunctionCall(iri, ctx.argList());
+    }
+
+
+    @Override
+    public IriNode visitIri(IriContext ctx)
+    {
+        return new IriVisitor(prologue, messages).visit(ctx);
+    }
+
+
+    @Override
+    public TripleTermNode visitExprTripleTerm(ExprTripleTermContext ctx)
+    {
+        Node subject = (Node) visit(ctx.exprTripleTermSubject());
+        VarOrIri predicate = parseVerb(ctx.verb());
+        Node object = (Node) visit(ctx.exprTripleTermObject());
+
+        return new TripleTermNode(subject, predicate, object);
+    }
+
+
+    /**
+     * Parses the predicate of a triple term: an IRI, a variable (unbound, like other variables of expressions), or
+     * {@code rdf:type} for {@code a}.
+     *
+     * @param ctx the parse tree node
+     * @return the predicate
+     */
+    private VarOrIri parseVerb(VerbContext ctx)
+    {
+        if(ctx.A() != null)
+            return withRange(new IriNode(Rdf.TYPE), ctx);
+
+        // the VarOrIri rule yields only IRIs and variables
+        return (VarOrIri) visit(ctx.varOrIri());
     }
 
 

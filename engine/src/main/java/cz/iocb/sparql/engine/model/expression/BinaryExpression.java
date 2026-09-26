@@ -12,11 +12,11 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * <p>
  * Corresponds to the following rules in the SPARQL grammar, except for the cases with no operators:
  * <ul>
- * <li>[111] ConditionalOrExpression
- * <li>[112] ConditionalAndExpression
- * <li>[114] RelationalExpression, except the IN and NOT IN cases
- * <li>[116] AdditiveExpression
- * <li>[117] MultiplicativeExpression
+ * <li>[128] ConditionalOrExpression
+ * <li>[129] ConditionalAndExpression
+ * <li>[131] RelationalExpression, except the IN and NOT IN cases
+ * <li>[133] AdditiveExpression
+ * <li>[134] MultiplicativeExpression
  * </ul>
  */
 public class BinaryExpression extends BaseElement implements Expression

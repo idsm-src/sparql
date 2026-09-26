@@ -64,12 +64,15 @@ import cz.iocb.sparql.engine.grammar.SparqlParser.SelectVariableContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ServiceGraphPatternContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.SolutionModifierContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.SubSelectContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.TripleTermDataContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.TripleTermDataObjectContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.TriplesBlockContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.TriplesSameSubjectContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.TriplesSameSubjectPathContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.ValuesClauseContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VarContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.VarOrIriContext;
+import cz.iocb.sparql.engine.grammar.SparqlParser.VersionDeclContext;
 import cz.iocb.sparql.engine.grammar.SparqlParser.WhereClauseContext;
 import cz.iocb.sparql.engine.mapping.extension.ParameterDefinition;
 import cz.iocb.sparql.engine.mapping.extension.ProcedureDefinition;
@@ -113,14 +116,21 @@ import cz.iocb.sparql.engine.model.pattern.Service;
 import cz.iocb.sparql.engine.model.pattern.Union;
 import cz.iocb.sparql.engine.model.pattern.Values;
 import cz.iocb.sparql.engine.model.pattern.Values.ValuesList;
+import cz.iocb.sparql.engine.model.triple.AnnotatedNode;
+import cz.iocb.sparql.engine.model.triple.Annotation;
+import cz.iocb.sparql.engine.model.triple.AnnotationBlock;
 import cz.iocb.sparql.engine.model.triple.BlankNode;
 import cz.iocb.sparql.engine.model.triple.BlankNodePropertyList;
 import cz.iocb.sparql.engine.model.triple.ComplexNode;
 import cz.iocb.sparql.engine.model.triple.ComplexTriple;
+import cz.iocb.sparql.engine.model.triple.ComplexTripleTerm;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.triple.Property;
 import cz.iocb.sparql.engine.model.triple.RdfCollection;
+import cz.iocb.sparql.engine.model.triple.ReifiedTriple;
+import cz.iocb.sparql.engine.model.triple.Reifier;
 import cz.iocb.sparql.engine.model.triple.Triple;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 import cz.iocb.sparql.engine.model.triple.Verb;
 import cz.iocb.sparql.engine.model.visitor.ComplexElementVisitor;
 import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
@@ -370,30 +380,13 @@ public class QueryVisitor extends BaseVisitor<Query>
         }
         else if(ctx.constructQuery() != null)
         {
-            PropertiesVisitor propertiesVisitor = new PropertiesVisitor(config, prologue, scopes, messages);
             NodeVisitor nodeVisitor = new NodeVisitor(config, prologue, scopes, messages);
             TripleExpander expander = new TripleExpander(usedBlankNodes);
 
             if(ctx.constructQuery().constructTemplate().triplesTemplate() != null)
-            {
                 for(TriplesSameSubjectContext triplesCtx : ctx.constructQuery().constructTemplate().triplesTemplate()
                         .triplesSameSubject())
-                {
-                    if(triplesCtx.varOrTerm() != null)
-                    {
-                        ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
-                        Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListNotEmpty());
-                        expander.visit(new ComplexTriple(node, properties.toList()));
-                    }
-                    else
-                    {
-                        ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNode());
-                        Stream<Property> properties = triplesCtx.propertyList().propertyListNotEmpty() != null ?
-                                propertiesVisitor.visit(triplesCtx.propertyList()) : Stream.empty();
-                        expander.visit(new ComplexTriple(node, properties.toList()));
-                    }
-                }
-            }
+                    expander.visit(nodeVisitor.parseTriples(triplesCtx));
 
             List<Pattern> templates = expander.getResults();
 
@@ -984,7 +977,7 @@ public class QueryVisitor extends BaseVisitor<Query>
 
 
 /**
- * Collects BASE and PREFIX declarations into a {@link Prologue} initialised with the configured prefixes.
+ * Collects BASE, PREFIX and VERSION declarations into a {@link Prologue} initialised with the configured prefixes.
  */
 class PrologueVisitor extends BaseVisitor<Void>
 {
@@ -1054,6 +1047,21 @@ class PrologueVisitor extends BaseVisitor<Void>
 
         PrefixDefinition result = withRange(new PrefixDefinition(name, iri), ctx);
         prologue.addPrefixDefinition(result);
+
+        return null;
+    }
+
+
+    @Override
+    public Void visitVersionDecl(VersionDeclContext ctx)
+    {
+        String version = LiteralVisitor.unquote(ctx.versionSpecifier().getText());
+
+        if(!version.equals("1.2") && !version.equals("1.2-basic") && !version.equals("1.1"))
+            messages.add(new TranslateMessage(MessageType.unknownVersionLabel, Range.compute(ctx.versionSpecifier()),
+                    version));
+
+        prologue.setVersion(version);
 
         return null;
     }
@@ -1489,8 +1497,12 @@ class GraphPatternVisitor extends BaseVisitor<GraphPattern>
 
 
 /**
- * Expands the syntax sugar of {@link ComplexTriple}s (object lists, blank node property lists, collections) into plain
- * {@link Triple}s, allocating fresh blank nodes where needed.
+ * Expands the syntax sugar of {@link ComplexTriple}s (object lists, blank node property lists, collections, reified
+ * triples, annotations of objects) into plain {@link Triple}s, allocating fresh blank nodes where needed. A reified
+ * triple {@code << s p o ~ r >>} becomes the node {@code r} together with the triple
+ * {@code r rdf:reifies <<( s p o )>>}; an annotation of an object adds such a reifying triple for every reifier and
+ * every annotation block not directly following a reifier, and the properties of every annotation block with its
+ * reifier as the subject.
  */
 class TripleExpander extends ComplexElementVisitor<Node>
 {
@@ -1555,15 +1567,127 @@ class TripleExpander extends ComplexElementVisitor<Node>
 
             for(ComplexNode objectNode : property.getObjects())
             {
+                List<Annotation> annotations = List.of();
+
+                if(objectNode instanceof AnnotatedNode annotatedNode)
+                {
+                    annotations = annotatedNode.getAnnotations();
+                    objectNode = annotatedNode.getNode();
+                }
+
                 Node object = visitElement(objectNode);
 
                 Triple resultTriple = new Triple(subject, verb, object);
                 resultTriple.setRange(triple.getRange());
                 results.add(resultTriple);
+
+                // an annotation of a property path has already been reported by the parser
+                if(verb instanceof VarOrIri predicate)
+                    expandAnnotations(subject, predicate, object, annotations);
             }
         }
 
         return null;
+    }
+
+
+    /**
+     * Expands the annotation of the triple: every reifier reifies the triple, and the properties of every annotation
+     * block get as their subject the reifier directly preceding the block, or a fresh blank node reifying the triple
+     * when the block does not directly follow a reifier.
+     *
+     * @param subject the subject of the annotated triple
+     * @param predicate the predicate of the annotated triple
+     * @param object the object of the annotated triple
+     * @param annotations the elements of the annotation
+     */
+    private void expandAnnotations(Node subject, VarOrIri predicate, Node object, List<Annotation> annotations)
+    {
+        Node reifier = null;
+
+        for(Annotation annotation : annotations)
+        {
+            if(annotation instanceof Reifier reifierElement)
+            {
+                reifier = reifierElement.getNode();
+
+                if(reifier == null)
+                {
+                    reifier = getBlankNode();
+                    reifier.setRange(reifierElement.getRange());
+                }
+
+                addReifyingTriple(reifier, subject, predicate, object, reifierElement.getRange());
+            }
+            else if(annotation instanceof AnnotationBlock block)
+            {
+                if(reifier == null)
+                {
+                    reifier = getBlankNode();
+                    reifier.setRange(block.getRange());
+                    addReifyingTriple(reifier, subject, predicate, object, block.getRange());
+                }
+
+                // take advantage of triple processing
+                ComplexTriple blockTriple = new ComplexTriple(reifier, block.getProperties());
+                blockTriple.setRange(block.getRange());
+                visit(blockTriple);
+
+                reifier = null;
+            }
+        }
+    }
+
+
+    /**
+     * Adds the reifying triple {@code reifier rdf:reifies <<( subject predicate object )>>}.
+     *
+     * @param reifier the reifier node
+     * @param subject the subject of the reified triple
+     * @param predicate the predicate of the reified triple
+     * @param object the object of the reified triple
+     * @param range the source range of the generated elements
+     */
+    private void addReifyingTriple(Node reifier, Node subject, VarOrIri predicate, Node object, Range range)
+    {
+        TripleTermNode tripleTerm = new TripleTermNode(subject, predicate, object);
+        tripleTerm.setRange(range);
+
+        Triple triple = new Triple(reifier, new IriNode(Rdf.REIFIES), tripleTerm);
+        triple.setRange(range);
+        results.add(triple);
+    }
+
+
+    @Override
+    public Node visit(ReifiedTriple reifiedTriple)
+    {
+        Node subject = visitElement(reifiedTriple.getSubject());
+        Node object = visitElement(reifiedTriple.getObject());
+        Node reifier = reifiedTriple.getReifier();
+
+        if(reifier == null)
+        {
+            reifier = getBlankNode();
+            reifier.setRange(reifiedTriple.getRange());
+        }
+
+        addReifyingTriple(reifier, subject, reifiedTriple.getPredicate(), object, reifiedTriple.getRange());
+
+        return reifier;
+    }
+
+
+    @Override
+    public Node visit(ComplexTripleTerm tripleTerm)
+    {
+        Node subject = visitElement(tripleTerm.getSubject());
+        Node object = visitElement(tripleTerm.getObject());
+
+        TripleTermNode result = new TripleTermNode(subject, tripleTerm.getPredicate(), object);
+        result.setRange(tripleTerm.getRange());
+
+        return result;
     }
 
 
@@ -1651,6 +1775,13 @@ class TripleExpander extends ComplexElementVisitor<Node>
     public Node visit(LiteralNode literal)
     {
         return literal;
+    }
+
+
+    @Override
+    public Node visit(TripleTermNode tripleTerm)
+    {
+        return tripleTerm;
     }
 
 
@@ -1770,25 +1901,11 @@ class GroupGraphPatternVisitor extends BaseVisitor<Stream<Pattern>>
     @Override
     public Stream<Pattern> visitTriplesBlock(TriplesBlockContext ctx)
     {
-        PropertiesVisitor propertiesVisitor = new PropertiesVisitor(config, prologue, scopes, messages);
         NodeVisitor nodeVisitor = new NodeVisitor(config, prologue, scopes, messages);
         List<ComplexTriple> triples = new LinkedList<>();
 
         for(TriplesSameSubjectPathContext triplesCtx : ctx.triplesSameSubjectPath())
-        {
-            if(triplesCtx.varOrTerm() != null)
-            {
-                ComplexNode node = nodeVisitor.visit(triplesCtx.varOrTerm());
-                Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPathNotEmpty());
-                triples.add(new ComplexTriple(node, properties.toList()));
-            }
-            else
-            {
-                ComplexNode node = nodeVisitor.visit(triplesCtx.triplesNodePath());
-                Stream<Property> properties = propertiesVisitor.visit(triplesCtx.propertyListPath());
-                triples.add(new ComplexTriple(node, properties.toList()));
-            }
-        }
+            triples.add(nodeVisitor.parseTriples(triplesCtx));
 
 
         TripleExpander tripleExpander = new TripleExpander(usedBlankNodes);
@@ -2031,19 +2148,58 @@ class PatternVisitor extends BaseVisitor<Pattern>
 
 
     /**
-     * Parses a VALUES data block value: a literal or an IRI.
+     * Parses a VALUES data block value: a literal, an IRI or a triple term.
      *
      * @param value the value
-     * @return the literal or IRI node
+     * @return the literal, IRI or triple term node
      */
     Expression createVal(DataBlockValueContext value)
     {
+        if(value.tripleTermData() != null)
+            return parseTripleTermData(value.tripleTermData());
+
         Expression ret = new LiteralVisitor(prologue, messages).visit(value);
 
         if(ret == null)
             ret = new IriVisitor(prologue, messages).visit(value);
 
         return ret;
+    }
+
+
+    /**
+     * Parses a constant triple term of a VALUES data block.
+     *
+     * @param ctx the parse tree node
+     * @return the triple term
+     */
+    private TripleTermNode parseTripleTermData(TripleTermDataContext ctx)
+    {
+        IriVisitor iriVisitor = new IriVisitor(prologue, messages);
+
+        IriNode subject = iriVisitor.visit(ctx.tripleTermDataSubject().iri());
+        IriNode predicate = ctx.A() != null ? new IriNode(Rdf.TYPE) : iriVisitor.visit(ctx.iri());
+        Node object = parseTripleTermDataObject(ctx.tripleTermDataObject());
+
+        return withRange(new TripleTermNode(subject, predicate, object), ctx);
+    }
+
+
+    /**
+     * Parses the object of a constant triple term: an IRI, a literal or a nested triple term.
+     *
+     * @param ctx the parse tree node
+     * @return the object node
+     */
+    private Node parseTripleTermDataObject(TripleTermDataObjectContext ctx)
+    {
+        if(ctx.iri() != null)
+            return new IriVisitor(prologue, messages).visit(ctx.iri());
+
+        if(ctx.tripleTermData() != null)
+            return parseTripleTermData(ctx.tripleTermData());
+
+        return new LiteralVisitor(prologue, messages).visit(ctx);
     }
 }
 

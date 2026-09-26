@@ -23,6 +23,11 @@ public class Prologue extends BaseElement
     private String base;
 
     /**
+     * Version label of the VERSION declaration, null when not declared.
+     */
+    private String version;
+
+    /**
      * All prefixes in effect, predefined ones first.
      */
     private final LinkedHashMap<String, String> prefixes;
@@ -65,6 +70,28 @@ public class Prologue extends BaseElement
     public void setBase(String base)
     {
         this.base = base;
+    }
+
+
+    /**
+     * Version label (for example {@code 1.2}) of the last VERSION declaration; null when none is declared.
+     *
+     * @return version label (for example {@code 1.2}) of the last VERSION declaration; null when none is declared
+     */
+    public String getVersion()
+    {
+        return version;
+    }
+
+
+    /**
+     * Sets the version label.
+     *
+     * @param version the version label, or null
+     */
+    public void setVersion(String version)
+    {
+        this.version = version;
     }
 
 

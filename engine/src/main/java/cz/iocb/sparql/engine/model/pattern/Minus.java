@@ -8,7 +8,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern used to compute set difference with the given pattern ( {@link #getPattern}).
  *
  * <p>
- * Corresponds to the rule [66] MinusGraphPattern in the SPARQL grammar.
+ * Corresponds to the rule [72] MinusGraphPattern in the SPARQL grammar.
  */
 public class Minus extends PatternElement implements Pattern
 {

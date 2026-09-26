@@ -9,7 +9,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Path that contains a path ({@link #getChild}) enclosed in parentheses.
  *
  * <p>
- * Corresponds to cases with parentheses in rules [94] PathPrimary and [95] PathNegatedPropertySet in the SPARQL
+ * Corresponds to cases with parentheses in rules [100] PathPrimary and [101] PathNegatedPropertySet in the SPARQL
  * grammar.
  */
 public class BracketedPath extends BaseElement implements Path

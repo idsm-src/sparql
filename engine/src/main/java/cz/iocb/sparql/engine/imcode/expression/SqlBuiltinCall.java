@@ -2556,7 +2556,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             }
 
             default:
-                throw new IllegalArgumentException(); // unexpected
+                //TODO: SPARQL 1.2
+                throw new IllegalArgumentException("unsupported function: " + function); // unexpected
         }
 
     }

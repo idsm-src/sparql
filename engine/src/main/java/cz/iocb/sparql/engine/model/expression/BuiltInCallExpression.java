@@ -11,7 +11,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * ({@link #getArguments}).
  *
  * <p>
- * Corresponds to rule [121] BuiltInCall, except for the {@code EXISTS} and {@code NOT EXISTS} cases.
+ * Corresponds to rule [141] BuiltInCall, except for the {@code EXISTS} and {@code NOT EXISTS} cases.
  *
  * <p>
  * Note: {@code COUNT} with empty arguments represents {@code COUNT(*)}; second parameter of {@code GROUP_CONCAT}

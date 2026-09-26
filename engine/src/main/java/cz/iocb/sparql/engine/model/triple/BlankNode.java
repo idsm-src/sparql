@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Named ({@link #getName}) blank node (for example {@code _:node}).
  *
  * <p>
- * Corresponds to the rule [142] BLANK_NODE_LABEL in the SPARQL grammar.
+ * Corresponds to the rule [162] BLANK_NODE_LABEL in the SPARQL grammar.
  */
 public final class BlankNode extends BaseComplexNode implements Node, VariableOrBlankNode
 {

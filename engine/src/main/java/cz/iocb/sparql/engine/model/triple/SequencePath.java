@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Path, that contains two or more paths ({@link #getChildren}) that have to be traversed in order.
  *
  * <p>
- * Corresponds to the rule [90] PathSequence with at least one {@code /} in the SPARQL grammar.
+ * Corresponds to the rule [96] PathSequence with at least one {@code /} in the SPARQL grammar.
  */
 public class SequencePath extends BaseElement implements Path
 {

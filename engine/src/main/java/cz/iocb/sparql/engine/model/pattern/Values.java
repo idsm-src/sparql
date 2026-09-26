@@ -15,7 +15,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern that assigns constant values ({@link #getValuesLists}) to variables ( {@link #getVariables}).
  *
  * <p>
- * Corresponds to the rules [28] ValuesClause and [61] InlineData in the SPARQL grammar.
+ * Corresponds to the rules [30] ValuesClause and [65] InlineData in the SPARQL grammar.
  */
 public class Values extends PatternElement implements Pattern
 {

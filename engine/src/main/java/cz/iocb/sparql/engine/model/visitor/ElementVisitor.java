@@ -45,6 +45,7 @@ import cz.iocb.sparql.engine.model.triple.NegatedPath;
 import cz.iocb.sparql.engine.model.triple.RepeatedPath;
 import cz.iocb.sparql.engine.model.triple.SequencePath;
 import cz.iocb.sparql.engine.model.triple.Triple;
+import cz.iocb.sparql.engine.model.triple.TripleTermNode;
 
 
 
@@ -538,6 +539,19 @@ public abstract class ElementVisitor<T>
     {
         return aggregateResult(visitElement(triple.getSubject()), visitElement(triple.getPredicate()),
                 visitElement(triple.getObject()));
+    }
+
+
+    /**
+     * Visits the element by visiting its children and aggregating their results.
+     *
+     * @param tripleTerm the visited element
+     * @return the result of the visit
+     */
+    public T visit(TripleTermNode tripleTerm)
+    {
+        return aggregateResult(visitElement(tripleTerm.getSubject()), visitElement(tripleTerm.getPredicate()),
+                visitElement(tripleTerm.getObject()));
     }
 
 

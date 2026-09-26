@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern that contains a list of other patterns ({@link #getPatterns}).
  *
  * <p>
- * Corresponds to the rule [54] GroupGraphPatternSub in the SPARQL grammar.
+ * Corresponds to the rule [56] GroupGraphPatternSub in the SPARQL grammar.
  */
 public class GroupGraph extends PatternElement implements GraphPattern
 {

@@ -13,7 +13,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * not ({@link #isNegated}).
  *
  * <p>
- * Corresponds to the {@code IN} and {@code NOT IN} cases in the rule [114] RelationalExpression in the SPARQL grammar.
+ * Corresponds to the {@code IN} and {@code NOT IN} cases in the rule [131] RelationalExpression in the SPARQL grammar.
  */
 public class InExpression extends BaseElement implements Expression
 {

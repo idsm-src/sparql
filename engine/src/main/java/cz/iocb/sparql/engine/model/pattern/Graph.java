@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern used to perform a sub-query ({@link #getPattern}) on a specific named graph ({@link #getName}).
  *
  * <p>
- * Corresponds to the rule [58] GraphGraphPattern in the SPARQL grammar.
+ * Corresponds to the rule [62] GraphGraphPattern in the SPARQL grammar.
  */
 public class Graph extends PatternElement implements Pattern
 {

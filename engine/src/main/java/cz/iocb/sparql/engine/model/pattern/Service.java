@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * Pattern used to perform a sub-query ({@link #getPattern}) on a specific named service ({@link #getName}).
  *
  * <p>
- * Corresponds to the rule [59] ServiceGraphPattern in the SPARQL grammar.
+ * Corresponds to the rule [63] ServiceGraphPattern in the SPARQL grammar.
  */
 public class Service extends PatternElement implements Pattern
 {

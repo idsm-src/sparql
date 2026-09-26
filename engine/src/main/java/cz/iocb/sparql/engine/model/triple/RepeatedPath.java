@@ -10,7 +10,7 @@ import cz.iocb.sparql.engine.model.visitor.ElementVisitor;
  * ({@link #getKind()}).
  *
  * <p>
- * Corresponds to the rule [91] PathElt with {@code PathMod} present in the SPARQL grammar.
+ * Corresponds to the rule [97] PathElt with {@code PathMod} present in the SPARQL grammar.
  */
 public class RepeatedPath extends BaseElement implements Path
 {

@@ -39,4 +39,9 @@ public abstract class Rdf
      * The rdf:type property is used to indicate that a resource has a given type.
      */
     public static final String TYPE = NS + "type";
+
+    /**
+     * The rdf:reifies property is used to indicate that a resource (the reifier) reifies the given triple term.
+     */
+    public static final String REIFIES = NS + "reifies";
 }

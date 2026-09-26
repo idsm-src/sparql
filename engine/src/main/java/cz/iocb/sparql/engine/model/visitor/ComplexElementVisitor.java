@@ -2,10 +2,15 @@ package cz.iocb.sparql.engine.model.visitor;
 
 import cz.iocb.sparql.engine.model.base.ComplexElement;
 import cz.iocb.sparql.engine.model.base.Element;
+import cz.iocb.sparql.engine.model.triple.AnnotatedNode;
+import cz.iocb.sparql.engine.model.triple.AnnotationBlock;
 import cz.iocb.sparql.engine.model.triple.BlankNodePropertyList;
 import cz.iocb.sparql.engine.model.triple.ComplexTriple;
+import cz.iocb.sparql.engine.model.triple.ComplexTripleTerm;
 import cz.iocb.sparql.engine.model.triple.Property;
 import cz.iocb.sparql.engine.model.triple.RdfCollection;
+import cz.iocb.sparql.engine.model.triple.ReifiedTriple;
+import cz.iocb.sparql.engine.model.triple.Reifier;
 
 
 
@@ -93,6 +98,66 @@ public abstract class ComplexElementVisitor<T> extends ElementVisitor<T>
      * @return the result of the visit
      */
     public T visit(Property property)
+    {
+        return defaultResult();
+    }
+
+
+    /**
+     * Visits a reified triple; returns the default result unless overridden.
+     *
+     * @param reifiedTriple the visited element
+     * @return the result of the visit
+     */
+    public T visit(ReifiedTriple reifiedTriple)
+    {
+        return defaultResult();
+    }
+
+
+    /**
+     * Visits a triple term of a triple pattern; returns the default result unless overridden.
+     *
+     * @param tripleTerm the visited element
+     * @return the result of the visit
+     */
+    public T visit(ComplexTripleTerm tripleTerm)
+    {
+        return defaultResult();
+    }
+
+
+    /**
+     * Visits an annotated object; returns the default result unless overridden.
+     *
+     * @param annotatedNode the visited element
+     * @return the result of the visit
+     */
+    public T visit(AnnotatedNode annotatedNode)
+    {
+        return defaultResult();
+    }
+
+
+    /**
+     * Visits a reifier of an annotation; returns the default result unless overridden.
+     *
+     * @param reifier the visited element
+     * @return the result of the visit
+     */
+    public T visit(Reifier reifier)
+    {
+        return defaultResult();
+    }
+
+
+    /**
+     * Visits an annotation block; returns the default result unless overridden.
+     *
+     * @param annotationBlock the visited element
+     * @return the result of the visit
+     */
+    public T visit(AnnotationBlock annotationBlock)
     {
         return defaultResult();
     }

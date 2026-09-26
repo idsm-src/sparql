@@ -100,13 +100,13 @@ import cz.iocb.sparql.nextprot.string.NeXtProtStringConfiguration;
 
 
 /**
- * Conformance tests driven by the W3C-style manifests under {@code src/test/resources/sparql11}: syntax tests check
- * that a query is or is not accepted, evaluation tests load the test data as constant quad mappings of a fresh
- * configuration and compare the results with the expected {@code .srx} or {@code .ttl} file. The NeXtProt families only
- * translate and run the queries of {@code nextprot/queryset.sparql} against the three NeXtProt configurations. Requires
- * the {@link Database} container.
+ * Conformance tests driven by the W3C-style manifests under {@code src/test/resources/sparql11} and
+ * {@code src/test/resources/sparql12}: syntax tests check that a query is or is not accepted, evaluation tests load the
+ * test data as constant quad mappings of a fresh configuration and compare the results with the expected {@code .srx}
+ * or {@code .ttl} file. The NeXtProt families only translate and run the queries of {@code nextprot/queryset.sparql}
+ * against the three NeXtProt configurations. Requires the {@link Database} container.
  */
-@DisplayName("SPARQL 1.1 Tests")
+@DisplayName("SPARQL Tests")
 public class SparqlTest
 {
     /**
@@ -178,22 +178,25 @@ public class SparqlTest
 
         model = ModelFactory.createDefaultModel();
 
-        File directory = new File("src/test/resources/sparql11");
-
-        for(File subdirectory : directory.listFiles())
+        for(String name : List.of("sparql11", "sparql12"))
         {
-            if(!subdirectory.isDirectory())
-                continue;
+            File directory = new File("src/test/resources/" + name);
 
-            for(File manifest : subdirectory.listFiles())
+            for(File subdirectory : directory.listFiles())
             {
-                if(!manifest.isFile() || !manifest.getName().equals("manifest.ttl"))
+                if(!subdirectory.isDirectory())
                     continue;
 
-                Model m = ModelFactory.createDefaultModel();
-                m.read(new FileReader(manifest), subdirectory.getCanonicalPath() + File.separator, "TTL");
+                for(File manifest : subdirectory.listFiles())
+                {
+                    if(!manifest.isFile() || !manifest.getName().equals("manifest.ttl"))
+                        continue;
 
-                model.add(m);
+                    Model m = ModelFactory.createDefaultModel();
+                    m.read(new FileReader(manifest), subdirectory.getCanonicalPath() + File.separator, "TTL");
+
+                    model.add(m);
+                }
             }
         }
 
@@ -394,7 +397,8 @@ public class SparqlTest
 
 
     /**
-     * Names and texts of the {@code mf:PositiveSyntaxTest11} entries of the manifests.
+     * Names and texts of the {@code mf:PositiveSyntaxTest11} and {@code mf:PositiveSyntaxTest} entries of the
+     * manifests.
      */
     static List<Arguments> getPositiveSyntaxTests() throws URISyntaxException, IOException
     {
@@ -406,8 +410,9 @@ public class SparqlTest
 
                 SELECT ?NAME ?QUERY WHERE
                 {
+                  VALUES ?TYPE { mf:PositiveSyntaxTest11 mf:PositiveSyntaxTest }
                   ?MANIFEST rdf:type mf:Manifest; mf:entries / rdf:rest* / rdf:first ?TEST.
-                  ?TEST rdf:type mf:PositiveSyntaxTest11; mf:name ?NAME; mf:action ?QUERY.
+                  ?TEST rdf:type ?TYPE; mf:name ?NAME; mf:action ?QUERY.
                 }
                 ORDER BY ?NAME
                 """);
@@ -433,7 +438,8 @@ public class SparqlTest
 
 
     /**
-     * Names and texts of the {@code mf:NegativeSyntaxTest11} entries of the manifests.
+     * Names and texts of the {@code mf:NegativeSyntaxTest11} and {@code mf:NegativeSyntaxTest} entries of the
+     * manifests.
      */
     static List<Arguments> getNegativeSyntaxTests() throws URISyntaxException, IOException
     {
@@ -445,8 +451,9 @@ public class SparqlTest
 
                 SELECT ?NAME ?QUERY WHERE
                 {
+                  VALUES ?TYPE { mf:NegativeSyntaxTest11 mf:NegativeSyntaxTest }
                   ?MANIFEST rdf:type mf:Manifest; mf:entries / rdf:rest* / rdf:first ?TEST.
-                  ?TEST rdf:type mf:NegativeSyntaxTest11; mf:name ?NAME; mf:action ?QUERY.
+                  ?TEST rdf:type ?TYPE; mf:name ?NAME; mf:action ?QUERY.
                 }
                 ORDER BY ?NAME
                 """);
