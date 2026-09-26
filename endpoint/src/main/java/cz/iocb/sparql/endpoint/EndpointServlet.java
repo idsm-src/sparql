@@ -36,10 +36,12 @@ import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.model.DataSet;
 import cz.iocb.sparql.engine.model.IriNode;
 import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Engine;
@@ -1069,36 +1071,7 @@ public class EndpointServlet extends HttpServlet
                 out.print("\t\t\t<binding name=\"");
                 writeXmlValue(out, result.getHeads().get(i).getName());
                 out.print("\">");
-
-                if(term instanceof Iri iri)
-                {
-                    out.print("<uri>");
-                    writeXmlValue(out, iri.getValue());
-                    out.print("</uri>");
-                }
-                else if(term instanceof LangStringLiteral literal)
-                {
-                    out.print("<literal xml:lang=\"");
-                    writeXmlValue(out, literal.getTag());
-                    out.print("\">");
-                    writeXmlValue(out, literal.getValue());
-                    out.print("</literal>");
-                }
-                else if(term instanceof TypedLiteral literal)
-                {
-                    out.print("<literal datatype=\"");
-                    writeXmlValue(out, literal.getType().getValue());
-                    out.print("\">");
-                    writeXmlValue(out, literal.getValue());
-                    out.print("</literal>");
-                }
-                else if(term instanceof BlankNode bnode)
-                {
-                    out.print("<bnode>");
-                    writeXmlValue(out, bnode.getLabel());
-                    out.print("</bnode>");
-                }
-
+                writeXmlNode(out, term);
                 out.println("</binding>");
             }
 
@@ -1410,80 +1383,140 @@ public class EndpointServlet extends HttpServlet
 
                 subject = result.get(0);
 
-                out.print("\t<rdf:Description ");
-
-                if(subject instanceof Iri iri)
-                {
-                    out.print("rdf:about=\"");
-                    writeXmlValue(out, iri.getValue());
-                }
-                else if(subject instanceof BlankNode bnode)
-                {
-                    out.print("rdf:nodeID=\"");
-                    writeXmlValue(out, bnode.getLabel());
-                }
-                else
-                {
-                    throw new IllegalArgumentException();
-                }
-
-                out.println("\">");
+                writeXmlDescriptionStart(out, subject, "\t");
             }
 
-            Iri predicate = (Iri) result.get(1);
-            RdfTerm object = result.get(2);
-
-            String prefix = predicate.getValue().replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
-            String name = predicate.getValue().substring(prefix.length());
-
-            out.print("\t\t<p:");
-            out.print(name);
-            out.print(" xmlns:p=\"");
-            writeXmlValue(out, prefix);
-            out.print("\"");
-
-            if(object instanceof Iri iri)
-            {
-                out.print(" rdf:resource=\"");
-                writeXmlValue(out, iri.getValue());
-                out.println("\"/>");
-            }
-            else if(object instanceof BlankNode node)
-            {
-                out.print(" rdf:nodeID=\"");
-                writeXmlValue(out, node.getLabel());
-                out.println("\"/>");
-            }
-            if(object instanceof LangStringLiteral literal)
-            {
-                out.print(" xml:lang=\"");
-                writeXmlValue(out, literal.getTag());
-                out.print("\">");
-                writeXmlValue(out, literal.getValue());
-                out.print("</p:");
-                out.print(name);
-                out.println(">");
-            }
-            else if(object instanceof TypedLiteral literal)
-            {
-                out.print(" rdf:datatype=\"");
-                writeXmlValue(out, literal.getValue());
-                out.print("\">");
-                writeXmlValue(out, literal.getValue());
-                out.print("</p:");
-                out.print(name);
-                out.println(">");
-            }
-            else
-            {
-                throw new IllegalArgumentException();
-            }
+            writeXmlProperty(out, result.get(1), result.get(2), "\t\t");
         }
 
         if(subject != null)
             out.println("\t</rdf:Description>");
 
         out.println("</rdf:RDF>");
+    }
+
+
+    /**
+     * Writes the opening tag of an RDF/XML description of the subject, which must be an IRI or a blank node.
+     *
+     * @param out the output writer
+     * @param subject the subject
+     * @param indent indentation of the tag
+     * @throws IOException on output errors
+     */
+    private static void writeXmlDescriptionStart(PrintWriter out, RdfTerm subject, String indent) throws IOException
+    {
+        out.print(indent);
+        out.print("<rdf:Description ");
+
+        if(subject instanceof Iri iri)
+        {
+            out.print("rdf:about=\"");
+            writeXmlValue(out, iri.getValue());
+        }
+        else if(subject instanceof BlankNode bnode)
+        {
+            out.print("rdf:nodeID=\"");
+            writeXmlValue(out, bnode.getLabel());
+        }
+        else
+        {
+            throw new IllegalArgumentException();
+        }
+
+        out.println("\">");
+    }
+
+
+    /**
+     * Writes an RDF/XML property element; the predicate must be an IRI. A triple term object is written as a nested
+     * description with {@code rdf:parseType="Triple"}, a literal with a base direction with {@code its:dir}; the RDF
+     * 1.2 version and the ITS namespace are announced on these elements only, so that graphs without such terms keep
+     * the RDF 1.1 form.
+     *
+     * @param out the output writer
+     * @param predicate the predicate
+     * @param object the object
+     * @param indent indentation of the element
+     * @throws IOException on output errors
+     */
+    private static void writeXmlProperty(PrintWriter out, RdfTerm predicate, RdfTerm object, String indent)
+            throws IOException
+    {
+        if(!(predicate instanceof Iri iri))
+            throw new IllegalArgumentException();
+
+        String prefix = iri.getValue().replaceAll("[_a-zA-Z][_a-zA-Z0-9]*$", "");
+        String name = iri.getValue().substring(prefix.length());
+
+        out.print(indent);
+        out.print("<p:");
+        out.print(name);
+        out.print(" xmlns:p=\"");
+        writeXmlValue(out, prefix);
+        out.print("\"");
+
+        if(object instanceof Iri value)
+        {
+            out.print(" rdf:resource=\"");
+            writeXmlValue(out, value.getValue());
+            out.println("\"/>");
+        }
+        else if(object instanceof BlankNode node)
+        {
+            out.print(" rdf:nodeID=\"");
+            writeXmlValue(out, node.getLabel());
+            out.println("\"/>");
+        }
+        else if(object instanceof LangStringLiteral literal)
+        {
+            out.print(" xml:lang=\"");
+            writeXmlValue(out, literal.getTag());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</p:");
+            out.print(name);
+            out.println(">");
+        }
+        else if(object instanceof DirLangStringLiteral literal)
+        {
+            out.print(" xmlns:its=\"http://www.w3.org/2005/11/its\" rdf:version=\"1.2\" its:version=\"2.0\"");
+            out.print(" xml:lang=\"");
+            writeXmlValue(out, literal.getTag());
+            out.print("\" its:dir=\"");
+            writeXmlValue(out, literal.getDirection().getText());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</p:");
+            out.print(name);
+            out.println(">");
+        }
+        else if(object instanceof TypedLiteral literal)
+        {
+            out.print(" rdf:datatype=\"");
+            writeXmlValue(out, literal.getType().getValue());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</p:");
+            out.print(name);
+            out.println(">");
+        }
+        else if(object instanceof TripleTerm triple)
+        {
+            out.println(" rdf:version=\"1.2\" rdf:parseType=\"Triple\">");
+            writeXmlDescriptionStart(out, triple.getSubject(), indent + "\t");
+            writeXmlProperty(out, triple.getPredicate(), triple.getObject(), indent + "\t\t");
+            out.print(indent);
+            out.println("\t</rdf:Description>");
+            out.print(indent);
+            out.print("</p:");
+            out.print(name);
+            out.println(">");
+        }
+        else
+        {
+            throw new IllegalArgumentException();
+        }
     }
 
 
@@ -1677,7 +1710,70 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes a term as a SPARQL JSON result value object.
+     * Writes a term as the content of a SPARQL XML result binding; a triple term is written as a {@code triple} element
+     * with the components written recursively, and a literal with a base direction declares the ITS namespace of its
+     * {@code its:dir} attribute itself, so that results without such literals keep the SPARQL 1.1 form.
+     *
+     * @param out the output writer
+     * @param term the RDF term
+     * @throws IOException on output errors
+     */
+    private static void writeXmlNode(PrintWriter out, RdfTerm term) throws IOException
+    {
+        if(term instanceof Iri iri)
+        {
+            out.print("<uri>");
+            writeXmlValue(out, iri.getValue());
+            out.print("</uri>");
+        }
+        else if(term instanceof LangStringLiteral literal)
+        {
+            out.print("<literal xml:lang=\"");
+            writeXmlValue(out, literal.getTag());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</literal>");
+        }
+        else if(term instanceof DirLangStringLiteral literal)
+        {
+            out.print("<literal xmlns:its=\"http://www.w3.org/2005/11/its\" its:version=\"2.0\" xml:lang=\"");
+            writeXmlValue(out, literal.getTag());
+            out.print("\" its:dir=\"");
+            writeXmlValue(out, literal.getDirection().getText());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</literal>");
+        }
+        else if(term instanceof TypedLiteral literal)
+        {
+            out.print("<literal datatype=\"");
+            writeXmlValue(out, literal.getType().getValue());
+            out.print("\">");
+            writeXmlValue(out, literal.getValue());
+            out.print("</literal>");
+        }
+        else if(term instanceof BlankNode bnode)
+        {
+            out.print("<bnode>");
+            writeXmlValue(out, bnode.getLabel());
+            out.print("</bnode>");
+        }
+        else if(term instanceof TripleTerm triple)
+        {
+            out.print("<triple><subject>");
+            writeXmlNode(out, triple.getSubject());
+            out.print("</subject><predicate>");
+            writeXmlNode(out, triple.getPredicate());
+            out.print("</predicate><object>");
+            writeXmlNode(out, triple.getObject());
+            out.print("</object></triple>");
+        }
+    }
+
+
+    /**
+     * Writes a term as a SPARQL JSON result value object; a triple term is written as an object of type {@code triple}
+     * whose value holds the components written recursively.
      *
      * @param out the output writer
      * @param term the RDF term
@@ -1701,6 +1797,16 @@ public class EndpointServlet extends HttpServlet
             writeJsonValue(out, literal.getTag());
             out.print('"');
         }
+        else if(term instanceof DirLangStringLiteral literal)
+        {
+            out.print("\"literal\", \"value\": \"");
+            writeJsonValue(out, literal.getValue());
+            out.print("\", \"xml:lang\": \"");
+            writeJsonValue(out, literal.getTag());
+            out.print("\", \"its:dir\": \"");
+            writeJsonValue(out, literal.getDirection().getText());
+            out.print('"');
+        }
         else if(term instanceof TypedLiteral literal)
         {
             out.print("\"literal\", \"value\": \"");
@@ -1715,13 +1821,23 @@ public class EndpointServlet extends HttpServlet
             writeJsonValue(out, bnode.getLabel());
             out.print('"');
         }
+        else if(term instanceof TripleTerm triple)
+        {
+            out.print("\"triple\", \"value\": { \"subject\": ");
+            writeJsonNode(out, triple.getSubject());
+            out.print(", \"predicate\": ");
+            writeJsonNode(out, triple.getPredicate());
+            out.print(", \"object\": ");
+            writeJsonNode(out, triple.getObject());
+            out.print(" }");
+        }
 
         out.print(" }");
     }
 
 
     /**
-     * Writes a term in N-Triples syntax.
+     * Writes a term in N-Triples syntax; a triple term is written as {@code <<( subject predicate object )>>}.
      *
      * @param out the output writer
      * @param term the RDF term
@@ -1742,6 +1858,15 @@ public class EndpointServlet extends HttpServlet
             out.print("\"@");
             writeTsvValue(out, literal.getTag());
         }
+        else if(term instanceof DirLangStringLiteral literal)
+        {
+            out.print('"');
+            writeTsvLiteralValue(out, literal.getValue());
+            out.print("\"@");
+            writeTsvValue(out, literal.getTag());
+            out.print("--");
+            writeTsvValue(out, literal.getDirection().getText());
+        }
         else if(term instanceof TypedLiteral literal)
         {
             out.print('"');
@@ -1754,6 +1879,16 @@ public class EndpointServlet extends HttpServlet
         {
             out.print("_:");
             writeTsvValue(out, bnode.getLabel());
+        }
+        else if(term instanceof TripleTerm triple)
+        {
+            out.print("<<( ");
+            writeTripleNode(out, triple.getSubject());
+            out.print(' ');
+            writeTripleNode(out, triple.getPredicate());
+            out.print(' ');
+            writeTripleNode(out, triple.getObject());
+            out.print(" )>>");
         }
     }
 
@@ -1778,6 +1913,16 @@ public class EndpointServlet extends HttpServlet
             writeTsvLiteralValue(out, literal.getValue());
             out.print("\"^^");
             writeTripleIri(out, literal.getType(), prefixes);
+        }
+        else if(term instanceof TripleTerm triple)
+        {
+            out.print("<<( ");
+            writeTripleNode(out, triple.getSubject(), prefixes);
+            out.print(' ');
+            writeTripleNode(out, triple.getPredicate(), prefixes);
+            out.print(' ');
+            writeTripleNode(out, triple.getObject(), prefixes);
+            out.print(" )>>");
         }
         else
         {
@@ -1819,7 +1964,8 @@ public class EndpointServlet extends HttpServlet
 
 
     /**
-     * Writes a term as a CSV field (IRIs and blank nodes as they are, literals by their lexical form).
+     * Writes a term as a CSV field (IRIs and blank nodes as they are, literals by their lexical form, triple terms as
+     * {@code <<( subject predicate object )>>}).
      *
      * @param out the output writer
      * @param term the RDF term
@@ -1839,6 +1985,91 @@ public class EndpointServlet extends HttpServlet
         {
             writeCsvValue(out, "_:" + bnode.getLabel());
         }
+        else if(term instanceof TripleTerm triple)
+        {
+            writeCsvTripleTerm(out, triple, 1);
+        }
+    }
+
+
+    /**
+     * Writes a triple term as a CSV field: {@code <<( subject predicate object )>>} with the components written
+     * recursively, quoted as a whole when it contains a special character. The quoting is applied at every level of
+     * nesting, so {@code multiplicity} gives the number of quotation marks that denote one quotation mark at this
+     * level: one for a field of the results table, doubled by every enclosing quoted field.
+     *
+     * @param out the output writer
+     * @param triple the triple term
+     * @param multiplicity number of quotation marks denoting one quotation mark at this level of nesting
+     * @throws IOException on output errors
+     */
+    private static void writeCsvTripleTerm(PrintWriter out, TripleTerm triple, int multiplicity) throws IOException
+    {
+        boolean quoted = requiresCsvQuoting(triple);
+        int inner = quoted ? 2 * multiplicity : multiplicity;
+
+        if(quoted)
+            writeCsvQuotationMark(out, multiplicity);
+
+        out.print("<<( ");
+        writeCsvTripleTermComponent(out, triple.getSubject(), inner);
+        out.print(' ');
+        writeCsvTripleTermComponent(out, triple.getPredicate(), inner);
+        out.print(' ');
+        writeCsvTripleTermComponent(out, triple.getObject(), inner);
+        out.print(" )>>");
+
+        if(quoted)
+            writeCsvQuotationMark(out, multiplicity);
+    }
+
+
+    /**
+     * Writes a component of a triple term, see {@link #writeCsvTripleTerm}: an IRI or a blank node as a field, a
+     * literal always quoted, a nested triple term recursively.
+     *
+     * @param out the output writer
+     * @param term the component
+     * @param multiplicity number of quotation marks denoting one quotation mark at this level of nesting
+     * @throws IOException on output errors
+     */
+    private static void writeCsvTripleTermComponent(PrintWriter out, RdfTerm term, int multiplicity) throws IOException
+    {
+        if(term instanceof Iri iri)
+            writeCsvValue(out, iri.getValue(), multiplicity);
+        else if(term instanceof Literal literal)
+            writeCsvQuotedValue(out, literal.getValue(), multiplicity);
+        else if(term instanceof BlankNode bnode)
+            writeCsvValue(out, "_:" + bnode.getLabel(), multiplicity);
+        else if(term instanceof TripleTerm triple)
+            writeCsvTripleTerm(out, triple, multiplicity);
+        else
+            throw new IllegalArgumentException();
+    }
+
+
+    /**
+     * True if the triple term written as a CSV field has to be quoted: it contains a literal (always quoted), a nested
+     * triple term that has to be quoted, or an IRI or a blank node with a special character.
+     *
+     * @param triple the triple term
+     * @return true if the triple term written as a CSV field has to be quoted, false otherwise
+     */
+    private static boolean requiresCsvQuoting(TripleTerm triple)
+    {
+        for(RdfTerm term : List.of(triple.getSubject(), triple.getPredicate(), triple.getObject()))
+        {
+            if(term instanceof Iri iri && requiresCsvQuoting(iri.getValue()))
+                return true;
+            else if(term instanceof Literal)
+                return true;
+            else if(term instanceof BlankNode bnode && requiresCsvQuoting(bnode.getLabel()))
+                return true;
+            else if(term instanceof TripleTerm nested && requiresCsvQuoting(nested))
+                return true;
+        }
+
+        return false;
     }
 
 
@@ -1988,30 +2219,79 @@ public class EndpointServlet extends HttpServlet
      */
     private static void writeCsvValue(PrintWriter out, String value) throws IOException
     {
-        boolean mustBeQuoted = false;
-
-        for(char val : value.toCharArray())
-        {
-            if(val == '"' || val == ',' || val == '\n' || val == '\r')
-            {
-                mustBeQuoted = true;
-                break;
-            }
-        }
+        writeCsvValue(out, value, 1);
+    }
 
 
-        if(mustBeQuoted)
-            out.print('"');
+    /**
+     * Writes text as a CSV field nested in {@code multiplicity} quoted fields (see {@link #writeCsvTripleTerm}), quoted
+     * when it contains special characters.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @param multiplicity number of quotation marks denoting one quotation mark at this level of nesting
+     * @throws IOException on output errors
+     */
+    private static void writeCsvValue(PrintWriter out, String value, int multiplicity) throws IOException
+    {
+        if(requiresCsvQuoting(value))
+            writeCsvQuotedValue(out, value, multiplicity);
+        else
+            out.print(value);
+    }
+
+
+    /**
+     * Writes text as a quoted CSV field nested in {@code multiplicity} quoted fields (see {@link #writeCsvTripleTerm}):
+     * the enclosing quotation marks are written {@code multiplicity} times and the inner ones twice as many times.
+     *
+     * @param out the output writer
+     * @param value the value
+     * @param multiplicity number of quotation marks denoting one quotation mark at this level of nesting
+     * @throws IOException on output errors
+     */
+    private static void writeCsvQuotedValue(PrintWriter out, String value, int multiplicity) throws IOException
+    {
+        writeCsvQuotationMark(out, multiplicity);
 
         for(char val : value.toCharArray())
         {
             if(val == '"')
-                out.print("\"\"");
+                writeCsvQuotationMark(out, 2 * multiplicity);
             else
                 out.print(val);
         }
 
-        if(mustBeQuoted)
+        writeCsvQuotationMark(out, multiplicity);
+    }
+
+
+    /**
+     * Writes the given number of quotation marks.
+     *
+     * @param out the output writer
+     * @param count the number of quotation marks
+     * @throws IOException on output errors
+     */
+    private static void writeCsvQuotationMark(PrintWriter out, int count) throws IOException
+    {
+        for(int i = 0; i < count; i++)
             out.print('"');
+    }
+
+
+    /**
+     * True if text written as a CSV field has to be quoted: it contains a quotation mark, a comma or a line break.
+     *
+     * @param value the value
+     * @return true if text written as a CSV field has to be quoted, false otherwise
+     */
+    private static boolean requiresCsvQuoting(String value)
+    {
+        for(char val : value.toCharArray())
+            if(val == '"' || val == ',' || val == '\n' || val == '\r')
+                return true;
+
+        return false;
     }
 }

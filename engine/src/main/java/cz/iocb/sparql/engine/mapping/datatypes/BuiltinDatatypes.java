@@ -130,6 +130,11 @@ public class BuiltinDatatypes
     public static final Iri rdfLangStringIri = new Iri(rdfPrefix + "langString");
 
     /**
+     * IRI of rdf:dirLangString.
+     */
+    public static final Iri rdfDirLangStringIri = new Iri(rdfPrefix + "dirLangString");
+
+    /**
      * The xsd:boolean datatype.
      */
     public static final Datatype xsdBooleanType = new BooleanDatatype();

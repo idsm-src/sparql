@@ -18,6 +18,7 @@ import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.IriCache;
 import cz.iocb.sparql.engine.request.Request;
@@ -83,6 +84,8 @@ public abstract class ResultHandler implements AutoCloseable
      * @param value the received term
      * @param variable the variable
      * @return class of the received term bound to the variable
+     * @throws UnsupportedOperationException for a triple term or a literal with a base direction, which the translator
+     *             does not support yet
      */
     protected final ResourceClass getResourceClass(Request request, RdfTerm value, Variable variable)
     {
@@ -91,6 +94,8 @@ public abstract class ResultHandler implements AutoCloseable
             case Literal lit -> getLiteralClass(request, lit);
             case Iri iri -> getIriClass(request, iri, variable);
             case BlankNode bn -> getBlankNodeClass(request, bn);
+            //TODO: SPARQL 1.2
+            case TripleTerm _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
             default -> null;
         };
     }

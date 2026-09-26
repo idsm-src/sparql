@@ -42,11 +42,13 @@ import cz.iocb.sparql.engine.model.SelectQuery;
 import cz.iocb.sparql.engine.parser.Parser;
 import cz.iocb.sparql.engine.parser.QueryVisitor;
 import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Result.ResultType;
 import cz.iocb.sparql.engine.translator.ServiceException;
@@ -824,6 +826,7 @@ public class Request implements AutoCloseable
      *
      * @param term the RDF term
      * @return most specific resource class of a constant term (null for a variable)
+     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
      */
     public ResourceClass getResourceClass(RdfTerm term)
     {
@@ -832,6 +835,8 @@ public class Request implements AutoCloseable
             case Literal lit -> getLiteralClass(lit);
             case Iri iri -> getIriClass(iri);
             case BlankNode bn -> getBlankNodeClass(bn);
+            //TODO: SPARQL 1.2
+            case TripleTerm _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
             default -> null;
         };
     }
@@ -872,9 +877,15 @@ public class Request implements AutoCloseable
      * @param literal the literal
      * @return class of the literal according to its datatype; the unsupported literal class for unknown datatypes or
      *         invalid lexical forms
+     * @throws UnsupportedOperationException for a literal with a base direction, which the translator does not support
+     *             yet
      */
     public ResourceClass getLiteralClass(Literal literal)
     {
+        //TODO: SPARQL 1.2
+        if(literal instanceof DirLangStringLiteral)
+            throw new UnsupportedOperationException("literals with a base direction are not supported yet");
+
         Datatype datatype = getConfiguration().getDatatype(literal.getType());
 
         if(datatype == null || !datatype.isValidForm(literal.getValue()))

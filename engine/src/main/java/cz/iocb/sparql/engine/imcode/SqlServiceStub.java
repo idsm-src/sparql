@@ -14,7 +14,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,11 +36,14 @@ import cz.iocb.sparql.engine.error.MessageType;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.Request;
@@ -78,6 +83,327 @@ public final class SqlServiceStub extends SqlIntercode
         {
         }
 
+    }
+
+
+    /**
+     * SAX handler of a SPARQL 1.2 XML results document. It collects the received solutions (merged with the context
+     * solution they were asked for) into a {@link ResultHandler}, reading IRIs, blank nodes, literals (with a language
+     * tag, a base direction or a datatype) and triple terms, the latter nested to any depth.
+     */
+    private static final class ResultsHandler extends DefaultHandler
+    {
+        /**
+         * Components of a triple term being read.
+         */
+        private static final class Triple
+        {
+            /**
+             * Subject, predicate and object.
+             */
+            final RdfTerm[] components = new RdfTerm[3];
+
+            /**
+             * Index of the component being read.
+             */
+            int position;
+
+
+            /**
+             * Creates the triple with no components read yet.
+             */
+            Triple()
+            {
+            }
+        }
+
+
+        /**
+         * Namespace of the {@code xml:lang} attribute.
+         */
+        private static final String xmlNamespace = "http://www.w3.org/XML/1998/namespace";
+
+        /**
+         * Namespace of the {@code its:dir} attribute.
+         */
+        private static final String itsNamespace = "http://www.w3.org/2005/11/its";
+
+        /**
+         * Variables of the pattern by their name in the sent query.
+         */
+        private final Map<String, Variable> serviceVariables;
+
+        /**
+         * Context solution the received solutions are merged with.
+         */
+        private final Map<Variable, RdfTerm> defaultResult;
+
+        /**
+         * Collector of the solutions.
+         */
+        private final ResultHandler results;
+
+        /**
+         * Prefix of the received blank node labels, unique per call.
+         */
+        private final String blankNodePrefix;
+
+        /**
+         * Segment of the received blank nodes.
+         */
+        private final int segment;
+
+        /**
+         * Variables bound in the current solution.
+         */
+        private final Set<Variable> used = new HashSet<>();
+
+        /**
+         * The current solution.
+         */
+        private final Map<Variable, RdfTerm> result = new HashMap<>();
+
+        /**
+         * Triple terms being read, innermost last.
+         */
+        private final Deque<Triple> triples = new ArrayDeque<>();
+
+        /**
+         * Whether the current solution is inconsistent with the context and is to be dropped.
+         */
+        private boolean skip;
+
+        /**
+         * Variable of the binding being read, null outside a binding.
+         */
+        private Variable variable;
+
+        /**
+         * Text of the term being read, null outside a term.
+         */
+        private StringBuilder data;
+
+        /**
+         * Datatype attribute of the literal being read.
+         */
+        private String datatype;
+
+        /**
+         * Language tag attribute of the literal being read.
+         */
+        private String lang;
+
+        /**
+         * Base direction attribute of the literal being read; null when absent or empty.
+         */
+        private String direction;
+
+
+        /**
+         * Creates the handler.
+         *
+         * @param serviceVariables variables of the pattern by their name in the sent query
+         * @param defaultResult context solution the received solutions are merged with
+         * @param results collector of the solutions
+         * @param blankNodePrefix prefix of the received blank node labels
+         * @param segment segment of the received blank nodes
+         */
+        ResultsHandler(Map<String, Variable> serviceVariables, Map<Variable, RdfTerm> defaultResult,
+                ResultHandler results, String blankNodePrefix, int segment)
+        {
+            this.serviceVariables = serviceVariables;
+            this.defaultResult = defaultResult;
+            this.results = results;
+            this.blankNodePrefix = blankNodePrefix;
+            this.segment = segment;
+        }
+
+
+        @Override
+        public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException
+        {
+            if(localName.equalsIgnoreCase("result"))
+            {
+                skip = false;
+                used.clear();
+                result.clear();
+                result.putAll(defaultResult);
+                triples.clear();
+
+                if(results.size() >= serviceResultLimit)
+                    throw new SAXException();
+            }
+            else if(localName.equalsIgnoreCase("binding"))
+            {
+                variable = serviceVariables.get(attributes.getValue("name"));
+            }
+            else if(localName.equalsIgnoreCase("literal"))
+            {
+                lang = attributes.getValue(xmlNamespace, "lang");
+                direction = attributes.getValue(itsNamespace, "dir");
+                datatype = attributes.getValue("datatype");
+                data = new StringBuilder();
+
+                if(direction != null && direction.isEmpty())
+                    direction = null;
+            }
+            else if(localName.equalsIgnoreCase("uri") || localName.equalsIgnoreCase("bnode"))
+            {
+                data = new StringBuilder();
+            }
+            else if(localName.equalsIgnoreCase("triple"))
+            {
+                triples.push(new Triple());
+            }
+            else if(localName.equalsIgnoreCase("subject") && !triples.isEmpty())
+            {
+                triples.peek().position = 0;
+            }
+            else if(localName.equalsIgnoreCase("predicate") && !triples.isEmpty())
+            {
+                triples.peek().position = 1;
+            }
+            else if(localName.equalsIgnoreCase("object") && !triples.isEmpty())
+            {
+                triples.peek().position = 2;
+            }
+        }
+
+
+        @Override
+        public void endElement(String uri, String localName, String qName) throws SAXException
+        {
+            if(localName.equalsIgnoreCase("result"))
+            {
+                if(skip)
+                    return;
+
+                try
+                {
+                    results.add(result);
+                }
+                catch(SQLException e)
+                {
+                    throw new SQLRuntimeException(e);
+                }
+            }
+            else if(localName.equalsIgnoreCase("binding"))
+            {
+                variable = null;
+            }
+            else if(localName.equalsIgnoreCase("uri"))
+            {
+                addTerm(new Iri(takeData()));
+            }
+            else if(localName.equalsIgnoreCase("bnode"))
+            {
+                addTerm(new StrBlankNode(blankNodePrefix + takeData(), segment));
+            }
+            else if(localName.equalsIgnoreCase("literal"))
+            {
+                String value = takeData();
+
+                if(direction != null)
+                    addTerm(new DirLangStringLiteral(value, lang, parseDirection()));
+                else if(lang != null)
+                    addTerm(new LangStringLiteral(value, lang));
+                else if(datatype != null)
+                    addTerm(new TypedLiteral(value, new Iri(datatype)));
+                else
+                    addTerm(new TypedLiteral(value, xsdStringIri));
+            }
+            else if(localName.equalsIgnoreCase("triple") && !triples.isEmpty())
+            {
+                RdfTerm[] components = triples.pop().components;
+
+                if(components[0] == null || components[1] == null || components[2] == null)
+                    return; // should not happen if the response is valid
+
+                addTerm(new TripleTerm(components[0], components[1], components[2]));
+            }
+        }
+
+
+        @Override
+        public void characters(char ch[], int start, int length)
+        {
+            if(data != null)
+                data.append(ch, start, length);
+        }
+
+
+        /**
+         * Base direction of the literal being read, which has to be {@code ltr} or {@code rtl} and has to come with a
+         * language tag.
+         *
+         * @return base direction of the literal being read
+         * @throws SAXException if the direction is not valid or the literal has no language tag
+         */
+        private Direction parseDirection() throws SAXException
+        {
+            Direction result = Direction.fromText(direction);
+
+            if(result == null)
+                throw new SAXException("invalid base direction '" + direction + "'");
+
+            if(lang == null)
+                throw new SAXException("base direction without language tag");
+
+            return result;
+        }
+
+
+        /**
+         * Text of the term just read; the collection of text is stopped.
+         *
+         * @return text of the term just read
+         */
+        private String takeData()
+        {
+            String value = data.toString();
+            data = null;
+
+            return value;
+        }
+
+
+        /**
+         * Places the term just read: as a component of the innermost triple term being read, or as the value of the
+         * current binding. A binding of a variable that the context binds to a blank node or to a different term makes
+         * the solution inconsistent, and it is dropped.
+         *
+         * @param term the term
+         */
+        private void addTerm(RdfTerm term)
+        {
+            if(!triples.isEmpty())
+            {
+                Triple triple = triples.peek();
+                triple.components[triple.position] = term;
+                return;
+            }
+
+            if(variable == null)
+                return; // should not happen if the response is valid
+
+            if(!used.add(variable))
+                return; // should not happen if the response is valid
+
+            if(defaultResult.get(variable) instanceof BlankNode)
+            {
+                skip = true;
+                return;
+            }
+
+            if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(term))
+            {
+                // should not happen if the response is correct
+                skip = true;
+                return;
+            }
+
+            result.put(variable, term);
+        }
     }
 
 
@@ -443,7 +769,7 @@ public final class SqlServiceStub extends SqlIntercode
                     {
                         RdfTerm term = row[varIndexes.get(serviceVariables.get(variable))];
 
-                        if(term != null && (term instanceof Iri || term instanceof Literal))
+                        if(term != null && isDataTerm(term))
                             sparqlQueryBuilder.append(term).append(" ");
                         else
                             sparqlQueryBuilder.append("undef ");
@@ -498,116 +824,13 @@ public final class SqlServiceStub extends SqlIntercode
 
                 try
                 {
-                    final int bnprefix = call++;
-
-                    DefaultHandler handler = new DefaultHandler()
-                    {
-                        Set<Variable> used = new HashSet<>();
-                        Map<Variable, RdfTerm> result = new HashMap<>();
-
-                        boolean skip;
-                        Variable variable;
-                        StringBuilder data;
-                        String datatype;
-                        String lang;
-
-                        @Override
-                        public void startElement(String uri, String localName, String qName, Attributes attributes)
-                                throws SAXException
-                        {
-                            if(qName.equalsIgnoreCase("result"))
-                            {
-                                skip = false;
-                                used.clear();
-                                result.clear();
-                                result.putAll(defaultResult);
-
-                                if(results.size() >= serviceResultLimit)
-                                    throw new SAXException();
-                            }
-                            else if(qName.equalsIgnoreCase("binding"))
-                            {
-                                variable = serviceVariables.get(attributes.getValue("name"));
-                            }
-                            else if(qName.equalsIgnoreCase("literal"))
-                            {
-                                lang = attributes.getValue("xml:lang");
-                                datatype = attributes.getValue("datatype");
-                                data = new StringBuilder();
-                            }
-                            else if(qName.equalsIgnoreCase("uri") || qName.equalsIgnoreCase("bnode"))
-                            {
-                                data = new StringBuilder();
-                            }
-                        }
-
-                        @Override
-                        public void endElement(String uri, String localName, String qName) throws SAXException
-                        {
-                            if(qName.equalsIgnoreCase("result") && !skip)
-                            {
-                                try
-                                {
-                                    results.add(result);
-                                }
-                                catch(SQLException e)
-                                {
-                                    throw new SQLRuntimeException(e);
-                                }
-                            }
-                            else if(qName.equalsIgnoreCase("binding"))
-                            {
-                                variable = null;
-                            }
-
-                            RdfTerm term = null;
-
-                            if(qName.equalsIgnoreCase("uri"))
-                                term = new Iri(data.toString());
-                            else if(qName.equalsIgnoreCase("bnode"))
-                                term = new StrBlankNode(bnprefix + "r" + data.toString(), blankNodeClass.getSegment());
-                            else if(!qName.equalsIgnoreCase("literal"))
-                                return;
-                            else if(lang != null)
-                                term = new LangStringLiteral(data.toString(), lang);
-                            else if(datatype != null)
-                                term = new TypedLiteral(data.toString(), new Iri(datatype));
-                            else
-                                term = new TypedLiteral(data.toString(), xsdStringIri);
-
-                            if(variable == null /*|| !serviceVariables.contains(variable)*/)
-                                return; // should not happen if the response is valid
-
-                            if(!used.add(variable))
-                                return; // should not happen if the response is valid
-
-                            if(defaultResult.get(variable) instanceof BlankNode)
-                            {
-                                skip = true;
-                                return;
-                            }
-
-                            if(defaultResult.containsKey(variable) && !defaultResult.get(variable).equals(term))
-                            {
-                                // should not happen if the response is correct
-                                skip = true;
-                                return;
-                            }
-
-                            result.put(variable, term);
-                        }
-
-                        @Override
-                        public void characters(char ch[], int start, int length)
-                        {
-                            if(data != null)
-                                data.append(new String(ch, start, length));
-                        }
-                    };
+                    ResultsHandler handler = new ResultsHandler(serviceVariables, defaultResult, results, call++ + "r",
+                            blankNodeClass.getSegment());
 
                     try(InputStream input = connection.getInputStream())
                     {
                         SAXParserFactory factory = SAXParserFactory.newInstance();
+                        factory.setNamespaceAware(true);
                         SAXParser saxParser = factory.newSAXParser();
                         saxParser.parse(input, handler);
                     }
@@ -642,6 +865,23 @@ public final class SqlServiceStub extends SqlIntercode
         {
             throw new SQLRuntimeException(e);
         }
+    }
+
+
+    /**
+     * True if the term can be written as a constant of a VALUES clause: an IRI, a literal, or a triple term whose
+     * subject and predicate are IRIs and whose object is such a term again (blank nodes and variables cannot be sent).
+     *
+     * @param term the RDF term
+     * @return true if the term can be written as a constant of a VALUES clause, false otherwise
+     */
+    private static boolean isDataTerm(RdfTerm term)
+    {
+        if(term instanceof Iri || term instanceof Literal)
+            return true;
+
+        return term instanceof TripleTerm triple && triple.getSubject() instanceof Iri
+                && triple.getPredicate() instanceof Iri && isDataTerm(triple.getObject());
     }
 
 
