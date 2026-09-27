@@ -12,7 +12,7 @@ import cz.iocb.sparql.engine.database.SqlType;
 /**
  * IRI class defined by a deployment: IRIs of a recognisable shape whose identifying part is stored in native columns.
  */
-public abstract class UserIriClass extends IriClass
+public non-sealed abstract class UserIriClass extends IriClass
 {
     /**
      * Creates the class with its name, column types and superclasses.

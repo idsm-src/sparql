@@ -20,7 +20,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * directional language-tagged strings of that direction. The direction is a part of the class rather than a column, as
  * the extension keeps the strings of the two directions in two box types with separate constructors and getters.
  */
-public final class DirLangStringClass extends CanonicalLiteralClass implements ResultResourceClass
+public final class DirLangStringClass extends CanonicalLiteralClass
 {
     /**
      * The base direction.
@@ -41,9 +41,9 @@ public final class DirLangStringClass extends CanonicalLiteralClass implements R
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

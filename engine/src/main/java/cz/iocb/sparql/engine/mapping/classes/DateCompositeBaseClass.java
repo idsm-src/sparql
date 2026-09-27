@@ -20,7 +20,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * Any valid xsd:date value as a {@code date}, an {@code int4} timezone offset and its lexical form; the result class of
  * non-canonical dates.
  */
-public final class DateCompositeBaseClass extends BaseLiteralClass implements ResultResourceClass
+public final class DateCompositeBaseClass extends BaseLiteralClass
 {
     /**
      * Creates the singleton instance, see {@link BuiltinClasses}.
@@ -40,9 +40,9 @@ public final class DateCompositeBaseClass extends BaseLiteralClass implements Re
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

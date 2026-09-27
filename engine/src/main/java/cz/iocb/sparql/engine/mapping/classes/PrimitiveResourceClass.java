@@ -12,7 +12,8 @@ import cz.iocb.sparql.engine.database.SqlType;
  * Resource class with a fixed SQL column layout and an explicitly declared set of superclasses. Primitive classes are
  * the atoms that {@link DerivedClass} combines.
  */
-public abstract class PrimitiveResourceClass extends ResourceClass
+public sealed abstract class PrimitiveResourceClass extends ResourceClass
+        permits LiteralClass, IriClass, BlankNodeClass, RdfBoxClass, InternalResourceClass, TripleTermClass
 {
     /**
      * SQL types of the columns.
@@ -24,9 +25,14 @@ public abstract class PrimitiveResourceClass extends ResourceClass
      */
     protected final Set<PrimitiveResourceClass> superClasses;
 
+    /**
+     * Primitive class whose columns store the values: the class itself, or the original class of a subset class.
+     */
+    private final PrimitiveResourceClass effectiveClass;
+
 
     /**
-     * Creates the class with its name, column types and superclasses.
+     * Creates the class with its name, column types and superclasses; the class stores its values itself.
      *
      * @param name the name
      * @param sqlTypes the SQL types
@@ -34,10 +40,26 @@ public abstract class PrimitiveResourceClass extends ResourceClass
      */
     protected PrimitiveResourceClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses)
     {
+        this(name, sqlTypes, superClasses, null);
+    }
+
+
+    /**
+     * Creates the class with its name, column types, superclasses and the class that effectively represents it.
+     *
+     * @param name the name
+     * @param sqlTypes the SQL types
+     * @param superClasses the superclasses
+     * @param effectiveClass primitive class whose columns store the values, or null for the class itself
+     */
+    protected PrimitiveResourceClass(String name, List<SqlType> sqlTypes, Set<PrimitiveResourceClass> superClasses,
+            PrimitiveResourceClass effectiveClass)
+    {
         super(name);
 
         this.sqlTypes = sqlTypes;
         this.superClasses = new HashSet<>(superClasses);
+        this.effectiveClass = effectiveClass != null ? effectiveClass : this;
     }
 
 
@@ -79,9 +101,9 @@ public abstract class PrimitiveResourceClass extends ResourceClass
 
 
     @Override
-    public PrimitiveResourceClass getEffectiveClass()
+    public final PrimitiveResourceClass getEffectiveClass()
     {
-        return this;
+        return effectiveClass;
     }
 
 

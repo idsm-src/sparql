@@ -80,11 +80,11 @@ import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.PositiveIntegerClass;
 import cz.iocb.sparql.engine.mapping.classes.RdfBoxClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.ShortClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.StringClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsignedByteBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsignedByteClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsignedIntBaseClass;
@@ -102,6 +102,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
 import info.adams.ryu.RyuDouble;
@@ -176,7 +177,7 @@ public class Result implements AutoCloseable
     /**
      * Result classes of each projected variable, in column order.
      */
-    protected final Map<Variable, List<ResultResourceClass>> description;
+    protected final Map<Variable, List<ResourceClass>> description;
 
     /**
      * Position of each variable in a row.
@@ -218,6 +219,11 @@ public class Result implements AutoCloseable
      */
     private int count = 0;
 
+    /**
+     * Position of the column read next by {@link #readTerm}.
+     */
+    private int column;
+
 
     /**
      * Creates the cursor over the result set described by the given result classes.
@@ -229,7 +235,7 @@ public class Result implements AutoCloseable
      * @param timeout time limit in nanoseconds, 0 for none
      * @throws SQLException on database errors
      */
-    public Result(ResultType type, Map<Variable, List<ResultResourceClass>> description, ResultSet rs, long begin,
+    public Result(ResultType type, Map<Variable, List<ResourceClass>> description, ResultSet rs, long begin,
             long timeout) throws SQLException
     {
         this.rs = rs;
@@ -268,344 +274,377 @@ public class Result implements AutoCloseable
 
         Arrays.fill(rowData, null);
 
-        int i = 1;
+        column = 1;
         int idx = 0;
 
-        for(Entry<Variable, List<ResultResourceClass>> entry : description.entrySet())
+        for(Entry<Variable, List<ResourceClass>> entry : description.entrySet())
         {
-            for(ResultResourceClass rc : entry.getValue())
+            for(ResourceClass rc : entry.getValue())
             {
-                Object value = getValue(rs, i++, ((ResourceClass) rc).getSqlTypes().get(0));
+                RdfTerm term = readTerm(rc);
 
-                if(value == null)
-                {
-                    i += (((ResourceClass) rc).getColumnCount() - 1);
-                    continue;
-                }
-
-                rowData[idx] = switch(rc)
-                {
-                    case RdfBoxClass _ ->
-                    {
-                        yield RdfBoxParser.parse((String) value);
-                    }
-
-                    case IriScalarClass _ ->
-                    {
-                        yield new Iri((String) value);
-                    }
-
-                    case IntBlankNodeClass _ ->
-                    {
-                        int segment = rs.getInt(i++);
-                        yield new IntBlankNode((Integer) value, segment);
-                    }
-
-                    case StrBlankNodeClass _ ->
-                    {
-                        int segment = rs.getInt(i++);
-                        yield new StrBlankNode((String) value, segment);
-                    }
-
-                    case BooleanClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdBooleanIri);
-                    }
-
-                    case BooleanBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdBooleanIri);
-                    }
-
-                    case ByteClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdByteIri);
-                    }
-
-                    case ByteBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdByteIri);
-                    }
-
-                    case UnsignedByteClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdUnsignedByteIri);
-                    }
-
-                    case UnsignedByteBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedByteIri);
-                    }
-
-                    case ShortClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdShortIri);
-                    }
-
-                    case ShortBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdShortIri);
-                    }
-
-                    case UnsignedShortClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdUnsignedShortIri);
-                    }
-
-                    case UnsignedShortBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedShortIri);
-                    }
-
-                    case IntClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdIntIri);
-                    }
-
-                    case IntBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdIntIri);
-                    }
-
-                    case UnsignedIntClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdUnsignedIntIri);
-                    }
-
-                    case UnsignedIntBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedIntIri);
-                    }
-
-                    case LongClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdLongIri);
-                    }
-
-                    case LongBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? value.toString() : lexical;
-                        yield new TypedLiteral(str, xsdLongIri);
-                    }
-
-                    case UnsignedLongClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdUnsignedLongIri);
-                    }
-
-                    case UnsignedLongBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdUnsignedLongIri);
-                    }
-
-                    case IntegerClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdIntegerIri);
-                    }
-
-                    case IntegerBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdIntegerIri);
-                    }
-
-                    case NonPositiveIntegerClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdNonPositiveIntegerIri);
-                    }
-
-                    case NonPositiveIntegerBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdNonPositiveIntegerIri);
-                    }
-
-                    case NegativeIntegerClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdNegativeIntegerIri);
-                    }
-
-                    case NegativeIntegerBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdNegativeIntegerIri);
-                    }
-
-                    case NonNegativeIntegerClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdNonNegativeIntegerIri);
-                    }
-
-                    case NonNegativeIntegerBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdNonNegativeIntegerIri);
-                    }
-
-                    case PositiveIntegerClass _ ->
-                    {
-                        yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
-                                xsdPositiveIntegerIri);
-                    }
-
-                    case PositiveIntegerBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdPositiveIntegerIri);
-                    }
-
-                    case DecimalClass _ ->
-                    {
-                        BigDecimal bn = ((BigDecimal) value).stripTrailingZeros();
-                        yield new TypedLiteral((bn.scale() < 1 ? bn.setScale(1) : bn).toPlainString(), xsdDecimalIri);
-                    }
-
-                    case DecimalBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
-                        String str = lexical.isEmpty() ? num.toPlainString() : lexical;
-                        yield new TypedLiteral(str, xsdDecimalIri);
-                    }
-
-                    case FloatClass _ ->
-                    {
-                        yield new TypedLiteral(RyuFloat.floatToString((float) value), xsdFloatIri);
-                    }
-
-                    case FloatBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? RyuFloat.floatToString((float) value) : lexical;
-                        yield new TypedLiteral(str, xsdFloatIri);
-                    }
-
-                    case DoubleClass _ ->
-                    {
-                        yield new TypedLiteral(RyuDouble.doubleToString((double) value), xsdDoubleIri);
-                    }
-
-                    case DoubleBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? RyuDouble.doubleToString((double) value) : lexical;
-                        yield new TypedLiteral(str, xsdDoubleIri);
-                    }
-
-                    case DateTimeCompositeClass _ ->
-                    {
-                        int zone = rs.getInt(i++);
-                        yield new TypedLiteral(dateTimeToString((LocalDateTime) value, zone), xsdDateTimeIri);
-                    }
-
-                    case DateTimeCompositeBaseClass _ ->
-                    {
-                        int zone = rs.getInt(i++);
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? dateTimeToString((LocalDateTime) value, zone) : lexical;
-                        yield new TypedLiteral(str, xsdDateTimeIri);
-                    }
-
-                    case DateCompositeClass _ ->
-                    {
-                        int zone = rs.getInt(i++);
-                        yield new TypedLiteral(dateToString((LocalDate) value, zone), xsdDateIri);
-                    }
-
-                    case DateCompositeBaseClass _ ->
-                    {
-                        int zone = rs.getInt(i++);
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? dateToString((LocalDate) value, zone) : lexical;
-                        yield new TypedLiteral(str, xsdDateIri);
-                    }
-
-                    case DayTimeDurationClass _ ->
-                    {
-                        yield new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
-                    }
-
-                    case DayTimeDurationBaseClass _ ->
-                    {
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? durationToString((Long) value) : lexical;
-                        yield new TypedLiteral(str, xsdDayTimeDurationIri);
-                    }
-
-                    case StringClass _ ->
-                    {
-                        yield new TypedLiteral(value.toString(), xsdStringIri);
-                    }
-
-                    case LangStringClass _ ->
-                    {
-                        String lang = rs.getString(i++);
-                        yield new LangStringLiteral(value.toString(), lang);
-                    }
-
-                    case DirLangStringClass dirClass ->
-                    {
-                        String lang = rs.getString(i++);
-                        yield new DirLangStringLiteral(value.toString(), lang, dirClass.getDirection());
-                    }
-
-                    case UserLiteralCompositeClass _ ->
-                    {
-                        String type = rs.getString(i++);
-                        yield new TypedLiteral(value.toString(), new Iri(type));
-                    }
-
-                    case UserLiteralCompositeBaseClass _ ->
-                    {
-                        String type = rs.getString(i++);
-                        String lexical = rs.getString(i++);
-                        String str = lexical.isEmpty() ? value.toString() : lexical;
-                        yield new TypedLiteral(str, new Iri(type));
-                    }
-
-                    case UnsupportedLiteralClass _ ->
-                    {
-                        String type = rs.getString(i++);
-                        yield new TypedLiteral(value.toString(), new Iri(type));
-                    }
-
-                    default ->
-                    {
-                        throw new UnsupportedOperationException();
-                    }
-                };
+                if(term != null)
+                    rowData[idx] = term;
             }
 
             idx++;
         }
 
         return true;
+    }
+
+
+    /**
+     * Reads the term delivered in the columns of the given result class at the current position and advances past them;
+     * null when the columns are NULL, i.e. the value is not of this class or the variable is unbound. A triple term is
+     * read from the columns of its components, recursively.
+     *
+     * @param rc the result class
+     * @return the term, or null
+     * @throws SQLException on database errors
+     */
+    private RdfTerm readTerm(ResourceClass rc) throws SQLException
+    {
+        if(rc instanceof TripleTermClass tripleTerm)
+        {
+            RdfTerm subject = readTerm(tripleTerm.getSubject());
+
+            if(subject == null)
+            {
+                column += tripleTerm.getColumnCount() - tripleTerm.getSubject().getColumnCount();
+                return null;
+            }
+
+            Iri predicate = new Iri(rs.getString(column++));
+            RdfTerm object = readTerm(tripleTerm.getObject());
+
+            return new TripleTerm(subject, predicate, object);
+        }
+
+        Object value = getValue(rs, column++, rc.getSqlTypes().get(0));
+
+        if(value == null)
+        {
+            column += rc.getColumnCount() - 1;
+            return null;
+        }
+
+        return switch(rc)
+        {
+            case RdfBoxClass _ ->
+            {
+                yield RdfBoxParser.parse((String) value);
+            }
+
+            case IriScalarClass _ ->
+            {
+                yield new Iri((String) value);
+            }
+
+            case IntBlankNodeClass _ ->
+            {
+                int segment = rs.getInt(column++);
+                yield new IntBlankNode((Integer) value, segment);
+            }
+
+            case StrBlankNodeClass _ ->
+            {
+                int segment = rs.getInt(column++);
+                yield new StrBlankNode((String) value, segment);
+            }
+
+            case BooleanClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdBooleanIri);
+            }
+
+            case BooleanBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdBooleanIri);
+            }
+
+            case ByteClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdByteIri);
+            }
+
+            case ByteBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdByteIri);
+            }
+
+            case UnsignedByteClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdUnsignedByteIri);
+            }
+
+            case UnsignedByteBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedByteIri);
+            }
+
+            case ShortClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdShortIri);
+            }
+
+            case ShortBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdShortIri);
+            }
+
+            case UnsignedShortClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdUnsignedShortIri);
+            }
+
+            case UnsignedShortBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedShortIri);
+            }
+
+            case IntClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdIntIri);
+            }
+
+            case IntBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdIntIri);
+            }
+
+            case UnsignedIntClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdUnsignedIntIri);
+            }
+
+            case UnsignedIntBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                yield new TypedLiteral(lexical.isEmpty() ? value.toString() : lexical, xsdUnsignedIntIri);
+            }
+
+            case LongClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdLongIri);
+            }
+
+            case LongBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? value.toString() : lexical;
+                yield new TypedLiteral(str, xsdLongIri);
+            }
+
+            case UnsignedLongClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdUnsignedLongIri);
+            }
+
+            case UnsignedLongBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdUnsignedLongIri);
+            }
+
+            case IntegerClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(), xsdIntegerIri);
+            }
+
+            case IntegerBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdIntegerIri);
+            }
+
+            case NonPositiveIntegerClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                        xsdNonPositiveIntegerIri);
+            }
+
+            case NonPositiveIntegerBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdNonPositiveIntegerIri);
+            }
+
+            case NegativeIntegerClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                        xsdNegativeIntegerIri);
+            }
+
+            case NegativeIntegerBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdNegativeIntegerIri);
+            }
+
+            case NonNegativeIntegerClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                        xsdNonNegativeIntegerIri);
+            }
+
+            case NonNegativeIntegerBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdNonNegativeIntegerIri);
+            }
+
+            case PositiveIntegerClass _ ->
+            {
+                yield new TypedLiteral(((BigDecimal) value).stripTrailingZeros().toPlainString(),
+                        xsdPositiveIntegerIri);
+            }
+
+            case PositiveIntegerBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdPositiveIntegerIri);
+            }
+
+            case DecimalClass _ ->
+            {
+                BigDecimal bn = ((BigDecimal) value).stripTrailingZeros();
+                yield new TypedLiteral((bn.scale() < 1 ? bn.setScale(1) : bn).toPlainString(), xsdDecimalIri);
+            }
+
+            case DecimalBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                BigDecimal num = ((BigDecimal) value).stripTrailingZeros();
+                String str = lexical.isEmpty() ? num.toPlainString() : lexical;
+                yield new TypedLiteral(str, xsdDecimalIri);
+            }
+
+            case FloatClass _ ->
+            {
+                yield new TypedLiteral(RyuFloat.floatToString((float) value), xsdFloatIri);
+            }
+
+            case FloatBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? RyuFloat.floatToString((float) value) : lexical;
+                yield new TypedLiteral(str, xsdFloatIri);
+            }
+
+            case DoubleClass _ ->
+            {
+                yield new TypedLiteral(RyuDouble.doubleToString((double) value), xsdDoubleIri);
+            }
+
+            case DoubleBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? RyuDouble.doubleToString((double) value) : lexical;
+                yield new TypedLiteral(str, xsdDoubleIri);
+            }
+
+            case DateTimeCompositeClass _ ->
+            {
+                int zone = rs.getInt(column++);
+                yield new TypedLiteral(dateTimeToString((LocalDateTime) value, zone), xsdDateTimeIri);
+            }
+
+            case DateTimeCompositeBaseClass _ ->
+            {
+                int zone = rs.getInt(column++);
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? dateTimeToString((LocalDateTime) value, zone) : lexical;
+                yield new TypedLiteral(str, xsdDateTimeIri);
+            }
+
+            case DateCompositeClass _ ->
+            {
+                int zone = rs.getInt(column++);
+                yield new TypedLiteral(dateToString((LocalDate) value, zone), xsdDateIri);
+            }
+
+            case DateCompositeBaseClass _ ->
+            {
+                int zone = rs.getInt(column++);
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? dateToString((LocalDate) value, zone) : lexical;
+                yield new TypedLiteral(str, xsdDateIri);
+            }
+
+            case DayTimeDurationClass _ ->
+            {
+                yield new TypedLiteral(durationToString((Long) value), xsdDayTimeDurationIri);
+            }
+
+            case DayTimeDurationBaseClass _ ->
+            {
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? durationToString((Long) value) : lexical;
+                yield new TypedLiteral(str, xsdDayTimeDurationIri);
+            }
+
+            case StringClass _ ->
+            {
+                yield new TypedLiteral(value.toString(), xsdStringIri);
+            }
+
+            case LangStringClass _ ->
+            {
+                String lang = rs.getString(column++);
+                yield new LangStringLiteral(value.toString(), lang);
+            }
+
+            case DirLangStringClass dirClass ->
+            {
+                String lang = rs.getString(column++);
+                yield new DirLangStringLiteral(value.toString(), lang, dirClass.getDirection());
+            }
+
+            case UserLiteralCompositeClass _ ->
+            {
+                String type = rs.getString(column++);
+                yield new TypedLiteral(value.toString(), new Iri(type));
+            }
+
+            case UserLiteralCompositeBaseClass _ ->
+            {
+                String type = rs.getString(column++);
+                String lexical = rs.getString(column++);
+                String str = lexical.isEmpty() ? value.toString() : lexical;
+                yield new TypedLiteral(str, new Iri(type));
+            }
+
+            case UnsupportedLiteralClass _ ->
+            {
+                String type = rs.getString(column++);
+                yield new TypedLiteral(value.toString(), new Iri(type));
+            }
+
+            default ->
+            {
+                // unreachable: the result classes are closed by the sealed class hierarchy
+                throw new IllegalStateException();
+            }
+        };
     }
 
 

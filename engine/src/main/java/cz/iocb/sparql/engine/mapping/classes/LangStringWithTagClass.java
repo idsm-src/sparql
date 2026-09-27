@@ -59,9 +59,9 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(rdfLangString);
+        return rdfLangString;
     }
 
 

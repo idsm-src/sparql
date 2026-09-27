@@ -26,7 +26,7 @@ import cz.iocb.sparql.engine.request.ColumnMap;
  * whose possible classes are known keeps native columns instead of boxed values, and disjoint classes let joins,
  * filters and comparisons be pruned at translation time.
  */
-public abstract class ResourceClass
+public sealed abstract class ResourceClass permits PrimitiveResourceClass, DerivedClass
 {
     /**
      * Unique name of the class.
@@ -46,11 +46,18 @@ public abstract class ResourceClass
 
 
     /**
-     * Return set of classes that represent values of this resource class in a query result.
+     * Class in which values of this class are delivered to the query result: the generated SELECT list holds one column
+     * group per result class of each projected variable, and {@link cz.iocb.sparql.engine.request.Result} decodes the
+     * columns of a result class into an RDF term. The result classes therefore form a closed set fixed by this sealed
+     * hierarchy: the box (delivered as the text form of the {@code sparql.rdfbox} column and decoded by
+     * {@link cz.iocb.sparql.engine.request.RdfBoxParser}), the scalar IRI class, the composite blank node and literal
+     * classes, and the triple term classes built from them. A deployment can only add classes whose result class is
+     * fixed: IRI classes deliver as {@link BuiltinClasses#iri}, user literal classes as {@link BuiltinClasses#userType}
+     * and a {@link SubsetLiteralClass} as its original class.
      *
-     * @return set of classes representing class values in a query result
+     * @return class in which values of this class are delivered to the query result
      */
-    public abstract Set<ResultResourceClass> getResultResourceClasses();
+    public abstract ResourceClass getResultResourceClass();
 
 
     /**

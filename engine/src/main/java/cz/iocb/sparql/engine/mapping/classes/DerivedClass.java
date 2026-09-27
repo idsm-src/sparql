@@ -26,7 +26,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
  * conjunctions of possibly negated primitive classes, and its values are stored in the columns of an effective
  * primitive class that is a superclass of all its positive members (the box unless something narrower fits).
  */
-public class DerivedClass extends ResourceClass
+public final class DerivedClass extends ResourceClass
 {
     /**
      * Disjunctive normal form: each term maps primitive classes to true (member) or false (excluded).
@@ -792,9 +792,9 @@ public class DerivedClass extends ResourceClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return effectiveClass.getResultResourceClasses();
+        return effectiveClass.getResultResourceClass();
     }
 
 

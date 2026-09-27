@@ -22,7 +22,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * Canonical xsd:dateTime values as a UTC {@code timestamptz} and an {@code int4} timezone offset; the result class of
  * canonical date-times.
  */
-public final class DateTimeCompositeClass extends CanonicalLiteralClass implements ResultResourceClass
+public final class DateTimeCompositeClass extends CanonicalLiteralClass
 {
     /**
      * Creates the singleton instance, see {@link BuiltinClasses}.
@@ -35,9 +35,9 @@ public final class DateTimeCompositeClass extends CanonicalLiteralClass implemen
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

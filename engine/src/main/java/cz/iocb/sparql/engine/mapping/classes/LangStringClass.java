@@ -17,7 +17,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 /**
  * Language-tagged strings stored as value and tag columns; the result class of all language-tagged strings.
  */
-public final class LangStringClass extends CanonicalLiteralClass implements ResultResourceClass
+public final class LangStringClass extends CanonicalLiteralClass
 {
     /**
      * Creates the singleton instance, see {@link BuiltinClasses}.
@@ -29,9 +29,9 @@ public final class LangStringClass extends CanonicalLiteralClass implements Resu
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

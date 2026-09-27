@@ -34,7 +34,7 @@ public final class InternalResourceClass extends PrimitiveResourceClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
         throw new IllegalArgumentException();
     }

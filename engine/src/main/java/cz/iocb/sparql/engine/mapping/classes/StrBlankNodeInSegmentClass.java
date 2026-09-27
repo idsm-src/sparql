@@ -20,7 +20,7 @@ import cz.iocb.sparql.engine.rdf.StrBlankNode;
 /**
  * String blank nodes of one fixed segment, stored as the varchar value only.
  */
-public class StrBlankNodeInSegmentClass extends StrBlankNodeClass
+public final class StrBlankNodeInSegmentClass extends StrBlankNodeClass
 {
     /**
      * The fixed segment.

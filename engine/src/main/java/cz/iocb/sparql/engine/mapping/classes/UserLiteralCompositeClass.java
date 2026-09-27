@@ -18,7 +18,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * Canonical literals of any user datatype: a {@code sparql.ubox} value and the datatype IRI; the result class of
  * canonical user literals. Not usable for matching constants.
  */
-public final class UserLiteralCompositeClass extends BaseLiteralClass implements ResultResourceClass
+public final class UserLiteralCompositeClass extends BaseLiteralClass
 {
     /**
      * Creates the singleton instance, see {@link BuiltinClasses}.
@@ -30,9 +30,9 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass implements
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

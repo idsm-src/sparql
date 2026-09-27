@@ -77,11 +77,13 @@ import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
+import cz.iocb.sparql.engine.mapping.classes.CanonicalLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.DirLangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.SubsetLiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -131,6 +133,16 @@ public class SparqlTest
      * Replacement of each built-in literal class by a {@link SubsetLiteralClass}, used by the subset literal family.
      */
     static final Map<ResourceClass, ResourceClass> literalClassMap = new HashMap<>();
+
+
+    /**
+     * The subset class standing in for the given built-in literal class, named {@code <original>_sub}; it keeps all the
+     * literals of the original, so that the test data can be mapped to it without a change.
+     */
+    private static SubsetLiteralClass subset(CanonicalLiteralClass original)
+    {
+        return new SubsetLiteralClass(original.getResourceName() + "_sub", original);
+    }
 
     /**
      * Pool of the test database.
@@ -206,24 +218,24 @@ public class SparqlTest
         }
 
 
-        literalClassMap.put(xsdBoolean, new SubsetLiteralClass(xsdBoolean));
-        literalClassMap.put(xsdByte, new SubsetLiteralClass(xsdByte));
-        literalClassMap.put(xsdUnsignedByte, new SubsetLiteralClass(xsdUnsignedByte));
-        literalClassMap.put(xsdShort, new SubsetLiteralClass(xsdShort));
-        literalClassMap.put(xsdUnsignedShort, new SubsetLiteralClass(xsdUnsignedShort));
-        literalClassMap.put(xsdInt, new SubsetLiteralClass(xsdInt));
-        literalClassMap.put(xsdUnsignedInt, new SubsetLiteralClass(xsdUnsignedInt));
-        literalClassMap.put(xsdLong, new SubsetLiteralClass(xsdLong));
-        literalClassMap.put(xsdUnsignedLong, new SubsetLiteralClass(xsdUnsignedLong));
-        literalClassMap.put(xsdInteger, new SubsetLiteralClass(xsdInteger));
-        literalClassMap.put(xsdNonPositiveInteger, new SubsetLiteralClass(xsdNonPositiveInteger));
-        literalClassMap.put(xsdNegativeInteger, new SubsetLiteralClass(xsdNegativeInteger));
-        literalClassMap.put(xsdNonNegativeInteger, new SubsetLiteralClass(xsdNonNegativeInteger));
-        literalClassMap.put(xsdPositiveInteger, new SubsetLiteralClass(xsdPositiveInteger));
-        literalClassMap.put(xsdDecimal, new SubsetLiteralClass(xsdDecimal));
-        literalClassMap.put(xsdFloat, new SubsetLiteralClass(xsdFloat));
-        literalClassMap.put(xsdDouble, new SubsetLiteralClass(xsdDouble));
-        literalClassMap.put(xsdString, new SubsetLiteralClass(xsdString));
+        literalClassMap.put(xsdBoolean, subset(xsdBoolean));
+        literalClassMap.put(xsdByte, subset(xsdByte));
+        literalClassMap.put(xsdUnsignedByte, subset(xsdUnsignedByte));
+        literalClassMap.put(xsdShort, subset(xsdShort));
+        literalClassMap.put(xsdUnsignedShort, subset(xsdUnsignedShort));
+        literalClassMap.put(xsdInt, subset(xsdInt));
+        literalClassMap.put(xsdUnsignedInt, subset(xsdUnsignedInt));
+        literalClassMap.put(xsdLong, subset(xsdLong));
+        literalClassMap.put(xsdUnsignedLong, subset(xsdUnsignedLong));
+        literalClassMap.put(xsdInteger, subset(xsdInteger));
+        literalClassMap.put(xsdNonPositiveInteger, subset(xsdNonPositiveInteger));
+        literalClassMap.put(xsdNegativeInteger, subset(xsdNegativeInteger));
+        literalClassMap.put(xsdNonNegativeInteger, subset(xsdNonNegativeInteger));
+        literalClassMap.put(xsdPositiveInteger, subset(xsdPositiveInteger));
+        literalClassMap.put(xsdDecimal, subset(xsdDecimal));
+        literalClassMap.put(xsdFloat, subset(xsdFloat));
+        literalClassMap.put(xsdDouble, subset(xsdDouble));
+        literalClassMap.put(xsdString, subset(xsdString));
     }
 
 

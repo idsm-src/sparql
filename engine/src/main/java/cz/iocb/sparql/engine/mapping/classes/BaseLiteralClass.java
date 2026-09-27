@@ -16,7 +16,10 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * Literal class keeping every valid lexical form of its datatype: the value columns are followed by a lexical column
  * holding the original form, or an empty string when the form is canonical.
  */
-public abstract class BaseLiteralClass extends LiteralClass
+public sealed abstract class BaseLiteralClass extends LiteralClass
+        permits SimpleLiteralBaseClass, DateCompositeBaseClass, DateInZoneBaseClass, DateScalarBaseClass,
+        DateTimeCompositeBaseClass, DateTimeInZoneBaseClass, DateTimeScalarBaseClass, UnsupportedLiteralClass,
+        UserLiteralBaseClass, UserLiteralCompositeBaseClass, UserLiteralCompositeClass
 {
     /**
      * Creates the class with its name, datatype, column types and superclasses.

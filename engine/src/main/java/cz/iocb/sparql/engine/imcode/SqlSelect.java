@@ -48,7 +48,6 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
-import cz.iocb.sparql.engine.mapping.classes.ResultResourceClass;
 import cz.iocb.sparql.engine.model.OrderCondition.Direction;
 import cz.iocb.sparql.engine.rdf.Variable;
 import cz.iocb.sparql.engine.request.ColumnMap;
@@ -103,7 +102,7 @@ public final class SqlSelect extends SqlIntercode
     /**
      * Result classes of each projected variable; null for a sub-select.
      */
-    private final Map<Variable, List<ResultResourceClass>> description;
+    private final Map<Variable, List<ResourceClass>> description;
 
 
     /**
@@ -138,8 +137,8 @@ public final class SqlSelect extends SqlIntercode
             if(binding == null)
                 description.put(var, List.of());
             else
-                description.put(var, binding.getClasses().stream().flatMap(c -> c.getResultResourceClasses().stream())
-                        .distinct().toList());
+                description.put(var,
+                        binding.getClasses().stream().map(c -> c.getResultResourceClass()).distinct().toList());
         }
     }
 
@@ -604,7 +603,7 @@ public final class SqlSelect extends SqlIntercode
      * @return SELECT list of a top-level select: for each variable, one column group per result class (NULL for classes
      *         it cannot take), named by the class
      */
-    private static String translateSelectVariables(Map<Variable, List<ResultResourceClass>> description,
+    private static String translateSelectVariables(Map<Variable, List<ResourceClass>> description,
             VariableBindings bindings)
     {
         ColumnMap columnMap = new ColumnMap();
@@ -612,7 +611,7 @@ public final class SqlSelect extends SqlIntercode
         StringBuilder builder = new StringBuilder();
         boolean hasSelect = false;
 
-        for(Entry<Variable, List<ResultResourceClass>> entry : description.entrySet())
+        for(Entry<Variable, List<ResourceClass>> entry : description.entrySet())
         {
             Variable var = entry.getKey();
             VariableBinding binding = bindings.get(var);
@@ -620,10 +619,10 @@ public final class SqlSelect extends SqlIntercode
             if(binding == null)
                 binding = new VariableBinding(var, true);
 
-            for(ResultResourceClass resClass : entry.getValue())
+            for(ResourceClass resClass : entry.getValue())
             {
-                List<Column> colNames = ((ResourceClass) resClass).createColumns(columnMap, var);
-                List<Column> cols = binding.deriveMapping((ResourceClass) resClass);
+                List<Column> colNames = resClass.createColumns(columnMap, var);
+                List<Column> cols = binding.deriveMapping(resClass);
 
                 for(int i = 0; i < cols.size(); i++)
                 {
@@ -937,7 +936,7 @@ public final class SqlSelect extends SqlIntercode
      * @return for each projected variable, the result classes in which it is delivered, in column order (top-level
      *         only)
      */
-    public Map<Variable, List<ResultResourceClass>> getResultDescription()
+    public Map<Variable, List<ResourceClass>> getResultDescription()
     {
         return description;
     }

@@ -16,9 +16,10 @@ import cz.iocb.sparql.engine.rdf.Literal;
 
 
 /**
- * Canonical literals of one user datatype stored in its PostgreSQL user type.
+ * Canonical literals of one user datatype stored in its PostgreSQL user type. A deployment may subclass it to narrow
+ * {@link #match}; the values are delivered to the result in {@link BuiltinClasses#userType} in any case.
  */
-public final class UserLiteralClass extends CanonicalLiteralClass
+public non-sealed class UserLiteralClass extends CanonicalLiteralClass
 {
     /**
      * PostgreSQL user type of the values.
@@ -49,9 +50,9 @@ public final class UserLiteralClass extends CanonicalLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public final ResourceClass getResultResourceClass()
     {
-        return Set.of(userType);
+        return userType;
     }
 
 

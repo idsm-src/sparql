@@ -63,9 +63,9 @@ public final class DateInZoneBaseClass extends BaseLiteralClass implements DateI
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(genDate);
+        return genDate;
     }
 
 

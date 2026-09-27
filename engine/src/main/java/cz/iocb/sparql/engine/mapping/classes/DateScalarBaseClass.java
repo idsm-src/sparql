@@ -29,9 +29,9 @@ public final class DateScalarBaseClass extends BaseLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(genDate);
+        return genDate;
     }
 
 

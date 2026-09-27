@@ -17,7 +17,7 @@ import cz.iocb.sparql.engine.rdf.IntBlankNode;
 /**
  * Integer blank nodes of one fixed segment, stored as the {@code int4} value only.
  */
-public class IntBlankNodeInSegmentClass extends IntBlankNodeClass
+public final class IntBlankNodeInSegmentClass extends IntBlankNodeClass
 {
     /**
      * The fixed segment.

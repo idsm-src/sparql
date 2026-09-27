@@ -31,9 +31,9 @@ public final class DateScalarClass extends CanonicalLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(xsdDate);
+        return xsdDate;
     }
 
 

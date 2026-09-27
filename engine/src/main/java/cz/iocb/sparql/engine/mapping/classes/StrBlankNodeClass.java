@@ -16,7 +16,8 @@ import cz.iocb.sparql.engine.rdf.Variable;
 /**
  * Resource class of blank nodes with a string value; their result class is {@link BuiltinClasses#strBlankNode}.
  */
-public abstract class StrBlankNodeClass extends BlankNodeClass
+public sealed abstract class StrBlankNodeClass extends BlankNodeClass
+        permits StrBlankNodeCompositeClass, StrBlankNodeInSegmentClass, StrBlankNodeScalarClass
 {
     /**
      * Creates the class with its name, column types and superclasses.
@@ -51,9 +52,9 @@ public abstract class StrBlankNodeClass extends BlankNodeClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public final ResourceClass getResultResourceClass()
     {
-        return Set.of(strBlankNode);
+        return strBlankNode;
     }
 
 

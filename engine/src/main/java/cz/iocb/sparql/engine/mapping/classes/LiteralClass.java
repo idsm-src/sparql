@@ -16,7 +16,7 @@ import cz.iocb.sparql.engine.rdf.Variable;
 /**
  * Resource class of literals of one datatype (null datatype for the classes of arbitrary literals).
  */
-public abstract class LiteralClass extends PrimitiveResourceClass
+public sealed abstract class LiteralClass extends PrimitiveResourceClass permits CanonicalLiteralClass, BaseLiteralClass
 {
     /**
      * Datatype of the literals, or null for classes spanning datatypes.
@@ -35,7 +35,24 @@ public abstract class LiteralClass extends PrimitiveResourceClass
     protected LiteralClass(String name, Datatype datatype, List<SqlType> sqlTypes,
             Set<PrimitiveResourceClass> superClasses)
     {
-        super(name, sqlTypes, superClasses);
+        this(name, datatype, sqlTypes, superClasses, null);
+    }
+
+
+    /**
+     * Creates the class with its name, datatype, column types, superclasses and the class that effectively represents
+     * it.
+     *
+     * @param name the name
+     * @param datatype the datatype
+     * @param sqlTypes the SQL types
+     * @param superClasses the superclasses
+     * @param effectiveClass primitive class whose columns store the values, or null for the class itself
+     */
+    protected LiteralClass(String name, Datatype datatype, List<SqlType> sqlTypes,
+            Set<PrimitiveResourceClass> superClasses, PrimitiveResourceClass effectiveClass)
+    {
+        super(name, sqlTypes, superClasses, effectiveClass);
         this.datatype = datatype;
     }
 

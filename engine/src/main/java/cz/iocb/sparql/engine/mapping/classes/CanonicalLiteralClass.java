@@ -12,7 +12,10 @@ import cz.iocb.sparql.engine.rdf.Literal;
 /**
  * Literal class holding only literals in the canonical lexical form of their datatype, so no lexical column is needed.
  */
-public abstract class CanonicalLiteralClass extends LiteralClass
+public sealed abstract class CanonicalLiteralClass extends LiteralClass
+        permits SimpleLiteralClass, DateCompositeClass, DateInZoneClass, DateScalarClass, DateTimeCompositeClass,
+        DateTimeInZoneClass, DateTimeScalarClass, DirLangStringClass, DirLangStringWithTagClass, LangStringClass,
+        LangStringWithTagClass, UserLiteralClass, SubsetLiteralClass
 {
     /**
      * Creates the class with its name, datatype, column types and superclasses.
@@ -26,6 +29,23 @@ public abstract class CanonicalLiteralClass extends LiteralClass
             Set<PrimitiveResourceClass> superClasses)
     {
         super(name, datatype, sqlTypes, superClasses);
+    }
+
+
+    /**
+     * Creates the class with its name, datatype, column types, superclasses and the class that effectively represents
+     * it.
+     *
+     * @param name the name
+     * @param datatype the datatype
+     * @param sqlTypes the SQL types
+     * @param superClasses the superclasses
+     * @param effectiveClass primitive class whose columns store the values, or null for the class itself
+     */
+    protected CanonicalLiteralClass(String name, Datatype datatype, List<SqlType> sqlTypes,
+            Set<PrimitiveResourceClass> superClasses, PrimitiveResourceClass effectiveClass)
+    {
+        super(name, datatype, sqlTypes, superClasses, effectiveClass);
     }
 
 

@@ -41,9 +41,9 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(genUserType);
+        return genUserType;
     }
 
 

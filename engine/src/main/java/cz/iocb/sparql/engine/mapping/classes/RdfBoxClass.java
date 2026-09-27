@@ -15,7 +15,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
  * delivered to the result as the text form of the box and decoded by
  * {@link cz.iocb.sparql.engine.request.RdfBoxParser}.
  */
-public final class RdfBoxClass extends PrimitiveResourceClass implements ResultResourceClass
+public final class RdfBoxClass extends PrimitiveResourceClass
 {
     /**
      * Creates the singleton instance, see {@link BuiltinClasses}.
@@ -27,9 +27,9 @@ public final class RdfBoxClass extends PrimitiveResourceClass implements ResultR
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

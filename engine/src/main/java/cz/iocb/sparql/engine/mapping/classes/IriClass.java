@@ -15,7 +15,8 @@ import cz.iocb.sparql.engine.rdf.Variable;
 /**
  * Resource class of IRIs.
  */
-public abstract class IriClass extends PrimitiveResourceClass
+public sealed abstract class IriClass extends PrimitiveResourceClass
+        permits IriScalarClass, UnsupportedIriClass, UserIriClass
 {
     /**
      * Creates the class with its name, column types and superclasses.
@@ -62,9 +63,9 @@ public abstract class IriClass extends PrimitiveResourceClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public final ResourceClass getResultResourceClass()
     {
-        return Set.of(iri);
+        return iri;
     }
 
 

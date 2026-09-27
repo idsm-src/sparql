@@ -17,11 +17,10 @@ import cz.iocb.sparql.engine.rdf.Literal;
  * Canonical literals of one datatype stored in a single native SQL column. Converts to the box and, when the datatype
  * has one, to its base class by adding an empty lexical column.
  */
-public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass implements ResultResourceClass
-        permits BooleanClass, ByteClass, UnsignedByteClass, ShortClass, UnsignedShortClass, IntClass, UnsignedIntClass,
-        LongClass, UnsignedLongClass, IntegerClass, NonPositiveIntegerClass, NegativeIntegerClass,
-        NonNegativeIntegerClass, PositiveIntegerClass, DecimalClass, FloatClass, DoubleClass, DayTimeDurationClass,
-        StringClass
+public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass permits BooleanClass, ByteClass,
+        UnsignedByteClass, ShortClass, UnsignedShortClass, IntClass, UnsignedIntClass, LongClass, UnsignedLongClass,
+        IntegerClass, NonPositiveIntegerClass, NegativeIntegerClass, NonNegativeIntegerClass, PositiveIntegerClass,
+        DecimalClass, FloatClass, DoubleClass, DayTimeDurationClass, StringClass
 {
     /**
      * Base class keeping the lexical form, or null when there is none.
@@ -61,9 +60,9 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass im
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

@@ -16,7 +16,7 @@ import cz.iocb.sparql.engine.rdf.Literal;
 /**
  * Literals of one datatype in any valid lexical form: the native SQL value plus a varchar lexical column.
  */
-public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass implements ResultResourceClass
+public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass
         permits BooleanBaseClass, ByteBaseClass, UnsignedByteBaseClass, ShortBaseClass, UnsignedShortBaseClass,
         IntBaseClass, UnsignedIntBaseClass, LongBaseClass, UnsignedLongBaseClass, IntegerBaseClass,
         NonPositiveIntegerBaseClass, NegativeIntegerBaseClass, NonNegativeIntegerBaseClass, PositiveIntegerBaseClass,
@@ -44,9 +44,9 @@ public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass imp
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(this);
+        return this;
     }
 
 

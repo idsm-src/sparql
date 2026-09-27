@@ -13,7 +13,7 @@ import cz.iocb.sparql.engine.rdf.RdfTerm;
 /**
  * Resource class of blank nodes.
  */
-public abstract class BlankNodeClass extends PrimitiveResourceClass
+public sealed abstract class BlankNodeClass extends PrimitiveResourceClass permits IntBlankNodeClass, StrBlankNodeClass
 {
     /**
      * Creates the class with its name, column types and superclasses.

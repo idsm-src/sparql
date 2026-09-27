@@ -72,9 +72,9 @@ public final class DateInZoneClass extends CanonicalLiteralClass implements Date
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(xsdDate);
+        return xsdDate;
     }
 
 

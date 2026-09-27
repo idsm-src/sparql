@@ -64,9 +64,9 @@ public final class DateTimeInZoneBaseClass extends BaseLiteralClass implements D
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(genDateTime);
+        return genDateTime;
     }
 
 

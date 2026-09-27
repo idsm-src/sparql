@@ -99,9 +99,9 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
 
 
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(getDirectionClass());
+        return getDirectionClass();
     }
 
 

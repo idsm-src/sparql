@@ -198,10 +198,14 @@ public final class TripleTermClass extends PrimitiveResourceClass
     }
 
 
+    /**
+     * The triple term class of the result classes of the subject and the object with the predicate delivered as its IRI
+     * text, which is what the result reads recursively.
+     */
     @Override
-    public Set<ResultResourceClass> getResultResourceClasses()
+    public ResourceClass getResultResourceClass()
     {
-        return Set.of(box);
+        return new TripleTermClass(subject.getResultResourceClass(), iri, object.getResultResourceClass());
     }
 
 
