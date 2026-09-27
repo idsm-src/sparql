@@ -1,7 +1,6 @@
 package cz.iocb.sparql.engine.mapping.datatypes;
 
 import java.util.Objects;
-import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -38,19 +37,21 @@ public abstract sealed class Datatype permits BooleanDatatype, GenericIntegerDat
 
 
     /**
-     * Class holding every valid literal of the datatype together with its lexical form.
+     * Class holding every valid literal of the datatype together with its lexical form; a union of primitive classes
+     * when the literals of the datatype are spread over several of them (rdf:dirLangString).
      *
      * @return class holding every valid literal of the datatype together with its lexical form
      */
-    public abstract LiteralClass getBaseLiteralClass();
+    public abstract ResourceClass getBaseLiteralClass();
 
 
     /**
-     * Class holding the literals in canonical form only.
+     * Class holding the literals in canonical form only; a union of primitive classes when the literals of the datatype
+     * are spread over several of them (rdf:dirLangString).
      *
      * @return class holding the literals in canonical form only
      */
-    public abstract LiteralClass getCanonicalLiteralClass();
+    public abstract ResourceClass getCanonicalLiteralClass();
 
 
     /**

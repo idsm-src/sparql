@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.subtract;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import java.util.List;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 
 
 
@@ -297,6 +298,16 @@ public class BuiltinClasses
     public static final LangStringClass rdfLangString = new LangStringClass();
 
     /**
+     * Result class of directional language-tagged strings with the left-to-right base direction.
+     */
+    public static final DirLangStringClass rdfLtrLangString = new DirLangStringClass(Direction.LTR);
+
+    /**
+     * Result class of directional language-tagged strings with the right-to-left base direction.
+     */
+    public static final DirLangStringClass rdfRtlLangString = new DirLangStringClass(Direction.RTL);
+
+    /**
      * Canonical literals of any user datatype.
      */
     public static final UserLiteralCompositeClass userType = new UserLiteralCompositeClass();
@@ -412,9 +423,19 @@ public class BuiltinClasses
     public static final ResourceClass scalarBlankNode = unionize(intScalarBlankNode, strScalarBlankNode);
 
     /**
-     * xsd:string or rdf:langString.
+     * Directional language-tagged strings of either base direction (rdf:dirLangString).
      */
-    public static final ResourceClass stringLiteral = unionize(xsdString, rdfLangString);
+    public static final ResourceClass dirLanguageTaggedString = unionize(rdfLtrLangString, rdfRtlLangString);
+
+    /**
+     * Language-tagged strings with or without a base direction (rdf:langString or rdf:dirLangString).
+     */
+    public static final ResourceClass languageTaggedString = unionize(rdfLangString, dirLanguageTaggedString);
+
+    /**
+     * xsd:string, rdf:langString or rdf:dirLangString.
+     */
+    public static final ResourceClass stringLiteral = unionize(xsdString, languageTaggedString);
 
     /**
      * Numerics fitting in an SQL smallint.
@@ -918,6 +939,57 @@ public class BuiltinClasses
 
 
     /**
+     * True if every value of the class is a directional language-tagged string with the left-to-right base direction.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a directional language-tagged string with the left-to-right base
+     *         direction, false otherwise
+     */
+    public static boolean isLtrLangString(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(rdfLtrLangString);
+    }
+
+
+    /**
+     * True if every value of the class is a directional language-tagged string with the right-to-left base direction.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a directional language-tagged string with the right-to-left base
+     *         direction, false otherwise
+     */
+    public static boolean isRtlLangString(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(rdfRtlLangString);
+    }
+
+
+    /**
+     * True if every value of the class is a directional language-tagged string.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a directional language-tagged string, false otherwise
+     */
+    public static boolean isDirLanguageTaggedString(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(dirLanguageTaggedString);
+    }
+
+
+    /**
+     * True if every value of the class is a language-tagged string, with or without a base direction.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a language-tagged string, with or without a base direction, false
+     *         otherwise
+     */
+    public static boolean isLanguageTaggedString(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(languageTaggedString);
+    }
+
+
+    /**
      * True if every value of the class is an unsupported literal.
      *
      * @param resClass the resource class
@@ -1322,5 +1394,58 @@ public class BuiltinClasses
     public static boolean hasLangString(ResourceClass resClass)
     {
         return !areDisjunct(resClass, rdfLangString);
+    }
+
+
+    /**
+     * True if some value of the class may be a directional language-tagged string with the left-to-right base
+     * direction.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a directional language-tagged string with the left-to-right base
+     *         direction, false otherwise
+     */
+    public static boolean hasLtrLangString(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, rdfLtrLangString);
+    }
+
+
+    /**
+     * True if some value of the class may be a directional language-tagged string with the right-to-left base
+     * direction.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a directional language-tagged string with the right-to-left base
+     *         direction, false otherwise
+     */
+    public static boolean hasRtlLangString(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, rdfRtlLangString);
+    }
+
+
+    /**
+     * True if some value of the class may be a directional language-tagged string.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a directional language-tagged string, false otherwise
+     */
+    public static boolean hasDirLanguageTaggedString(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, dirLanguageTaggedString);
+    }
+
+
+    /**
+     * True if some value of the class may be a language-tagged string, with or without a base direction.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a language-tagged string, with or without a base direction, false
+     *         otherwise
+     */
+    public static boolean hasLanguageTaggedString(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, languageTaggedString);
     }
 }

@@ -6,9 +6,13 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.get
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLtrLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numericBaseClasses;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -485,11 +489,11 @@ public class VariableBinding
 
 
     /**
-     * Expression yielding the string value of the variable when it is a string literal (plain or language-tagged), null
-     * otherwise.
+     * Expression yielding the string value of the variable when it is a string literal (plain or language-tagged, with
+     * or without a base direction), null otherwise.
      *
      * @return expression yielding the string value of the variable when it is a string literal (plain or
-     *         language-tagged), null otherwise
+     *         language-tagged, with or without a base direction), null otherwise
      */
     public Column getStringLiteral()
     {
@@ -503,6 +507,10 @@ public class VariableBinding
                 variants.add(e.getKey().toClass(xsdString, e.getValue(), literalCanBeNull).get(0));
             else if(isLangString(e.getKey()))
                 variants.add(e.getKey().toClass(rdfLangString, e.getValue(), literalCanBeNull).get(0));
+            else if(isLtrLangString(e.getKey()))
+                variants.add(e.getKey().toClass(rdfLtrLangString, e.getValue(), literalCanBeNull).get(0));
+            else if(isRtlLangString(e.getKey()))
+                variants.add(e.getKey().toClass(rdfRtlLangString, e.getValue(), literalCanBeNull).get(0));
             else if(hasStringLiteral(e.getKey()))
                 variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
                         + e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0) + ")"));
@@ -533,6 +541,10 @@ public class VariableBinding
                 variants.add(resClass.toClass(xsdString, columns, literalCanBeNull).get(0));
             else if(isLangString(resClass))
                 variants.add(resClass.toClass(rdfLangString, columns, literalCanBeNull).get(0));
+            else if(isLtrLangString(resClass))
+                variants.add(resClass.toClass(rdfLtrLangString, columns, literalCanBeNull).get(0));
+            else if(isRtlLangString(resClass))
+                variants.add(resClass.toClass(rdfRtlLangString, columns, literalCanBeNull).get(0));
             else if(hasStringLiteral(resClass))
                 variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
                         + resClass.toClass(box, columns, literalCanBeNull).get(0) + ")"));

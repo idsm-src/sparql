@@ -67,6 +67,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.config.SparqlDatabaseConfiguration;
 import cz.iocb.sparql.engine.database.DatabaseSchema;
@@ -75,6 +77,7 @@ import cz.iocb.sparql.engine.mapping.ConstantBlankNodeMapping;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
 import cz.iocb.sparql.engine.mapping.ConstantLiteralMapping;
 import cz.iocb.sparql.engine.mapping.TermMapping;
+import cz.iocb.sparql.engine.mapping.classes.DirLangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
@@ -83,6 +86,8 @@ import cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
 import cz.iocb.sparql.engine.rdf.BlankNode;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -687,6 +692,14 @@ public class SparqlTest
 
             return new ConstantLiteralMapping(map.getOrDefault(literalClass, literalClass), literal);
         }
+        else if(node.isLiteral() && node.asLiteral().getBaseDirection() != null)
+        {
+            Direction direction = Direction.fromText(node.asLiteral().getBaseDirection());
+            LiteralClass literalClass = DirLangStringWithTagClass.get(direction, node.asLiteral().getLanguage());
+
+            return new ConstantLiteralMapping(literalClass, new DirLangStringLiteral(node.asLiteral().getLexicalForm(),
+                    node.asLiteral().getLanguage(), direction));
+        }
         else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
         {
             LiteralClass literalClass = LangStringWithTagClass.get(node.asLiteral().getLanguage());
@@ -705,13 +718,15 @@ public class SparqlTest
 
 
     /**
-     * Expected rows of a test, read from a Turtle graph or a SPARQL XML result file.
+     * Expected rows of a test, read from a Turtle graph or a SPARQL XML or JSON result file.
      */
     static List<List<RdfTerm>> getResult(RDFNode result)
             throws ParserConfigurationException, SAXException, IOException, URISyntaxException
     {
         if(result.toString().endsWith(".ttl"))
             return getResultFromTTL(result);
+        else if(result.toString().endsWith(".srj"))
+            return getResultFromJSON(result);
         else
             return getResultFromXML(result);
     }
@@ -750,12 +765,90 @@ public class SparqlTest
             return new Iri(node.asResource().getURI().replaceFirst("file://.*/", ""));
         else if(node.isLiteral() && node.asLiteral().getLanguage().isEmpty())
             return new TypedLiteral(node.asLiteral().getLexicalForm(), new Iri(node.asLiteral().getDatatypeURI()));
+        else if(node.isLiteral() && node.asLiteral().getBaseDirection() != null)
+            return new DirLangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage(),
+                    Direction.fromText(node.asLiteral().getBaseDirection()));
         else if(node.isLiteral() && !node.asLiteral().getLanguage().isEmpty())
             return new LangStringLiteral(node.asLiteral().getLexicalForm(), node.asLiteral().getLanguage());
         else if(node.isAnon())
             return new StrBlankNode("", 0);
 
         return null;
+    }
+
+
+    /**
+     * Rows of an expected SPARQL JSON result; an ASK result becomes a single boolean row.
+     */
+    static List<List<RdfTerm>> getResultFromJSON(RDFNode result) throws IOException, URISyntaxException
+    {
+        List<List<RdfTerm>> results = new ArrayList<>();
+
+        JsonNode root;
+
+        try(InputStream in = new URI(result.asResource().getURI()).toURL().openStream())
+        {
+            root = new ObjectMapper().readTree(in);
+        }
+
+        if(root.has("boolean"))
+        {
+            List<RdfTerm> row = new ArrayList<>(1);
+            row.add(new TypedLiteral(root.get("boolean").asText(), BuiltinDatatypes.xsdBooleanType.getTypeIri()));
+            results.add(row);
+
+            return results;
+        }
+
+        List<String> variables = new ArrayList<>();
+
+        for(JsonNode variable : root.get("head").get("vars"))
+            variables.add(variable.asText());
+
+        for(JsonNode binding : root.get("results").get("bindings"))
+        {
+            List<RdfTerm> row = new ArrayList<>(variables.size());
+
+            for(String variable : variables)
+                row.add(getNode(binding.get(variable)));
+
+            results.add(row);
+        }
+
+        return results;
+    }
+
+
+    /**
+     * Engine term of a term of a SPARQL JSON result; null for a missing binding, blank nodes lose their label.
+     */
+    static RdfTerm getNode(JsonNode node)
+    {
+        if(node == null)
+            return null;
+
+        String value = node.get("value").asText();
+
+        return switch(node.get("type").asText())
+        {
+            case "uri" -> new Iri(value);
+            case "bnode" -> new StrBlankNode("", 0);
+            case "literal" ->
+            {
+                if(node.has("its:dir"))
+                    yield new DirLangStringLiteral(value, node.get("xml:lang").asText(),
+                            Direction.fromText(node.get("its:dir").asText()));
+
+                if(node.has("xml:lang"))
+                    yield new LangStringLiteral(value, node.get("xml:lang").asText());
+
+                if(node.has("datatype"))
+                    yield new TypedLiteral(value, new Iri(node.get("datatype").asText()));
+
+                yield new TypedLiteral(value, BuiltinDatatypes.xsdStringType.getTypeIri());
+            }
+            default -> throw new IllegalArgumentException("unknown term type: " + node.get("type").asText());
+        };
     }
 
 

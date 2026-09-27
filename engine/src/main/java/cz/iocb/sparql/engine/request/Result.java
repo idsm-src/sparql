@@ -56,6 +56,7 @@ import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DayTimeDurationClass;
 import cz.iocb.sparql.engine.mapping.classes.DecimalBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DecimalClass;
+import cz.iocb.sparql.engine.mapping.classes.DirLangStringClass;
 import cz.iocb.sparql.engine.mapping.classes.DoubleBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DoubleClass;
 import cz.iocb.sparql.engine.mapping.classes.FloatBaseClass;
@@ -95,6 +96,7 @@ import cz.iocb.sparql.engine.mapping.classes.UnsignedShortClass;
 import cz.iocb.sparql.engine.mapping.classes.UnsupportedLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -565,6 +567,12 @@ public class Result implements AutoCloseable
                     {
                         String lang = rs.getString(i++);
                         yield new LangStringLiteral(value.toString(), lang);
+                    }
+
+                    case DirLangStringClass dirClass ->
+                    {
+                        String lang = rs.getString(i++);
+                        yield new DirLangStringLiteral(value.toString(), lang, dirClass.getDirection());
                     }
 
                     case UserLiteralCompositeClass _ ->

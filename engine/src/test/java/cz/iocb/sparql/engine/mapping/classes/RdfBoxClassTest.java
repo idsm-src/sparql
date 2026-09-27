@@ -5,6 +5,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.strBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
+import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfDirLangStringType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.rdfLangStringType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBooleanType;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdByteType;
@@ -41,6 +42,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import cz.iocb.sparql.engine.Database;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -65,7 +68,7 @@ public class RdfBoxClassTest
             xsdShortType, xsdUnsignedShortType, xsdIntType, xsdUnsignedIntType, xsdLongType, xsdUnsignedLongType,
             xsdIntegerType, xsdNonPositiveIntegerType, xsdNegativeIntegerType, xsdNonNegativeIntegerType,
             xsdPositiveIntegerType, xsdDecimalType, xsdFloatType, xsdDoubleType, xsdDateTimeType, xsdDateType,
-            xsdDayTimeDurationType, xsdStringType, rdfLangStringType);
+            xsdDayTimeDurationType, xsdStringType, rdfLangStringType, rdfDirLangStringType);
 
 
     static Stream<Arguments> roundTripArguments()
@@ -115,6 +118,8 @@ public class RdfBoxClassTest
             Arguments.of(new TypedLiteral("@x^^<y>", new Iri(xsd + "string"))),
             Arguments.of(new LangStringLiteral("hello", "en")),
             Arguments.of(new LangStringLiteral("a\"@b", "en-US")),
+            Arguments.of(new DirLangStringLiteral("hello", "en", Direction.LTR)),
+            Arguments.of(new DirLangStringLiteral("a\"@b--c", "en-US", Direction.RTL)),
             Arguments.of(new TypedLiteral("x", new Iri("http://example.org/unknown"))),
             Arguments.of(new TypedLiteral("a\"b", new Iri("http://example.org/unknown"))),
             Arguments.of(new TypedLiteral("abc", new Iri(xsd + "integer")))

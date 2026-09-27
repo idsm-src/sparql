@@ -9,6 +9,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeIntBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.bnodeStrBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.dirLanguageTaggedString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
@@ -35,10 +36,14 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDerivatedFromInteger;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDirLanguageTaggedString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLanguageTaggedString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.integerNumeric;
@@ -51,8 +56,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDerivatedFr
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isInteger;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTaggedString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
@@ -77,6 +85,8 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedLo
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexUnsignedShort;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.literal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
@@ -136,6 +146,7 @@ import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.DateTimeInZoneClass;
+import cz.iocb.sparql.engine.mapping.classes.DirLangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
@@ -145,6 +156,7 @@ import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
@@ -159,6 +171,22 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
  */
 public final class SqlBuiltinCall extends SqlExpressionIntercode
 {
+    /**
+     * Regular expression of a well-formed language tag, the one the extension checks.
+     */
+    private static final String languageTagPattern = """
+            ([A-Za-z]{2,3}(-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8})\
+            (-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?(-([A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*\
+            (-[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+)*(-x(-[A-Za-z0-9]{1,8})+)?|x(-[A-Za-z0-9]{1,8})+\
+            |i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn\
+            |i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE""";
+
+    /**
+     * String literals of every kind stored in a box column.
+     */
+    private static final ResourceClass boxedStringLiteral = unionize(
+            Set.of(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString), box);
+
     /**
      * Lower-case function name.
      */
@@ -690,6 +718,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             case "isblank":
             case "isliteral":
             case "isnumeric":
+            case "haslang":
+            case "haslangdir":
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
@@ -719,9 +749,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     else if(!has.apply(r))
                         variants.add(new ExpressionColumn("NULLIF(" + argument.getIsNull(r) + ", true)"));
                     else
-                        variants.add(
-                                new ExpressionColumn("sparql.is_" + function.substring(2).replaceFirst("uri", "iri")
-                                        + "_rdfbox(" + argument.get(unionize(Set.of(r), box)).get(0) + ")"));
+                        variants.add(new ExpressionColumn(getBoxTestFunction(function) + "("
+                                + argument.get(unionize(Set.of(r), box)).get(0) + ")"));
                 }
 
                 List<Column> result = List.of(coalesce(variants));
@@ -781,6 +810,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append(argument.getMapping(argumentClass).get(0));
                     }
+                    else if(argumentClass instanceof DirLangStringWithTagClass)
+                    {
+                        builder.append(argument.getMapping(argumentClass).get(0));
+                    }
                     else if(argument.canSafelyGeneralize(argumentClass, xsdDateTime))
                     {
                         List<Column> columns = argumentClass.toGeneralClass(xsdDateTime, argument.get(argumentClass),
@@ -833,6 +866,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         List<Column> columns = argumentClass.toGeneralClass(rdfLangString, argument.get(argumentClass),
                                 true);
+
+                        builder.append(columns.get(0));
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfLtrLangString))
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(rdfLtrLangString,
+                                argument.get(argumentClass), true);
+
+                        builder.append(columns.get(0));
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfRtlLangString))
+                    {
+                        List<Column> columns = argumentClass.toGeneralClass(rdfRtlLangString,
+                                argument.get(argumentClass), true);
 
                         builder.append(columns.get(0));
                     }
@@ -985,12 +1032,30 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         else
                             builder.append("'" + langClass.getTag() + "'");
                     }
+                    else if(argumentClass instanceof DirLangStringWithTagClass langClass)
+                    {
+                        if(partCanBeBull)
+                            builder.append("CASE WHEN " + argument.getIsNotNull(argumentClass) + " THEN '"
+                                    + langClass.getTag() + "' END");
+                        else
+                            builder.append("'" + langClass.getTag() + "'");
+                    }
                     else if(argument.canSafelyGeneralize(argumentClass, rdfLangString))
                     {
                         builder.append(argumentClass
                                 .toGeneralClass(rdfLangString, argument.get(argumentClass), partCanBeBull).get(1));
                     }
-                    else if(isLiteral(argumentClass) && !hasLangString(argumentClass))
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfLtrLangString))
+                    {
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfLtrLangString, argument.get(argumentClass), partCanBeBull).get(1));
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfRtlLangString))
+                    {
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfRtlLangString, argument.get(argumentClass), partCanBeBull).get(1));
+                    }
+                    else if(isLiteral(argumentClass) && !hasLanguageTaggedString(argumentClass))
                     {
                         if(partCanBeBull)
                             builder.append("CASE WHEN " + argument.getIsNotNull(argumentClass) + " THEN '' END");
@@ -1001,6 +1066,61 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         Column col = argument.get(unionize(Set.of(argumentClass), box)).get(0);
                         builder.append("sparql.lang_rdfbox(" + col + ")");
+                    }
+
+                    if(!builder.isEmpty())
+                        variants.add(new ExpressionColumn(builder.toString()));
+                }
+
+
+                List<Column> result = List.of(coalesce(variants));
+
+                return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdString, result), canBeNull);
+            }
+
+            case "langdir":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(argument.getResourceClasses().stream().noneMatch(r -> hasLiteral(r)))
+                    return SqlNull.get();
+
+                boolean canBeNull = argument.canBeNull()
+                        || argument.getResourceClasses().stream().anyMatch(r -> !isLiteral(r));
+
+
+                if(!restriction.contains(xsdString))
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdString, null), canBeNull);
+
+                boolean partCanBeBull = argument.canBeNull() || argument.getResourceClasses().size() > 1;
+
+                Set<Column> variants = new HashSet<>();
+
+                for(ResourceClass argumentClass : argument.getResourceClasses())
+                {
+                    StringBuilder builder = new StringBuilder();
+
+                    if(isLtrLangString(argumentClass) || isRtlLangString(argumentClass))
+                    {
+                        Direction direction = isLtrLangString(argumentClass) ? Direction.LTR : Direction.RTL;
+
+                        if(partCanBeBull)
+                            builder.append("CASE WHEN " + argument.getIsNotNull(argumentClass) + " THEN '"
+                                    + direction.getText() + "' END");
+                        else
+                            builder.append("'" + direction.getText() + "'");
+                    }
+                    else if(isLiteral(argumentClass) && !hasDirLanguageTaggedString(argumentClass))
+                    {
+                        if(partCanBeBull)
+                            builder.append("CASE WHEN " + argument.getIsNotNull(argumentClass) + " THEN '' END");
+                        else
+                            builder.append("''");
+                    }
+                    else if(hasLiteral(argumentClass))
+                    {
+                        Column col = argument.get(unionize(Set.of(argumentClass), box)).get(0);
+                        builder.append("sparql.langdir_rdfbox(" + col + ")");
                     }
 
                     if(!builder.isEmpty())
@@ -1245,12 +1365,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     String tag = literal.getLiteral().getValue();
 
-                    if(!tag.matches("""
-                            ([A-Za-z]{2,3}(-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8})\
-                            (-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?(-([A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*\
-                            (-[0-9A-WY-Za-wy-z](-[A-Za-z0-9]{2,8})+)*(-x(-[A-Za-z0-9]{1,8})+)?|x(-[A-Za-z0-9]{1,8})+\
-                            |i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn\
-                            |i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE"""))
+                    if(!tag.matches(languageTagPattern))
                         return SqlNull.get();
 
                     // TODO: add a variant for case the argument is a constant
@@ -1276,6 +1391,53 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         + argument.get(xsdString).get(0) + ", " + lang.get(xsdString).get(0) + ")"));
 
                 return new SqlBuiltinCall(function, arguments, singletonMap(resultClass, result), true);
+            }
+
+            case "strlangdir":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+                SqlExpressionIntercode lang = arguments.get(1);
+                SqlExpressionIntercode dir = arguments.get(2);
+
+                if(argument.getResourceClasses().stream().noneMatch(r -> hasString(r)))
+                    return SqlNull.get();
+
+                if(lang.getResourceClasses().stream().noneMatch(r -> hasString(r)))
+                    return SqlNull.get();
+
+                if(dir.getResourceClasses().stream().noneMatch(r -> hasString(r)))
+                    return SqlNull.get();
+
+                if(lang instanceof SqlLiteral langLiteral && dir instanceof SqlLiteral dirLiteral)
+                {
+                    String tag = langLiteral.getLiteral().getValue();
+                    Direction direction = Direction.fromText(dirLiteral.getLiteral().getValue());
+
+                    if(!tag.matches(languageTagPattern) || direction == null)
+                        return SqlNull.get();
+
+                    // TODO: add a variant for case the argument is a constant
+
+                    boolean canBeNull = argument.canBeNull()
+                            || argument.getResourceClasses().stream().anyMatch(r -> !isString(r));
+                    DirLangStringWithTagClass resultClass = DirLangStringWithTagClass.get(direction, tag);
+
+                    if(!restriction.contains(resultClass))
+                        return new SqlBuiltinCall(function, arguments, singletonMap(resultClass, null), canBeNull);
+
+                    List<Column> result = argument.get(xsdString);
+
+                    return new SqlBuiltinCall(function, arguments, singletonMap(resultClass, result), canBeNull);
+                }
+
+                if(!restriction.contains(dirLanguageTaggedString))
+                    return new SqlBuiltinCall(function, arguments, singletonMap(dirLanguageTaggedString, null), true);
+
+                List<Column> result = List
+                        .of(new ExpressionColumn("sparql.strlangdir_string(" + argument.get(xsdString).get(0) + ", "
+                                + lang.get(xsdString).get(0) + ", " + dir.get(xsdString).get(0) + ")"));
+
+                return new SqlBuiltinCall(function, arguments, singletonMap(dirLanguageTaggedString, result), true);
             }
 
             case "uuid":
@@ -1324,7 +1486,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LangStringWithTagClass)
+                    if(isFixedTagClass(argumentClass))
                     {
                         builder.append("length(");
                         builder.append(argument.getMapping(argumentClass).get(0));
@@ -1341,7 +1503,21 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append("length(");
                         builder.append(argumentClass
-                                .toGeneralClass(rdfLangString, argument.get(argumentClass), partCanBeBull).get(1));
+                                .toGeneralClass(rdfLangString, argument.get(argumentClass), partCanBeBull).get(0));
+                        builder.append(")::decimal");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfLtrLangString))
+                    {
+                        builder.append("length(");
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfLtrLangString, argument.get(argumentClass), partCanBeBull).get(0));
+                        builder.append(")::decimal");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfRtlLangString))
+                    {
+                        builder.append("length(");
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfRtlLangString, argument.get(argumentClass), partCanBeBull).get(0));
                         builder.append(")::decimal");
                     }
                     else if(hasStringLiteral(argumentClass))
@@ -1405,8 +1581,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     ResourceClass resultClass = getStringLiteralResultClass(resClass);
 
-                    if(resultClass.equals(rdfLangString) && additionalCanBeNull)
-                        resultClass = unionize(Set.of(rdfLangString), box);
+                    if((resultClass.equals(rdfLangString) || resultClass.equals(rdfLtrLangString)
+                            || resultClass.equals(rdfRtlLangString)) && additionalCanBeNull)
+                        resultClass = unionize(Set.of(resultClass), box);
 
                     List<ResourceClass> list = new ArrayList<>();
 
@@ -1433,7 +1610,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
+                        if(xsdString.equals(e.getKey()) || isFixedTagClass(e.getKey()))
                         {
                             Column col = argument.getStringLiteral(resClasses);
 
@@ -1456,7 +1633,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             result = List.of(new ExpressionColumn(builder.toString()));
                         }
-                        else if(rdfLangString.equals(e.getKey()))
+                        else if(rdfLangString.equals(e.getKey()) || rdfLtrLangString.equals(e.getKey())
+                                || rdfRtlLangString.equals(e.getKey()))
                         {
                             List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
@@ -1546,7 +1724,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
+                        if(xsdString.equals(e.getKey()) || isFixedTagClass(e.getKey()))
                         {
                             List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
@@ -1558,7 +1736,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             result = List.of(new ExpressionColumn(builder.toString()));
                         }
-                        else if(rdfLangString.equals(e.getKey()))
+                        else if(rdfLangString.equals(e.getKey()) || rdfLtrLangString.equals(e.getKey())
+                                || rdfRtlLangString.equals(e.getKey()))
                         {
                             List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
@@ -1625,8 +1804,11 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     Set<ResourceClass> leftClasses = variant.get(0);
                     Set<ResourceClass> rightClasses = variant.get(1);
 
-                    ResourceClass leftUnionClass = unionize(leftClasses).getEffectiveClass();
-                    ResourceClass rightUnionClass = unionize(rightClasses).getEffectiveClass();
+                    PrimitiveResourceClass leftUnionClass = unionize(leftClasses).getEffectiveClass();
+                    PrimitiveResourceClass rightUnionClass = unionize(rightClasses).getEffectiveClass();
+
+                    PrimitiveResourceClass leftTaggedClass = getLanguageTaggedClass(leftClasses);
+                    PrimitiveResourceClass rightTaggedClass = getLanguageTaggedClass(rightClasses);
 
 
                     if(leftUnionClass.equals(box) && rightUnionClass.isSubclassOf(xsdString))
@@ -1639,8 +1821,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(right.get(unionize(rightClasses, xsdString)).get(0));
                         builder.append(")");
                     }
-                    else if(rightUnionClass.isSubclassOf(xsdString) || leftUnionClass instanceof LangStringWithTagClass
-                            && rightUnionClass instanceof LangStringWithTagClass)
+                    else if(rightUnionClass.isSubclassOf(xsdString)
+                            || isFixedTagClass(leftUnionClass) && isFixedTagClass(rightUnionClass))
                     {
                         builder.append("sparql.");
                         builder.append(function);
@@ -1650,11 +1832,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(right.getStringLiteral(rightClasses));
                         builder.append(")");
                     }
-                    else if(leftClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString))
-                            && rightClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString)))
+                    else if(leftTaggedClass != null && leftTaggedClass.equals(rightTaggedClass))
                     {
-                        List<Column> leftCols = left.get(unionize(leftClasses, rdfLangString));
-                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, leftTaggedClass));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rightTaggedClass));
 
                         builder.append("CASE WHEN ");
                         builder.append(leftCols.get(1));
@@ -1668,14 +1849,13 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(rightCols.get(0));
                         builder.append(") END");
                     }
-                    else if(leftUnionClass instanceof LangStringWithTagClass leftConstantTagClass
-                            && rightClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString)))
+                    else if(rightTaggedClass != null && getFixedTag(leftUnionClass, rightTaggedClass) != null)
                     {
-                        List<Column> leftCols = left.get(unionize(leftClasses, leftConstantTagClass));
-                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, leftUnionClass));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rightTaggedClass));
 
                         builder.append("CASE WHEN '");
-                        builder.append(leftConstantTagClass.getTag());
+                        builder.append(getFixedTag(leftUnionClass, rightTaggedClass));
                         builder.append("'::varchar = ");
                         builder.append(rightCols.get(1));
                         builder.append(" THEN sparql.");
@@ -1686,16 +1866,15 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         builder.append(rightCols.get(0));
                         builder.append(") END");
                     }
-                    else if(leftClasses.stream().allMatch(r -> r.getEffectiveClass().equals(rdfLangString))
-                            && rightUnionClass instanceof LangStringWithTagClass rightConstantTagClass)
+                    else if(leftTaggedClass != null && getFixedTag(rightUnionClass, leftTaggedClass) != null)
                     {
-                        List<Column> leftCols = left.get(unionize(leftClasses, rightConstantTagClass));
-                        List<Column> rightCols = right.get(unionize(rightClasses, rdfLangString));
+                        List<Column> leftCols = left.get(unionize(leftClasses, leftTaggedClass));
+                        List<Column> rightCols = right.get(unionize(rightClasses, rightUnionClass));
 
                         builder.append("CASE WHEN ");
                         builder.append(leftCols.get(1));
                         builder.append(" = '");
-                        builder.append(rightConstantTagClass.getTag());
+                        builder.append(getFixedTag(rightUnionClass, leftTaggedClass));
                         builder.append("'::varchar THEN sparql.");
                         builder.append(function);
                         builder.append("_string_string(");
@@ -1830,7 +2009,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     ResourceClass ec = argumentClass.getEffectiveClass();
 
-                    if(ec.equals(xsdString) || ec.equals(rdfLangString) || ec instanceof LangStringWithTagClass)
+                    if(ec.equals(xsdString) || ec.equals(rdfLangString) || ec.equals(rdfLtrLangString)
+                            || ec.equals(rdfRtlLangString) || isFixedTagClass(ec))
                     {
                         List<Column> cols = argument.get(argumentClass);
 
@@ -1891,20 +2071,19 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             if(isString(x) || isString(y))
                                 newClasses.add(xsdString);
-                            else if(x instanceof LangStringWithTagClass && x.equals(y))
+                            else if(isFixedTagClass(x) && x.equals(y))
                                 newClasses.add(x);
-                            else if(x instanceof LangStringWithTagClass && y instanceof LangStringWithTagClass)
+                            else if(isFixedTagClass(x) && isFixedTagClass(y))
                                 newClasses.add(xsdString);
                             else if(hasStringLiteral(x) && hasStringLiteral(y))
-                                newClasses.addAll(Set.of(rdfLangString, xsdString));
+                                newClasses.addAll(Set.of(rdfLangString, rdfLtrLangString, rdfRtlLangString, xsdString));
                         }
                     }
 
                     resClasses = newClasses;
                 }
 
-                ResourceClass resultClass = resClasses.size() == 1 ? resClasses.iterator().next() :
-                        unionize(Set.of(rdfLangString, xsdString), box);
+                ResourceClass resultClass = resClasses.size() == 1 ? resClasses.iterator().next() : boxedStringLiteral;
 
                 if(!restriction.contains(resultClass))
                     return new SqlBuiltinCall(function, distinct, arguments, singletonMap(resultClass, null),
@@ -1917,7 +2096,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                 StringBuilder builder = new StringBuilder();
 
-                if(resultClass.equals(xsdString) || resultClass instanceof LangStringWithTagClass)
+                if(resultClass.equals(xsdString) || isFixedTagClass(resultClass))
                 {
                     builder.append("concat(");
                     builder.append(arguments.get(0).getStringLiteral());
@@ -1932,12 +2111,12 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     for(int i = 1; i < arguments.size(); i++)
                         builder.append("sparql.concat_rdfbox_rdfbox(");
 
-                    builder.append(arguments.get(0).get(unionize(Set.of(rdfLangString, xsdString), box)).get(0));
+                    builder.append(arguments.get(0).get(boxedStringLiteral).get(0));
 
                     for(int i = 1; i < arguments.size(); i++)
                     {
                         builder.append(", ");
-                        builder.append(arguments.get(i).get(unionize(Set.of(rdfLangString, xsdString), box)).get(0));
+                        builder.append(arguments.get(i).get(boxedStringLiteral).get(0));
                         builder.append(")");
                     }
                 }
@@ -2109,8 +2288,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                     ResourceClass resultClass = getStringLiteralResultClass(resClass);
 
-                    if(resultClass.equals(rdfLangString) && additionalCanBeNull)
-                        resultClass = unionize(Set.of(rdfLangString), box);
+                    if((resultClass.equals(rdfLangString) || resultClass.equals(rdfLtrLangString)
+                            || resultClass.equals(rdfRtlLangString)) && additionalCanBeNull)
+                        resultClass = unionize(Set.of(resultClass), box);
 
                     List<ResourceClass> list = new ArrayList<>();
 
@@ -2138,7 +2318,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         Set<ResourceClass> resClasses = e.getValue().stream().flatMap(a -> a.get(0).stream())
                                 .collect(toSet());
 
-                        if(xsdString.equals(e.getKey()) || e.getKey() instanceof LangStringWithTagClass)
+                        if(xsdString.equals(e.getKey()) || isFixedTagClass(e.getKey()))
                         {
                             Column col = argument.getStringLiteral(resClasses);
 
@@ -2158,7 +2338,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
                             result = List.of(new ExpressionColumn(builder.toString()));
                         }
-                        else if(rdfLangString.equals(e.getKey()))
+                        else if(rdfLangString.equals(e.getKey()) || rdfLtrLangString.equals(e.getKey())
+                                || rdfRtlLangString.equals(e.getKey()))
                         {
                             List<Column> cols = argument.get(unionize(resClasses, (PrimitiveResourceClass) e.getKey()));
 
@@ -2519,7 +2700,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 {
                     StringBuilder builder = new StringBuilder();
 
-                    if(argumentClass instanceof LangStringWithTagClass)
+                    if(isFixedTagClass(argumentClass))
                     {
                         builder.append("hashtextextended(");
                         builder.append(argument.getMapping(argumentClass).get(0));
@@ -2536,7 +2717,21 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         builder.append("hashtextextended(");
                         builder.append(argumentClass
-                                .toGeneralClass(rdfLangString, argument.get(argumentClass), partCanBeBull).get(1));
+                                .toGeneralClass(rdfLangString, argument.get(argumentClass), partCanBeBull).get(0));
+                        builder.append(",0)::int8");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfLtrLangString))
+                    {
+                        builder.append("hashtextextended(");
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfLtrLangString, argument.get(argumentClass), partCanBeBull).get(0));
+                        builder.append(",0)::int8");
+                    }
+                    else if(argument.canSafelyGeneralize(argumentClass, rdfRtlLangString))
+                    {
+                        builder.append("hashtextextended(");
+                        builder.append(argumentClass
+                                .toGeneralClass(rdfRtlLangString, argument.get(argumentClass), partCanBeBull).get(0));
                         builder.append(",0)::int8");
                     }
                     else if(hasStringLiteral(argumentClass))
@@ -2565,24 +2760,30 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
     /**
      * Result class of a string function preserving the string type of its argument (plain string, fixed-tag or general
-     * language string).
+     * language string, with or without a base direction).
      *
      * @param resClass the resource class
      * @return result class of a string function preserving the string type of its argument (plain string, fixed-tag or
-     *         general language string)
+     *         general language string, with or without a base direction)
      */
     private static ResourceClass getStringLiteralResultClass(ResourceClass resClass)
     {
         if(isString(resClass))
             return xsdString;
 
-        if(resClass.getEffectiveClass() instanceof LangStringWithTagClass)
+        if(isFixedTagClass(resClass.getEffectiveClass()))
             return resClass.getEffectiveClass();
 
         if(isLangString(resClass))
             return rdfLangString;
 
-        return unionize(Set.of(xsdString, rdfLangString), box);
+        if(isLtrLangString(resClass))
+            return rdfLtrLangString;
+
+        if(isRtlLangString(resClass))
+            return rdfRtlLangString;
+
+        return boxedStringLiteral;
     }
 
 
@@ -2599,13 +2800,79 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
         for(ResourceClass r : estimateAsUnion(left))
         {
-            if(r.getEffectiveClass() instanceof LangStringWithTagClass)
+            if(isFixedTagClass(r.getEffectiveClass()))
+            {
                 resClasses.add(r.getEffectiveClass());
-            else if(hasLangString(r))
-                resClasses.add(rdfLangString);
+            }
+            else
+            {
+                if(hasLangString(r))
+                    resClasses.add(rdfLangString);
+
+                if(hasLtrLangString(r))
+                    resClasses.add(rdfLtrLangString);
+
+                if(hasRtlLangString(r))
+                    resClasses.add(rdfRtlLangString);
+            }
         }
 
         return unionize(resClasses);
+    }
+
+
+    /**
+     * True if the class holds language-tagged strings (with or without a base direction) of one fixed tag.
+     *
+     * @param resClass the resource class
+     * @return true if the class holds language-tagged strings (with or without a base direction) of one fixed tag,
+     *         false otherwise
+     */
+    private static boolean isFixedTagClass(ResourceClass resClass)
+    {
+        return resClass instanceof LangStringWithTagClass || resClass instanceof DirLangStringWithTagClass;
+    }
+
+
+    /**
+     * Fixed tag of a class holding language-tagged strings of one fixed tag, provided that they belong to the given
+     * class of language-tagged strings; null otherwise.
+     *
+     * @param resClass the resource class
+     * @param taggedClass the class of language-tagged strings ({@code rdfLangString}, {@code rdfLtrLangString} or
+     *            {@code rdfRtlLangString})
+     * @return fixed tag of a class holding language-tagged strings of one fixed tag, provided that they belong to the
+     *         given class of language-tagged strings; null otherwise
+     */
+    private static String getFixedTag(ResourceClass resClass, PrimitiveResourceClass taggedClass)
+    {
+        if(resClass instanceof LangStringWithTagClass langClass && rdfLangString.equals(taggedClass))
+            return langClass.getTag();
+
+        if(resClass instanceof DirLangStringWithTagClass langClass && langClass.getDirectionClass().equals(taggedClass))
+            return langClass.getTag();
+
+        return null;
+    }
+
+
+    /**
+     * The class of language-tagged strings ({@code rdfLangString}, {@code rdfLtrLangString} or
+     * {@code rdfRtlLangString}) in whose columns every class of the set is stored; null when the classes are not all
+     * stored in the same one.
+     *
+     * @param resClasses the resource classes
+     * @return the class of language-tagged strings in whose columns every class of the set is stored; null when the
+     *         classes are not all stored in the same one
+     */
+    private static PrimitiveResourceClass getLanguageTaggedClass(Set<ResourceClass> resClasses)
+    {
+        for(PrimitiveResourceClass taggedClass : List.<PrimitiveResourceClass> of(rdfLangString, rdfLtrLangString,
+                rdfRtlLangString))
+            if(resClasses.stream().allMatch(r -> r.getEffectiveClass().equals(taggedClass)))
+                return taggedClass;
+
+        return null;
     }
 
 
@@ -2684,6 +2951,10 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return BuiltinClasses::isLiteral;
         else if(function.equals("isnumeric"))
             return BuiltinClasses::isNumeric;
+        else if(function.equals("haslang"))
+            return BuiltinClasses::isLanguageTaggedString;
+        else if(function.equals("haslangdir"))
+            return BuiltinClasses::isDirLanguageTaggedString;
         return null;
     }
 
@@ -2704,7 +2975,26 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return BuiltinClasses::hasLiteral;
         else if(function.equals("isnumeric"))
             return BuiltinClasses::hasNumeric;
+        else if(function.equals("haslang"))
+            return BuiltinClasses::hasLanguageTaggedString;
+        else if(function.equals("haslangdir"))
+            return BuiltinClasses::hasDirLanguageTaggedString;
         return null;
+    }
+
+
+    /**
+     * Name of the extension function evaluating the {@code isIRI}-like function on a box.
+     *
+     * @param function lower-case function name
+     * @return name of the extension function evaluating the {@code isIRI}-like function on a box
+     */
+    private static String getBoxTestFunction(String function)
+    {
+        if(function.startsWith("is"))
+            return "sparql.is_" + function.substring(2).replaceFirst("uri", "iri") + "_rdfbox";
+
+        return "sparql." + function + "_rdfbox";
     }
 
 
@@ -2802,7 +3092,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
                     }
 
-                    case "bound", "isiri", "isuri", "isblank", "isliteral", "isnumeric" ->
+                    case "bound", "isiri", "isuri", "isblank", "isliteral", "isnumeric", "haslang", "haslangdir" ->
                     {
                         yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
                     }
@@ -2839,7 +3129,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 evalServices));
                     }
 
-                    case "lang", "datatype" ->
+                    case "lang", "langdir", "datatype" ->
                     {
                         yield List.of(
                                 arguments.get(0).optimize(request, bindings, new Restriction(literal), evalServices));
@@ -2867,7 +3157,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                                 arguments.get(1).optimize(request, bindings, new Restriction(iri), evalServices));
                     }
 
-                    case "strlang" ->
+                    case "strlang", "strlangdir" ->
                     {
                         yield arguments.stream()
                                 .map(a -> a.optimize(request, bindings, new Restriction(xsdString), evalServices))
@@ -2877,7 +3167,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "strlen" ->
                     {
                         yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices));
+                                new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                evalServices));
                     }
 
                     case "substr" ->
@@ -2911,28 +3202,38 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "strstarts", "strends", "contains" ->
                     {
                         //TODO can be improved
-                        yield arguments.stream().map(a -> a.optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices)).toList();
+                        yield arguments.stream()
+                                .map(a -> a.optimize(request, bindings,
+                                        new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                        evalServices))
+                                .toList();
                     }
 
                     case "strbefore", "strafter" ->
                     {
                         //TODO can be improved
-                        yield arguments.stream().map(a -> a.optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices)).toList();
+                        yield arguments.stream()
+                                .map(a -> a.optimize(request, bindings,
+                                        new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                        evalServices))
+                                .toList();
                     }
 
                     case "encode_for_uri" ->
                     {
                         yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices));
+                                new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                evalServices));
                     }
 
                     case "concat" ->
                     {
                         //TODO can be improved
-                        yield arguments.stream().map(a -> a.optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices)).toList();
+                        yield arguments.stream()
+                                .map(a -> a.optimize(request, bindings,
+                                        new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                        evalServices))
+                                .toList();
                     }
 
                     case "langmatches" ->
@@ -2946,7 +3247,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     {
                         List<SqlExpressionIntercode> args = new ArrayList<>(arguments.size());
 
-                        args.add(arguments.get(0).optimize(request, bindings, new Restriction(xsdString, rdfLangString),
+                        args.add(arguments.get(0).optimize(request, bindings,
+                                new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
                                 evalServices));
 
                         for(int i = 1; i < arguments.size(); i++)
@@ -3024,7 +3326,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                     case "_strhash" ->
                     {
                         yield List.of(arguments.get(0).optimize(request, bindings,
-                                new Restriction(xsdString, rdfLangString), evalServices));
+                                new Restriction(xsdString, rdfLangString, rdfLtrLangString, rdfRtlLangString),
+                                evalServices));
                     }
 
                     default -> throw new IllegalArgumentException(); // unexpected
@@ -3076,8 +3379,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     /**
-     * True if the primitive classes are argument compatible: equal fixed tags, a plain string second argument, or both
-     * language-tagged.
+     * True if the primitive classes are argument compatible: equal fixed tags (and base directions), a plain string
+     * second argument, or both language-tagged strings of the same kind.
      *
      * @param left class of the left operand
      * @param right class of the right operand
@@ -3085,15 +3388,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
      */
     private static boolean areStringLiteralsCompatibleBase(ResourceClass left, ResourceClass right)
     {
-        if(left.getEffectiveClass() instanceof LangStringWithTagClass l
-                && right.getEffectiveClass() instanceof LangStringWithTagClass r)
-            return l.equals(r);
+        if(isFixedTagClass(left.getEffectiveClass()) && isFixedTagClass(right.getEffectiveClass()))
+            return left.getEffectiveClass().equals(right.getEffectiveClass());
 
         if(hasString(right))
             return hasStringLiteral(left);
 
         if(hasLangString(left))
             return hasLangString(right);
+
+        if(hasLtrLangString(left))
+            return hasLtrLangString(right);
+
+        if(hasRtlLangString(left))
+            return hasRtlLangString(right);
 
         return false;
     }
@@ -3139,8 +3447,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
 
 
     /**
-     * True unless the primitive classes are compatible by construction: a language string with a plain string, or equal
-     * fixed tags.
+     * True unless the primitive classes are compatible by construction: a language-tagged string (with or without a
+     * base direction) with a plain string, or equal fixed tags (and base directions).
      *
      * @param left class of the left operand
      * @param right class of the right operand
@@ -3151,7 +3459,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
         ResourceClass l = left.getEffectiveClass();
         ResourceClass r = right.getEffectiveClass();
 
-        return !(isLangString(l) && isString(r) || l instanceof LangStringWithTagClass && l.equals(r));
+        return !(isLanguageTaggedString(l) && isString(r) || isFixedTagClass(l) && l.equals(r));
     }
 
 

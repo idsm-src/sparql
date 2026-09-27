@@ -12,6 +12,7 @@ import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.Compar
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.NOT_EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.AND;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.OR;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTaggedString;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getIri;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getLiteral;
 import static cz.iocb.sparql.engine.translator.TermGenerator.getVariable;
@@ -30,9 +31,11 @@ import cz.iocb.sparql.engine.imcode.expression.SqlFunctionCall;
 import cz.iocb.sparql.engine.imcode.expression.SqlInExpression;
 import cz.iocb.sparql.engine.imcode.expression.SqlIri;
 import cz.iocb.sparql.engine.imcode.expression.SqlLiteral;
+import cz.iocb.sparql.engine.imcode.expression.SqlNull;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryArithmetic;
 import cz.iocb.sparql.engine.imcode.expression.SqlUnaryLogical;
 import cz.iocb.sparql.engine.imcode.expression.SqlVariable;
+import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.datatypes.UserDatatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -218,7 +221,14 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
         //TODO: add support for casting to user literals
 
         if(datatype != null && !(datatype instanceof UserDatatype))
-            return SqlCast.create(datatype.getCanonicalLiteralClass(), arguemnts.get(0));
+        {
+            // there is no cast to a language-tagged string (rdf:langString, rdf:dirLangString)
+            if(!(datatype.getCanonicalLiteralClass() instanceof LiteralClass literalClass)
+                    || isLanguageTaggedString(literalClass))
+                return SqlNull.get();
+
+            return SqlCast.create(literalClass, arguemnts.get(0));
+        }
 
         FunctionDefinition definition = request.getConfiguration().getFunctions(parent.getService())
                 .get(iri.getValue());

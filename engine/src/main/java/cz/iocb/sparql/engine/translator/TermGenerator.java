@@ -7,6 +7,8 @@ import cz.iocb.sparql.engine.model.expression.LiteralNode;
 import cz.iocb.sparql.engine.model.triple.BlankNode;
 import cz.iocb.sparql.engine.model.triple.Node;
 import cz.iocb.sparql.engine.model.triple.TripleTermNode;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -75,17 +77,15 @@ public class TermGenerator
      *
      * @param literal the literal node
      * @return literal term of the node; null for a null node
-     * @throws UnsupportedOperationException for a literal with a base direction, which the translator does not support
-     *             yet
      */
     public static Literal getLiteral(LiteralNode literal)
     {
         if(literal == null)
             return null;
 
-        //TODO: SPARQL 1.2
         if(literal.getDirection() != null)
-            throw new UnsupportedOperationException("literals with a base direction are not supported yet");
+            return new DirLangStringLiteral(literal.getValue(), literal.getTag(),
+                    Direction.fromText(literal.getDirection()));
 
         if(literal.getTag() != null)
             return new LangStringLiteral(literal.getValue(), literal.getTag());

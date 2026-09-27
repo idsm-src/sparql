@@ -42,7 +42,6 @@ import cz.iocb.sparql.engine.model.SelectQuery;
 import cz.iocb.sparql.engine.parser.Parser;
 import cz.iocb.sparql.engine.parser.QueryVisitor;
 import cz.iocb.sparql.engine.rdf.BlankNode;
-import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.Literal;
@@ -877,15 +876,9 @@ public class Request implements AutoCloseable
      * @param literal the literal
      * @return class of the literal according to its datatype; the unsupported literal class for unknown datatypes or
      *         invalid lexical forms
-     * @throws UnsupportedOperationException for a literal with a base direction, which the translator does not support
-     *             yet
      */
     public ResourceClass getLiteralClass(Literal literal)
     {
-        //TODO: SPARQL 1.2
-        if(literal instanceof DirLangStringLiteral)
-            throw new UnsupportedOperationException("literals with a base direction are not supported yet");
-
         Datatype datatype = getConfiguration().getDatatype(literal.getType());
 
         if(datatype == null || !datatype.isValidForm(literal.getValue()))

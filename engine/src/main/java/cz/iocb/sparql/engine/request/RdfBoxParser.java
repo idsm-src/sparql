@@ -2,6 +2,8 @@ package cz.iocb.sparql.engine.request;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -15,9 +17,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
  * Decoder of the text form of a {@code sparql.rdfbox} value, as the output function of the pgsparql extension prints
  * it: an IRI as {@code <iri>}, an integer blank node as {@code _:i} and sixteen hexadecimal digits packing the segment
  * and the value, a string blank node as {@code _:s} and the segment with the value escaped byte by byte, a
- * language-tagged string as {@code "value"@tag}, any other literal as {@code "lexical"^^<datatype>} and a user literal
- * as {@code 'lexical:sqltype'^^<datatype>}. The accepted syntax is exactly what the output function produces; anything
- * else is reported as an error, as it means the engine and the extension disagree.
+ * language-tagged string as {@code "value"@tag}, a directional one as {@code "value"@tag--dir}, any other literal as
+ * {@code "lexical"^^<datatype>} and a user literal as {@code 'lexical:sqltype'^^<datatype>}. The accepted syntax is
+ * exactly what the output function produces; anything else is reported as an error, as it means the engine and the
+ * extension disagree.
  */
 public final class RdfBoxParser
 {
@@ -133,8 +136,9 @@ public final class RdfBoxParser
 
 
     /**
-     * Decodes a literal: the quoted and escaped lexical form followed by a language tag or a datatype. Apostrophes
-     * enclose a user literal, whose lexical form is followed by a colon and the name of the SQL type of the value.
+     * Decodes a literal: the quoted and escaped lexical form followed by a language tag (and a base direction) or a
+     * datatype. Apostrophes enclose a user literal, whose lexical form is followed by a colon and the name of the SQL
+     * type of the value.
      *
      * @param text text form of the box
      * @return the literal
@@ -172,7 +176,19 @@ public final class RdfBoxParser
         String suffix = text.substring(i);
 
         if(quote == '"' && suffix.startsWith("@"))
-            return new LangStringLiteral(value.toString(), suffix.substring(1));
+        {
+            int separator = suffix.indexOf("--");
+
+            if(separator == -1)
+                return new LangStringLiteral(value.toString(), suffix.substring(1));
+
+            Direction direction = Direction.fromText(suffix.substring(separator + 2));
+
+            if(direction == null)
+                throw new IllegalArgumentException("invalid rdfbox text: " + text);
+
+            return new DirLangStringLiteral(value.toString(), suffix.substring(1, separator), direction);
+        }
 
         if(suffix.startsWith("^^<") && suffix.endsWith(">"))
         {

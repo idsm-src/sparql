@@ -7,6 +7,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
+import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
@@ -48,6 +50,8 @@ public class RdfBoxParserTest
                     new TypedLiteral("@x^^<y>", xsdString)),
             Arguments.of("\"hello\"@en", new LangStringLiteral("hello", "en")),
             Arguments.of("\"a@b\"@en-US", new LangStringLiteral("a@b", "en-US")),
+            Arguments.of("\"hello\"@en--ltr", new DirLangStringLiteral("hello", "en", Direction.LTR)),
+            Arguments.of("\"a@b--c\"@en-US--rtl", new DirLangStringLiteral("a@b--c", "en-US", Direction.RTL)),
             Arguments.of("'42:integer'^^<http://example.org/datatype#user>", new TypedLiteral("42", userType)),
             Arguments.of("'a:b:\"x:y\".\"t:z\"'^^<http://example.org/datatype#user>",
                     new TypedLiteral("a:b", userType)),
@@ -71,7 +75,8 @@ public class RdfBoxParserTest
     @ValueSource(strings = { "", "foo", "<a", "a>", "_:", "_:x", "_:i", "_:i123", "_:i000000010000000g",
             "_:i00000001000000020", "_:s", "_:s0000000", "_:s0000000g", "_:s00000001-", "_:s00000001-a",
             "_:s00000001-gg", "_:s00000001.", "\"", "\"abc", "\"abc\"", "\"a\\qb\"^^<t>", "\"a\\", "\"a\"^^t",
-            "\"a\"^^<t", "\"a\"^^", "\"a\"x", "'a'^^<t>", "'a:b'@en", "'a:b'", "'a:b'^^<t" })
+            "\"a\"^^<t", "\"a\"^^", "\"a\"x", "\"a\"@en--", "\"a\"@en--LTR", "\"a\"@en--xyz", "'a'^^<t>", "'a:b'@en",
+            "'a:b'", "'a:b'^^<t" })
     void invalidTest(String text)
     {
         assertThrows(IllegalArgumentException.class, () -> RdfBoxParser.parse(text));

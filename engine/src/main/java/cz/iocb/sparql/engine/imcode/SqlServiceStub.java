@@ -2,8 +2,11 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import java.io.IOException;
 import java.io.InputStream;
@@ -546,10 +549,13 @@ public final class SqlServiceStub extends SqlIntercode
         resourceClasses.add(unsupportedIri);
         resourceClasses.add(unsupportedType);
         resourceClasses.add(rdfLangString);
+        resourceClasses.add(rdfLtrLangString);
+        resourceClasses.add(rdfRtlLangString);
         resourceClasses.add(blankNodeClass);
 
         request.getConfiguration().getIriClasses().forEach(c -> resourceClasses.add(c));
-        request.getConfiguration().getDatatypes().forEach(d -> resourceClasses.add(d.getBaseLiteralClass()));
+        request.getConfiguration().getDatatypes()
+                .forEach(d -> resourceClasses.addAll(estimateAsUnion(d.getBaseLiteralClass())));
 
         VariableBindings bindings = new VariableBindings();
 

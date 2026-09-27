@@ -5,7 +5,8 @@ import cz.iocb.sparql.engine.rdf.Iri;
 
 
 /**
- * IRIs and singleton {@link Datatype}s of the supported XSD datatypes and {@code rdf:langString}.
+ * IRIs and singleton {@link Datatype}s of the supported XSD datatypes, {@code rdf:langString} and
+ * {@code rdf:dirLangString}.
  */
 public class BuiltinDatatypes
 {
@@ -243,6 +244,11 @@ public class BuiltinDatatypes
      * The rdf:langString datatype.
      */
     public static final Datatype rdfLangStringType = new LangStringDatatype();
+
+    /**
+     * The rdf:dirLangString datatype.
+     */
+    public static final Datatype rdfDirLangStringType = new DirLangStringDatatype();
 
 
     /**

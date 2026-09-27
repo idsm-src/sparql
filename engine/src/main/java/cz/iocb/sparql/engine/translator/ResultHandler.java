@@ -84,8 +84,7 @@ public abstract class ResultHandler implements AutoCloseable
      * @param value the received term
      * @param variable the variable
      * @return class of the received term bound to the variable
-     * @throws UnsupportedOperationException for a triple term or a literal with a base direction, which the translator
-     *             does not support yet
+     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
      */
     protected final ResourceClass getResourceClass(Request request, RdfTerm value, Variable variable)
     {
