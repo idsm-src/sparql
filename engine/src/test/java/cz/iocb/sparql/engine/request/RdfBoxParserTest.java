@@ -14,6 +14,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 
 
@@ -27,6 +28,8 @@ public class RdfBoxParserTest
     private static final Iri xsdInteger = new Iri("http://www.w3.org/2001/XMLSchema#integer");
     private static final Iri xsdString = new Iri("http://www.w3.org/2001/XMLSchema#string");
     private static final Iri userType = new Iri("http://example.org/datatype#user");
+    private static final Iri s = new Iri("http://example.org/s");
+    private static final Iri p = new Iri("http://example.org/p");
 
 
     static Stream<Arguments> validArguments()
@@ -57,7 +60,24 @@ public class RdfBoxParserTest
                     new TypedLiteral("a:b", userType)),
             Arguments.of("'a\\'b\\\"c:character varying'^^<http://example.org/datatype#user>",
                     new TypedLiteral("a'b\"c", userType)),
-            Arguments.of("':integer'^^<http://example.org/datatype#user>", new TypedLiteral("", userType))
+            Arguments.of("':integer'^^<http://example.org/datatype#user>", new TypedLiteral("", userType)),
+            Arguments.of("<<( <http://example.org/s> <http://example.org/p> "
+                    + "\"o\"^^<http://www.w3.org/2001/XMLSchema#string> )>>",
+                    new TripleTerm(s, p, new TypedLiteral("o", xsdString))),
+            Arguments.of("<<( _:i0000000100000002 <http://example.org/p> <http://example.org/o> )>>",
+                    new TripleTerm(new IntBlankNode(2, 1), p, new Iri("http://example.org/o"))),
+            Arguments.of("<<( _:s0000000aa-2db-c3-a9-20 <http://example.org/p> \"a b\"@en--ltr )>>",
+                    new TripleTerm(new StrBlankNode("a-b\u00e9 ", 10), p,
+                            new DirLangStringLiteral("a b", "en", Direction.LTR))),
+            Arguments.of("<<( <http://example.org/s> <http://example.org/p> "
+                    + "'42:integer'^^<http://example.org/datatype#user> )>>",
+                    new TripleTerm(s, p, new TypedLiteral("42", userType))),
+            Arguments.of("""
+                <<( <http://example.org/s> <http://example.org/p> \
+                <<( <http://example.org/a> <http://example.org/b> \
+                "c )>>"^^<http://www.w3.org/2001/XMLSchema#string> )>> )>>""",
+                    new TripleTerm(s, p, new TripleTerm(new Iri("http://example.org/a"),
+                            new Iri("http://example.org/b"), new TypedLiteral("c )>>", xsdString))))
         // @formatter:on
         );
     }
@@ -76,7 +96,19 @@ public class RdfBoxParserTest
             "_:i00000001000000020", "_:s", "_:s0000000", "_:s0000000g", "_:s00000001-", "_:s00000001-a",
             "_:s00000001-gg", "_:s00000001.", "\"", "\"abc", "\"abc\"", "\"a\\qb\"^^<t>", "\"a\\", "\"a\"^^t",
             "\"a\"^^<t", "\"a\"^^", "\"a\"x", "\"a\"@en--", "\"a\"@en--LTR", "\"a\"@en--xyz", "'a'^^<t>", "'a:b'@en",
-            "'a:b'", "'a:b'^^<t" })
+            "'a:b'", "'a:b'^^<t", "<<( )>>", "<<( <http://example.org/s> )>>",
+            "<<( <http://example.org/s> <http://example.org/p> )>>",
+            "<<( <http://example.org/s> <http://example.org/p>  )>>",
+            "<<(  <http://example.org/s> <http://example.org/p> \"o\"^^<t> )>>",
+            "<<( \"s\" <http://example.org/p> \"o\"^^<t> )>>",
+            "<<( <http://example.org/s> _:i0000000100000002 \"o\"^^<t> )>>",
+            "<<( <http://example.org/s> \"p\" \"o\"^^<t> )>>",
+            "<<( <http://example.org/s> <http://example.org/p> o )>>",
+            "<<( <http://example.org/s><http://example.org/p> \"o\"^^<t> )>>",
+            "<<( <http://example.org/s> <http://example.org/p> "
+                    + "<<( <http://example.org/a> <http://example.org/b> )>> )>>",
+            "<<( <<( <http://example.org/a> <http://example.org/b> \"c\"^^<t> )>> "
+                    + "<http://example.org/p> \"o\"^^<t> )>>" })
     void invalidTest(String text)
     {
         assertThrows(IllegalArgumentException.class, () -> RdfBoxParser.parse(text));

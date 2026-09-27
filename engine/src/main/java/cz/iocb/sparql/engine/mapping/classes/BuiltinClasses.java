@@ -33,6 +33,12 @@ public class BuiltinClasses
     public static final UnsupportedIriClass unsupportedIri = new UnsupportedIriClass();
 
     /**
+     * Any triple term: a boxed subject, the predicate IRI and a boxed object; every triple term class is a subclass of
+     * it.
+     */
+    public static final TripleTermClass tripleTerm = new TripleTermClass(box, iri, box);
+
+    /**
      * Integer blank nodes packed in one column.
      */
     public static final IntBlankNodeScalarClass intScalarBlankNode = new IntBlankNodeScalarClass();
@@ -567,6 +573,18 @@ public class BuiltinClasses
 
 
     /**
+     * True if every value of the class is a triple term.
+     *
+     * @param resClass the resource class
+     * @return true if every value of the class is a triple term, false otherwise
+     */
+    public static boolean isTripleTerm(ResourceClass resClass)
+    {
+        return resClass.isSubclassOf(tripleTerm);
+    }
+
+
+    /**
      * True if every value of the class is a literal.
      *
      * @param resClass the resource class
@@ -1058,6 +1076,18 @@ public class BuiltinClasses
     public static boolean hasStrBlankNode(ResourceClass resClass)
     {
         return !areDisjunct(resClass, strScalarBlankNode);
+    }
+
+
+    /**
+     * True if some value of the class may be a triple term.
+     *
+     * @param resClass the resource class
+     * @return true if some value of the class may be a triple term, false otherwise
+     */
+    public static boolean hasTripleTerm(ResourceClass resClass)
+    {
+        return !areDisjunct(resClass, tripleTerm);
     }
 
 

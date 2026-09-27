@@ -2,6 +2,7 @@ package cz.iocb.sparql.engine.request;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import cz.iocb.sparql.engine.rdf.BlankNode;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral;
 import cz.iocb.sparql.engine.rdf.DirLangStringLiteral.Direction;
 import cz.iocb.sparql.engine.rdf.IntBlankNode;
@@ -9,6 +10,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 
 
@@ -18,9 +20,10 @@ import cz.iocb.sparql.engine.rdf.TypedLiteral;
  * it: an IRI as {@code <iri>}, an integer blank node as {@code _:i} and sixteen hexadecimal digits packing the segment
  * and the value, a string blank node as {@code _:s} and the segment with the value escaped byte by byte, a
  * language-tagged string as {@code "value"@tag}, a directional one as {@code "value"@tag--dir}, any other literal as
- * {@code "lexical"^^<datatype>} and a user literal as {@code 'lexical:sqltype'^^<datatype>}. The accepted syntax is
- * exactly what the output function produces; anything else is reported as an error, as it means the engine and the
- * extension disagree.
+ * {@code "lexical"^^<datatype>}, a user literal as {@code 'lexical:sqltype'^^<datatype>} and a triple term as
+ * {@code <<( subject <predicate> object )>>} with the components in these forms. The accepted syntax is exactly what
+ * the output function produces; anything else is reported as an error, as it means the engine and the extension
+ * disagree.
  */
 public final class RdfBoxParser
 {
@@ -41,6 +44,9 @@ public final class RdfBoxParser
      */
     public static RdfTerm parse(String text)
     {
+        if(text.startsWith("<<( ") && text.endsWith(" )>>"))
+            return parseTripleTerm(text);
+
         if(text.startsWith("<") && text.endsWith(">"))
             return new Iri(text.substring(1, text.length() - 1));
 
@@ -54,6 +60,37 @@ public final class RdfBoxParser
             return parseLiteral(text);
 
         throw new IllegalArgumentException("invalid rdfbox text: " + text);
+    }
+
+
+    /**
+     * Decodes a triple term: the subject, an IRI or a blank node, and the predicate IRI end at the space following
+     * them, the object is the rest before the closing {@code )>>}; the components are decoded like boxes of their own.
+     *
+     * @param text text form of the box
+     * @return the triple term
+     * @throws IllegalArgumentException if the text is not a valid text form of a triple term
+     */
+    private static TripleTerm parseTripleTerm(String text)
+    {
+        int begin = 4;
+        int end = text.length() - 4;
+
+        int subjectEnd = text.indexOf(' ', begin);
+        int predicateEnd = subjectEnd == -1 ? -1 : text.indexOf(' ', subjectEnd + 1);
+
+        if(predicateEnd == -1 || predicateEnd + 1 >= end)
+            throw new IllegalArgumentException("invalid rdfbox text: " + text);
+
+        RdfTerm subject = parse(text.substring(begin, subjectEnd));
+        String predicate = text.substring(subjectEnd + 1, predicateEnd);
+        RdfTerm object = parse(text.substring(predicateEnd + 1, end));
+
+        if(!(subject instanceof Iri || subject instanceof BlankNode) || !predicate.startsWith("<")
+                || !predicate.endsWith(">"))
+            throw new IllegalArgumentException("invalid rdfbox text: " + text);
+
+        return new TripleTerm(subject, new Iri(predicate.substring(1, predicate.length() - 1)), object);
     }
 
 

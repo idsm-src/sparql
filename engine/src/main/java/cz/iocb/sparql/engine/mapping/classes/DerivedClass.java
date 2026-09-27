@@ -456,7 +456,8 @@ public class DerivedClass extends ResourceClass
 
     /**
      * True if two signed classes exclude each other: the same class with opposite signs, a positive subclass with its
-     * negated superclass, or two positive unrelated (hence disjoint) classes.
+     * negated superclass, or two positive unrelated classes that are disjoint (which unrelated primitive classes are,
+     * except for two triple term classes with overlapping components).
      *
      * @param a one signed class
      * @param b the other signed class
@@ -479,13 +480,11 @@ public class DerivedClass extends ResourceClass
             if(!a.getValue() && b.getValue())
                 return true;
         }
-        else // a.getKey() and b.getValue() are distinct
+        else // a.getKey() and b.getKey() are distinct
         {
             if(a.getValue() && b.getValue())
-                return true;
+                return ResourceClass.areDisjunct(a.getKey(), b.getKey());
         }
-
-        //TODO: add the possibility that classes are not disjunct
 
         return false;
     }

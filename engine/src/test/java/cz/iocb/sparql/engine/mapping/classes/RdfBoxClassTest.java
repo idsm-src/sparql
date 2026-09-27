@@ -50,6 +50,7 @@ import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.RdfBoxParser;
 
@@ -122,7 +123,20 @@ public class RdfBoxClassTest
             Arguments.of(new DirLangStringLiteral("a\"@b--c", "en-US", Direction.RTL)),
             Arguments.of(new TypedLiteral("x", new Iri("http://example.org/unknown"))),
             Arguments.of(new TypedLiteral("a\"b", new Iri("http://example.org/unknown"))),
-            Arguments.of(new TypedLiteral("abc", new Iri(xsd + "integer")))
+            Arguments.of(new TypedLiteral("abc", new Iri(xsd + "integer"))),
+            Arguments.of(new TripleTerm(new Iri("http://example.org/s"), new Iri("http://example.org/p"),
+                    new TypedLiteral("o", new Iri(xsd + "string")))),
+            Arguments.of(new TripleTerm(new IntBlankNode(2, 1), new Iri("http://example.org/p"),
+                    new Iri("http://example.org/o"))),
+            Arguments.of(new TripleTerm(new StrBlankNode("a-b\u00e9 \n'\"\\", -1), new Iri("http://example.org/p"),
+                    new DirLangStringLiteral("a\"@b--c )>>", "en-US", Direction.RTL))),
+            Arguments.of(new TripleTerm(new Iri("http://example.org/s"), new Iri("http://example.org/p"),
+                    new TypedLiteral("NaN", new Iri(xsd + "double")))),
+            Arguments.of(new TripleTerm(new Iri("http://example.org/s"), new Iri("http://example.org/p"),
+                    new TypedLiteral("abc", new Iri(xsd + "integer")))),
+            Arguments.of(new TripleTerm(new Iri("http://example.org/s"), new Iri("http://example.org/p"),
+                    new TripleTerm(new Iri("http://example.org/a"), new Iri("http://example.org/b"),
+                            new TypedLiteral("c )>>", new Iri(xsd + "string")))))
         // @formatter:on
         );
     }
@@ -161,6 +175,8 @@ public class RdfBoxClassTest
             case Literal literal -> datatypes.stream()
                     .filter(d -> d.getTypeIri().equals(literal.getType()) && d.isValidForm(literal.getValue()))
                     .findFirst().map(d -> d.getResourceClass(literal)).orElse(unsupportedType);
+            case TripleTerm triple -> new TripleTermClass(getResourceClass(triple.getSubject()), iri,
+                    getResourceClass(triple.getObject()));
             default -> throw new IllegalArgumentException();
         };
     }

@@ -188,7 +188,9 @@ public abstract class ResourceClass
 
 
     /**
-     * True if no term belongs to both classes.
+     * True if no term belongs to both classes: two triple term classes are disjoint when some pair of their components
+     * is, two other primitive classes when neither is a subclass of the other, and derived classes by their normal
+     * forms.
      *
      * @param a one operand
      * @param b the other operand
@@ -196,6 +198,9 @@ public abstract class ResourceClass
      */
     public static boolean areDisjunct(ResourceClass a, ResourceClass b)
     {
+        if(a instanceof TripleTermClass ta && b instanceof TripleTermClass tb)
+            return ta.isDisjunctWith(tb);
+
         if(a instanceof PrimitiveResourceClass pa && b instanceof PrimitiveResourceClass pb)
             return !pa.isSubclassOf(pb) && !pb.isSubclassOf(pa);
 
