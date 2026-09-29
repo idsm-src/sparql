@@ -84,7 +84,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
         boolean check = !checkOptional && !getIntersectionClass(Set.of(superClass, iri)).equals(this);
 
         if(sourceClass.equals(box))
-            List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));
+            return List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));
 
         if(sourceClass.equals(iri))
             return List.of(generateInverseFunction(columns.get(0), check));
