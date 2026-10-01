@@ -2,7 +2,7 @@ package cz.iocb.sparql.engine.database;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -79,7 +79,7 @@ public class SqlType
     /**
      * PostgreSQL {@code timestamp with time zone}.
      */
-    public static final SqlType TIMESTAMPTZ = builtin("timestamptz", LocalDateTime.class, "timestamp with time zone");
+    public static final SqlType TIMESTAMPTZ = builtin("timestamptz", OffsetDateTime.class, "timestamp with time zone");
 
     /**
      * The universal RDF term type {@code sparql.rdfbox} of the pgsparql extension, read from a result as its text form.

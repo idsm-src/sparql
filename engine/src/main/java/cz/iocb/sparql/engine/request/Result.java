@@ -30,7 +30,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -565,14 +564,14 @@ public class Result implements AutoCloseable
             case DateTimeCompositeClass _ ->
             {
                 int zone = rs.getInt(column++);
-                yield new TypedLiteral(dateTimeToString((LocalDateTime) value, zone), xsdDateTimeIri);
+                yield new TypedLiteral(dateTimeToString((OffsetDateTime) value, zone), xsdDateTimeIri);
             }
 
             case DateTimeCompositeBaseClass _ ->
             {
                 int zone = rs.getInt(column++);
                 String lexical = rs.getString(column++);
-                String str = lexical.isEmpty() ? dateTimeToString((LocalDateTime) value, zone) : lexical;
+                String str = lexical.isEmpty() ? dateTimeToString((OffsetDateTime) value, zone) : lexical;
                 yield new TypedLiteral(str, xsdDateTimeIri);
             }
 
@@ -839,18 +838,19 @@ public class Result implements AutoCloseable
 
 
     /**
-     * Lexical form of a date-time given in UTC with the zone offset in seconds; without an offset when the zone is
+     * Lexical form of the date-time instant in the zone given by its offset in seconds (the extension stores the
+     * instant and the zone separately); without an offset, as the UTC wall time, when the zone is
      * {@link Integer#MIN_VALUE}.
      *
-     * @param value the date-time in UTC
+     * @param value the instant
      * @param zone the timezone offset in seconds
-     * @return lexical form of a date-time given in UTC with the zone offset in seconds; without an offset when the zone
-     *         is {@link Integer#MIN_VALUE}
+     * @return lexical form of the date-time instant in the zone given by its offset in seconds; without an offset when
+     *         the zone is {@link Integer#MIN_VALUE}
      */
-    private String dateTimeToString(LocalDateTime value, int zone)
+    private static String dateTimeToString(OffsetDateTime value, int zone)
     {
         ZoneOffset offset = ZoneOffset.ofTotalSeconds(zone != Integer.MIN_VALUE ? zone : 0);
-        OffsetDateTime date = value.atOffset(offset);
+        OffsetDateTime date = value.withOffsetSameInstant(offset);
         DateTimeFormatter format = zone != Integer.MIN_VALUE ? ISO_OFFSET_DATE_TIME : ISO_LOCAL_DATE_TIME;
 
         return date.format(format);
