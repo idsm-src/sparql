@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import cz.iocb.sparql.engine.database.AliasTable;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ConstantColumn;
@@ -445,17 +446,11 @@ public final class SqlRecursive extends SqlIntercode
         VariableBinding initEndBinding = init.getVariableBindings().get(endVar);
         VariableBinding nextEndBinding = next.getVariableBindings().get(endVar);
 
-        Set<ResourceClass> resClasses = new HashSet<>();
-
-        if(initEndBinding != null)
-            resClasses.addAll(initEndBinding.getClasses());
-
-        if(nextEndBinding != null)
-            resClasses.addAll(nextEndBinding.getClasses());
+        List<VariableBinding> defs = Stream.of(initEndBinding, nextEndBinding).filter(Objects::nonNull).toList();
 
         VariableBinding endBinding = new VariableBinding(endVar, false);
 
-        for(ResourceClass resClass : ResourceClass.getDisjunctClasses(resClasses))
+        for(ResourceClass resClass : unionResourceClasses(defs))
             endBinding.addMapping(resClass, resClass.createColumns(request.getColumnMap(), endVar));
 
         //TODO: handle constant columns

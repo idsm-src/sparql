@@ -342,17 +342,9 @@ public final class SqlConstruct extends SqlIntercode
 
         for(Variable var : columns)
         {
-            Set<ResourceClass> resources = new HashSet<>();
+            List<VariableBinding> defs = branches.stream().map(b -> b.get(var)).filter(Objects::nonNull).toList();
 
-            for(VariableBindings branche : branches)
-            {
-                VariableBinding binding = branche.get(var);
-
-                if(binding != null)
-                    resources.addAll(binding.getClasses());
-            }
-
-            classes.put(var, ResourceClass.getDisjunctClasses(resources));
+            classes.put(var, unionResourceClasses(defs));
         }
 
 

@@ -4,12 +4,10 @@ import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
 import static java.util.stream.Collectors.toSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.TableColumn;
@@ -323,41 +321,6 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
         }
 
         return effectiveClass;
-    }
-
-
-    /**
-     * The most specific of the given classes, which are expected to be mutually comparable.
-     *
-     * @param classes the classes
-     * @return the most specific of the given classes, which are expected to be mutually comparable
-     */
-    public static ResourceClass getIntersectionClass(Set<ResourceClass> classes)
-    {
-        //TODO: take into account that a primitive class can be composed of (finitely many) other primitive classes
-        //TODO: use more general approach
-
-        ResourceClass result = null;
-
-        for(ResourceClass c : classes)
-            if(result == null || c.isSubclassOf(result))
-                result = c;
-
-        return result;
-    }
-
-
-    /**
-     * Merges the given classes into pairwise disjoint ones: classes that overlap (transitively) are unioned together.
-     *
-     * @param classes the classes
-     * @return the disjoint classes
-     */
-    public static Set<ResourceClass> getDisjunctClasses(Set<ResourceClass> classes)
-    {
-        Collection<Set<ResourceClass>> out = UnionFind.getDisjunctEntries(classes, (l, r) -> !areDisjunct(l, r));
-
-        return out.stream().map(s -> unionize(s)).collect(toSet());
     }
 
 

@@ -1,6 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -125,7 +125,8 @@ public final class SqlProcedureCall extends SqlIntercode
      * @param results variable receiving each result
      * @param child the child node
      * @param restrictions what the parent needs of the variables
-     * @return procedure call over the child, joined with it on the variables used as parameters and results
+     * @return procedure call over the child, joined with it on the variables used as parameters and results, or no
+     *         solutions when a variable is used as parameters of disjoint classes
      */
     protected static SqlIntercode create(Request request, ProcedureDefinition procedure,
             LinkedHashMap<ParameterDefinition, SqlExpressionIntercode> parameters,
@@ -140,7 +141,14 @@ public final class SqlProcedureCall extends SqlIntercode
             SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-                resClasses.computeIfAbsent(var.getVariable(), _ -> new HashSet<>()).add(resClass);
+            {
+                Set<ResourceClass> classes = resClasses.computeIfAbsent(var.getVariable(), _ -> new HashSet<>());
+
+                if(classes.stream().anyMatch(c -> ResourceClass.areDisjunct(c, resClass)))
+                    return SqlNoSolution.get();
+
+                classes.add(resClass);
+            }
         }
 
 
@@ -148,11 +156,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
         for(Entry<Variable, Set<ResourceClass>> e : resClasses.entrySet())
         {
-            ResourceClass interClass = getIntersectionClass(e.getValue());
+            ResourceClass interClass = intersect(e.getValue());
             Variable variable = e.getKey();
-
-            if(interClass == null)
-                continue;
 
             callBindings.add(new VariableBinding(variable, interClass, getColumns(child, variable, interClass), false));
         }
@@ -225,9 +230,18 @@ public final class SqlProcedureCall extends SqlIntercode
             SqlExpressionIntercode node = entry.getValue();
 
             if(node instanceof SqlVariable var)
-                resClasses.computeIfAbsent(var.getVariable(), _ -> new HashSet<>()).add(resClass);
+            {
+                Set<ResourceClass> classes = resClasses.computeIfAbsent(var.getVariable(), _ -> new HashSet<>());
+
+                if(classes.stream().anyMatch(c -> ResourceClass.areDisjunct(c, resClass)))
+                    return SqlNoSolution.get();
+
+                classes.add(resClass);
+            }
             else if(node == null || ResourceClass.areDisjunct(resClass, node.getResourceClasses()))
+            {
                 return SqlNoSolution.get();
+            }
         }
 
 
@@ -235,11 +249,8 @@ public final class SqlProcedureCall extends SqlIntercode
 
         for(Entry<Variable, Set<ResourceClass>> e : resClasses.entrySet())
         {
-            ResourceClass interClass = getIntersectionClass(e.getValue());
+            ResourceClass interClass = intersect(e.getValue());
             Variable variable = e.getKey();
-
-            if(interClass == null)
-                return SqlNoSolution.get();
 
             callBindings
                     .add(new VariableBinding(variable, interClass, getColumns(optChild, variable, interClass), false));

@@ -2,9 +2,8 @@ package cz.iocb.sparql.engine.imcode;
 
 import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
+import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.intersect;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.unionize;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getDisjunctClasses;
-import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getIntersectionClass;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
@@ -511,12 +510,13 @@ public abstract class SqlIntercode extends SqlBaseClass
 
 
     /**
-     * Classes a variable can take in a join where it is always bound in the given children: the intersections of one
-     * class per child, merged into disjoint classes.
+     * Classes a variable can take in a join where it is always bound in the given children: the intersections of the
+     * combinations of one class per child whose classes pairwise overlap. The intersections are pairwise disjoint, as
+     * two combinations differ in the class taken from some child, and the classes of one child are disjoint.
      *
      * @param defs bindings of the variable in the children where it is always bound
      * @return classes a variable can take in a join where it is always bound in the given children: the intersections
-     *         of one class per child, merged into disjoint classes
+     *         of the combinations of one class per child whose classes pairwise overlap
      */
     private static Set<ResourceClass> joinResourceClasses(List<VariableBinding> defs)
     {
@@ -534,8 +534,40 @@ public abstract class SqlIntercode extends SqlBaseClass
             result = nextResult;
         }
 
-        //FIXME: getDisjunctClasses is probably not needed
-        return getDisjunctClasses(result.stream().map(s -> getIntersectionClass(s)).collect(toSet()));
+        return result.stream().map(s -> intersect(s)).collect(toSet());
+    }
+
+
+    /**
+     * Classes a variable can take in a union of the given children: the classes of the children, where overlapping
+     * classes are merged into their union, so that the classes are pairwise disjoint and every class of a child is a
+     * subclass of one of them.
+     *
+     * @param defs bindings of the variable in the children where it is bound
+     * @return classes a variable can take in a union of the given children: the classes of the children, where
+     *         overlapping classes are merged into their union
+     */
+    protected static Set<ResourceClass> unionResourceClasses(List<VariableBinding> defs)
+    {
+        Set<ResourceClass> result = new HashSet<>();
+
+        for(VariableBinding def : defs)
+        {
+            for(ResourceClass resClass : def.getClasses())
+            {
+                Set<ResourceClass> group = new HashSet<>();
+                group.add(resClass);
+
+                for(ResourceClass other : result)
+                    if(!ResourceClass.areDisjunct(other, resClass))
+                        group.add(other);
+
+                result.removeAll(group);
+                result.add(unionize(group));
+            }
+        }
+
+        return result;
     }
 
 
@@ -582,7 +614,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             }
             else
             {
-                Set<ResourceClass> resClasses = ResourceClass.getDisjunctClasses(collectClasses(defs));
+                Set<ResourceClass> resClasses = unionResourceClasses(defs);
                 VariableBinding binding = createVariableBinding(request, variable, resClasses, vars, tables, columnMap,
                         true);
 
@@ -770,18 +802,6 @@ public abstract class SqlIntercode extends SqlBaseClass
                 .range(0, cols).mapToObj(i -> (Column) new ExpressionColumn(variants.stream()
                         .map(l -> l.get(i).toString()).distinct().sorted().collect(joining(", ", "COALESCE(", ")"))))
                 .toList();
-    }
-
-
-    /**
-     * Union of the classes of the bindings.
-     *
-     * @param variables the variables
-     * @return union of the classes of the bindings
-     */
-    private static Set<ResourceClass> collectClasses(List<VariableBinding> variables)
-    {
-        return variables.stream().flatMap(v -> v.getClasses().stream()).collect(toSet());
     }
 
 

@@ -5,7 +5,6 @@ import static java.util.Objects.isNull;
 import static java.util.stream.Collectors.toSet;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -86,17 +85,10 @@ public final class SqlUnion extends SqlIntercode
 
         for(Variable var : varNames)
         {
-            Set<ResourceClass> resources = new HashSet<>();
+            List<VariableBinding> defs = branches.stream().map(b -> b.getVariableBindings().get(var))
+                    .filter(Objects::nonNull).toList();
 
-            for(SqlIntercode branche : branches)
-            {
-                VariableBinding binding = branche.getVariableBindings().get(var);
-
-                if(binding != null)
-                    resources.addAll(binding.getClasses());
-            }
-
-            classes.put(var, ResourceClass.getDisjunctClasses(resources));
+            classes.put(var, unionResourceClasses(defs));
         }
 
 
