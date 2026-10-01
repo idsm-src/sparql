@@ -46,7 +46,6 @@ public final class RdfBoxClass extends PrimitiveResourceClass
      * ({@link Request#getResourceClass}), by converting the columns of that class to the box.
      *
      * @throws IllegalArgumentException if the term is a variable
-     * @throws UnsupportedOperationException for a triple term, which the request cannot classify yet
      */
     @Override
     public List<Column> toColumns(Request request, RdfTerm term)

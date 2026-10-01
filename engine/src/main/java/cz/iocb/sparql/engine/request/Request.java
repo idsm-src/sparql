@@ -29,6 +29,7 @@ import cz.iocb.sparql.engine.mapping.classes.IntBlankNodeInSegmentClass;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.StrBlankNodeInSegmentClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.model.AskQuery;
@@ -815,11 +816,11 @@ public class Request implements AutoCloseable
 
 
     /**
-     * Most specific resource class of a constant term (null for a variable).
+     * Most specific resource class of a constant term (null for a variable, or for a triple term with a variable).
      *
      * @param term the RDF term
-     * @return most specific resource class of a constant term (null for a variable)
-     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
+     * @return most specific resource class of a constant term (null for a variable, or for a triple term with a
+     *         variable)
      */
     public ResourceClass getResourceClass(RdfTerm term)
     {
@@ -828,10 +829,29 @@ public class Request implements AutoCloseable
             case Literal lit -> getLiteralClass(lit);
             case Iri iri -> getIriClass(iri);
             case BlankNode bn -> getBlankNodeClass(bn);
-            //TODO: SPARQL 1.2
-            case TripleTerm _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
+            case TripleTerm triple -> getTripleTermClass(triple);
             default -> null;
         };
+    }
+
+
+    /**
+     * Class of a constant triple term: the triple term class of the most specific classes of its components; null when
+     * some component (of a nested triple term too) is a variable.
+     *
+     * @param triple the triple term
+     * @return class of a constant triple term; null when some component is a variable
+     */
+    public TripleTermClass getTripleTermClass(TripleTerm triple)
+    {
+        ResourceClass subject = getResourceClass(triple.getSubject());
+        ResourceClass predicate = getResourceClass(triple.getPredicate());
+        ResourceClass object = getResourceClass(triple.getObject());
+
+        if(subject == null || predicate == null || object == null)
+            return null;
+
+        return new TripleTermClass(subject, predicate, object);
     }
 
 

@@ -13,6 +13,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.Literal;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.rdf.Variable;
 
@@ -33,11 +34,11 @@ public class TermGenerator
 
 
     /**
-     * Term of a subject, predicate or object node; null for a null node.
+     * Term of a subject, predicate or object node; null for a null node. A triple term node becomes a
+     * {@link TripleTerm} of the terms of its components, so the variables and blank nodes inside it stay variables.
      *
      * @param node the subject node
      * @return term of a subject, predicate or object node; null for a null node
-     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
      */
     public static RdfTerm getTerm(Node node)
     {
@@ -50,10 +51,25 @@ public class TermGenerator
             case LiteralNode literal -> getLiteral(literal);
             case VariableNode var -> getVariable(var);
             case BlankNode bnode -> getVariable(bnode);
-            //TODO: SPARQL 1.2
-            case TripleTermNode _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
+            case TripleTermNode triple -> getTripleTerm(triple);
             default -> throw new IllegalArgumentException();
         };
+    }
+
+
+    /**
+     * Triple term of the node: the terms of its subject, predicate and object; null for a null node.
+     *
+     * @param triple the triple term node
+     * @return triple term of the node; null for a null node
+     */
+    public static TripleTerm getTripleTerm(TripleTermNode triple)
+    {
+        if(triple == null)
+            return null;
+
+        return new TripleTerm(getTerm(triple.getSubject()), getTerm(triple.getPredicate()),
+                getTerm(triple.getObject()));
     }
 
 

@@ -258,11 +258,17 @@ public class ExpressionTranslateVisitor extends ElementVisitor<SqlExpressionInte
     }
 
 
+    /**
+     * A triple term written in an expression is the shorthand of the function {@code TRIPLE} applied to its components
+     * (SPARQL 1.2, section 17.4.6.1), so it is translated as that call.
+     */
     @Override
     public SqlExpressionIntercode visit(TripleTermNode tripleTerm)
     {
-        //TODO: SPARQL 1.2
-        throw new UnsupportedOperationException("triple terms are not supported yet");
+        List<SqlExpressionIntercode> arguments = List.of(visitElement(tripleTerm.getSubject()),
+                visitElement(tripleTerm.getPredicate()), visitElement(tripleTerm.getObject()));
+
+        return SqlBuiltinCall.create(request, "triple", false, arguments);
     }
 
 

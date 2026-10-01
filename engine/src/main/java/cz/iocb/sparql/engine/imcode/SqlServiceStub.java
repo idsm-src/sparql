@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.DerivedClass.estimateAsUnion;
@@ -554,6 +555,7 @@ public final class SqlServiceStub extends SqlIntercode
         resourceClasses.add(rdfLangString);
         resourceClasses.add(rdfLtrLangString);
         resourceClasses.add(rdfRtlLangString);
+        resourceClasses.add(tripleTerm);
         resourceClasses.add(blankNodeClass);
 
         request.getConfiguration().getIriClasses().forEach(c -> resourceClasses.add(c));

@@ -49,9 +49,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLanguageTa
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasReference;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasStringLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.integerNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
@@ -66,9 +68,11 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLanguageTag
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isReference;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
@@ -93,6 +97,8 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.literal;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfRtlLangString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.reference;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.unsupportedType;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdByte;
@@ -140,8 +146,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
+import cz.iocb.sparql.engine.database.SqlType;
 import cz.iocb.sparql.engine.database.ValueColumn;
 import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.imcode.SqlIntercode.Restrictions;
@@ -158,6 +166,7 @@ import cz.iocb.sparql.engine.mapping.classes.LangStringWithTagClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
@@ -171,10 +180,10 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 
 /**
- * Call of a SPARQL built-in function or aggregate (functions on terms, strings, numerics, dates and hashes, the
- * aggregates, and the internal {@code card} for {@code COUNT(*)}). The result classes are derived from the classes of
- * the arguments when the call is created, and the SQL of each class is emitted only when the parent needs it.
- * {@code RAND} is the only nondeterministic function.
+ * Call of a SPARQL built-in function or aggregate (functions on terms, triple terms, strings, numerics, dates and
+ * hashes, the aggregates, and the internal {@code card} for {@code COUNT(*)}). The result classes are derived from the
+ * classes of the arguments when the call is created, and the SQL of each class is emitted only when the parent needs
+ * it. {@code RAND} is the only nondeterministic function.
  */
 public final class SqlBuiltinCall extends SqlExpressionIntercode
 {
@@ -733,6 +742,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             case "isblank":
             case "isliteral":
             case "isnumeric":
+            case "istriple":
             case "haslang":
             case "haslangdir":
             {
@@ -1499,6 +1509,181 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 List<Column> result = List.of(new ExpressionColumn("uuid.uuid_generate_v4()::varchar", VARCHAR, false));
 
                 return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdString, result), false);
+            }
+
+
+            // functions on triple terms:
+
+            case "triple":
+            {
+                SqlExpressionIntercode subject = arguments.get(0);
+                SqlExpressionIntercode predicate = arguments.get(1);
+                SqlExpressionIntercode object = arguments.get(2);
+
+                if(subject.equals(SqlNull.get()) || predicate.equals(SqlNull.get()) || object.equals(SqlNull.get()))
+                    return SqlNull.get();
+
+                // the subject has to be an IRI or a blank node and the predicate an IRI, anything else is an error
+                Set<ResourceClass> subjectClasses = subject.getResourceClasses().stream().filter(r -> hasReference(r))
+                        .collect(toSet());
+                Set<ResourceClass> predicateClasses = predicate.getResourceClasses().stream().filter(r -> hasIri(r))
+                        .collect(toSet());
+                Set<ResourceClass> objectClasses = object.getResourceClasses();
+
+                if(subjectClasses.isEmpty() || predicateClasses.isEmpty() || objectClasses.isEmpty())
+                    return SqlNull.get();
+
+                boolean canBeNull = subject.canBeNull() || predicate.canBeNull() || object.canBeNull()
+                        || subject.getResourceClasses().stream().anyMatch(r -> !isReference(r))
+                        || predicate.getResourceClasses().stream().anyMatch(r -> !isIri(r));
+
+                boolean subjectCanBeNull = subject.canBeNull() || subject.getResourceClasses().size() > 1;
+                boolean predicateCanBeNull = predicate.canBeNull() || predicate.getResourceClasses().size() > 1;
+                boolean objectCanBeNull = object.canBeNull() || object.getResourceClasses().size() > 1;
+
+                Map<ResourceClass, List<Column>> mappings = new HashMap<>();
+
+                for(ResourceClass subjectClass : subjectClasses)
+                {
+                    // a subject that may be another kind of term stays in the box, where it can be tested
+                    ResourceClass subjectComponent = isReference(subjectClass) ? subjectClass :
+                            unionize(Set.of(subjectClass), box);
+
+                    for(ResourceClass predicateClass : predicateClasses)
+                    {
+                        // a predicate that may be another kind of term is decoded into the IRI class
+                        ResourceClass predicateComponent = isIri(predicateClass) ? predicateClass : iri;
+
+                        for(ResourceClass objectClass : objectClasses)
+                        {
+                            TripleTermClass resultClass = new TripleTermClass(subjectComponent, predicateComponent,
+                                    objectClass);
+
+                            if(!restriction.contains(relations, resultClass))
+                            {
+                                mappings.put(resultClass, null);
+                                continue;
+                            }
+
+                            // the columns of the term are null together: when a component is missing or is not of
+                            // the kind its position requires, the whole term is an error
+                            List<String> conditions = new ArrayList<>();
+                            List<Column> columns = new ArrayList<>(resultClass.getColumnCount());
+
+                            List<Column> subjectColumns = subject.get(relations, subjectClass);
+
+                            if(subjectCanBeNull)
+                                conditions.add(subject.getIsNotNull(relations, subjectClass));
+
+                            if(!isReference(subjectClass))
+                            {
+                                subjectColumns = subjectClass.toGeneralClass(subjectComponent, subjectColumns,
+                                        subjectCanBeNull);
+                                conditions.add("(sparql.is_iri_rdfbox(" + subjectColumns.get(0)
+                                        + ") OR sparql.is_blank_rdfbox(" + subjectColumns.get(0) + "))");
+                            }
+
+                            List<Column> predicateColumns = predicate.get(relations, predicateClass);
+
+                            if(predicateCanBeNull)
+                                conditions.add(predicate.getIsNotNull(relations, predicateClass));
+
+                            if(!isIri(predicateClass))
+                            {
+                                Column boxed = predicateClass.toGeneralClass(unionize(Set.of(predicateClass), box),
+                                        predicateColumns, predicateCanBeNull).get(0);
+                                predicateColumns = List
+                                        .of(new ExpressionColumn("sparql.rdfbox_get_iri(" + boxed + ")", VARCHAR));
+                                conditions.add("sparql.is_iri_rdfbox(" + boxed + ")");
+                            }
+
+                            List<Column> objectColumns = object.get(relations, objectClass);
+
+                            if(objectCanBeNull)
+                                conditions.add(object.getIsNotNull(relations, objectClass));
+
+                            columns.addAll(subjectColumns);
+                            columns.addAll(predicateColumns);
+                            columns.addAll(objectColumns);
+
+                            if(!conditions.isEmpty())
+                            {
+                                String condition = conditions.stream().collect(joining(" AND "));
+                                List<SqlType> types = resultClass.getSqlTypes();
+
+                                for(int i = 0; i < columns.size(); i++)
+                                    columns.set(i,
+                                            new ExpressionColumn(
+                                                    "CASE WHEN " + condition + " THEN " + columns.get(i) + " END",
+                                                    types.get(i)));
+                            }
+
+                            mappings.put(resultClass, columns);
+                        }
+                    }
+                }
+
+                return new SqlBuiltinCall(function, distinct, arguments, mappings, canBeNull);
+            }
+
+            case "subject":
+            case "predicate":
+            case "object":
+            {
+                SqlExpressionIntercode argument = arguments.get(0);
+
+                if(argument.getResourceClasses().stream().noneMatch(r -> hasTripleTerm(r)))
+                    return SqlNull.get();
+
+                boolean canBeNull = argument.canBeNull()
+                        || argument.getResourceClasses().stream().anyMatch(r -> !isTripleTerm(r));
+
+                // the classes of the component, each with the classes of the argument delivering it
+                Map<ResourceClass, Set<ResourceClass>> components = new HashMap<>();
+
+                for(ResourceClass argumentClass : argument.getResourceClasses())
+                    if(hasTripleTerm(argumentClass))
+                        components.computeIfAbsent(getComponentClass(function, argumentClass), _ -> new HashSet<>())
+                                .add(argumentClass);
+
+                // overlapping classes of the component are delivered together in their union
+                Map<ResourceClass, List<Column>> mappings = new HashMap<>();
+
+                for(Set<ResourceClass> group : UnionFind.getDisjunctEntries(components.keySet(),
+                        (l, r) -> !areDisjunct(relations, l, r)))
+                {
+                    ResourceClass resultClass = group.size() == 1 ? group.iterator().next() : unionize(group);
+
+                    if(!restriction.contains(relations, resultClass))
+                    {
+                        mappings.put(resultClass, null);
+                        continue;
+                    }
+
+                    List<Set<Column>> variants = new ArrayList<>(resultClass.getColumnCount());
+
+                    for(int i = 0; i < resultClass.getColumnCount(); i++)
+                        variants.add(new HashSet<>());
+
+                    for(ResourceClass componentClass : group)
+                    {
+                        for(ResourceClass argumentClass : components.get(componentClass))
+                        {
+                            List<Column> columns = getComponentColumns(function, argumentClass,
+                                    argument.get(relations, argumentClass));
+
+                            if(!componentClass.equals(resultClass))
+                                columns = componentClass.toGeneralClass(resultClass, columns, true);
+
+                            for(int i = 0; i < columns.size(); i++)
+                                variants.get(i).add(columns.get(i));
+                        }
+                    }
+
+                    mappings.put(resultClass, variants.stream().map(v -> coalesce(v)).toList());
+                }
+
+                return new SqlBuiltinCall(function, distinct, arguments, mappings, canBeNull);
             }
 
 
@@ -3008,6 +3193,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return BuiltinClasses::isLiteral;
         else if(function.equals("isnumeric"))
             return BuiltinClasses::isNumeric;
+        else if(function.equals("istriple"))
+            return BuiltinClasses::isTripleTerm;
         else if(function.equals("haslang"))
             return BuiltinClasses::isLanguageTaggedString;
         else if(function.equals("haslangdir"))
@@ -3032,6 +3219,8 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return BuiltinClasses::hasLiteral;
         else if(function.equals("isnumeric"))
             return BuiltinClasses::hasNumeric;
+        else if(function.equals("istriple"))
+            return BuiltinClasses::hasTripleTerm;
         else if(function.equals("haslang"))
             return BuiltinClasses::hasLanguageTaggedString;
         else if(function.equals("haslangdir"))
@@ -3048,10 +3237,63 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
      */
     private static String getBoxTestFunction(String function)
     {
+        if(function.equals("istriple"))
+            return "sparql.is_tripleterm_rdfbox";
+
         if(function.startsWith("is"))
             return "sparql.is_" + function.substring(2).replaceFirst("uri", "iri") + "_rdfbox";
 
         return "sparql." + function + "_rdfbox";
+    }
+
+
+    /**
+     * Class of the component selected by the function from the triple terms of the class: the component class of a
+     * triple term class, otherwise (the triple terms are boxed) the box for a subject or an object and the IRI class
+     * for a predicate.
+     *
+     * @param function lower-case function name ({@code subject}, {@code predicate} or {@code object})
+     * @param resClass class of the triple terms
+     * @return class of the component selected by the function from the triple terms of the class
+     */
+    private static ResourceClass getComponentClass(String function, ResourceClass resClass)
+    {
+        if(resClass.getEffectiveClass() instanceof TripleTermClass tripleClass)
+            return switch(function)
+            {
+                case "subject" -> tripleClass.getSubject();
+                case "predicate" -> tripleClass.getPredicate();
+                default -> tripleClass.getObject();
+            };
+
+        return function.equals("predicate") ? iri : box;
+    }
+
+
+    /**
+     * Columns of the component selected by the function from the triple terms represented by the given columns of the
+     * class, in the class given by {@link #getComponentClass}: a part of the columns of a triple term class, otherwise
+     * the component extracted from the box (NULL when the box holds another kind of term).
+     *
+     * @param function lower-case function name ({@code subject}, {@code predicate} or {@code object})
+     * @param resClass class of the triple terms
+     * @param columns the columns representing the triple terms
+     * @return columns of the component selected by the function from the triple terms represented by the columns
+     */
+    private static List<Column> getComponentColumns(String function, ResourceClass resClass, List<Column> columns)
+    {
+        if(resClass.getEffectiveClass() instanceof TripleTermClass tripleClass)
+            return switch(function)
+            {
+                case "subject" -> tripleClass.getSubjectColumns(columns);
+                case "predicate" -> tripleClass.getPredicateColumns(columns);
+                default -> tripleClass.getObjectColumns(columns);
+            };
+
+        SqlType type = function.equals("predicate") ? VARCHAR : RDFBOX;
+
+        return List.of(
+                new ExpressionColumn("sparql.rdfbox_get_tripleterm_" + function + "(" + columns.get(0) + ")", type));
     }
 
 
@@ -3151,7 +3393,7 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
                     }
 
-                    case "bound", "isiri", "isuri", "isblank", "isliteral", "isnumeric", "haslang", "haslangdir" ->
+                    case "bound", "isiri", "isuri", "isblank", "isliteral", "isnumeric", "istriple", "haslang", "haslangdir" ->
                     {
                         yield arguments.stream().map(a -> a.optimize(request, bindings, ALL, evalServices)).toList();
                     }
@@ -3221,6 +3463,20 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                         yield arguments.stream()
                                 .map(a -> a.optimize(request, bindings, new Restriction(xsdString), evalServices))
                                 .toList();
+                    }
+
+                    case "triple" ->
+                    {
+                        yield List.of(
+                                arguments.get(0).optimize(request, bindings, new Restriction(reference), evalServices),
+                                arguments.get(1).optimize(request, bindings, new Restriction(iri), evalServices),
+                                arguments.get(2).optimize(request, bindings, ALL, evalServices));
+                    }
+
+                    case "subject", "predicate", "object" ->
+                    {
+                        yield List.of(arguments.get(0).optimize(request, bindings, new Restriction(tripleTerm),
+                                evalServices));
                     }
 
                     case "strlen" ->

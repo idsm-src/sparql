@@ -94,6 +94,7 @@ import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.LangStringLiteral;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
 import cz.iocb.sparql.engine.rdf.StrBlankNode;
+import cz.iocb.sparql.engine.rdf.TripleTerm;
 import cz.iocb.sparql.engine.rdf.TypedLiteral;
 import cz.iocb.sparql.engine.request.Engine;
 import cz.iocb.sparql.engine.request.LimitExceedException;
@@ -832,33 +833,36 @@ public class SparqlTest
 
 
     /**
-     * Engine term of a term of a SPARQL JSON result; null for a missing binding, blank nodes lose their label.
+     * Engine term of a term of a SPARQL JSON result; null for a missing binding, blank nodes lose their label, the
+     * components of a triple term are read recursively.
      */
     static RdfTerm getNode(JsonNode node)
     {
         if(node == null)
             return null;
 
-        String value = node.get("value").asText();
+        JsonNode value = node.get("value");
 
         return switch(node.get("type").asText())
         {
-            case "uri" -> new Iri(value);
+            case "uri" -> new Iri(value.asText());
             case "bnode" -> new StrBlankNode("", 0);
             case "literal" ->
             {
                 if(node.has("its:dir"))
-                    yield new DirLangStringLiteral(value, node.get("xml:lang").asText(),
+                    yield new DirLangStringLiteral(value.asText(), node.get("xml:lang").asText(),
                             Direction.fromText(node.get("its:dir").asText()));
 
                 if(node.has("xml:lang"))
-                    yield new LangStringLiteral(value, node.get("xml:lang").asText());
+                    yield new LangStringLiteral(value.asText(), node.get("xml:lang").asText());
 
                 if(node.has("datatype"))
-                    yield new TypedLiteral(value, new Iri(node.get("datatype").asText()));
+                    yield new TypedLiteral(value.asText(), new Iri(node.get("datatype").asText()));
 
-                yield new TypedLiteral(value, BuiltinDatatypes.xsdStringType.getTypeIri());
+                yield new TypedLiteral(value.asText(), BuiltinDatatypes.xsdStringType.getTypeIri());
             }
+            case "triple" -> new TripleTerm(getNode(value.get("subject")), getNode(value.get("predicate")),
+                    getNode(value.get("object")));
             default -> throw new IllegalArgumentException("unknown term type: " + node.get("type").asText());
         };
     }
@@ -973,6 +977,22 @@ public class SparqlTest
     /**
      * Rows of an engine result.
      */
+    /**
+     * The term with the labels of its blank nodes erased, inside triple terms too, so that it compares equal to the
+     * expected term.
+     */
+    private static RdfTerm eraseBlankNodeLabels(RdfTerm term)
+    {
+        return switch(term)
+        {
+            case BlankNode _ -> new StrBlankNode("", 0);
+            case TripleTerm triple -> new TripleTerm(eraseBlankNodeLabels(triple.getSubject()),
+                    eraseBlankNodeLabels(triple.getPredicate()), eraseBlankNodeLabels(triple.getObject()));
+            case null, default -> term;
+        };
+    }
+
+
     private List<List<RdfTerm>> getResult(Result it) throws SQLException
     {
         List<List<RdfTerm>> result = new ArrayList<>();
@@ -991,8 +1011,7 @@ public class SparqlTest
                 RdfTerm[] row = it.getRow();
 
                 for(int i = 0; i < row.length; i++)
-                    if(row[i] instanceof BlankNode)
-                        row[i] = new StrBlankNode("", 0);
+                    row[i] = eraseBlankNodeLabels(row[i]);
 
                 result.add(Arrays.asList(row));
             }

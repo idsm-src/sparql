@@ -76,6 +76,30 @@ public final class TripleTerm extends RdfTerm
 
 
     /**
+     * True if some component, those of nested triple terms included, is a variable, i.e. the term is a pattern rather
+     * than a constant.
+     *
+     * @return true if some component, those of nested triple terms included, is a variable, false otherwise
+     */
+    public boolean hasVariable()
+    {
+        return hasVariable(subject) || hasVariable(predicate) || hasVariable(object);
+    }
+
+
+    /**
+     * True if the component is a variable or a triple term with a variable.
+     *
+     * @param component the component
+     * @return true if the component is a variable or a triple term with a variable, false otherwise
+     */
+    private static boolean hasVariable(RdfTerm component)
+    {
+        return component instanceof Variable || component instanceof TripleTerm triple && triple.hasVariable();
+    }
+
+
+    /**
      * SPARQL rendering {@code <<( subject predicate object )>>} of the components' renderings.
      */
     @Override

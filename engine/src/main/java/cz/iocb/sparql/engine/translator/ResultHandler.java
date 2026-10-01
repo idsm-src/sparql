@@ -84,13 +84,13 @@ public abstract class ResultHandler implements AutoCloseable
 
 
     /**
-     * Class of the received term bound to the variable.
+     * Class of the received term bound to the variable. The components of a triple term are classified by the request
+     * among all user IRI classes, because the classes admitted for the variable describe the triple term as a whole.
      *
      * @param request the current request
      * @param value the received term
      * @param variable the variable
      * @return class of the received term bound to the variable
-     * @throws UnsupportedOperationException for a triple term, which the translator does not support yet
      */
     protected final ResourceClass getResourceClass(Request request, RdfTerm value, Variable variable)
     {
@@ -99,8 +99,7 @@ public abstract class ResultHandler implements AutoCloseable
             case Literal lit -> getLiteralClass(request, lit);
             case Iri iri -> getIriClass(request, iri, variable);
             case BlankNode bn -> getBlankNodeClass(request, bn);
-            //TODO: SPARQL 1.2
-            case TripleTerm _ -> throw new UnsupportedOperationException("triple terms are not supported yet");
+            case TripleTerm triple -> getTripleTermClass(request, triple);
             default -> null;
         };
     }
@@ -164,6 +163,19 @@ public abstract class ResultHandler implements AutoCloseable
     private ResourceClass getBlankNodeClass(Request request, BlankNode bnode)
     {
         return request.getBlankNodeClass(bnode);
+    }
+
+
+    /**
+     * Class of a received triple term.
+     *
+     * @param request the current request
+     * @param triple the triple term
+     * @return the resulting class
+     */
+    private ResourceClass getTripleTermClass(Request request, TripleTerm triple)
+    {
+        return request.getTripleTermClass(triple);
     }
 
 
