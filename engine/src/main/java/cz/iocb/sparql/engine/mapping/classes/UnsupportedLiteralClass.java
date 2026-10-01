@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -63,7 +64,7 @@ public final class UnsupportedLiteralClass extends BaseLiteralClass
         Column type = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_typedliteral(%s, %s)", value, type));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_typedliteral(%s, %s)", value, type));
 
         throw new IllegalArgumentException();
     }
@@ -80,8 +81,8 @@ public final class UnsupportedLiteralClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_typedliteral_value(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_typedliteral_type(%s)", columns.get(0)));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_typedliteral_value(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_typedliteral_type(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }

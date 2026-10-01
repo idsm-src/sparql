@@ -1,8 +1,10 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATETIME;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -62,11 +64,11 @@ public final class DateTimeCompositeBaseClass extends BaseLiteralClass
         Column lexical = columns.get(2);
 
         if(targetClass.equals(box))
-            return List
-                    .of(expression("sparql.rdfbox_create_from_datetime_with_lexical(%s, %s, %s)", time, zone, lexical));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_datetime_with_lexical(%s, %s, %s)", time, zone,
+                    lexical));
 
         if(targetClass.equals(genScalarDateTime))
-            return List.of(expression("sparql.zoneddatetime_create(%s, %s)", time, zone), lexical);
+            return List.of(expression(ZONEDDATETIME, "sparql.zoneddatetime_create(%s, %s)", time, zone), lexical);
 
         throw new IllegalArgumentException();
     }
@@ -83,13 +85,13 @@ public final class DateTimeCompositeBaseClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_datetime_value(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_datetime_zone(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_datetime_lexical(%s)", columns.get(0)));
+            return List.of(expression(TIMESTAMPTZ, "sparql.rdfbox_get_datetime_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.rdfbox_get_datetime_zone(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_datetime_lexical(%s)", columns.get(0)));
 
         if(sourceClass.equals(genScalarDateTime))
-            return List.of(expression("sparql.zoneddatetime_get_value(%s)", columns.get(0)),
-                    expression("sparql.zoneddatetime_get_zone(%s)", columns.get(0)), columns.get(1));
+            return List.of(expression(TIMESTAMPTZ, "sparql.zoneddatetime_get_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.zoneddatetime_get_zone(%s)", columns.get(0)), columns.get(1));
 
         throw new IllegalArgumentException();
     }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLtrLangString;
@@ -136,12 +137,12 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
         Column string = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_%slangstring(%s, '%s'::varchar)", direction.getText(),
-                    string, tag));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_%slangstring(%s, '%s'::varchar)",
+                    direction.getText(), string, tag));
 
         if(targetClass.equals(getDirectionClass()))
             return List.of(string, !canBeNull ? constant(tag, VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
 
         throw new IllegalArgumentException();
     }
@@ -158,11 +159,12 @@ public final class DirLangStringWithTagClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_%slangstring_value_of_lang(%s, '%s'::varchar)",
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_%slangstring_value_of_lang(%s, '%s'::varchar)",
                     direction.getText(), columns.get(0), tag));
 
         if(sourceClass.equals(getDirectionClass()))
-            return List.of(expression("CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag, columns.get(0)));
+            return List.of(expression(VARCHAR, "CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag,
+                    columns.get(0)));
 
         throw new IllegalArgumentException();
     }

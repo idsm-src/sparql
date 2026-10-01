@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -70,11 +71,11 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass
         Column type = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
 
         if(targetClass.equals(genUserType))
             return List.of(value, type, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
 
         throw new IllegalArgumentException();
     }
@@ -91,12 +92,12 @@ public final class UserLiteralCompositeClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_userliteral_value(%s, false)", columns.get(0)),
-                    expression("sparql.rdfbox_get_userliteral_type(%s, false)", columns.get(0)));
+            return List.of(expression(UBOX, "sparql.rdfbox_get_userliteral_value(%s, false)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_userliteral_type(%s, false)", columns.get(0)));
 
         if(sourceClass.equals(genUserType))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
-                    expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
+            return List.of(expression(UBOX, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
+                    expression(VARCHAR, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
 
         throw new IllegalArgumentException();
     }

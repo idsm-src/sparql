@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -279,9 +280,9 @@ public class MapUserIriClass extends SimpleUserIriClass
     protected Column generateFunction(Column column)
     {
         String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
-        Column code = addPrefixAndSuffix(prefix, expression("\"@to\""), suffix);
+        Column code = addPrefixAndSuffix(prefix, expression(VARCHAR, "\"@to\""), suffix);
 
-        return expression("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, column);
+        return expression(VARCHAR, "(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, column);
     }
 
 
@@ -293,7 +294,8 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(!check)
             return func;
 
-        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+        return expression(sqlTypes.get(0), "CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp),
+                func);
     }
 
 
@@ -305,10 +307,11 @@ public class MapUserIriClass extends SimpleUserIriClass
      */
     protected Column generateNonCheckedInverseFunction(Column column)
     {
-        Column access = expression("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
         Column code = generateExtractionFunction(column);
 
-        return expression("(SELECT \"@from\"::%s FROM %s WHERE \"@to\" = %s)", sqlTypes.get(0), access, code);
+        return expression(sqlTypes.get(0), "(SELECT \"@from\"::%s FROM %s WHERE \"@to\" = %s)", sqlTypes.get(0), access,
+                code);
     }
 
 
@@ -323,25 +326,27 @@ public class MapUserIriClass extends SimpleUserIriClass
         if(prefix == null && suffix == null)
             return column;
         else if(length > 0 && prefix == null)
-            return expression("substring(%s, %d, %d)::varchar", column, 1, length);
+            return expression(VARCHAR, "substring(%s, %d, %d)::varchar", column, 1, length);
         else if(length > 0 && prefix != null)
-            return expression("substring(%s, %d, %d)::varchar", column, prefix.length() + 1, length);
+            return expression(VARCHAR, "substring(%s, %d, %d)::varchar", column, prefix.length() + 1, length);
         else if(prefix == null)
-            return expression("left(%s, -%d)::varchar", column, suffix.length());
+            return expression(VARCHAR, "left(%s, -%d)::varchar", column, suffix.length());
         else if(suffix == null)
-            return expression("right(%s, -%d)::varchar", column, prefix.length());
+            return expression(VARCHAR, "right(%s, -%d)::varchar", column, prefix.length());
         else
-            return expression("left(right(%s, -%d), -%d)::varchar", column, prefix.length(), suffix.length());
+            return expression(VARCHAR, "left(right(%s, -%d), -%d)::varchar", column, prefix.length(), suffix.length());
     }
 
 
     @Override
     public List<Column> toOrderColumns(List<Column> columns)
     {
-        Column access = expression("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
-        Column code = suffix != null ? code = expression("\"@to\" || %s", string(suffix)) : expression("\"@to\"");
+        String access = String.format("(SELECT %s as \"@from\", %s as \"@to\" FROM %s) as \"@rctab\"", from, to, table);
+        Column code = suffix != null ? code = expression(VARCHAR, "\"@to\" || %s", string(suffix)) :
+                expression(VARCHAR, "\"@to\"");
 
-        return List.of(expression("(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access, columns.get(0)));
+        return List.of(expression(VARCHAR, "(SELECT (%s)::varchar FROM %s WHERE \"@from\" = %s)", code, access,
+                columns.get(0)));
     }
 
 

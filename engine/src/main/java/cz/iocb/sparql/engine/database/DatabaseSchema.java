@@ -19,13 +19,31 @@ import cz.iocb.sparql.engine.database.VirtualTableDefinition.UnjoinableColumns;
 
 
 /**
- * Catalog facts about the source tables used by the optimiser: nullable columns, unique keys, foreign keys, column
- * pairs known never to join, and character columns with a collation that does not order by code points. The facts about
- * database tables are read from the JDBC metadata and the PostgreSQL catalog (or filled in by hand); the facts about
- * virtual tables are merged in from their definitions by {@link #addVirtualTable}.
+ * Catalog facts about the source tables used by the optimiser and the translator: the columns with their SQL types,
+ * nullable columns, unique keys, foreign keys, column pairs known never to join, and character columns with a collation
+ * that does not order by code points. The facts about database tables are read from the JDBC metadata and the
+ * PostgreSQL catalog (or filled in by hand); the facts about virtual tables are merged in from their definitions by
+ * {@link #addVirtualTable}.
  */
 public class DatabaseSchema
 {
+    /**
+     * Catalog query listing every column of a user table or view with the schema and the name of its type. The type is
+     * named the way a configuration names it (see {@link SqlType#of}): by the bare name of a type of the
+     * {@code pg_catalog} or {@code public} schema, which is the canonical name of a built-in type, and schema-qualified
+     * otherwise.
+     */
+    private static final String columnTypeQuery = """
+            SELECT n.nspname, c.relname, a.attname, tn.nspname, t.typname
+            FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_type t ON t.oid = a.atttypid
+            JOIN pg_namespace tn ON tn.oid = t.typnamespace
+            WHERE a.attnum > 0 AND NOT a.attisdropped
+                AND c.relkind IN ('r', 'v', 'm', 'p', 'f')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')""";
+
     /**
      * Catalog query listing every column of a user table or view that has an explicit collation. SPARQL orders and
      * compares strings by unicode code points, whereas PostgreSQL orders a character column by its collation, so only
@@ -50,6 +68,11 @@ public class DatabaseSchema
             FROM (VALUES ('A'), ('a'), ('B'), ('b'), ('Z'), ('z'), ('0'), ('_'), ('-'), (' '), ('E'), ('\u00e9'))
                 AS probe(s)""";
 
+
+    /**
+     * SQL types of the columns per table.
+     */
+    protected final Map<SourceTable, Map<Column, SqlType>> columnTypes = new HashMap<>();
 
     /**
      * Nullable columns per table.
@@ -78,8 +101,8 @@ public class DatabaseSchema
 
 
     /**
-     * Reads tables and views, their nullable columns, unique indexes, foreign keys and column collations from the
-     * database.
+     * Reads tables and views, their columns with the types, nullable columns, unique indexes, foreign keys and column
+     * collations from the database.
      *
      * @param connectionPool the connection pool of the database
      * @throws SQLException on database errors
@@ -89,6 +112,25 @@ public class DatabaseSchema
         try(Connection connection = connectionPool.getConnection())
         {
             connection.setAutoCommit(true);
+
+            try(Statement statement = connection.createStatement())
+            {
+                try(ResultSet columns = statement.executeQuery(columnTypeQuery))
+                {
+                    while(columns.next())
+                    {
+                        String typeSchema = columns.getString(4);
+                        String typeName = columns.getString(5);
+
+                        if(!typeSchema.equals("pg_catalog") && !typeSchema.equals("public"))
+                            typeName = typeSchema + "." + typeName;
+
+                        addColumn(new DatabaseTable(columns.getString(1), columns.getString(2)),
+                                new TableColumn(columns.getString(3), SqlType.of(typeName)));
+                    }
+                }
+            }
+
 
             DatabaseMetaData metaData = connection.getMetaData();
 
@@ -105,7 +147,7 @@ public class DatabaseSchema
                     {
                         while(columns.next())
                         {
-                            TableColumn column = new TableColumn(columns.getString("COLUMN_NAME"));
+                            TableColumn column = requireColumn(table, columns.getString("COLUMN_NAME"));
 
                             if(columns.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls)
                                 addNullableColumn(table, column);
@@ -132,7 +174,7 @@ public class DatabaseSchema
                                 columns = new ArrayList<>();
                             }
 
-                            columns.add(new TableColumn(indexes.getString("COLUMN_NAME")));
+                            columns.add(requireColumn(table, indexes.getString("COLUMN_NAME")));
                         }
 
                         if(columns != null)
@@ -165,8 +207,8 @@ public class DatabaseSchema
                                         indexes.getString("FKTABLE_NAME"));
                             }
 
-                            parentColumns.add(new TableColumn(indexes.getString("PKCOLUMN_NAME")));
-                            foreignColumns.add(new TableColumn(indexes.getString("FKCOLUMN_NAME")));
+                            parentColumns.add(requireColumn(table, indexes.getString("PKCOLUMN_NAME")));
+                            foreignColumns.add(requireColumn(foreignTable, indexes.getString("FKCOLUMN_NAME")));
                         }
 
                         if(foreignTable != null)
@@ -197,10 +239,29 @@ public class DatabaseSchema
                 if(checkedCollations.computeIfAbsent(collation, c -> isCodepointCollation(connection, c)))
                     continue;
 
-                addForeignCollation(new DatabaseTable(collatedColumn[0], collatedColumn[1]),
-                        new TableColumn(collatedColumn[2]), collation);
+                SourceTable table = new DatabaseTable(collatedColumn[0], collatedColumn[1]);
+                addForeignCollation(table, requireColumn(table, collatedColumn[2]), collation);
             }
         }
+    }
+
+
+    /**
+     * Reference to the named column of the table typed by the catalog, which has to list the column.
+     *
+     * @param table the table
+     * @param name the column name
+     * @return reference to the named column of the table typed by the catalog
+     * @throws SQLException if the catalog does not list the column
+     */
+    private TableColumn requireColumn(SourceTable table, String name) throws SQLException
+    {
+        TableColumn column = getColumn(table, name);
+
+        if(column == null)
+            throw new SQLException("type of column \"" + name + "\" of table " + table + " is not known");
+
+        return column;
     }
 
 
@@ -237,6 +298,9 @@ public class DatabaseSchema
      */
     public DatabaseSchema(DatabaseSchema other)
     {
+        for(Entry<SourceTable, Map<Column, SqlType>> e : other.columnTypes.entrySet())
+            columnTypes.put(e.getKey(), new HashMap<>(e.getValue()));
+
         for(Entry<SourceTable, List<Column>> e : other.nullableColumns.entrySet())
             nullableColumns.put(e.getKey(), new ArrayList<>(e.getValue()));
 
@@ -255,15 +319,18 @@ public class DatabaseSchema
 
 
     /**
-     * Merges the facts stated by the definition of a virtual table: its nullable columns, unique keys, foreign keys and
-     * unjoinable column lists. The query of the definition is not needed here; it is attached to the generated
-     * statements by the translator.
+     * Merges the facts stated by the definition of a virtual table: its columns with their types, nullable columns,
+     * unique keys, foreign keys and unjoinable column lists. The query of the definition is not needed here; it is
+     * attached to the generated statements by the translator.
      *
      * @param table the virtual table
      * @param definition the definition of the virtual table
      */
     public void addVirtualTable(VirtualTable table, VirtualTableDefinition definition)
     {
+        for(TableColumn column : definition.getColumns())
+            addColumn(table, column);
+
         for(TableColumn column : definition.getNullableColumns())
             addNullableColumn(table, column);
 
@@ -276,6 +343,48 @@ public class DatabaseSchema
         for(UnjoinableColumns unjoinable : definition.getUnjoinableColumns())
             addUnjoinableColumns(unjoinable.leftTable(), unjoinable.leftColumns(), unjoinable.rightTable(),
                     unjoinable.rightColumns());
+    }
+
+
+    /**
+     * Declares a column of the table with its type.
+     *
+     * @param table the table
+     * @param column the column
+     */
+    public void addColumn(SourceTable table, TableColumn column)
+    {
+        columnTypes.computeIfAbsent(table, _ -> new HashMap<>()).put(column, column.getType());
+    }
+
+
+    /**
+     * SQL type of the column of the table, or null when the schema does not know the column.
+     *
+     * @param table the table
+     * @param column the column
+     * @return SQL type of the column of the table, or null when the schema does not know the column
+     */
+    public SqlType getColumnType(SourceTable table, Column column)
+    {
+        return columnTypes.getOrDefault(table, Map.of()).get(column);
+    }
+
+
+    /**
+     * Reference to the named column of the table typed by the schema, or null when the schema does not know the column.
+     *
+     * @param table the table
+     * @param name the column name
+     * @return reference to the named column of the table typed by the schema, or null when the schema does not know the
+     *         column
+     */
+    public TableColumn getColumn(SourceTable table, String name)
+    {
+        SqlType type = columnTypes.getOrDefault(table, Map.of()).entrySet().stream()
+                .filter(e -> e.getKey().getName().equals(name)).map(Entry::getValue).findFirst().orElse(null);
+
+        return type != null ? new TableColumn(name, type) : null;
     }
 
 

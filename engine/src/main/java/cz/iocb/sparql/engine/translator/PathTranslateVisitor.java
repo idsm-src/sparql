@@ -549,7 +549,8 @@ public class PathTranslateVisitor extends ElementVisitor<SqlIntercode>
 
                 if(i < tables.size() - 1)
                 {
-                    resourceClass = new InternalResourceClass(joinColumnsPairs.get(i).getTypes());
+                    resourceClass = new InternalResourceClass(
+                            joinColumnsPairs.get(i).getLeftColumns().stream().map(Column::getType).toList());
                     TermMapping nodeMapping = new InternalNodeMapping(resourceClass,
                             joinColumnsPairs.get(i).getLeftColumns());
                     term = parent.createVariable(variablePrefix);

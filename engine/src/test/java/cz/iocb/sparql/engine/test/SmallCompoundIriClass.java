@@ -88,7 +88,7 @@ public class SmallCompoundIriClass extends UserIriClass
         if(checkOptional)
             return ids;
 
-        return List.of(expression("CASE WHEN %s < 100 THEN %s END", ids.get(0), ids.get(0)));
+        return List.of(expression(INT4, "CASE WHEN %s < 100 THEN %s END", ids.get(0), ids.get(0)));
     }
 
 

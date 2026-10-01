@@ -745,7 +745,7 @@ public abstract class SqlIntercode extends SqlBaseClass
             // the joined columns are equal, so the value is not null when any of them is not null
             if(column instanceof ExpressionColumn && column.canBeNull()
                     && mappings.stream().anyMatch(m -> !m.get(position).canBeNull()))
-                column = new ExpressionColumn(column.getName(), false);
+                column = new ExpressionColumn(column.getName(), column.getType(), false);
 
             columns.add(column);
         }
@@ -785,7 +785,8 @@ public abstract class SqlIntercode extends SqlBaseClass
                 if(column == null)
                 {
                     // the exposed column keeps the knowledge that the accessed value is not null
-                    column = new TableColumn(output.get(i).getName(), canBeNull || access.canBeNull());
+                    column = new TableColumn(output.get(i).getName(), output.get(i).getType(),
+                            canBeNull || access.canBeNull());
                     map.put(access, column);
                 }
 
@@ -809,9 +810,9 @@ public abstract class SqlIntercode extends SqlBaseClass
         if(variants.size() == 1)
             return variants.getFirst();
 
-        return IntStream
-                .range(0, cols).mapToObj(i -> (Column) new ExpressionColumn(variants.stream()
-                        .map(l -> l.get(i).toString()).distinct().sorted().collect(joining(", ", "COALESCE(", ")"))))
+        return IntStream.range(0, cols)
+                .mapToObj(i -> (Column) new ExpressionColumn(variants.stream().map(l -> l.get(i).toString()).distinct()
+                        .sorted().collect(joining(", ", "COALESCE(", ")")), variants.getFirst().get(i).getType()))
                 .toList();
     }
 

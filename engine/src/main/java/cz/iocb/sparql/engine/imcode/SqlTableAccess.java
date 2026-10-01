@@ -344,13 +344,14 @@ public final class SqlTableAccess extends SqlIntercode
             if(column instanceof ExpressionColumn)
             {
                 if(!expressions.containsKey(column))
-                    expressions.put(column, new TableColumn("#expr-" + expressions.size(), canBeNull));
+                    expressions.put(column,
+                            new TableColumn("#expr-" + expressions.size(), column.getType(), canBeNull));
 
                 column = expressions.get(column);
             }
             else if(column instanceof TableColumn && !canBeNull)
             {
-                column = new TableColumn(column.getName(), false);
+                column = new TableColumn(column.getName(), column.getType(), false);
             }
 
             assert column != null;
@@ -1207,7 +1208,8 @@ public final class SqlTableAccess extends SqlIntercode
                             modified.add(col);
                         else
                             modified.add(new ExpressionColumn(
-                                    "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END"));
+                                    "CASE WHEN " + extraCondition + " IS NOT NULL THEN " + col + " END",
+                                    col.getType()));
                     }
 
                     columns = modified;
@@ -1682,9 +1684,7 @@ public final class SqlTableAccess extends SqlIntercode
                     appendAnd(builder, hasCondition);
                     hasCondition = true;
 
-                    builder.append(pair.getLeft());
-                    builder.append(" = ");
-                    builder.append(pair.getRight());
+                    builder.append(pair.getType().equal(pair.getLeft(), pair.getRight()));
                 }
 
                 for(ColumnComparison pair : condition.getAreNotDistinct())
@@ -1692,9 +1692,7 @@ public final class SqlTableAccess extends SqlIntercode
                     appendAnd(builder, hasCondition);
                     hasCondition = true;
 
-                    builder.append(pair.getLeft());
-                    builder.append(" IS NOT DISTINCT FROM ");
-                    builder.append(pair.getRight());
+                    builder.append(pair.getType().notDistinct(pair.getLeft(), pair.getRight()));
                 }
 
                 for(ColumnComparison pair : condition.getAreNotEqual())
@@ -1702,9 +1700,7 @@ public final class SqlTableAccess extends SqlIntercode
                     appendAnd(builder, hasCondition);
                     hasCondition = true;
 
-                    builder.append(pair.getLeft());
-                    builder.append(" <> ");
-                    builder.append(pair.getRight());
+                    builder.append(pair.getType().notEqual(pair.getLeft(), pair.getRight()));
                 }
 
                 // TODO: do not use derivable conditions

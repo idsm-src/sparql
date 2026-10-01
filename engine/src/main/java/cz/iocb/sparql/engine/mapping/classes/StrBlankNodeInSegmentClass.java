@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intBlankNode;
@@ -62,14 +63,15 @@ public final class StrBlankNodeInSegmentClass extends StrBlankNodeClass
         Column bnvalue = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_sblanknode(%s, '%d'::int4)", bnvalue, segment));
+            return List
+                    .of(expression(RDFBOX, "sparql.rdfbox_create_from_sblanknode(%s, '%d'::int4)", bnvalue, segment));
 
         if(targetClass.equals(strScalarBlankNode))
-            return List.of(expression("sparql.sblanknode_create(%s, '%d'::int4)", bnvalue, segment));
+            return List.of(expression(VARCHAR, "sparql.sblanknode_create(%s, '%d'::int4)", bnvalue, segment));
 
         if(targetClass.equals(strBlankNode))
             return List.of(bnvalue, !canBeNull ? constant(segment, INT4) :
-                    expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", bnvalue, segment));
+                    expression(INT4, "CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", bnvalue, segment));
 
         throw new IllegalArgumentException();
     }
@@ -86,16 +88,16 @@ public final class StrBlankNodeInSegmentClass extends StrBlankNodeClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_sblanknode_value_of_segment(%s, '%d'::int4)", columns.get(0),
-                    segment));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_sblanknode_value_of_segment(%s, '%d'::int4)",
+                    columns.get(0), segment));
 
         if(sourceClass.equals(intScalarBlankNode))
-            return List
-                    .of(expression("sparql.sblanknode_get_value_of_segment(%s, '%d'::int4)", columns.get(0), segment));
+            return List.of(expression(VARCHAR, "sparql.sblanknode_get_value_of_segment(%s, '%d'::int4)", columns.get(0),
+                    segment));
 
         if(sourceClass.equals(intBlankNode))
-            return List
-                    .of(expression("CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), segment, columns.get(0)));
+            return List.of(expression(VARCHAR, "CASE WHEN %s = '%d'::int4 THEN %s END", columns.get(1), segment,
+                    columns.get(0)));
 
         throw new IllegalArgumentException();
     }

@@ -3,6 +3,7 @@ package cz.iocb.sparql.engine.mapping.classes;
 import static cz.iocb.sparql.engine.database.SqlType.INT2;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.database.SqlType.INT8;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -195,7 +196,8 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         if(!check)
             return func;
 
-        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+        return expression(sqlTypes.get(0), "CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp),
+                func);
     }
 
 
@@ -208,11 +210,11 @@ public class IntegerUserIriClass extends SimpleUserIriClass
     private Column numberAsString(Column column)
     {
         if(length == 0)
-            return expression("(%s)::varchar", column);
+            return expression(VARCHAR, "(%s)::varchar", column);
         if(length > 0)
-            return expression("lpad((%s)::varchar, %d, '0')", column, length);
+            return expression(VARCHAR, "lpad((%s)::varchar, %d, '0')", column, length);
         else
-            return expression("CASE WHEN %d <= %s THEN (%s)::varchar ELSE lpad((%s)::varchar, %d, '0') END",
+            return expression(VARCHAR, "CASE WHEN %d <= %s THEN (%s)::varchar ELSE lpad((%s)::varchar, %d, '0') END",
                     BigInteger.TEN.pow(-1 - length), column, column, column, -length);
     }
 
@@ -228,11 +230,12 @@ public class IntegerUserIriClass extends SimpleUserIriClass
         SqlType sqlType = sqlTypes.get(0);
 
         if(length > 0)
-            return expression("substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+            return expression(sqlType, "substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
         else if(suffix == null)
-            return expression("right(%s, -%d)::%s", column, prefix.length(), sqlType);
+            return expression(sqlType, "right(%s, -%d)::%s", column, prefix.length(), sqlType);
         else
-            return expression("left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(), sqlType);
+            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(),
+                    sqlType);
     }
 
 

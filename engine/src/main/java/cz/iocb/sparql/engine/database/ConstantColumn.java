@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.database;
 
+import java.util.Objects;
+
 
 
 /**
@@ -10,12 +12,6 @@ package cz.iocb.sparql.engine.database;
 public abstract sealed class ConstantColumn extends Column permits NullColumn, ValueColumn
 {
     /**
-     * SQL type of the constant.
-     */
-    private final SqlType type;
-
-
-    /**
      * Creates the constant.
      *
      * @param value the SQL text of the constant
@@ -23,8 +19,7 @@ public abstract sealed class ConstantColumn extends Column permits NullColumn, V
      */
     protected ConstantColumn(String value, SqlType type)
     {
-        super(value);
-        this.type = type;
+        super(value, Objects.requireNonNull(type, "type of constant " + value));
     }
 
 
@@ -39,16 +34,5 @@ public abstract sealed class ConstantColumn extends Column permits NullColumn, V
     public Column fromTable(Table table)
     {
         return this;
-    }
-
-
-    /**
-     * SQL type of the constant.
-     *
-     * @return SQL type of the constant
-     */
-    public SqlType getType()
-    {
-        return type;
     }
 }

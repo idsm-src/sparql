@@ -174,7 +174,8 @@ public final class SqlUnion extends SqlIntercode
                     else
                     {
                         // the union column is not null when the columns of all the branches are not null
-                        Column col = new TableColumn(columns.get(i).getName(), c.stream().anyMatch(Column::canBeNull));
+                        Column col = new TableColumn(columns.get(i).getName(), columns.get(i).getType(),
+                                c.stream().anyMatch(Column::canBeNull));
                         unionColumns.put(c, col);
                         mapping.add(col);
 

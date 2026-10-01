@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.rdfLangString;
@@ -95,11 +96,11 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
         Column string = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_langstring(%s, '%s'::varchar)", string, tag));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_langstring(%s, '%s'::varchar)", string, tag));
 
         if(targetClass.equals(rdfLangString))
             return List.of(string, !canBeNull ? constant(tag, VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN '%s'::varchar END", string, tag));
 
         throw new IllegalArgumentException();
     }
@@ -116,11 +117,12 @@ public final class LangStringWithTagClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(
-                    expression("sparql.rdfbox_get_langstring_value_of_lang(%s, '%s'::varchar)", columns.get(0), tag));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_langstring_value_of_lang(%s, '%s'::varchar)",
+                    columns.get(0), tag));
 
         if(sourceClass.equals(rdfLangString))
-            return List.of(expression("CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag, columns.get(0)));
+            return List.of(expression(VARCHAR, "CASE WHEN %s = '%s'::varchar THEN %s END", columns.get(1), tag,
+                    columns.get(0)));
 
         throw new IllegalArgumentException();
     }

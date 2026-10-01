@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
@@ -78,9 +79,9 @@ public class UserLiteralCompositeBaseClassTest
         List<Column> canonicalColumns = genUserType.toColumns(request, canonical);
         List<Column> otherColumns = genUserType.toColumns(request, other);
 
-        assertEquals(List.of(expression("sparql.ubox_create(%s)", constant("42", intType)),
+        assertEquals(List.of(expression(UBOX, "sparql.ubox_create(%s)", constant("42", intType)),
                 constant(intIri.getValue(), VARCHAR), constant("", VARCHAR)), canonicalColumns);
-        assertEquals(List.of(expression("sparql.ubox_create(%s)", constant("42", intType)),
+        assertEquals(List.of(expression(UBOX, "sparql.ubox_create(%s)", constant("42", intType)),
                 constant(intIri.getValue(), VARCHAR), constant("+042", VARCHAR)), otherColumns);
         assertEquals(otherColumns, request.getColumns(genUserType, other));
 

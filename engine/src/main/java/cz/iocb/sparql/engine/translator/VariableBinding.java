@@ -1,6 +1,7 @@
 package cz.iocb.sparql.engine.translator;
 
 import static cz.iocb.sparql.engine.database.Column.coalesce;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.database.Table.toTableColumns;
 import static cz.iocb.sparql.engine.imcode.expression.SqlExpressionIntercode.getLiteralClassName;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -276,7 +277,8 @@ public class VariableBinding
                 columns.add(variants.get(0).get(i));
             else
                 columns.add(new ExpressionColumn(
-                        set.stream().sorted().map(Object::toString).collect(joining(",", "COALESCE(", ")"))));
+                        set.stream().sorted().map(Object::toString).collect(joining(",", "COALESCE(", ")")),
+                        targetClass.getSqlTypes().get(i)));
         }
 
         return columns;
@@ -519,7 +521,7 @@ public class VariableBinding
                 variants.add(e.getKey().toClass(rdfRtlLangString, e.getValue(), literalCanBeNull).get(0));
             else if(hasStringLiteral(e.getKey()))
                 variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
-                        + e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0) + ")"));
+                        + e.getKey().toClass(box, e.getValue(), literalCanBeNull).get(0) + ")", VARCHAR));
         }
 
         return coalesce(variants);
@@ -554,7 +556,7 @@ public class VariableBinding
                 variants.add(resClass.toClass(rdfRtlLangString, columns, literalCanBeNull).get(0));
             else if(hasStringLiteral(resClass))
                 variants.add(new ExpressionColumn("sparql.rdfbox_get_string_literal("
-                        + resClass.toClass(box, columns, literalCanBeNull).get(0) + ")"));
+                        + resClass.toClass(box, columns, literalCanBeNull).get(0) + ")", VARCHAR));
             else
                 throw new IllegalArgumentException();
         }
@@ -582,12 +584,13 @@ public class VariableBinding
         Column value = deriveMapping(ClassRelations.NONE, base).get(0);
 
         if(base.equals(box))
-            return new ExpressionColumn("sparql.rdfbox_promote_to_" + getLiteralClassName(target) + "(" + value + ")");
+            return new ExpressionColumn("sparql.rdfbox_promote_to_" + getLiteralClassName(target) + "(" + value + ")",
+                    target.getSqlTypes().get(0));
         else if(target.isSubclassOf(base))
             return value;
         else
             return new ExpressionColumn("sparql.cast_as_" + target.getResourceName() + "_from_"
-                    + getLiteralClassName(base) + "(" + value + ")");
+                    + getLiteralClassName(base) + "(" + value + ")", target.getSqlTypes().get(0));
     }
 
 

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.extension;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,20 +59,39 @@ public class ResultDefinition
 
 
     /**
-     * Creates a result of one class stored in a single field.
+     * Creates a result of one class stored in the named fields, which are typed by the class (one field per column of
+     * the class).
      *
      * @param resultName IRI naming the result
      * @param resultClass class of the result
-     * @param sqlTypeField field of the SQL result row holding the value
+     * @param sqlTypeFields names of the fields of the SQL result row holding the value
+     * @throws IllegalArgumentException if the number of fields differs from the number of columns of the class
      */
-    public ResultDefinition(String resultName, ResourceClass resultClass, String sqlTypeField)
+    public ResultDefinition(String resultName, ResourceClass resultClass, String... sqlTypeFields)
     {
-        List<Column> sqlTypeFields = List.of(new TableColumn(sqlTypeField));
-        Map<ResourceClass, List<Column>> mappings = new HashMap<>();
-        mappings.put(resultClass, sqlTypeFields);
+        this(resultName, resultClass, fields(resultClass, sqlTypeFields));
+    }
 
-        this.resultName = resultName;
-        this.mappings = mappings;
+
+    /**
+     * The named fields typed by the class positionally.
+     *
+     * @param resultClass class of the result
+     * @param names names of the fields
+     * @return the named fields typed by the class positionally
+     * @throws IllegalArgumentException if the number of names differs from the number of columns of the class
+     */
+    private static List<Column> fields(ResourceClass resultClass, String... names)
+    {
+        if(names.length != resultClass.getColumnCount())
+            throw new IllegalArgumentException("wrong number of fields");
+
+        List<Column> fields = new ArrayList<>(names.length);
+
+        for(int i = 0; i < names.length; i++)
+            fields.add(new TableColumn(names[i], resultClass.getSqlTypes().get(i)));
+
+        return fields;
     }
 
 

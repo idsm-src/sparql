@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.userType;
@@ -79,7 +80,7 @@ public class UserLiteralCompositeClassTest
         Literal value = new TypedLiteral("42", intIri);
         List<Column> columns = userType.toColumns(request, value);
 
-        assertEquals(List.of(expression("sparql.ubox_create(%s)", constant("42", intType)),
+        assertEquals(List.of(expression(UBOX, "sparql.ubox_create(%s)", constant("42", intType)),
                 constant(intIri.getValue(), VARCHAR)), columns);
         assertEquals(columns, request.getColumns(userType, value));
 

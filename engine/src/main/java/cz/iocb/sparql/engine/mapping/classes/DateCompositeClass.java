@@ -2,7 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.DATE;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATE;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
@@ -62,18 +64,18 @@ public final class DateCompositeClass extends CanonicalLiteralClass
         Column zone = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_date(%s, %s)", date, zone));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_date(%s, %s)", date, zone));
 
         if(targetClass.equals(genScalarDate))
-            return List.of(expression("sparql.zoneddate_create(%s, %s)", date, zone), !canBeNull ?
-                    constant("", VARCHAR) : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+            return List.of(expression(ZONEDDATE, "sparql.zoneddate_create(%s, %s)", date, zone), !canBeNull ?
+                    constant("", VARCHAR) : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(genDate))
             return List.of(date, zone, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(xsdScalarDate))
-            return List.of(expression("sparql.zoneddate_create(%s, %s)", date, zone));
+            return List.of(expression(ZONEDDATE, "sparql.zoneddate_create(%s, %s)", date, zone));
 
         throw new IllegalArgumentException();
     }
@@ -90,23 +92,23 @@ public final class DateCompositeClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_date_value(%s, false)", columns.get(0)),
-                    expression("sparql.rdfbox_get_date_zone(%s, false)", columns.get(0)));
+            return List.of(expression(DATE, "sparql.rdfbox_get_date_value(%s, false)", columns.get(0)),
+                    expression(INT4, "sparql.rdfbox_get_date_zone(%s, false)", columns.get(0)));
 
         if(sourceClass.equals(genScalarDate))
             return List.of(
-                    expression("(CASE %s WHEN '' THEN sparql.zoneddate_get_value(%s) END)", columns.get(1),
+                    expression(DATE, "(CASE %s WHEN '' THEN sparql.zoneddate_get_value(%s) END)", columns.get(1),
                             columns.get(0)),
-                    expression("(CASE %s WHEN '' THEN sparql.zoneddate_get_zone(%s) END)", columns.get(1),
+                    expression(INT4, "(CASE %s WHEN '' THEN sparql.zoneddate_get_zone(%s) END)", columns.get(1),
                             columns.get(0)));
 
         if(sourceClass.equals(genDate))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
-                    expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
+            return List.of(expression(DATE, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
+                    expression(INT4, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
 
         if(sourceClass.equals(xsdScalarDate))
-            return List.of(expression("sparql.zoneddate_get_value(%s)", columns.get(0)),
-                    expression("sparql.zoneddate_get_zone(%s)", columns.get(0)));
+            return List.of(expression(DATE, "sparql.zoneddate_get_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.zoneddate_get_zone(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }

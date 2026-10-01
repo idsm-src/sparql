@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -45,7 +46,7 @@ public final class StrBlankNodeScalarClass extends StrBlankNodeClass
         Column bnvalue = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_sblanknode(%s)", bnvalue));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_sblanknode(%s)", bnvalue));
 
         //if(targetClass.equals(strBlankNode))
         //    return List.of(expression("sparql.sblanknode_get_value(%s)", bnvalue),
@@ -66,7 +67,7 @@ public final class StrBlankNodeScalarClass extends StrBlankNodeClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_sblanknode(%s)", columns.get(0)));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_sblanknode(%s)", columns.get(0)));
 
         //if(sourceClass.equals(strBlankNode))
         //    return List.of(expression("sparql.sblanknode_create(%s, %s)", columns.get(0), columns.get(1)));
@@ -78,7 +79,7 @@ public final class StrBlankNodeScalarClass extends StrBlankNodeClass
     @Override
     public List<Column> toColumns(StrBlankNode bnode)
     {
-        return List.of(expression("sparql.sblanknode_create('%s'::varchar, '%s'::int4)", bnode.getValue(),
+        return List.of(expression(VARCHAR, "sparql.sblanknode_create('%s'::varchar, '%s'::int4)", bnode.getValue(),
                 bnode.getSegment()));
     }
 }

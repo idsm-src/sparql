@@ -188,7 +188,8 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(!check)
             return func;
 
-        return expression("CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp), func);
+        return expression(sqlTypes.get(0), "CASE WHEN sparql.regex_string(%s, %s) THEN %s END", column, string(regexp),
+                func);
     }
 
 
@@ -205,15 +206,16 @@ public class StringUserIriClass extends SimpleUserIriClass
         if(prefix == null && suffix == null)
             return column;
         else if(length > 0 && prefix == null)
-            return expression("substring(%s, %d, %d)::%s", column, 1, length, sqlType);
+            return expression(sqlType, "substring(%s, %d, %d)::%s", column, 1, length, sqlType);
         else if(length > 0)
-            return expression("substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
+            return expression(sqlType, "substring(%s, %d, %d)::%s", column, prefix.length() + 1, length, sqlType);
         else if(prefix == null)
-            return expression("left(%s, -%d)::%s", column, suffix.length(), sqlType);
+            return expression(sqlType, "left(%s, -%d)::%s", column, suffix.length(), sqlType);
         else if(suffix == null)
-            return expression("right(%s, -%d)::%s", column, prefix.length(), sqlType);
+            return expression(sqlType, "right(%s, -%d)::%s", column, prefix.length(), sqlType);
         else
-            return expression("left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(), sqlType);
+            return expression(sqlType, "left(right(%s, -%d), -%d)::%s", column, prefix.length(), suffix.length(),
+                    sqlType);
     }
 
 

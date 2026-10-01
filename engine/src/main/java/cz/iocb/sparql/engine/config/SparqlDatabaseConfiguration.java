@@ -76,6 +76,7 @@ import cz.iocb.sparql.engine.mapping.classes.BlankNodeClass;
 import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.IriClass;
 import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
+import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.UserIriClass;
 import cz.iocb.sparql.engine.mapping.datatypes.Datatype;
 import cz.iocb.sparql.engine.mapping.extension.FunctionDefinition;
@@ -432,15 +433,17 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Column-based IRI mapping of the class over the given column specifications (see {@link #getColumn}).
+     * Column-based IRI mapping of the class over the given column specifications (see
+     * {@link #getColumns(ResourceClass, String...)}).
      *
      * @param iriClass the user IRI class
      * @param columns the columns
-     * @return column-based IRI mapping of the class over the given column specifications (see {@link #getColumn})
+     * @return column-based IRI mapping of the class over the given column specifications (see
+     *         {@link #getColumns(ResourceClass, String...)})
      */
     public TermMapping createIriMapping(IriClass iriClass, String... columns)
     {
-        return new ParametrisedIriMapping(iriClass, getColumns(columns));
+        return new ParametrisedIriMapping(iriClass, getColumns(iriClass, columns));
     }
 
 
@@ -471,15 +474,19 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Column-based IRI mapping of the named class over the given column specifications (see {@link #getColumn}).
+     * Column-based IRI mapping of the named class over the given column specifications (see
+     * {@link #getColumns(ResourceClass, String...)}).
      *
      * @param iriClassName name of the user IRI class
      * @param columns the columns
-     * @return column-based IRI mapping of the named class over the given column specifications (see {@link #getColumn})
+     * @return column-based IRI mapping of the named class over the given column specifications (see
+     *         {@link #getColumns(ResourceClass, String...)})
      */
     public TermMapping createIriMapping(String iriClassName, String... columns)
     {
-        return new ParametrisedIriMapping(getIriClass(iriClassName), getColumns(columns));
+        IriClass iriClass = getIriClass(iriClassName);
+
+        return new ParametrisedIriMapping(iriClass, getColumns(iriClass, columns));
     }
 
 
@@ -529,28 +536,32 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Column-based blank node mapping over the given column specifications (see {@link #getColumn}).
+     * Column-based blank node mapping over the given column specifications (see
+     * {@link #getColumns(ResourceClass, String...)}).
      *
      * @param blankNodeClass the blank node class
      * @param columns the columns
-     * @return column-based blank node mapping over the given column specifications (see {@link #getColumn})
+     * @return column-based blank node mapping over the given column specifications (see
+     *         {@link #getColumns(ResourceClass, String...)})
      */
     public TermMapping createBlankNodeMapping(BlankNodeClass blankNodeClass, String... columns)
     {
-        return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(columns));
+        return new ParametrisedBlankNodeMapping(blankNodeClass, getColumns(blankNodeClass, columns));
     }
 
 
     /**
-     * Column-based literal mapping over the given column specifications (see {@link #getColumn}).
+     * Column-based literal mapping over the given column specifications (see
+     * {@link #getColumns(ResourceClass, String...)}).
      *
      * @param literalClass the literal class
      * @param columns the columns
-     * @return column-based literal mapping over the given column specifications (see {@link #getColumn})
+     * @return column-based literal mapping over the given column specifications (see
+     *         {@link #getColumns(ResourceClass, String...)})
      */
     public TermMapping createLiteralMapping(LiteralClass literalClass, String... columns)
     {
-        return new ParametrisedLiteralMapping(literalClass, getColumns(columns));
+        return new ParametrisedLiteralMapping(literalClass, getColumns(literalClass, columns));
     }
 
 
@@ -747,8 +758,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
     /**
      * Registers a single-table quad mapping of this service (see {@link SingleTableQuadMapping}). With
-     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. Mapped character columns
-     * must use a code-point collation.
+     * {@code autoAddToDefaultGraph}, a named-graph mapping is also added to the default graph. The columns of the table
+     * referenced by the mappings and the conditions are checked against the database schema: they have to exist with
+     * the types they are declared with. Mapped character columns must use a code-point collation.
      *
      * @param table the table
      * @param graph the graph mapping, or null for the default graph
@@ -757,11 +769,16 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      * @param distinct distinct flag of each table
+     * @throws IllegalArgumentException if a referenced column of the table is unknown to the schema or declared with
+     *             another type
      */
     public void addQuadMapping(SourceTable table, ConstantIriMapping graph, TermMapping subject,
             ConstantIriMapping predicate, TermMapping object, Conditions conditions, boolean distinct)
     {
         checkVirtualTables(table == null ? List.of() : List.of(table));
+        checkMapping(table, subject);
+        checkMapping(table, object);
+        checkConditions(table, conditions);
         checkColumnCollations(table == null ? List.of() : List.of(table), subject, predicate, object);
 
         mappings.get(serviceIri)
@@ -824,7 +841,9 @@ public class SparqlDatabaseConfiguration implements ClassRelations
     /**
      * Registers a join quad mapping of this service (see {@link JoinTableQuadMapping}): graph, subject and predicate
      * come from the first table, the object from the last one. With {@code autoAddToDefaultGraph}, a named-graph
-     * mapping is also added to the default graph.
+     * mapping is also added to the default graph. The columns referenced by the mappings, the join columns and the
+     * conditions are checked against the database schema: they have to exist in their tables with the types they are
+     * declared with.
      *
      * @param tables the tables
      * @param joinColumnsPairs join columns between adjacent tables
@@ -834,12 +853,22 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param object the object mapping
      * @param conditions the conditions
      * @param distinct distinct flag of each table
+     * @throws IllegalArgumentException if a referenced column is unknown to the schema or declared with another type
      */
     public void addQuadMapping(List<SourceTable> tables, List<JoinColumns> joinColumnsPairs, ConstantIriMapping graph,
             TermMapping subject, ConstantIriMapping predicate, TermMapping object, List<Conditions> conditions,
             List<Boolean> distinct)
     {
         checkVirtualTables(tables);
+        checkMapping(tables.get(0), subject);
+        checkMapping(tables.get(tables.size() - 1), object);
+
+        for(int i = 0; i < joinColumnsPairs.size(); i++)
+            checkJoinColumns(tables.get(i), tables.get(i + 1), joinColumnsPairs.get(i));
+
+        for(int i = 0; i < conditions.size(); i++)
+            checkConditions(tables.get(i), conditions.get(i));
+
         checkColumnCollations(tables, subject, predicate, object);
 
         mappings.get(serviceIri).add(new JoinTableQuadMapping(tables, joinColumnsPairs, graph, subject, predicate,
@@ -889,37 +918,37 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Registers a two-table join mapping joined on one column pair of the given SQL type.
+     * Registers a two-table join mapping joined on one column pair, which is typed from the database schema (see
+     * {@link #getColumn(SourceTable, String)}).
      *
      * @param subjectTable table of the subject
      * @param objectTable table of the object
      * @param subjectTableJoinColumn join column of the subject table
      * @param objectTableJoinColumn join column of the object table
-     * @param type SQL type of the join columns
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
      * @param object the object mapping
      */
     public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
-            ConstantIriMapping predicate, TermMapping object)
+            String objectTableJoinColumn, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
+            TermMapping object)
     {
         addQuadMapping(List.of(subjectTable, objectTable),
-                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn),
-                        SqlType.of(type))),
+                List.of(new JoinColumns(getColumn(subjectTable, subjectTableJoinColumn),
+                        getColumn(objectTable, objectTableJoinColumn))),
                 graph, subject, predicate, object);
     }
 
 
     /**
-     * Registers a two-table join mapping joined on one column pair, with conditions on each table.
+     * Registers a two-table join mapping joined on one column pair, which is typed from the database schema (see
+     * {@link #getColumn(SourceTable, String)}), with conditions on each table.
      *
      * @param subjectTable table of the subject
      * @param objectTable table of the object
      * @param subjectTableJoinColumn join column of the subject table
      * @param objectTableJoinColumn join column of the object table
-     * @param type SQL type of the join columns
      * @param graph the graph mapping, or null for the default graph
      * @param subject the subject mapping
      * @param predicate the predicate mapping
@@ -928,12 +957,12 @@ public class SparqlDatabaseConfiguration implements ClassRelations
      * @param objectCondition conditions on the object table
      */
     public void addQuadMapping(SourceTable subjectTable, SourceTable objectTable, String subjectTableJoinColumn,
-            String objectTableJoinColumn, String type, ConstantIriMapping graph, TermMapping subject,
-            ConstantIriMapping predicate, TermMapping object, Conditions subjectCondition, Conditions objectCondition)
+            String objectTableJoinColumn, ConstantIriMapping graph, TermMapping subject, ConstantIriMapping predicate,
+            TermMapping object, Conditions subjectCondition, Conditions objectCondition)
     {
         addQuadMapping(List.of(subjectTable, objectTable),
-                List.of(new JoinColumns(new TableColumn(subjectTableJoinColumn), new TableColumn(objectTableJoinColumn),
-                        SqlType.of(type))),
+                List.of(new JoinColumns(getColumn(subjectTable, subjectTableJoinColumn),
+                        getColumn(objectTable, objectTableJoinColumn))),
                 graph, subject, predicate, object, List.of(subjectCondition, objectCondition));
     }
 
@@ -1076,40 +1105,216 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Parses a column specification: {@code (expression)} is an SQL expression, {@code 'literal'::type} a typed
-     * constant, {@code null::type} (in any letter case) a typed NULL constant, anything else a column name.
+     * Parses a column specification that carries its type: {@code (expression)::type} is an SQL expression of the given
+     * type, {@code 'literal'::type} a typed constant and {@code null::type} (in any letter case) a typed NULL constant.
+     * Anything else is the name of a column of a table, whose type is not part of the specification; such a name is
+     * accepted only by {@link #getColumns(ResourceClass, String...)}, which types it by the resource class of the
+     * mapped term, and by {@link #getColumn(SourceTable, String)}, which types it from the database schema.
      *
      * @param value the specification text
      * @return the parsed column
+     * @throws IllegalArgumentException if an expression lacks its type, or the specification is a column name
      */
     public static Column getColumn(String value)
     {
-        if(value.startsWith("("))
-            return new ExpressionColumn(value);
+        Column column = parseColumn(value);
+
+        if(column == null)
+            throw new IllegalArgumentException(
+                    "column name " + value + " needs a table or a resource class to get its type");
+
+        return column;
+    }
+
+
+    /**
+     * Parses a column specification that carries its type (see {@link #getColumn(String)}); a column name, which
+     * carries none, yields null.
+     *
+     * @param value the specification text
+     * @return the parsed column, or null for a column name
+     * @throws IllegalArgumentException if an expression lacks its type
+     */
+    private static Column parseColumn(String value)
+    {
+        if(value.matches("(?s)\\(.*\\)::[_a-zA-Z0-9.]+"))
+            return new ExpressionColumn(value,
+                    SqlType.of(value.replaceFirst("(?s)^\\(.*\\)::([_a-zA-Z0-9.]+)$", "$1")));
+        else if(value.startsWith("("))
+            throw new IllegalArgumentException(
+                    "expression column " + value + " lacks its type: use (expression)::type");
         else if(value.matches("'.*'::[_a-zA-Z0-9.]+"))
             return new ValueColumn(value.replaceFirst("^'(.*)'::[_a-zA-Z0-9.]+", "$1").replaceAll("''", "'"),
                     SqlType.of(value.replaceFirst("^'.*'::([_a-zA-Z0-9.]+)$", "$1")));
         else if(value.matches("(?i)null::[_a-zA-Z0-9.]+"))
             return new NullColumn(SqlType.of(value.replaceFirst("^(?i)null::([_a-zA-Z0-9.]+)$", "$1")));
         else
-            return new TableColumn(value);
+            return null;
     }
 
 
     /**
-     * Parses column specifications, see {@link #getColumn}.
+     * Parses a column specification (see {@link #getColumn(String)}), typing a column name by the given type.
      *
+     * @param value the specification text
+     * @param type SQL type of the column when the specification is a column name
+     * @return the parsed column
+     */
+    private static Column getColumn(String value, SqlType type)
+    {
+        Column column = parseColumn(value);
+
+        return column != null ? column : new TableColumn(value, type);
+    }
+
+
+    /**
+     * Parses the column specifications of the columns representing a term of the resource class (see
+     * {@link #getColumn(String)}), one per column of the class: a column name gets the SQL type of the class at its
+     * position.
+     *
+     * @param resourceClass the resource class of the term
      * @param values the column specifications
      * @return the parsed columns
+     * @throws IllegalArgumentException if the number of specifications differs from the number of columns of the class
      */
-    public static List<Column> getColumns(String... values)
+    public static List<Column> getColumns(ResourceClass resourceClass, String... values)
+    {
+        if(values.length != resourceClass.getColumnCount())
+            throw new IllegalArgumentException("wrong number of columns for class " + resourceClass.getResourceName());
+
+        List<Column> columns = new ArrayList<>(values.length);
+
+        for(int i = 0; i < values.length; i++)
+            columns.add(getColumn(values[i], resourceClass.getSqlTypes().get(i)));
+
+        return columns;
+    }
+
+
+    /**
+     * Parses a column specification of a column of the given table (see {@link #getColumn(String)}): a column name gets
+     * its SQL type from the database schema.
+     *
+     * @param table the table
+     * @param value the specification text
+     * @return the parsed column
+     * @throws IllegalStateException if the configuration has no database schema
+     * @throws IllegalArgumentException if the schema does not know the column of the table
+     */
+    public Column getColumn(SourceTable table, String value)
+    {
+        Column column = parseColumn(value);
+
+        if(column != null)
+            return column;
+
+        if(databaseSchema == null)
+            throw new IllegalStateException(
+                    "column " + value + " of table " + table + " cannot be typed without a database schema");
+
+        TableColumn tableColumn = databaseSchema.getColumn(table, value);
+
+        if(tableColumn == null)
+            throw new IllegalArgumentException("unknown column \"" + value + "\" of table " + table);
+
+        return tableColumn;
+    }
+
+
+    /**
+     * Parses column specifications of columns of the given table, see {@link #getColumn(SourceTable, String)}.
+     *
+     * @param table the table
+     * @param values the column specifications
+     * @return the parsed columns
+     * @throws IllegalStateException if the configuration has no database schema
+     * @throws IllegalArgumentException if the schema does not know a column of the table
+     */
+    public List<Column> getColumns(SourceTable table, String... values)
     {
         List<Column> columns = new ArrayList<>(values.length);
 
         for(String value : values)
-            columns.add(getColumn(value));
+            columns.add(getColumn(table, value));
 
         return columns;
+    }
+
+
+    /**
+     * Checks that a column of the table referenced by a mapping or a condition is known to the database schema with the
+     * type it is declared with; constants and expressions are not checked, nor is anything when the configuration has
+     * no database schema.
+     *
+     * @param table the table
+     * @param column the column
+     * @throws IllegalArgumentException if the column is unknown to the schema or declared with another type
+     */
+    private void checkColumn(SourceTable table, Column column)
+    {
+        if(!(column instanceof TableColumn) || databaseSchema == null)
+            return;
+
+        SqlType type = databaseSchema.getColumnType(table, column);
+
+        if(type == null)
+            throw new IllegalArgumentException("unknown column " + column + " of table " + table);
+
+        if(!type.equals(column.getType()))
+            throw new IllegalArgumentException("column " + column + " of table " + table + " is declared as "
+                    + column.getType() + " but has type " + type);
+    }
+
+
+    /**
+     * Checks the columns of a term mapping against the database schema (see {@link #checkColumn}); a mapping without
+     * columns or without a table has nothing to check.
+     *
+     * @param table the table of the mapping, or null
+     * @param mapping the term mapping
+     */
+    private void checkMapping(SourceTable table, TermMapping mapping)
+    {
+        if(table == null || !(mapping instanceof ParametrisedMapping))
+            return;
+
+        for(Column column : mapping.getColumns(null))
+            checkColumn(table, column);
+    }
+
+
+    /**
+     * Checks the columns of conditions against the database schema (see {@link #checkColumn}); conditions without a
+     * table have nothing to check.
+     *
+     * @param table the table of the conditions, or null
+     * @param conditions the conditions
+     */
+    private void checkConditions(SourceTable table, Conditions conditions)
+    {
+        if(table == null)
+            return;
+
+        for(Column column : conditions.getNonConstantColumns())
+            checkColumn(table, column);
+    }
+
+
+    /**
+     * Checks the columns of both sides of join columns against the database schema (see {@link #checkColumn}).
+     *
+     * @param leftTable the left table
+     * @param rightTable the right table
+     * @param joinColumns the join columns
+     */
+    private void checkJoinColumns(SourceTable leftTable, SourceTable rightTable, JoinColumns joinColumns)
+    {
+        for(Column column : joinColumns.getLeftColumns())
+            checkColumn(leftTable, column);
+
+        for(Column column : joinColumns.getRightColumns())
+            checkColumn(rightTable, column);
     }
 
 
@@ -1301,20 +1506,50 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Condition {@code column = v1 OR column = v2 ...} over column specifications (see {@link #getColumn}).
+     * Condition {@code column = v1 OR column = v2 ...} over column specifications: the values have to carry their type
+     * (see {@link #getColumn(String)}) and a column name takes the type of the first value.
      *
      * @param column the column specification
-     * @param values the column specifications
-     * @return condition {@code column = v1 OR column = v2 ...} over column specifications (see {@link #getColumn})
+     * @param values the column specifications of the values, at least one
+     * @return condition {@code column = v1 OR column = v2 ...}
+     * @throws IllegalArgumentException if there is no value, or a value is a column name
      */
     public Conditions createAreEqualCondition(String column, String... values)
     {
+        return createAreEqualCondition(getColumnOfValues(column, values), getColumns(values));
+    }
+
+
+    /**
+     * Condition {@code column = v1 OR column = v2 ...} over column specifications of columns of the table (see
+     * {@link #getColumn(SourceTable, String)}).
+     *
+     * @param table the table
+     * @param column the column specification
+     * @param values the column specifications of the values
+     * @return condition {@code column = v1 OR column = v2 ...}
+     */
+    public Conditions createAreEqualCondition(SourceTable table, String column, String... values)
+    {
+        return createAreEqualCondition(getColumn(table, column), getColumns(table, values));
+    }
+
+
+    /**
+     * Condition {@code column = v1 OR column = v2 ...}.
+     *
+     * @param column the column
+     * @param values the values
+     * @return condition {@code column = v1 OR column = v2 ...}
+     */
+    private static Conditions createAreEqualCondition(Column column, List<Column> values)
+    {
         Conditions result = new Conditions(false);
 
-        for(String value : values)
+        for(Column value : values)
         {
             Condition condition = new Condition();
-            condition.addAreEqual(getColumn(column), getColumn(value));
+            condition.addAreEqual(column, value);
             result.add(condition);
         }
 
@@ -1323,28 +1558,96 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Condition {@code column != v1 AND column != v2 ...} over column specifications (see {@link #getColumn}).
+     * Condition {@code column != v1 AND column != v2 ...} over column specifications: the values have to carry their
+     * type (see {@link #getColumn(String)}) and a column name takes the type of the first value.
      *
      * @param column the column specification
-     * @param values the column specifications
-     * @return condition {@code column != v1 AND column != v2 ...} over column specifications (see {@link #getColumn})
+     * @param values the column specifications of the values, at least one
+     * @return condition {@code column != v1 AND column != v2 ...}
+     * @throws IllegalArgumentException if there is no value, or a value is a column name
      */
     public Conditions createAreNotEqualCondition(String column, String... values)
     {
+        return createAreNotEqualCondition(getColumnOfValues(column, values), getColumns(values));
+    }
+
+
+    /**
+     * Condition {@code column != v1 AND column != v2 ...} over column specifications of columns of the table (see
+     * {@link #getColumn(SourceTable, String)}).
+     *
+     * @param table the table
+     * @param column the column specification
+     * @param values the column specifications of the values
+     * @return condition {@code column != v1 AND column != v2 ...}
+     */
+    public Conditions createAreNotEqualCondition(SourceTable table, String column, String... values)
+    {
+        return createAreNotEqualCondition(getColumn(table, column), getColumns(table, values));
+    }
+
+
+    /**
+     * Condition {@code column != v1 AND column != v2 ...}.
+     *
+     * @param column the column
+     * @param values the values
+     * @return condition {@code column != v1 AND column != v2 ...}
+     */
+    private static Conditions createAreNotEqualCondition(Column column, List<Column> values)
+    {
         Condition condition = new Condition();
 
-        for(String value : values)
-            condition.addAreNotEqual(getColumn(column), getColumn(value));
+        for(Column value : values)
+            condition.addAreNotEqual(column, value);
 
         return new Conditions(condition);
     }
 
 
     /**
-     * Condition {@code column IS NOT NULL}.
+     * Parses the column specification of a column compared with values that carry their type: a column name takes the
+     * type of the first value.
+     *
+     * @param column the column specification
+     * @param values the column specifications of the values, at least one
+     * @return the parsed column
+     * @throws IllegalArgumentException if there is no value, or a value is a column name
+     */
+    private static Column getColumnOfValues(String column, String... values)
+    {
+        if(values.length == 0)
+            throw new IllegalArgumentException("no value to compare column " + column + " with");
+
+        return getColumn(column, getColumn(values[0]).getType());
+    }
+
+
+    /**
+     * Parses column specifications that carry their type, see {@link #getColumn(String)}.
+     *
+     * @param values the column specifications
+     * @return the parsed columns
+     * @throws IllegalArgumentException if a specification is a column name
+     */
+    private static List<Column> getColumns(String... values)
+    {
+        List<Column> columns = new ArrayList<>(values.length);
+
+        for(String value : values)
+            columns.add(getColumn(value));
+
+        return columns;
+    }
+
+
+    /**
+     * Condition {@code column IS NOT NULL} over a column specification that carries its type (see
+     * {@link #getColumn(String)}).
      *
      * @param column the column specification
      * @return condition {@code column IS NOT NULL}
+     * @throws IllegalArgumentException if the specification is a column name
      */
     public Conditions createIsNotNullCondition(String column)
     {
@@ -1355,15 +1658,49 @@ public class SparqlDatabaseConfiguration implements ClassRelations
 
 
     /**
-     * Condition {@code column IS NULL}.
+     * Condition {@code column IS NOT NULL} over a column specification of a column of the table (see
+     * {@link #getColumn(SourceTable, String)}).
+     *
+     * @param table the table
+     * @param column the column specification
+     * @return condition {@code column IS NOT NULL}
+     */
+    public Conditions createIsNotNullCondition(SourceTable table, String column)
+    {
+        Condition condition = new Condition();
+        condition.addIsNotNull(getColumn(table, column));
+        return new Conditions(condition);
+    }
+
+
+    /**
+     * Condition {@code column IS NULL} over a column specification that carries its type (see
+     * {@link #getColumn(String)}).
      *
      * @param column the column specification
      * @return condition {@code column IS NULL}
+     * @throws IllegalArgumentException if the specification is a column name
      */
     public Conditions createIsNullCondition(String column)
     {
         Condition condition = new Condition();
         condition.addIsNull(getColumn(column));
+        return new Conditions(condition);
+    }
+
+
+    /**
+     * Condition {@code column IS NULL} over a column specification of a column of the table (see
+     * {@link #getColumn(SourceTable, String)}).
+     *
+     * @param table the table
+     * @param column the column specification
+     * @return condition {@code column IS NULL}
+     */
+    public Conditions createIsNullCondition(SourceTable table, String column)
+    {
+        Condition condition = new Condition();
+        condition.addIsNull(getColumn(table, column));
         return new Conditions(condition);
     }
 }

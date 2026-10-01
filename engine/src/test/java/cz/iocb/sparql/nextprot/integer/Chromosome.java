@@ -1,6 +1,7 @@
 package cz.iocb.sparql.nextprot.integer;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDouble;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdInteger;
@@ -40,17 +41,19 @@ public class Chromosome
     public static void addResourceClasses(SparqlDatabaseConfiguration config)
     {
         config.addIriClass(new MapUserIriClass("isoform", INT4, new DatabaseTable(schema, "isoform_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/isoform/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/isoform/", 0));
         config.addIriClass(new MapUserIriClass("annotation", INT4, new DatabaseTable(schema, "annotation_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/annotation/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/annotation/",
+                0));
         config.addIriClass(new MapUserIriClass("evidence", INT4, new DatabaseTable(schema, "evidence_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/evidence/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/evidence/", 0));
         config.addIriClass(new MapUserIriClass("entry", INT4, new DatabaseTable(schema, "entry_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/entry/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/entry/", 0));
         config.addIriClass(new MapUserIriClass("proteoform", INT4, new DatabaseTable(schema, "proteoform_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/proteoform/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/proteoform/",
+                0));
         config.addIriClass(new MapUserIriClass("gene", INT4, new DatabaseTable(schema, "gene_bases"),
-                new TableColumn("id"), new TableColumn("iri"), "http://nextprot.org/rdf/gene/", 0));
+                new TableColumn("id", INT4), new TableColumn("iri", VARCHAR), "http://nextprot.org/rdf/gene/", 0));
     }
 
 

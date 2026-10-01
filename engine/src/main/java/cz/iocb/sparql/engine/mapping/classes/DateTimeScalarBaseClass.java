@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATETIME;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -58,7 +59,8 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
         Column lexical = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_datetime_with_lexical(%s, %s)", time, lexical));
+            return List
+                    .of(expression(RDFBOX, "sparql.rdfbox_create_from_datetime_with_lexical(%s, %s)", time, lexical));
 
         //if(targetClass.equals(genDateTime))
         //    return List.of(expression("sparql.zoneddatetime_get_value(%s)", time),
@@ -79,8 +81,8 @@ public final class DateTimeScalarBaseClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_datetime(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_datetime_lexical(%s)", columns.get(0)));
+            return List.of(expression(ZONEDDATETIME, "sparql.rdfbox_get_datetime(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_datetime_lexical(%s)", columns.get(0)));
 
         //if(sourceClass.equals(genDateTime))
         //    return List.of(expression("sparql.zoneddatetime_create(%s, %s)", columns.get(0), columns.get(1)),

@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
@@ -71,12 +73,13 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
         Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(targetClass.equals(box))
-            return List.of(
-                    expression("sparql.rdfbox_create_from_userliteral_with_lexical(%s, %s, %s)", value, type, lexical));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_userliteral_with_lexical(%s, %s, %s)", value,
+                    type, lexical));
 
         if(targetClass.equals(genUserType))
-            return List.of(expression("sparql.ubox_create(%s)", value),
-                    !canBeNull ? type : expression("CASE WHEN %s IS NOT NULL THEN %s END", value, type), lexical);
+            return List.of(expression(UBOX, "sparql.ubox_create(%s)", value),
+                    !canBeNull ? type : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", value, type),
+                    lexical);
 
         throw new IllegalArgumentException();
     }
@@ -96,15 +99,15 @@ public final class UserLiteralBaseClass extends BaseLiteralClass
 
         if(sourceClass.equals(box))
             return List.of(
-                    expression("sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s)", columns.get(0),
-                            type, sqlType),
-                    expression("sparql.rdfbox_get_userliteral_lexical_of_type(%s, %s)", columns.get(0), type));
+                    expression(sqlType, "sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s)",
+                            columns.get(0), type, sqlType),
+                    expression(VARCHAR, "sparql.rdfbox_get_userliteral_lexical_of_type(%s, %s)", columns.get(0), type));
 
         if(sourceClass.equals(genUserType))
             return List.of(
-                    expression("(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)", columns.get(1), type,
-                            columns.get(0), sqlType),
-                    expression("(CASE %s WHEN %s THEN %s END)", columns.get(1), type, columns.get(2)));
+                    expression(sqlType, "(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)",
+                            columns.get(1), type, columns.get(0), sqlType),
+                    expression(VARCHAR, "(CASE %s WHEN %s THEN %s END)", columns.get(1), type, columns.get(2)));
 
         throw new IllegalArgumentException();
     }

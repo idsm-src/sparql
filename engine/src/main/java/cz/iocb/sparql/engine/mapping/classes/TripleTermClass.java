@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -266,7 +268,7 @@ public final class TripleTermClass extends PrimitiveResourceClass
         }
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_tripleterm(%s, %s, %s)",
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_tripleterm(%s, %s, %s)",
                     subject.toClass(box, subjectColumns, canBeNull).get(0),
                     predicate.toClass(iri, predicateColumns, canBeNull).get(0),
                     object.toClass(box, objectColumns, canBeNull).get(0)));
@@ -303,11 +305,11 @@ public final class TripleTermClass extends PrimitiveResourceClass
             List<Column> result = new ArrayList<>(getColumnCount());
 
             result.addAll(fromComponentClass(subject, box,
-                    List.of(expression("sparql.rdfbox_get_tripleterm_subject(%s)", column)), checkOptional));
+                    List.of(expression(RDFBOX, "sparql.rdfbox_get_tripleterm_subject(%s)", column)), checkOptional));
             result.addAll(fromComponentClass(predicate, iri,
-                    List.of(expression("sparql.rdfbox_get_tripleterm_predicate(%s)", column)), checkOptional));
+                    List.of(expression(VARCHAR, "sparql.rdfbox_get_tripleterm_predicate(%s)", column)), checkOptional));
             result.addAll(fromComponentClass(object, box,
-                    List.of(expression("sparql.rdfbox_get_tripleterm_object(%s)", column)), checkOptional));
+                    List.of(expression(RDFBOX, "sparql.rdfbox_get_tripleterm_object(%s)", column)), checkOptional));
 
             return result;
         }

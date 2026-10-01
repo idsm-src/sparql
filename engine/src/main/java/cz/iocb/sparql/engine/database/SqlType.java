@@ -67,6 +67,11 @@ public class SqlType
     public static final SqlType VARCHAR = builtin("varchar", String.class, "character varying");
 
     /**
+     * PostgreSQL {@code text}.
+     */
+    public static final SqlType TEXT = builtin("text", String.class);
+
+    /**
      * PostgreSQL {@code date}.
      */
     public static final SqlType DATE = builtin("date", LocalDate.class);
@@ -259,6 +264,20 @@ public class SqlType
     public String distinct(Column left, Column right)
     {
         return "(" + left + " IS DISTINCT FROM " + right + ")";
+    }
+
+
+    /**
+     * SQL condition that two not-null values of the type are not identical, the negation of
+     * {@link #equal(Column, Column)}.
+     *
+     * @param left the left value
+     * @param right the right value
+     * @return SQL condition that two not-null values of the type are not identical
+     */
+    public String notEqual(Column left, Column right)
+    {
+        return "(" + left + " != " + right + ")";
     }
 
 

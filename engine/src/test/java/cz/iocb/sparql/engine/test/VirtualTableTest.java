@@ -1,12 +1,15 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdString;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.sql.Connection;
@@ -30,6 +33,9 @@ import cz.iocb.sparql.engine.database.VirtualTable;
 import cz.iocb.sparql.engine.database.VirtualTableDefinition;
 import cz.iocb.sparql.engine.error.TranslateExceptions;
 import cz.iocb.sparql.engine.mapping.ConstantIriMapping;
+import cz.iocb.sparql.engine.mapping.ParametrisedMapping;
+import cz.iocb.sparql.engine.mapping.QuadMapping;
+import cz.iocb.sparql.engine.mapping.TermMapping;
 import cz.iocb.sparql.engine.mapping.classes.IntegerUserIriClass;
 import cz.iocb.sparql.engine.rdf.Iri;
 import cz.iocb.sparql.engine.rdf.RdfTerm;
@@ -117,9 +123,11 @@ public class VirtualTableTest
     {
         VirtualTableDefinition definition = new VirtualTableDefinition(
                 "SELECT DISTINCT compound, synonym FROM virtual_test.synonym");
-        definition.addPrimaryKeys(List.of(new TableColumn("compound"), new TableColumn("synonym")));
-        definition.addForeignKeys(compound, List.of(new TableColumn("id")), synonyms,
-                List.of(new TableColumn("compound")));
+        definition.addColumn(new TableColumn("compound", INT4));
+        definition.addColumn(new TableColumn("synonym", VARCHAR));
+        definition.addPrimaryKeys(List.of(new TableColumn("compound", INT4), new TableColumn("synonym", VARCHAR)));
+        definition.addForeignKeys(compound, List.of(new TableColumn("id", INT4)), synonyms,
+                List.of(new TableColumn("compound", INT4)));
         return definition;
     }
 
@@ -133,7 +141,10 @@ public class VirtualTableTest
     {
         VirtualTableDefinition definition = new VirtualTableDefinition("SELECT c.id, c.label, s.synonym "
                 + "FROM virtual_test.compound c JOIN " + synonyms + " s ON s.compound = c.id", List.of(synonyms));
-        definition.addPrimaryKeys(List.of(new TableColumn("id"), new TableColumn("synonym")));
+        definition.addColumn(new TableColumn("id", INT4));
+        definition.addColumn(new TableColumn("label", VARCHAR));
+        definition.addColumn(new TableColumn("synonym", VARCHAR));
+        definition.addPrimaryKeys(List.of(new TableColumn("id", INT4), new TableColumn("synonym", VARCHAR)));
         return definition;
     }
 
@@ -307,12 +318,69 @@ public class VirtualTableTest
     void schemaFacts() throws Exception
     {
         SparqlDatabaseConfiguration config = createConfiguration();
-        Set<Column> key = Set.of(new TableColumn("compound"), new TableColumn("synonym"));
+        Set<Column> key = Set.of(new TableColumn("compound", INT4), new TableColumn("synonym", VARCHAR));
 
         assertTrue(config.getDatabaseSchema().isKey(synonyms, key));
         assertFalse(config.getDatabaseSchema().getForeignKeys(compound, synonyms).isEmpty());
         assertFalse(schema.isKey(synonyms, key));
         assertTrue(schema.getForeignKeys(compound, synonyms).isEmpty());
+
+        assertEquals(INT4, config.getDatabaseSchema().getColumnType(synonyms, new TableColumn("compound", INT4)));
+        assertEquals(VARCHAR, config.getDatabaseSchema().getColumnType(labeled, new TableColumn("label", VARCHAR)));
+        assertNull(schema.getColumnType(synonyms, new TableColumn("compound", INT4)));
+    }
+
+
+    @Test
+    @DisplayName("column references are typed from the schema when the mapping is registered")
+    void columnTypes() throws Exception
+    {
+        SparqlDatabaseConfiguration config = createConfiguration();
+
+        assertEquals(new TableColumn("id", INT4), schema.getColumn(compound, "id"));
+        assertEquals(INT4, schema.getColumn(compound, "id").getType());
+        assertEquals(VARCHAR, schema.getColumn(compound, "label").getType());
+        assertNull(schema.getColumn(compound, "missing"));
+
+        assertEquals(INT4, config.getColumn(compound, "id").getType());
+        assertEquals(VARCHAR, config.getColumn(labeled, "synonym").getType());
+        assertEquals(VARCHAR, config.getColumn(compound, "(label || label)::varchar").getType());
+        assertEquals(List.of(new TableColumn("id", INT4)), config.getColumns(compound, "id"));
+        assertThrows(IllegalArgumentException.class, () -> config.getColumn(compound, "missing"));
+
+        assertTrue(config.createIsNotNullCondition(compound, "label").getIsNotNull()
+                .contains(new TableColumn("label", VARCHAR)));
+        assertThrows(IllegalArgumentException.class, () -> config.createIsNotNullCondition("label"));
+        assertThrows(IllegalArgumentException.class, () -> config.createIsNotNullCondition(compound, "missing"));
+
+        for(QuadMapping mapping : config.getMappings(null))
+        {
+            for(TermMapping term : List.of(mapping.getSubject(), mapping.getObject()))
+            {
+                if(!(term instanceof ParametrisedMapping))
+                    continue;
+
+                List<Column> columns = term.getColumns(null);
+
+                for(int i = 0; i < columns.size(); i++)
+                    assertEquals(term.getResourceClass(null).getSqlTypes().get(i), columns.get(i).getType());
+            }
+        }
+
+        assertThrows(IllegalArgumentException.class,
+                () -> config.addQuadMapping(compound, null, config.createIriMapping("compound", "missing"),
+                        config.createIriMapping("ex:label"), config.createLiteralMapping(xsdString, "label")));
+
+        // the compound class declares an int4 column, the label column is a varchar
+        assertThrows(IllegalArgumentException.class,
+                () -> config.addQuadMapping(compound, null, config.createIriMapping("compound", "label"),
+                        config.createIriMapping("ex:label"), config.createLiteralMapping(xsdString, "label")));
+
+        // the same mismatch in a condition
+        assertThrows(IllegalArgumentException.class,
+                () -> config.addQuadMapping(compound, null, config.createIriMapping("compound", "id"),
+                        config.createIriMapping("ex:label"), config.createLiteralMapping(xsdString, "label"),
+                        config.createAreEqualCondition("label", "'1'::int4")));
     }
 
 

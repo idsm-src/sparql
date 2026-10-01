@@ -369,7 +369,8 @@ public sealed abstract class ResourceClass permits PrimitiveResourceClass, Deriv
 
         for(int i = 0; i < count; i++)
             columns.add(
-                    new TableColumn(map.getSafeName(variable.getName() + "#" + name + (count > 0 ? "_par" + i : ""))));
+                    new TableColumn(map.getSafeName(variable.getName() + "#" + name + (count > 0 ? "_par" + i : "")),
+                            getSqlTypes().get(i)));
 
         return columns;
     }

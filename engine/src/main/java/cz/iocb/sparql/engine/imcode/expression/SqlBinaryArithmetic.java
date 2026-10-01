@@ -236,7 +236,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
                 Column cl = left.promoteNumericAs(variant.get(0), resultClass);
                 Column cr = right.promoteNumericAs(variant.get(1), resultClass);
 
-                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")"));
+                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")",
+                        resultClass.getSqlTypes().get(0)));
             }
         }
         else
@@ -246,7 +247,8 @@ public final class SqlBinaryArithmetic extends SqlBinary
                 Column cl = left.get(relations, unionize(variant.get(0), box)).get(0);
                 Column cr = right.get(relations, unionize(variant.get(1), box)).get(0);
 
-                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")"));
+                cols.add(new ExpressionColumn("(" + cl + " operator(sparql." + operator.getText() + ") " + cr + ")",
+                        resultClass.getSqlTypes().get(0)));
             }
         }
 

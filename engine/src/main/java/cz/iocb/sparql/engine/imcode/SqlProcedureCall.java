@@ -174,7 +174,7 @@ public final class SqlProcedureCall extends SqlIntercode
             Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
             for(Entry<ResourceClass, List<Column>> e : definition.getMappings().entrySet())
-                mappings.put(e.getKey(), getSqlResultColumns(e.getValue()));
+                mappings.put(e.getKey(), getSqlResultColumns(e.getKey(), e.getValue()));
 
             callBindings.add(new VariableBinding(variable, mappings, false));
         }
@@ -271,7 +271,7 @@ public final class SqlProcedureCall extends SqlIntercode
             Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
             for(Entry<ResourceClass, List<Column>> e : definition.getMappings().entrySet())
-                mappings.put(e.getKey(), getSqlResultColumns(e.getValue()));
+                mappings.put(e.getKey(), getSqlResultColumns(e.getKey(), e.getValue()));
 
             callBindings.add(new VariableBinding(variable, mappings, false));
         }
@@ -418,23 +418,24 @@ public final class SqlProcedureCall extends SqlIntercode
     /**
      * Columns reading a result from the function result: the whole result, or its fields.
      *
+     * @param resClass class of the result
      * @param fields fields of the SQL result row, or null
      * @return columns reading a result from the function result: the whole result, or its fields
      */
-    private static List<Column> getSqlResultColumns(List<Column> fields)
+    private static List<Column> getSqlResultColumns(ResourceClass resClass, List<Column> fields)
     {
         List<Column> result = new ArrayList<>();
 
         if(fields == null)
         {
-            result.add(new ExpressionColumn("\"" + resultVar + "\""));
+            result.add(new ExpressionColumn("\"" + resultVar + "\"", resClass.getSqlTypes().get(0)));
         }
         else
         {
             for(Column field : fields)
             {
                 if(field instanceof TableColumn)
-                    result.add(new ExpressionColumn("(\"" + resultVar + "\")." + field));
+                    result.add(new ExpressionColumn("(\"" + resultVar + "\")." + field, field.getType()));
                 else if(field instanceof ConstantColumn)
                     result.add(field);
                 else

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
 import java.util.List;
@@ -71,11 +72,11 @@ public non-sealed abstract class UserIriClass extends IriClass
     protected static Column addPrefixAndSuffix(String prefix, Column value, String suffix)
     {
         if(prefix != null && suffix != null)
-            return expression("(%s || %s || %s)::varchar", string(prefix), value, string(suffix));
+            return expression(VARCHAR, "(%s || %s || %s)::varchar", string(prefix), value, string(suffix));
         else if(prefix != null)
-            return expression("(%s || %s)::varchar", string(prefix), value);
+            return expression(VARCHAR, "(%s || %s)::varchar", string(prefix), value);
         else if(suffix != null)
-            return expression("(%s || %s)::varchar", value, string(suffix));
+            return expression(VARCHAR, "(%s || %s)::varchar", value, string(suffix));
         else
             return value;
     }

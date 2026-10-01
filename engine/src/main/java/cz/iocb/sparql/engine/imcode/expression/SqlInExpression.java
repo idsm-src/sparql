@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.areComparable;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.NOT_EQUAL;
@@ -83,7 +84,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
             LinkedHashMap<Column, Column> columnMap = new LinkedHashMap<>();
 
             for(Column c : operand.getBinding().getExpressionColumns())
-                columnMap.put(c, new TableColumn("@col" + columnMap.size()));
+                columnMap.put(c, new TableColumn("@col" + columnMap.size(), c.getType()));
 
             Map<ResourceClass, List<Column>> mapping = operand.getBinding().getMappings().entrySet().stream()
                     .collect(toMap(e -> e.getKey(), e -> e.getValue() == null ? null :
@@ -253,7 +254,7 @@ public final class SqlInExpression extends SqlExpressionIntercode
             builder.append(columnMap.keySet().stream().map(c -> c.toString()).collect(joining(", ")));
             builder.append("))");
 
-            List<Column> result = List.of(new ExpressionColumn(builder.toString()));
+            List<Column> result = List.of(new ExpressionColumn(builder.toString(), BOOL));
 
             return new SqlInExpression(negated, left, rights, singletonMap(xsdBoolean, result), expression.canBeNull());
         }

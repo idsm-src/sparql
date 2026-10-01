@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.string;
@@ -92,7 +93,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
     @Override
     protected Column generateFunction(Column column)
     {
-        return expression("CASE %s %s END", column,
+        return expression(VARCHAR, "CASE %s %s END", column,
                 values.entrySet().stream().map(e -> format("WHEN %s::%s THEN %s::varchar", string(e.getValue()),
                         sqlTypes.get(0), string(e.getKey().getValue()))).collect(joining(" ")));
     }
@@ -102,7 +103,7 @@ public class EnumUserIriClass extends SimpleUserIriClass
     protected Column generateInverseFunction(Column column, boolean check)
     {
         return expression(
-                "CASE %s %s END", column, values
+                sqlTypes.get(0), "CASE %s %s END", column, values
                         .entrySet().stream().map(e -> format("WHEN %s::varchar THEN %s::%s",
                                 string(e.getKey().getValue()), string(e.getValue()), sqlTypes.get(0)))
                         .collect(joining(" ")));

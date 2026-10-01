@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.expression;
@@ -64,7 +66,7 @@ public abstract class SimpleUserIriClass extends UserIriClass
         Column value = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", generateFunction(value)));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(%s)", generateFunction(value)));
 
         if(targetClass.equals(iri))
             return List.of(generateFunction(value));
@@ -87,7 +89,8 @@ public abstract class SimpleUserIriClass extends UserIriClass
         boolean check = !checkOptional && !superClass.isSubclassOf(unionize(this, subtract(box, iri)));
 
         if(sourceClass.equals(box))
-            return List.of(generateInverseFunction(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)), check));
+            return List.of(
+                    generateInverseFunction(expression(VARCHAR, "sparql.rdfbox_get_iri(%s)", columns.get(0)), check));
 
         if(sourceClass.equals(iri))
             return List.of(generateInverseFunction(columns.get(0), check));

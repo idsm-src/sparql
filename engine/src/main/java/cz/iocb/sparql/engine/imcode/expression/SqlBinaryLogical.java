@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.AND;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryLogical.LogicalOperator.OR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
@@ -219,7 +220,7 @@ public final class SqlBinaryLogical extends SqlBinary implements SqlBooleanExpre
             SqlExpressionIntercode left, SqlExpressionIntercode right)
     {
         return List.of(new ExpressionColumn("(" + left.get(relations, genBoolean).get(0) + " " + operator.getName()
-                + " " + right.get(relations, genBoolean).get(0) + ")", left.canBeNull() || right.canBeNull()));
+                + " " + right.get(relations, genBoolean).get(0) + ")", BOOL, left.canBeNull() || right.canBeNull()));
     }
 
 

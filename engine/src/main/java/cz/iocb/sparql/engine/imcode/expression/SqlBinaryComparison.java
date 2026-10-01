@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.EQUAL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBinaryComparison.ComparisonOperator.GREATER_THAN_OR_EQUAL;
@@ -609,7 +610,7 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return null;
 
         return List.of(Column.coalesce(variants.stream()
-                .map(v -> new ExpressionColumn(translate(relations, operator, v.get(0), v.get(1), left, right)))
+                .map(v -> new ExpressionColumn(translate(relations, operator, v.get(0), v.get(1), left, right), BOOL))
                 .collect(toSet())));
     }
 

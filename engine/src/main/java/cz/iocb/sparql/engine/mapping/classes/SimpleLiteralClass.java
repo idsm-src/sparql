@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -89,11 +90,11 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass pe
         Column value = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_%s(%s)", name, value));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_%s(%s)", name, value));
 
         if(targetClass.equals(base))
             return List.of(value, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", value));
 
         throw new IllegalArgumentException();
     }
@@ -111,12 +112,13 @@ public sealed abstract class SimpleLiteralClass extends CanonicalLiteralClass pe
 
         if(sourceClass.equals(box))
             if(base == null)
-                return List.of(expression("sparql.rdfbox_get_%s(%s)", name, columns.get(0)));
+                return List.of(expression(sqlTypes.get(0), "sparql.rdfbox_get_%s(%s)", name, columns.get(0)));
             else
-                return List.of(expression("sparql.rdfbox_get_%s(%s, false)", name, columns.get(0)));
+                return List.of(expression(sqlTypes.get(0), "sparql.rdfbox_get_%s(%s, false)", name, columns.get(0)));
 
         if(sourceClass.equals(base))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
+            return List
+                    .of(expression(sqlTypes.get(0), "(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
 
         throw new IllegalArgumentException();
     }

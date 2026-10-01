@@ -11,9 +11,9 @@ import java.util.Set;
 /**
  * Definition of a {@link VirtualTable}: the SQL query that computes its rows, the other virtual tables the query reads
  * (so that the {@code WITH} clause of a generated statement can list them first), and the facts about the table that
- * the optimiser cannot read from the catalog: nullable columns, unique keys, foreign keys and column pairs that never
- * join. The facts are stated the same way as in {@link DatabaseSchema} and are merged into the schema of the
- * configuration when the table is registered.
+ * the optimiser cannot read from the catalog: the columns with their types, nullable columns, unique keys, foreign keys
+ * and column pairs that never join. The facts are stated the same way as in {@link DatabaseSchema} and are merged into
+ * the schema of the configuration when the table is registered; a mapping may use only the declared columns.
  */
 public class VirtualTableDefinition
 {
@@ -56,6 +56,11 @@ public class VirtualTableDefinition
      * Virtual tables read by the query, in registration order.
      */
     private final Set<VirtualTable> dependencies = new LinkedHashSet<>();
+
+    /**
+     * Columns of the table with their types.
+     */
+    private final List<TableColumn> columns = new ArrayList<>();
 
     /**
      * Columns that may be NULL.
@@ -110,6 +115,17 @@ public class VirtualTableDefinition
     public void addDependency(VirtualTable table)
     {
         dependencies.add(table);
+    }
+
+
+    /**
+     * Declares a column of the table with its type.
+     *
+     * @param column the column
+     */
+    public void addColumn(TableColumn column)
+    {
+        columns.add(column);
     }
 
 
@@ -192,6 +208,17 @@ public class VirtualTableDefinition
 
 
     /**
+     * Columns of the table with their types.
+     *
+     * @return columns of the table with their types
+     */
+    public List<TableColumn> getColumns()
+    {
+        return columns;
+    }
+
+
+    /**
      * Columns that may be NULL.
      *
      * @return columns that may be NULL
@@ -253,7 +280,7 @@ public class VirtualTableDefinition
 
         VirtualTableDefinition other = (VirtualTableDefinition) object;
 
-        return query.equals(other.query) && dependencies.equals(other.dependencies)
+        return query.equals(other.query) && dependencies.equals(other.dependencies) && columns.equals(other.columns)
                 && nullableColumns.equals(other.nullableColumns) && primaryKeys.equals(other.primaryKeys)
                 && foreignKeys.equals(other.foreignKeys) && unjoinableColumns.equals(other.unjoinableColumns);
     }

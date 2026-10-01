@@ -2,13 +2,14 @@ package cz.iocb.sparql.engine.database;
 
 import static java.util.stream.Collectors.joining;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 
 
 /**
- * A column reference, constant or SQL expression usable in generated SQL. The natural ordering puts constants first,
- * then table columns, then expressions.
+ * A column reference, constant or SQL expression usable in generated SQL, together with its SQL type. The natural
+ * ordering puts constants first, then table columns, then expressions.
  */
 public abstract sealed class Column implements Comparable<Column> permits TableColumn, ExpressionColumn, ConstantColumn
 {
@@ -17,15 +18,22 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
      */
     protected final String value;
 
+    /**
+     * SQL type of the column.
+     */
+    protected final SqlType type;
+
 
     /**
-     * Creates the column with its SQL text.
+     * Creates the column with its SQL text and type.
      *
      * @param value SQL text of the column
+     * @param type SQL type of the column
      */
-    protected Column(String value)
+    protected Column(String value, SqlType type)
     {
         this.value = value;
+        this.type = Objects.requireNonNull(type, "type of column " + value);
     }
 
 
@@ -41,6 +49,17 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
 
 
     /**
+     * SQL type of the column.
+     *
+     * @return SQL type of the column
+     */
+    public final SqlType getType()
+    {
+        return type;
+    }
+
+
+    /**
      * This column qualified by the table (or alias); constants are returned unchanged, expressions cannot be qualified.
      *
      * @param table the table
@@ -52,8 +71,8 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
 
     /**
      * True if the value of the column may be NULL. A table column is nullable unless it was created with the knowledge
-     * that its values are not null (see {@link TableColumn#TableColumn(String, boolean)}), an expression column unless
-     * declared otherwise, and a constant column only if it is the NULL constant.
+     * that its values are not null (see {@link TableColumn#TableColumn(String, SqlType, boolean)}), an expression
+     * column unless declared otherwise, and a constant column only if it is the NULL constant.
      *
      * @return true if the value of the column may be NULL, false otherwise
      */
@@ -111,8 +130,8 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
 
 
     /**
-     * Column yielding the first non-null of the given columns: a constant if one is present, the only column, or a
-     * {@code COALESCE} expression.
+     * Column yielding the first non-null of the given columns, which are all of the same type: a constant if one is
+     * present, the only column, or a {@code COALESCE} expression.
      *
      * @param cols the columns
      * @return column yielding the first non-null of the given columns: a constant if one is present, the only column,
@@ -125,6 +144,7 @@ public abstract sealed class Column implements Comparable<Column> permits TableC
         if(list.get(0) instanceof ConstantColumn || list.size() == 1)
             return list.get(0);
 
-        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "COALESCE(", ")")));
+        return new ExpressionColumn(list.stream().map(Object::toString).collect(joining(",", "COALESCE(", ")")),
+                list.get(0).getType());
     }
 }

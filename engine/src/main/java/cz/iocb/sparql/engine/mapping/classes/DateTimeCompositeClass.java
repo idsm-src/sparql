@@ -1,8 +1,10 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATETIME;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDateTime;
@@ -64,18 +66,18 @@ public final class DateTimeCompositeClass extends CanonicalLiteralClass
         Column zone = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_datetime(%s, %s)", time, zone));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_datetime(%s, %s)", time, zone));
 
         if(targetClass.equals(genScalarDateTime))
-            return List.of(expression("sparql.zoneddatetime_create(%s, %s)", time, zone), !canBeNull ?
-                    constant("", VARCHAR) : expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+            return List.of(expression(ZONEDDATETIME, "sparql.zoneddatetime_create(%s, %s)", time, zone), !canBeNull ?
+                    constant("", VARCHAR) : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(genDateTime))
             return List.of(time, zone, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(xsdScalarDateTime))
-            return List.of(expression("sparql.zoneddatetime_create(%s, %s)", time, zone));
+            return List.of(expression(ZONEDDATETIME, "sparql.zoneddatetime_create(%s, %s)", time, zone));
 
         throw new IllegalArgumentException();
     }
@@ -92,23 +94,23 @@ public final class DateTimeCompositeClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_datetime_value(%s, false)", columns.get(0)),
-                    expression("sparql.rdfbox_get_datetime_zone(%s, false)", columns.get(0)));
+            return List.of(expression(TIMESTAMPTZ, "sparql.rdfbox_get_datetime_value(%s, false)", columns.get(0)),
+                    expression(INT4, "sparql.rdfbox_get_datetime_zone(%s, false)", columns.get(0)));
 
         if(sourceClass.equals(genScalarDateTime))
             return List.of(
-                    expression("(CASE %s WHEN '' THEN sparql.zoneddatetime_get_value(%s) END)", columns.get(1),
-                            columns.get(0)),
-                    expression("(CASE %s WHEN '' THEN sparql.zoneddatetime_get_zone(%s) END)", columns.get(1),
+                    expression(TIMESTAMPTZ, "(CASE %s WHEN '' THEN sparql.zoneddatetime_get_value(%s) END)",
+                            columns.get(1), columns.get(0)),
+                    expression(INT4, "(CASE %s WHEN '' THEN sparql.zoneddatetime_get_zone(%s) END)", columns.get(1),
                             columns.get(0)));
 
         if(sourceClass.equals(genDateTime))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
-                    expression("(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
+            return List.of(expression(TIMESTAMPTZ, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(0)),
+                    expression(INT4, "(CASE %s WHEN '' THEN %s END)", columns.get(2), columns.get(1)));
 
         if(sourceClass.equals(xsdScalarDateTime))
-            return List.of(expression("sparql.zoneddatetime_get_value(%s)", columns.get(0)),
-                    expression("sparql.zoneddatetime_get_zone(%s)", columns.get(0)));
+            return List.of(expression(TIMESTAMPTZ, "sparql.zoneddatetime_get_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.zoneddatetime_get_zone(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }

@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.TIMESTAMPTZ;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATETIME;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -59,16 +62,16 @@ public final class DateTimeScalarClass extends CanonicalLiteralClass
         Column time = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_datetime(%s)", time));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_datetime(%s)", time));
 
         if(targetClass.equals(genScalarDateTime))
             return List.of(time, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         if(targetClass.equals(genDateTime))
-            return List.of(expression("sparql.zoneddatetime_get_value(%s)", time),
-                    expression("sparql.zoneddatetime_get_zone(%s)", time), !canBeNull ? constant("", VARCHAR) :
-                            expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
+            return List.of(expression(TIMESTAMPTZ, "sparql.zoneddatetime_get_value(%s)", time),
+                    expression(INT4, "sparql.zoneddatetime_get_zone(%s)", time), !canBeNull ? constant("", VARCHAR) :
+                            expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", time));
 
         //if(targetClass.equals(xsdDateTime))
         //    return List.of(expression("sparql.zoneddatetime_get_value(%s)", time),
@@ -89,14 +92,14 @@ public final class DateTimeScalarClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_datetime(%s, false)", columns.get(0)));
+            return List.of(expression(ZONEDDATETIME, "sparql.rdfbox_get_datetime(%s, false)", columns.get(0)));
 
         if(sourceClass.equals(genScalarDateTime))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
+            return List.of(expression(ZONEDDATETIME, "(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
 
         if(sourceClass.equals(genDateTime))
-            return List.of(expression("(CASE %s WHEN '' THEN sparql.zoneddatetime_create(%s, %s) END)", columns.get(2),
-                    columns.get(0), columns.get(1)));
+            return List.of(expression(ZONEDDATETIME, "(CASE %s WHEN '' THEN sparql.zoneddatetime_create(%s, %s) END)",
+                    columns.get(2), columns.get(0), columns.get(1)));
 
         //if(sourceClass.equals(xsdDateTime))
         //    return List.of(expression("sparql.zoneddatetime_create(%s, %s)", columns.get(0), columns.get(1)));

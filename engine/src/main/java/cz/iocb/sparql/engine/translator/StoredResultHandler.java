@@ -116,7 +116,7 @@ public class StoredResultHandler extends ResultHandler
     {
         super(request, restrictions);
 
-        columns.put(new TableColumn("__"), INT4);
+        columns.put(new TableColumn("__", INT4), INT4);
     }
 
 
@@ -320,7 +320,7 @@ public class StoredResultHandler extends ResultHandler
         }
 
         if(data.isEmpty())
-            data.put(new TableColumn("__"), new ArrayList<>(Collections.nCopies(batchCount, null)));
+            data.put(new TableColumn("__", INT4), new ArrayList<>(Collections.nCopies(batchCount, null)));
 
         String insert = "insert into " + table
                 + data.keySet().stream().map(c -> c.toString()).collect(joining(", ", "(", ") values "))

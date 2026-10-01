@@ -17,11 +17,11 @@ import cz.iocb.sparql.engine.database.Condition.ColumnComparison;
  */
 public class ConditionTest
 {
-    private static final Column a = new TableColumn("a");
+    private static final Column a = new TableColumn("a", INT4);
 
-    private static final Column b = new TableColumn("b");
+    private static final Column b = new TableColumn("b", INT4);
 
-    private static final Column c = new TableColumn("c");
+    private static final Column c = new TableColumn("c", INT4);
 
     private static final Column one = new ValueColumn("1", INT4);
 

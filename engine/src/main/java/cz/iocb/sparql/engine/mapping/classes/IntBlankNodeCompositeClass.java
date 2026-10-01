@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.INT8;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.intScalarBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -48,10 +50,10 @@ public final class IntBlankNodeCompositeClass extends IntBlankNodeClass
         Column segment = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_iblanknode(%s, %s)", bnvalue, segment));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iblanknode(%s, %s)", bnvalue, segment));
 
         if(targetClass.equals(intScalarBlankNode))
-            return List.of(expression("sparql.iblanknode_create(%s, %s)", bnvalue, segment));
+            return List.of(expression(INT8, "sparql.iblanknode_create(%s, %s)", bnvalue, segment));
 
         throw new IllegalArgumentException();
     }
@@ -68,12 +70,12 @@ public final class IntBlankNodeCompositeClass extends IntBlankNodeClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_iblanknode_value(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_iblanknode_segment(%s)", columns.get(0)));
+            return List.of(expression(INT4, "sparql.rdfbox_get_iblanknode_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.rdfbox_get_iblanknode_segment(%s)", columns.get(0)));
 
         if(sourceClass.equals(intScalarBlankNode))
-            return List.of(expression("sparql.iblanknode_get_value(%s)", columns.get(0)),
-                    expression("sparql.iblanknode_get_segment(%s)", columns.get(0)));
+            return List.of(expression(INT4, "sparql.iblanknode_get_value(%s)", columns.get(0)),
+                    expression(INT4, "sparql.iblanknode_get_segment(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }

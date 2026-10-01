@@ -120,7 +120,7 @@ public class DistinctTableAccessTest
                 config.createAreEqualCondition("source", "'2'::int4"), distinct);
 
         config.addQuadMapping(List.of(compound, synonym),
-                List.of(new JoinColumns(new TableColumn("id"), new TableColumn("compound"), INT4)), graph,
+                List.of(new JoinColumns(new TableColumn("id", INT4), new TableColumn("compound", INT4))), graph,
                 config.createLiteralMapping(xsdString, "label"), config.createIriMapping("ex:labelSynonym"),
                 config.createLiteralMapping(xsdString, "synonym"), List.of(new Conditions(true), new Conditions(true)),
                 List.of(false, distinct));

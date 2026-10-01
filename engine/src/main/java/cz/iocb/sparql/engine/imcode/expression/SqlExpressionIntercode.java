@@ -645,13 +645,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             SqlType type = resClass.getSqlTypes().get(i);
 
             if(!resClass.isOptionalColumn(i))
-                conditions.add("(" + l + " != " + r + ")");
+                conditions.add(type.notEqual(l, r));
             else if(isNullConstant(l))
                 conditions.add(r.canBeNull() ? "(" + r + " IS NOT NULL)" : "true");
             else if(isNullConstant(r))
                 conditions.add(l.canBeNull() ? "(" + l + " IS NOT NULL)" : "true");
             else if(!l.canBeNull() || !r.canBeNull())
-                conditions.add("(" + l + " != " + r + ")");
+                conditions.add(type.notEqual(l, r));
             else
                 conditions.add(type.distinct(l, r));
         }

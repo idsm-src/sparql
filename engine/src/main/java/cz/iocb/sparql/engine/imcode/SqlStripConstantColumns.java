@@ -88,7 +88,7 @@ public final class SqlStripConstantColumns extends SqlIntercode
 
                             if(col == null)
                             {
-                                col = new TableColumn("#const" + map.size());
+                                col = new TableColumn("#const" + map.size(), constColumn.getType());
                                 map.put(constColumn, col);
                             }
 

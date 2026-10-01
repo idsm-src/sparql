@@ -1,9 +1,11 @@
 package cz.iocb.sparql.engine.database;
 
+import java.util.Objects;
+
 
 
 /**
- * Arbitrary SQL expression.
+ * Arbitrary SQL expression of a known type.
  */
 public final class ExpressionColumn extends Column
 {
@@ -14,15 +16,17 @@ public final class ExpressionColumn extends Column
 
 
     /**
-     * Creates the expression column with the given nullability.
+     * Creates the expression column with the given nullability. The type is not part of the identity of the column: two
+     * columns of the same expression are equal regardless of it.
      *
      * @param value the SQL expression
+     * @param type SQL type of the expression
      * @param canBeNull whether the value may be null
      */
-    public ExpressionColumn(String value, boolean canBeNull)
+    public ExpressionColumn(String value, SqlType type, boolean canBeNull)
     {
         //TODO: check whether the parameter is a valid SQL expression
-        super(value);
+        super(value, Objects.requireNonNull(type, "type of expression " + value));
         this.canBeNull = canBeNull;
     }
 
@@ -31,22 +35,11 @@ public final class ExpressionColumn extends Column
      * Creates a possibly-null expression column.
      *
      * @param value the SQL expression
+     * @param type SQL type of the expression
      */
-    public ExpressionColumn(String value)
+    public ExpressionColumn(String value, SqlType type)
     {
-        this(value, true);
-    }
-
-
-    /**
-     * Creates a possibly-null expression column from a format string and arguments.
-     *
-     * @param format the format string
-     * @param args the format arguments
-     */
-    public ExpressionColumn(String format, Object... args)
-    {
-        this(String.format(format, args), true);
+        this(value, type, true);
     }
 
 

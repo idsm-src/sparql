@@ -108,7 +108,7 @@ public final class SqlBind extends SqlIntercode
             for(int i = 0; i < e.getKey().getColumnCount(); i++)
             {
                 if(e.getValue().get(i) instanceof ExpressionColumn expr)
-                    list.add(new TableColumn(names.get(i).getName(), expr.canBeNull()));
+                    list.add(new TableColumn(names.get(i).getName(), names.get(i).getType(), expr.canBeNull()));
                 else
                     list.add(e.getValue().get(i));
             }

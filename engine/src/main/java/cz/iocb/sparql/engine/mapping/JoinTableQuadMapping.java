@@ -6,7 +6,6 @@ import java.util.List;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Conditions;
 import cz.iocb.sparql.engine.database.SourceTable;
-import cz.iocb.sparql.engine.database.SqlType;
 
 
 
@@ -19,8 +18,8 @@ import cz.iocb.sparql.engine.database.SqlType;
 public class JoinTableQuadMapping extends QuadMapping
 {
     /**
-     * Columns joining two adjacent tables of the chain (left table columns to right table columns), with the SQL type
-     * of each pair.
+     * Columns joining two adjacent tables of the chain (left table columns to right table columns, matched by position
+     * and of the same SQL types).
      */
     public static class JoinColumns
     {
@@ -35,22 +34,15 @@ public class JoinTableQuadMapping extends QuadMapping
         private final List<Column> rightColumns;
 
         /**
-         * SQL type of each column pair.
-         */
-        private final List<SqlType> types;
-
-        /**
          * Creates the join on several column pairs.
          *
          * @param leftColumns columns of the left table
          * @param rightColumns columns of the right table
-         * @param types SQL types of the column pairs
          */
-        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns, List<SqlType> types)
+        public JoinColumns(List<Column> leftColumns, List<Column> rightColumns)
         {
             this.leftColumns = leftColumns;
             this.rightColumns = rightColumns;
-            this.types = types;
 
             assert leftColumns.size() == rightColumns.size();
         }
@@ -61,13 +53,11 @@ public class JoinTableQuadMapping extends QuadMapping
          *
          * @param leftColumn column of the left table
          * @param rightColumn column of the right table
-         * @param type the SQL type
          */
-        public JoinColumns(Column leftColumn, Column rightColumn, SqlType type)
+        public JoinColumns(Column leftColumn, Column rightColumn)
         {
             this.leftColumns = List.of(leftColumn);
             this.rightColumns = List.of(rightColumn);
-            this.types = List.of(type);
         }
 
 
@@ -92,16 +82,6 @@ public class JoinTableQuadMapping extends QuadMapping
             return rightColumns;
         }
 
-
-        /**
-         * SQL type of each column pair.
-         *
-         * @return SQL type of each column pair
-         */
-        public List<SqlType> getTypes()
-        {
-            return types;
-        }
 
         @Override
         public int hashCode()

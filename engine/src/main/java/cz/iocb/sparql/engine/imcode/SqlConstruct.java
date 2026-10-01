@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode;
 
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.OBJECT;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.PREDICATE;
 import static cz.iocb.sparql.engine.imcode.SqlConstruct.ConstructColumn.SUBJECT;
@@ -761,7 +762,7 @@ public final class SqlConstruct extends SqlIntercode
                 ResourceClass resClass = bnResourceClasses.computeIfAbsent(bnode,
                         _ -> new IntBlankNodeInSegmentClass(bnOffset.decrementAndGet()));
 
-                List<Column> columns = List.of(new ExpressionColumn("(row_number() OVER ())::int4"));
+                List<Column> columns = List.of(new ExpressionColumn("(row_number() OVER ())::int4", INT4));
                 return new VariableBinding(column.getVariable(), resClass, columns, false);
             }
 

@@ -600,7 +600,7 @@ public final class SqlCast extends SqlUnary
             builder.append(")");
         }
 
-        return new ExpressionColumn(builder.toString());
+        return new ExpressionColumn(builder.toString(), castClass.getSqlTypes().get(0));
     }
 
 

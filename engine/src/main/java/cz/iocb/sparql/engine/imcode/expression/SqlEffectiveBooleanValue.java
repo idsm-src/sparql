@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
@@ -182,18 +183,18 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
             {
                 SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))"));
+                cols.add(new ExpressionColumn("(" + col + " not in ('0'::" + type + ", 'NaN'::" + type + "))", BOOL));
             }
             else if(numericBase != null)
             {
                 SqlType type = numericBase.getSqlTypes().get(0);
                 Column col = e.getKey().toGeneralClass(numericBase, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(" + col + " != '0'::" + type + ")"));
+                cols.add(new ExpressionColumn("(" + col + " != '0'::" + type + ")", BOOL));
             }
             else if(isString(e.getKey()))
             {
                 Column col = e.getKey().toGeneralClass(xsdString, e.getValue(), true).get(0);
-                cols.add(new ExpressionColumn("(octet_length(" + col + ") != 0)"));
+                cols.add(new ExpressionColumn("(octet_length(" + col + ") != 0)", BOOL));
             }
             else if(isBoolean(e.getKey()))
             {
@@ -210,12 +211,12 @@ public final class SqlEffectiveBooleanValue extends SqlUnary
                         .map(i -> "'" + i.getValue().replaceAll("'", "''") + "'").collect(joining(", ", "(", ")"));
 
                 Column col = e.getKey().toGeneralClass(unsupportedType, e.getValue(), true).get(1);
-                cols.add(new ExpressionColumn("NULLIF(" + col + " NOT IN " + types + ", true)"));
+                cols.add(new ExpressionColumn("NULLIF(" + col + " NOT IN " + types + ", true)", BOOL));
             }
             else if(!areDisjunct(relations, e.getKey(), operandClass))
             {
                 Column col = operand.get(relations, unionize(operandClasses, box)).get(0);
-                cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")"));
+                cols.add(new ExpressionColumn("sparql.ebv_rdfbox(" + col + ")", BOOL));
             }
         }
 

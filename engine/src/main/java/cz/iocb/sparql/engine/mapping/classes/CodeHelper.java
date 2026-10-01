@@ -47,14 +47,15 @@ public class CodeHelper
 
 
     /**
-     * Expression column formatted with {@link String#format} (US locale).
+     * Expression column of the given type formatted with {@link String#format} (US locale).
      *
+     * @param type SQL type of the expression
      * @param format the format string
      * @param args the format arguments
-     * @return expression column formatted with {@link String#format} (US locale)
+     * @return expression column of the given type formatted with {@link String#format} (US locale)
      */
-    public static Column expression(String format, Object... args)
+    public static Column expression(SqlType type, String format, Object... args)
     {
-        return new ExpressionColumn(String.format(Locale.US, format, args), true);
+        return new ExpressionColumn(String.format(Locale.US, format, args), type, true);
     }
 }

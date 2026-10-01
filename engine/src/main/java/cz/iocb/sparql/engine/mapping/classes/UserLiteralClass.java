@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genUserType;
@@ -79,20 +81,20 @@ public non-sealed class UserLiteralClass extends CanonicalLiteralClass
         Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_userliteral(%s, %s)", value, type));
 
         if(targetClass.equals(genUserType))
-            return List.of(expression("sparql.ubox_create(%s)", value),
-                    !canBeNull ? type : expression("CASE WHEN %s IS NOT NULL THEN %s END", value, type),
-                    !canBeNull ? lexical : expression("CASE WHEN %s IS NOT NULL THEN %s END", value, lexical));
+            return List.of(expression(UBOX, "sparql.ubox_create(%s)", value),
+                    !canBeNull ? type : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", value, type),
+                    !canBeNull ? lexical : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", value, lexical));
 
         if(targetClass.equals(userType))
-            return List.of(expression("sparql.ubox_create(%s)", value),
-                    !canBeNull ? type : expression("CASE WHEN %s IS NOT NULL THEN %s END", value, type));
+            return List.of(expression(UBOX, "sparql.ubox_create(%s)", value),
+                    !canBeNull ? type : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", value, type));
 
         if(targetClass.equals(base))
             return List.of(value,
-                    !canBeNull ? lexical : expression("CASE WHEN %s IS NOT NULL THEN %s END", value, lexical));
+                    !canBeNull ? lexical : expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN %s END", value, lexical));
 
         throw new IllegalArgumentException();
     }
@@ -111,20 +113,22 @@ public non-sealed class UserLiteralClass extends CanonicalLiteralClass
         Column type = constant(datatype.getTypeIri().getValue(), VARCHAR);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s, false)",
-                    columns.get(0), type, sqlType));
+            return List
+                    .of(expression(sqlType, "sparql.rdfbox_get_userliteral_typedvalue_of_type(%s, %s, NULL::%s, false)",
+                            columns.get(0), type, sqlType));
 
         if(sourceClass.equals(genUserType))
-            return List.of(
-                    expression("(CASE WHEN %s = ''::varchar AND %s = %s THEN sparql.ubox_get_value(%s, NULL::%s) END)",
-                            columns.get(2), columns.get(1), type, columns.get(0), sqlType));
+            return List.of(expression(sqlType,
+                    "(CASE WHEN %s = ''::varchar AND %s = %s THEN sparql.ubox_get_value(%s, NULL::%s) END)",
+                    columns.get(2), columns.get(1), type, columns.get(0), sqlType));
 
         if(sourceClass.equals(userType))
-            return List.of(expression("(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)", columns.get(1),
-                    type, columns.get(0), sqlType));
+            return List.of(expression(sqlType, "(CASE %s WHEN %s THEN sparql.ubox_get_value(%s, NULL::%s) END)",
+                    columns.get(1), type, columns.get(0), sqlType));
 
         if(sourceClass.equals(base))
-            return List.of(expression("(CASE %s WHEN ''::varchar THEN %s END)", columns.get(1), columns.get(0)));
+            return List
+                    .of(expression(sqlType, "(CASE %s WHEN ''::varchar THEN %s END)", columns.get(1), columns.get(0)));
 
         throw new IllegalArgumentException();
     }

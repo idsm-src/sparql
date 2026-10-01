@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -68,7 +69,7 @@ public final class LangStringClass extends CanonicalLiteralClass
         Column lang = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_langstring(%s, %s)", string, lang));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_langstring(%s, %s)", string, lang));
 
         throw new IllegalArgumentException();
     }
@@ -85,8 +86,8 @@ public final class LangStringClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_langstring_value(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_langstring_lang(%s)", columns.get(0)));
+            return List.of(expression(VARCHAR, "sparql.rdfbox_get_langstring_value(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_langstring_lang(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }

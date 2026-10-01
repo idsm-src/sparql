@@ -97,9 +97,9 @@ public class ListUserIriClass extends SimpleUserIriClass
         if(!check)
             return column;
 
-        Column access = expression("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
+        String access = String.format("(SELECT %s as \"@col\" FROM %s) as \"@rctab\"", column, table);
 
-        return expression("(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, column);
+        return expression(VARCHAR, "(SELECT \"@col\"::varchar FROM %s WHERE \"@col\" = %s)", access, column);
     }
 
 

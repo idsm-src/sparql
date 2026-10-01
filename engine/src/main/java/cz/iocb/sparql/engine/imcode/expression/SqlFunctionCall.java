@@ -173,7 +173,7 @@ public final class SqlFunctionCall extends SqlExpressionIntercode
 
         builder.append(")");
 
-        return List.of(new ExpressionColumn(builder.toString()));
+        return List.of(new ExpressionColumn(builder.toString(), definition.getResultClass().getSqlTypes().get(0)));
     }
 
 

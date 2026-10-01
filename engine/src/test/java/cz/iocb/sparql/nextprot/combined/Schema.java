@@ -84,7 +84,7 @@ public class Schema
             TermMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"), INT4)), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("db", INT4))), graph, subject,
                     config.createIriMapping("rdfs:comment"), config.createLiteralMapping(xsdString, "comment"));
         }
 
@@ -93,7 +93,7 @@ public class Schema
             TermMapping subject = config.createIriMapping("database", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("db"), INT4)), graph, subject,
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("db", INT4))), graph, subject,
                     config.createIriMapping(":category"), config.createLiteralMapping(xsdString, "category"));
         }
     }
@@ -109,7 +109,7 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(table, baseTable),
-                    asList(new JoinColumns(new TableColumn("type"), new TableColumn("id"), INT4)), graph, subject,
+                    asList(new JoinColumns(new TableColumn("type", INT4), new TableColumn("id", INT4))), graph, subject,
                     config.createIriMapping("rdf:type"), config.createIriMapping("schema", "iri"));
             config.addQuadMapping(table, graph, subject, config.createIriMapping("rdfs:label"),
                     config.createLiteralMapping(xsdString, "label"));
@@ -124,8 +124,8 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), INT4)), graph, subject,
-                    config.createIriMapping("rdf:type"), config.createIriMapping("owl:Class"));
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("entity", INT4))), graph,
+                    subject, config.createIriMapping("rdf:type"), config.createIriMapping("owl:Class"));
         }
 
         {
@@ -133,8 +133,8 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), INT4)), graph, subject,
-                    config.createIriMapping("rdfs:subClassOf"), config.createIriMapping("owl:Thing"));
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("entity", INT4))), graph,
+                    subject, config.createIriMapping("rdfs:subClassOf"), config.createIriMapping("owl:Thing"));
         }
 
         {
@@ -142,8 +142,8 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), INT4),
-                            new JoinColumns(new TableColumn("notin"), new TableColumn("id"), INT4)),
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("entity", INT4)),
+                            new JoinColumns(new TableColumn("notin", INT4), new TableColumn("id", INT4))),
                     graph, subject, config.createIriMapping(":notIn"), config.createIriMapping("schema", "iri"));
         }
 
@@ -152,8 +152,8 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), INT4),
-                            new JoinColumns(new TableColumn("related"), new TableColumn("id"), INT4)),
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("entity", INT4)),
+                            new JoinColumns(new TableColumn("related", INT4), new TableColumn("id", INT4))),
                     graph, subject, config.createIriMapping(":related"), config.createIriMapping("terminology", "iri"));
         }
 
@@ -162,8 +162,8 @@ public class Schema
             TermMapping subject = config.createIriMapping("schema", "iri");
 
             config.addQuadMapping(asList(baseTable, table, baseTable),
-                    asList(new JoinColumns(new TableColumn("id"), new TableColumn("entity"), INT4),
-                            new JoinColumns(new TableColumn("parent"), new TableColumn("id"), INT4)),
+                    asList(new JoinColumns(new TableColumn("id", INT4), new TableColumn("entity", INT4)),
+                            new JoinColumns(new TableColumn("parent", INT4), new TableColumn("id", INT4))),
                     graph, subject, config.createIriMapping("rdfs:subClassOf"),
                     config.createIriMapping("schema", "iri"));
         }

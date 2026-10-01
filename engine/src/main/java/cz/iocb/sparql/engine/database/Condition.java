@@ -18,7 +18,9 @@ import java.util.function.IntPredicate;
  * known to be not null (it is required to be not null, it is compared by {@code =} or {@code !=}, or it is a non-null
  * constant), all members are not null and every pair of the class is strict. A class containing a NULL constant
  * requires its members to be null instead. A column compared by {@code =} or {@code !=} drops its {@code IS NOT NULL}
- * predicate as redundant. Contradictory predicates are stored as they are and detected by {@link #isFalse()}.
+ * predicate as redundant. Contradictory predicates are stored as they are and detected by {@link #isFalse()}. A
+ * comparison is rendered by the operators of the SQL type of the compared columns (see {@link ColumnComparison#getType}
+ * and {@link SqlType#equal}).
  */
 public class Condition
 {
@@ -99,6 +101,22 @@ public class Condition
         {
             return right;
         }
+
+
+        /**
+         * SQL type of the comparison, whose operators render it: the type of the column when a constant is compared
+         * with a column, the type of the left column otherwise (the compared columns are of the same type).
+         *
+         * @return SQL type of the comparison
+         */
+        public SqlType getType()
+        {
+            if(left instanceof ConstantColumn && !(right instanceof ConstantColumn))
+                return right.getType();
+
+            return left.getType();
+        }
+
 
         @Override
         public int hashCode()

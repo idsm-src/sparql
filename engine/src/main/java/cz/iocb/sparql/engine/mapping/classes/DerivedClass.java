@@ -1026,7 +1026,7 @@ public final class DerivedClass extends ResourceClass
         if(condition.equals("false"))
             return effectiveClass.getSqlTypes().stream().map(t -> (Column) new NullColumn(t)).toList();
 
-        return result.stream().map(c -> expression("CASE WHEN %s THEN %s END", condition, c)).toList();
+        return result.stream().map(c -> expression(c.getType(), "CASE WHEN %s THEN %s END", condition, c)).toList();
     }
 
 

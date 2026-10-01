@@ -1,6 +1,8 @@
 package cz.iocb.sparql.engine.test;
 
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -80,14 +82,14 @@ public class OptionalSuffixIriClass extends UserIriClass
         if(targetClass.equals(this))
             return columns;
 
-        Column value = expression("(%s || %s::varchar || COALESCE('/' || %s::varchar, ''))::varchar", string(prefix),
-                columns.get(0), columns.get(1));
+        Column value = expression(VARCHAR, "(%s || %s::varchar || COALESCE('/' || %s::varchar, ''))::varchar",
+                string(prefix), columns.get(0), columns.get(1));
 
         if(targetClass.equals(iri))
             return List.of(value);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", value));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(%s)", value));
 
         throw new IllegalArgumentException();
     }
@@ -104,12 +106,12 @@ public class OptionalSuffixIriClass extends UserIriClass
         if(!sourceClass.equals(iri) && !sourceClass.equals(box))
             throw new IllegalArgumentException();
 
-        Column value = sourceClass.equals(box) ? expression("sparql.rdfbox_get_iri(%s)", columns.get(0)) :
+        Column value = sourceClass.equals(box) ? expression(VARCHAR, "sparql.rdfbox_get_iri(%s)", columns.get(0)) :
                 columns.get(0);
 
         // a value not matching the pattern yields NULL in both columns, so the check is never optional
-        return List.of(expression("(regexp_match(%s, %s))[1]::int4", value, string(regexp)),
-                expression("(regexp_match(%s, %s))[2]::int4", value, string(regexp)));
+        return List.of(expression(INT4, "(regexp_match(%s, %s))[1]::int4", value, string(regexp)),
+                expression(INT4, "(regexp_match(%s, %s))[2]::int4", value, string(regexp)));
     }
 
 

@@ -1,5 +1,7 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
+import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -14,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.Function;
 import cz.iocb.sparql.engine.database.SQLRuntimeException;
@@ -195,10 +198,10 @@ public class GenericUserIriClass extends UserIriClass
         String call = columns.stream().map(Object::toString).collect(joining(", ", function + "(", "))"));
 
         if(superClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_iri(" + call + ")"));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(" + call + ")"));
 
         if(superClass.equals(iri))
-            return List.of(expression(call));
+            return List.of(expression(VARCHAR, call));
 
         throw new IllegalArgumentException();
     }
@@ -215,11 +218,13 @@ public class GenericUserIriClass extends UserIriClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return inverseFunction.stream().map(f -> expression(f + "(sparql.rdfbox_get_iri(" + columns.get(0) + "))"))
-                    .toList();
+            return IntStream.range(0, inverseFunction.size()).mapToObj(i -> expression(sqlTypes.get(i),
+                    inverseFunction.get(i) + "(sparql.rdfbox_get_iri(" + columns.get(0) + "))")).toList();
 
         if(sourceClass.equals(iri))
-            return inverseFunction.stream().map(f -> expression(f + "(" + columns.get(0) + ")")).toList();
+            return IntStream.range(0, inverseFunction.size())
+                    .mapToObj(i -> expression(sqlTypes.get(i), inverseFunction.get(i) + "(" + columns.get(0) + ")"))
+                    .toList();
 
         throw new IllegalArgumentException();
     }

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.falseValue;
 import static cz.iocb.sparql.engine.imcode.expression.SqlLiteral.trueValue;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdBoolean;
@@ -202,7 +203,7 @@ public final class SqlExists extends SqlExpressionIntercode
 
         Map<Column, Column> map = new HashMap<>();
         pattern.getVariableBindings().getNonConstantColumns()
-                .forEach(c -> map.put(c, new TableColumn("@cnd" + map.size())));
+                .forEach(c -> map.put(c, new TableColumn("@cnd" + map.size(), c.getType())));
 
         VariableBindings cndBindings = new VariableBindings();
 
@@ -248,7 +249,7 @@ public final class SqlExists extends SqlExpressionIntercode
 
         builder.append(")");
 
-        return List.of(new ExpressionColumn(builder.toString(), false));
+        return List.of(new ExpressionColumn(builder.toString(), BOOL, false));
     }
 
 

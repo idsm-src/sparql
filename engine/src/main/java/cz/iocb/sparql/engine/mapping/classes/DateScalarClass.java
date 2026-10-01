@@ -1,5 +1,8 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.DATE;
+import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATE;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -58,16 +61,16 @@ public final class DateScalarClass extends CanonicalLiteralClass
         Column date = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_date(%s)", date));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_date(%s)", date));
 
         if(targetClass.equals(genScalarDate))
             return List.of(date, !canBeNull ? constant("", VARCHAR) :
-                    expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+                    expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         if(targetClass.equals(genDate))
-            return List.of(expression("sparql.zoneddate_get_value(%s)", date),
-                    expression("sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", VARCHAR) :
-                            expression("CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
+            return List.of(expression(DATE, "sparql.zoneddate_get_value(%s)", date),
+                    expression(INT4, "sparql.zoneddate_get_zone(%s)", date), !canBeNull ? constant("", VARCHAR) :
+                            expression(VARCHAR, "CASE WHEN %s IS NOT NULL THEN ''::varchar END", date));
 
         //if(targetClass.equals(xsdDate))
         //    return List.of(expression("sparql.zoneddate_get_value(%s)", date),
@@ -88,14 +91,14 @@ public final class DateScalarClass extends CanonicalLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_date(%s, false)", columns.get(0)));
+            return List.of(expression(ZONEDDATE, "sparql.rdfbox_get_date(%s, false)", columns.get(0)));
 
         if(sourceClass.equals(genScalarDate))
-            return List.of(expression("(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
+            return List.of(expression(ZONEDDATE, "(CASE %s WHEN '' THEN %s END)", columns.get(1), columns.get(0)));
 
         if(sourceClass.equals(genDate))
-            return List.of(expression("(CASE %s WHEN '' THEN sparql.zoneddate_create(%s, %s) END)", columns.get(2),
-                    columns.get(0), columns.get(1)));
+            return List.of(expression(ZONEDDATE, "(CASE %s WHEN '' THEN sparql.zoneddate_create(%s, %s) END)",
+                    columns.get(2), columns.get(0), columns.get(1)));
 
         //if(sourceClass.equals(xsdDate))
         //    return List.of(expression("sparql.zoneddate_create(%s, %s)", columns.get(0), columns.get(1)));

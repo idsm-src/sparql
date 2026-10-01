@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.imcode.expression;
 
+import static cz.iocb.sparql.engine.database.SqlType.BOOL;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.ANY;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.FALSE_OR_ERROR;
 import static cz.iocb.sparql.engine.imcode.expression.SqlBooleanExpression.NonConstantBooleanValue.TRUE_OR_ERROR;
@@ -105,8 +106,8 @@ public final class SqlUnaryLogical extends SqlUnary implements SqlBooleanExpress
      */
     private static List<Column> translate(ClassRelations relations, SqlExpressionIntercode operand)
     {
-        return List.of(
-                new ExpressionColumn("(not " + operand.get(relations, genBoolean).get(0) + ")", operand.canBeNull()));
+        return List.of(new ExpressionColumn("(not " + operand.get(relations, genBoolean).get(0) + ")", BOOL,
+                operand.canBeNull()));
     }
 
 

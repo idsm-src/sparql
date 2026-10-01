@@ -133,7 +133,7 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.promoteNumericAs(variant.get(0), resultClass);
-                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")"));
+                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)));
             }
         }
         else
@@ -141,7 +141,7 @@ public final class SqlUnaryArithmetic extends SqlUnary
             for(List<Set<ResourceClass>> variant : variants)
             {
                 Column op = operand.get(relations, unionize(variant.get(0), box)).get(0);
-                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")"));
+                cols.add(new ExpressionColumn("(operator(sparql.-) " + op + ")", resultClass.getSqlTypes().get(0)));
             }
         }
 

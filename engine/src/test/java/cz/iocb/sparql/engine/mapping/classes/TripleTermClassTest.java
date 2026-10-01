@@ -66,12 +66,13 @@ public class TripleTermClassTest
         assertEquals(List.of(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR), nested.getSqlTypes());
         assertEquals(5, nested.getColumnCount());
 
-        List<Column> columns = List.of(expression("s"), expression("p"), expression("a"), expression("b"),
-                expression("c"));
+        List<Column> columns = List.of(expression(VARCHAR, "s"), expression(VARCHAR, "p"), expression(VARCHAR, "a"),
+                expression(VARCHAR, "b"), expression(VARCHAR, "c"));
 
-        assertEquals(List.of(expression("s")), nested.getSubjectColumns(columns));
-        assertEquals(List.of(expression("p")), nested.getPredicateColumns(columns));
-        assertEquals(List.of(expression("a"), expression("b"), expression("c")), nested.getObjectColumns(columns));
+        assertEquals(List.of(expression(VARCHAR, "s")), nested.getSubjectColumns(columns));
+        assertEquals(List.of(expression(VARCHAR, "p")), nested.getPredicateColumns(columns));
+        assertEquals(List.of(expression(VARCHAR, "a"), expression(VARCHAR, "b"), expression(VARCHAR, "c")),
+                nested.getObjectColumns(columns));
 
         for(int i = 0; i < blankSubject.getColumnCount(); i++)
             assertFalse(blankSubject.isOptionalColumn(i));
@@ -196,41 +197,48 @@ public class TripleTermClassTest
     @Test
     void conversionTest()
     {
-        List<Column> columns = List.of(expression("s"), expression("p"), expression("o"));
-        Column x = expression("x");
+        List<Column> columns = List.of(expression(VARCHAR, "s"), expression(VARCHAR, "p"), expression(VARCHAR, "o"));
+        Column x = expression(RDFBOX, "x");
 
         assertEquals(columns, stringObject.toGeneralClass(stringObject, columns, true));
         assertEquals(columns, stringObject.fromGeneralClass(stringObject, columns, false));
 
-        assertEquals(List.of(expression("sparql.rdfbox_create_from_tripleterm(sparql.rdfbox_create_from_iri(s), p, "
-                + "sparql.rdfbox_create_from_string(o))")), stringObject.toGeneralClass(box, columns, true));
+        assertEquals(
+                List.of(expression(RDFBOX,
+                        "sparql.rdfbox_create_from_tripleterm(sparql.rdfbox_create_from_iri(s), p, "
+                                + "sparql.rdfbox_create_from_string(o))")),
+                stringObject.toGeneralClass(box, columns, true));
 
         assertEquals(
-                List.of(expression("sparql.rdfbox_create_from_iri(s)"), expression("p"),
-                        expression("sparql.rdfbox_create_from_string(o)")),
+                List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(s)"), expression(VARCHAR, "p"),
+                        expression(RDFBOX, "sparql.rdfbox_create_from_string(o)")),
                 stringObject.toGeneralClass(tripleTerm, columns, true));
 
-        assertEquals(List.of(expression("s"), expression("p"), expression("sparql.rdfbox_create_from_string(o)")),
+        assertEquals(
+                List.of(expression(VARCHAR, "s"), expression(VARCHAR, "p"),
+                        expression(RDFBOX, "sparql.rdfbox_create_from_string(o)")),
                 stringObject.toGeneralClass(generalObject, columns, true));
 
         assertEquals(
-                List.of(expression("sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject(x))"),
-                        expression("sparql.rdfbox_get_tripleterm_predicate(x)"),
-                        expression("sparql.rdfbox_get_string(sparql.rdfbox_get_tripleterm_object(x))")),
+                List.of(expression(VARCHAR, "sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject(x))"),
+                        expression(VARCHAR, "sparql.rdfbox_get_tripleterm_predicate(x)"),
+                        expression(VARCHAR, "sparql.rdfbox_get_string(sparql.rdfbox_get_tripleterm_object(x))")),
                 stringObject.fromGeneralClass(box, List.of(x), false));
 
         assertEquals(
-                List.of(expression("sparql.rdfbox_get_tripleterm_subject(x)"),
-                        expression("sparql.rdfbox_get_tripleterm_predicate(x)"),
-                        expression("sparql.rdfbox_get_tripleterm_object(x)")),
+                List.of(expression(RDFBOX, "sparql.rdfbox_get_tripleterm_subject(x)"),
+                        expression(VARCHAR, "sparql.rdfbox_get_tripleterm_predicate(x)"),
+                        expression(RDFBOX, "sparql.rdfbox_get_tripleterm_object(x)")),
                 tripleTerm.fromGeneralClass(box, List.of(x), false));
 
         assertEquals(
-                List.of(expression("sparql.rdfbox_get_iri(s)"), expression("p"),
-                        expression("sparql.rdfbox_get_string(o)")),
+                List.of(expression(VARCHAR, "sparql.rdfbox_get_iri(s)"), expression(VARCHAR, "p"),
+                        expression(VARCHAR, "sparql.rdfbox_get_string(o)")),
                 stringObject.fromGeneralClass(tripleTerm, columns, false));
 
-        assertEquals(List.of(expression("s"), expression("p"), expression("sparql.rdfbox_get_string(o)")),
+        assertEquals(
+                List.of(expression(VARCHAR, "s"), expression(VARCHAR, "p"),
+                        expression(VARCHAR, "sparql.rdfbox_get_string(o)")),
                 stringObject.fromGeneralClass(generalObject, columns, false));
 
         assertEquals(stringObject.fromGeneralClass(tripleTerm, columns, false),
@@ -239,22 +247,25 @@ public class TripleTermClassTest
         assertEquals(stringObject.toGeneralClass(tripleTerm, columns, false),
                 stringObject.toClass(tripleTerm, columns, false));
 
-        List<Column> nestedColumns = List.of(expression("s"), expression("p"), expression("a"), expression("b"),
-                expression("c"));
+        List<Column> nestedColumns = List.of(expression(VARCHAR, "s"), expression(VARCHAR, "p"),
+                expression(VARCHAR, "a"), expression(VARCHAR, "b"), expression(VARCHAR, "c"));
 
-        assertEquals(List.of(expression("""
+        assertEquals(List.of(expression(RDFBOX, """
                 sparql.rdfbox_create_from_tripleterm(sparql.rdfbox_create_from_iri(s), p, \
                 sparql.rdfbox_create_from_tripleterm(sparql.rdfbox_create_from_iri(a), b, \
                 sparql.rdfbox_create_from_string(c)))""")), nested.toGeneralClass(box, nestedColumns, true));
 
         assertEquals(
-                List.of(expression("sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject(x))"),
-                        expression("sparql.rdfbox_get_tripleterm_predicate(x)"),
-                        expression("sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject("
-                                + "sparql.rdfbox_get_tripleterm_object(x)))"),
-                        expression("sparql.rdfbox_get_tripleterm_predicate(sparql.rdfbox_get_tripleterm_object(x))"),
-                        expression("sparql.rdfbox_get_string(sparql.rdfbox_get_tripleterm_object("
-                                + "sparql.rdfbox_get_tripleterm_object(x)))")),
+                List.of(expression(VARCHAR, "sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject(x))"),
+                        expression(VARCHAR, "sparql.rdfbox_get_tripleterm_predicate(x)"),
+                        expression(VARCHAR,
+                                "sparql.rdfbox_get_iri(sparql.rdfbox_get_tripleterm_subject("
+                                        + "sparql.rdfbox_get_tripleterm_object(x)))"),
+                        expression(VARCHAR,
+                                "sparql.rdfbox_get_tripleterm_predicate(sparql.rdfbox_get_tripleterm_object(x))"),
+                        expression(VARCHAR,
+                                "sparql.rdfbox_get_string(sparql.rdfbox_get_tripleterm_object("
+                                        + "sparql.rdfbox_get_tripleterm_object(x)))")),
                 nested.fromGeneralClass(box, List.of(x), false));
     }
 }

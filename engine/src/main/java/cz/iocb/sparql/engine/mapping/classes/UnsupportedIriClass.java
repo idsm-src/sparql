@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
@@ -67,7 +68,7 @@ public final class UnsupportedIriClass extends IriClass
         Column value = columns.get(0);
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_iri(%s)", value));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_iri(%s)", value));
 
         if(targetClass.equals(iri))
             return columns;
@@ -89,7 +90,7 @@ public final class UnsupportedIriClass extends IriClass
         if(sourceClass.equals(box))
         {
             if(checkOptional)
-                return List.of(expression("sparql.rdfbox_get_iri(%s)", columns.get(0)));
+                return List.of(expression(VARCHAR, "sparql.rdfbox_get_iri(%s)", columns.get(0)));
             else
                 throw new UnsupportedOperationException();
         }

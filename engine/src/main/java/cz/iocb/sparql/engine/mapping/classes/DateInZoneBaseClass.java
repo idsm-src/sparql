@@ -2,7 +2,9 @@ package cz.iocb.sparql.engine.mapping.classes;
 
 import static cz.iocb.sparql.engine.database.SqlType.DATE;
 import static cz.iocb.sparql.engine.database.SqlType.INT4;
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
+import static cz.iocb.sparql.engine.database.SqlType.ZONEDDATE;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.genScalarDate;
@@ -97,15 +99,15 @@ public final class DateInZoneBaseClass extends BaseLiteralClass implements DateI
         Column lexical = columns.get(1);
 
         if(targetClass.equals(box))
-            return List.of(
-                    expression("sparql.rdfbox_create_from_date_with_lexical(%s, '%d'::int4, %s)", date, zone, lexical));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_date_with_lexical(%s, '%d'::int4, %s)", date,
+                    zone, lexical));
 
         if(targetClass.equals(genScalarDate))
-            return List.of(expression("sparql.zoneddate_create(%s, '%d'::int4)", date, zone), lexical);
+            return List.of(expression(ZONEDDATE, "sparql.zoneddate_create(%s, '%d'::int4)", date, zone), lexical);
 
         if(targetClass.equals(genDate))
             return List.of(date, !canBeNull ? constant(zone, INT4) :
-                    expression("CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", date, zone), lexical);
+                    expression(INT4, "CASE WHEN %s IS NOT NULL THEN '%d'::int4 END", date, zone), lexical);
 
         throw new IllegalArgumentException();
     }
@@ -123,15 +125,19 @@ public final class DateInZoneBaseClass extends BaseLiteralClass implements DateI
 
         if(sourceClass.equals(box))
             return List.of(
-                    expression("sparql.rdfbox_get_date_value_of_zone(%s, '%d'::int4, true)", columns.get(0), zone),
-                    expression("sparql.rdfbox_get_date_lexical_of_zone(%s, '%d'::int4)", columns.get(0), zone));
+                    expression(DATE, "sparql.rdfbox_get_date_value_of_zone(%s, '%d'::int4, true)", columns.get(0),
+                            zone),
+                    expression(VARCHAR, "sparql.rdfbox_get_date_lexical_of_zone(%s, '%d'::int4)", columns.get(0),
+                            zone));
 
         if(sourceClass.equals(genScalarDate))
-            return List.of(expression("CASE WHEN %s != '' THEN sparql.zoneddate_get_value_of_zone(%s, '%d'::int4) END",
-                    columns.get(1), columns.get(0), zone), columns.get(1));
+            return List.of(
+                    expression(DATE, "CASE WHEN %s != '' THEN sparql.zoneddate_get_value_of_zone(%s, '%d'::int4) END",
+                            columns.get(1), columns.get(0), zone),
+                    columns.get(1));
 
         if(sourceClass.equals(genDate))
-            return List.of(expression("CASE WHEN %s != '' AND %s = '%d'::int4 THEN %s END", columns.get(2),
+            return List.of(expression(DATE, "CASE WHEN %s != '' AND %s = '%d'::int4 THEN %s END", columns.get(2),
                     columns.get(1), zone, columns.get(0)), columns.get(2));
 
         throw new IllegalArgumentException();

@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
 import static cz.iocb.sparql.engine.mapping.classes.CodeHelper.constant;
@@ -70,8 +71,8 @@ public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass
             return columns;
 
         if(targetClass.equals(box))
-            return List.of(expression("sparql.rdfbox_create_from_%s_with_lexical(%s, %s)", fname, columns.get(0),
-                    columns.get(1)));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_%s_with_lexical(%s, %s)", fname,
+                    columns.get(0), columns.get(1)));
 
         throw new IllegalArgumentException();
     }
@@ -88,8 +89,8 @@ public sealed abstract class SimpleLiteralBaseClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_%s(%s)", fname, columns.get(0)),
-                    expression("sparql.rdfbox_get_%s_lexical(%s)", fname, columns.get(0)));
+            return List.of(expression(sqlTypes.get(0), "sparql.rdfbox_get_%s(%s)", fname, columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_%s_lexical(%s)", fname, columns.get(0)));
 
         throw new IllegalArgumentException();
     }

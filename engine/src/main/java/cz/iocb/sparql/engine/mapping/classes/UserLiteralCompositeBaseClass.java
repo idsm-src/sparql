@@ -1,5 +1,6 @@
 package cz.iocb.sparql.engine.mapping.classes;
 
+import static cz.iocb.sparql.engine.database.SqlType.RDFBOX;
 import static cz.iocb.sparql.engine.database.SqlType.UBOX;
 import static cz.iocb.sparql.engine.database.SqlType.VARCHAR;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.box;
@@ -69,8 +70,8 @@ public final class UserLiteralCompositeBaseClass extends BaseLiteralClass
         Column lexical = columns.get(2);
 
         if(targetClass.equals(box))
-            return List.of(
-                    expression("sparql.rdfbox_create_from_userliteral_with_lexical(%s, %s, %s)", value, type, lexical));
+            return List.of(expression(RDFBOX, "sparql.rdfbox_create_from_userliteral_with_lexical(%s, %s, %s)", value,
+                    type, lexical));
 
         throw new IllegalArgumentException();
     }
@@ -87,9 +88,9 @@ public final class UserLiteralCompositeBaseClass extends BaseLiteralClass
         assert isSubclassOf(sourceClass);
 
         if(sourceClass.equals(box))
-            return List.of(expression("sparql.rdfbox_get_userliteral_value(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_usertype_type(%s)", columns.get(0)),
-                    expression("sparql.rdfbox_get_usertype_lexical(%s)", columns.get(0)));
+            return List.of(expression(UBOX, "sparql.rdfbox_get_userliteral_value(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_usertype_type(%s)", columns.get(0)),
+                    expression(VARCHAR, "sparql.rdfbox_get_usertype_lexical(%s)", columns.get(0)));
 
         throw new IllegalArgumentException();
     }
