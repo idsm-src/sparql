@@ -281,6 +281,40 @@ public class SqlType
     }
 
 
+    /**
+     * SQL condition that the columns hold the same term, the identity of the type. For {@code sparql.rdfbox} it is the
+     * operator {@code ===}, while {@link #equal} keeps the value equality {@code =} of the box, on which the join
+     * conditions rely as the only mergeable operator of the type.
+     *
+     * @param left the left column
+     * @param right the right column
+     * @return SQL condition that the columns hold the same term
+     */
+    public String same(Column left, Column right)
+    {
+        if(equals(RDFBOX))
+            return "(" + left + " operator(sparql.===) " + right + ")";
+
+        return equal(left, right);
+    }
+
+
+    /**
+     * SQL condition that the columns hold different terms, the negation of {@link #same}.
+     *
+     * @param left the left column
+     * @param right the right column
+     * @return SQL condition that the columns hold different terms
+     */
+    public String notSame(Column left, Column right)
+    {
+        if(equals(RDFBOX))
+            return "NOT (" + left + " operator(sparql.===) " + right + ")";
+
+        return notEqual(left, right);
+    }
+
+
     @Override
     public final String toString()
     {

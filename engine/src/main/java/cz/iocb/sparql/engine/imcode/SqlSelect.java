@@ -12,6 +12,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.iri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBlankNode;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
@@ -21,8 +22,10 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isFloatPoint;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isIri;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.numeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.scalarBlankNode;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.tripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdFloat;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.xsdShort;
@@ -735,8 +738,10 @@ public final class SqlSelect extends SqlIntercode
                     sortSet.computeIfAbsent(genScalarDate, _ -> new HashSet<>()).add(r);
                 else if(isDateTime(r))
                     sortSet.computeIfAbsent(genScalarDateTime, _ -> new HashSet<>()).add(r);
+                else if(isTripleTerm(r))
+                    sortSet.computeIfAbsent(tripleTerm, _ -> new HashSet<>()).add(r);
                 else if(hasBlankNode(r) || hasIri(r) || hasNumeric(r) || hasBoolean(r) || hasString(r) || hasDate(r)
-                        || hasDateTime(r))
+                        || hasDateTime(r) || hasTripleTerm(r))
                     sortSet.computeIfAbsent(box, _ -> new HashSet<>()).add(r);
             }
 
@@ -888,6 +893,18 @@ public final class SqlSelect extends SqlIntercode
                     builder.append(binding.deriveMapping(relations, dates.iterator().next()).get(0));
                 else
                     builder.append(binding.deriveMapping(relations, genScalarDate).get(0));
+
+                if(order.getValue() == Direction.Descending)
+                    builder.append(" DESC");
+            }
+
+            // order triple terms (after the other terms, by their components through the box)
+            if(sortSet.get(tripleTerm) != null)
+            {
+                appendComma(builder, hasOrderCondition);
+                hasOrderCondition = true;
+
+                builder.append(binding.deriveMapping(relations, unionize(sortSet.get(tripleTerm), box)).get(0));
 
                 if(order.getValue() == Direction.Descending)
                     builder.append(" DESC");

@@ -29,6 +29,28 @@ import cz.iocb.sparql.engine.request.Request;
 public final class TripleTermClass extends PrimitiveResourceClass
 {
     /**
+     * Position of a component in a triple term.
+     */
+    public static enum Component
+    {
+        /**
+         * The subject.
+         */
+        SUBJECT,
+
+        /**
+         * The predicate.
+         */
+        PREDICATE,
+
+        /**
+         * The object.
+         */
+        OBJECT
+    }
+
+
+    /**
      * Class of the subjects.
      */
     private final ResourceClass subject;
@@ -129,6 +151,41 @@ public final class TripleTermClass extends PrimitiveResourceClass
     public ResourceClass getObject()
     {
         return object;
+    }
+
+
+    /**
+     * Class of the component.
+     *
+     * @param component the component
+     * @return class of the component
+     */
+    public ResourceClass getComponentClass(Component component)
+    {
+        return switch(component)
+        {
+            case SUBJECT -> subject;
+            case PREDICATE -> predicate;
+            case OBJECT -> object;
+        };
+    }
+
+
+    /**
+     * The columns of the component among the given columns of this class.
+     *
+     * @param component the component
+     * @param columns the columns representing values of this class
+     * @return the columns of the component
+     */
+    public List<Column> getComponentColumns(Component component, List<Column> columns)
+    {
+        return switch(component)
+        {
+            case SUBJECT -> getSubjectColumns(columns);
+            case PREDICATE -> getPredicateColumns(columns);
+            case OBJECT -> getObjectColumns(columns);
+        };
     }
 
 

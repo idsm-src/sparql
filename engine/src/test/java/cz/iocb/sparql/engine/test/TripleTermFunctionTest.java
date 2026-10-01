@@ -4,6 +4,7 @@ import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdBoolea
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdIntegerIri;
 import static cz.iocb.sparql.engine.mapping.datatypes.BuiltinDatatypes.xsdStringIri;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -31,7 +32,8 @@ import cz.iocb.sparql.engine.translator.ServiceException;
 /**
  * Queries over triple terms given by VALUES or built by expressions, run against an empty configuration: the functions
  * TRIPLE, SUBJECT, PREDICATE, OBJECT and isTRIPLE applied to triple terms kept in their own classes and to triple terms
- * stored in the box, the triple term shorthand of expressions, nested triple terms and sameTerm.
+ * stored in the box, the triple term shorthand of expressions, nested triple terms, the comparisons {@code =},
+ * {@code !=}, {@code <} and IN, sameTerm and ORDER BY.
  */
 public class TripleTermFunctionTest
 {
@@ -45,6 +47,7 @@ public class TripleTermFunctionTest
     private static final Iri x = iri("x");
     private static final TypedLiteral lit = new TypedLiteral("lit", xsdStringIri);
     private static final TypedLiteral one = new TypedLiteral("1", xsdIntegerIri);
+    private static final TypedLiteral two = new TypedLiteral("2", xsdIntegerIri);
     private static final TypedLiteral yes = new TypedLiteral("true", xsdBooleanIri);
     private static final TypedLiteral no = new TypedLiteral("false", xsdBooleanIri);
 
@@ -237,5 +240,84 @@ public class TripleTermFunctionTest
                   VALUES ?t { <<( :a :b :c )>> <<( :a :b 1 )>> :x }
                   FILTER(sameTerm(?t, <<( :a :b 1 )>>))
                 }"""), containsInAnyOrder(row(triple(a, b, one))));
+    }
+
+
+    @Test
+    @DisplayName("= and != compare triple terms by the values of their components, sameTerm by their identity")
+    void equality() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?e ?n ?s WHERE {
+                  VALUES (?l ?r) {
+                    (<<( :a :b 123 )>> <<( :a :b 123.0 )>>)
+                    (<<( :a :b 123 )>> <<( :a :b 123 )>>)
+                    (<<( :a :q <<( :a :b 123 )>> )>> <<( :a :q <<( :a :b 123.0 )>> )>>)
+                    (<<( :a :b 123 )>> <<( :c :d 123 )>>)
+                    (<<( :a :b 9 )>> <<( :a :b 123 )>>)
+                    (<<( :a :b "x"^^:t )>> <<( :a :b "y"^^:t )>>)
+                    (<<( :a :b :c )>> :x)
+                  }
+                  BIND(?l = ?r AS ?e)
+                  BIND(?l != ?r AS ?n)
+                  BIND(sameTerm(?l, ?r) AS ?s)
+                }"""), containsInAnyOrder(row(yes, no, no), row(yes, no, yes), row(yes, no, no), row(no, yes, no),
+                row(no, yes, no), row(null, null, no), row(no, yes, no)));
+    }
+
+
+    @Test
+    @DisplayName("boxed triple terms compare by value with = and by identity with sameTerm")
+    void boxedEquality() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?e ?s ?i WHERE {
+                  VALUES ?c { true false }
+                  BIND(IF(?c, <<( :a :b 1 )>>, :x) AS ?b)
+                  BIND(?b = <<( :a :b 1.0 )>> AS ?e)
+                  BIND(sameTerm(?b, <<( :a :b 1.0 )>>) AS ?s)
+                  BIND(sameTerm(?b, <<( :a :b 1 )>>) AS ?i)
+                }"""), containsInAnyOrder(row(yes, no, yes), row(no, no, no)));
+    }
+
+
+    @Test
+    @DisplayName("ordering comparisons of triple terms are errors")
+    void lessThan() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?c WHERE {
+                  VALUES (?l ?r) { (<<( :a :b 1 )>> <<( :a :b 2 )>>) }
+                  BIND(?l < ?r AS ?c)
+                }"""), containsInAnyOrder(row((RdfTerm) null)));
+    }
+
+
+    @Test
+    @DisplayName("IN tests the membership of a triple term by value")
+    void in() throws Exception
+    {
+        assertThat(execute("""
+                SELECT ?t WHERE {
+                  VALUES ?t { <<( :a :b 1 )>> <<( :a :b 2 )>> <<( :a :b 3 )>> :x }
+                  FILTER(?t IN (<<( :a :b 1 )>>, <<( :a :b 2.0 )>>))
+                }"""), containsInAnyOrder(row(triple(a, b, one)), row(triple(a, b, two))));
+    }
+
+
+    @Test
+    @DisplayName("triple terms are ordered after the other terms and among themselves by their components")
+    void ordering() throws Exception
+    {
+        String query = """
+                SELECT ?v WHERE {
+                  VALUES ?v { <<( :b :p 1 )>> "lit" <<( :a :p 2 )>> :x <<( :a :p 1 )>> }
+                } ORDER BY %s(?v)""";
+
+        assertThat(execute(query.formatted("ASC")),
+                contains(row(x), row(lit), row(triple(a, p, one)), row(triple(a, p, two)), row(triple(b, p, one))));
+
+        assertThat(execute(query.formatted("DESC")),
+                contains(row(triple(b, p, one)), row(triple(a, p, two)), row(triple(a, p, one)), row(lit), row(x)));
     }
 }

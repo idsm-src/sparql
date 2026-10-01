@@ -610,13 +610,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             SqlType type = resClass.getSqlTypes().get(i);
 
             if(!resClass.isOptionalColumn(i))
-                conditions.add(type.equal(l, r));
+                conditions.add(type.same(l, r));
             else if(isNullConstant(l))
                 conditions.add(r.canBeNull() ? "(" + r + " IS NULL)" : "false");
             else if(isNullConstant(r))
                 conditions.add(l.canBeNull() ? "(" + l + " IS NULL)" : "false");
             else if(!l.canBeNull() || !r.canBeNull())
-                conditions.add(type.equal(l, r));
+                conditions.add(type.same(l, r));
             else
                 conditions.add(type.notDistinct(l, r));
         }
@@ -645,13 +645,13 @@ public abstract class SqlExpressionIntercode extends SqlBaseClass
             SqlType type = resClass.getSqlTypes().get(i);
 
             if(!resClass.isOptionalColumn(i))
-                conditions.add(type.notEqual(l, r));
+                conditions.add(type.notSame(l, r));
             else if(isNullConstant(l))
                 conditions.add(r.canBeNull() ? "(" + r + " IS NOT NULL)" : "true");
             else if(isNullConstant(r))
                 conditions.add(l.canBeNull() ? "(" + l + " IS NOT NULL)" : "true");
             else if(!l.canBeNull() || !r.canBeNull())
-                conditions.add(type.notEqual(l, r));
+                conditions.add(type.notSame(l, r));
             else
                 conditions.add(type.distinct(l, r));
         }

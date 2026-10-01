@@ -72,7 +72,6 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isReference;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isRtlLangString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isString;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isStringLiteral;
-import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexByte;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.lexDate;
@@ -146,7 +145,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import cz.iocb.sparql.engine.common.UnionFind;
 import cz.iocb.sparql.engine.database.Column;
 import cz.iocb.sparql.engine.database.ExpressionColumn;
 import cz.iocb.sparql.engine.database.SqlType;
@@ -167,6 +165,7 @@ import cz.iocb.sparql.engine.mapping.classes.LiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.PrimitiveResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
 import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralBaseClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralClass;
 import cz.iocb.sparql.engine.mapping.classes.UserLiteralCompositeBaseClass;
@@ -699,6 +698,16 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                 if(set.isEmpty() && !canBeNull)
                     return falseValue;
 
+                // terms whose classes never pair are different, unless one of them is missing
+                String absent = "NULLIF(" + left.getIsNull() + " OR " + right.getIsNull() + ", true)";
+
+                if(set.isEmpty())
+                {
+                    List<Column> result = List.of(new ExpressionColumn(absent, BOOL, canBeNull));
+                    return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, result),
+                            canBeNull);
+                }
+
                 List<SqlExpressionIntercode> operands = List.of(left, right);
                 Map<ResourceClass, Set<List<Set<ResourceClass>>>> resMap = processResultMap(relations, operands, map,
                         restriction);
@@ -728,8 +737,9 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
                             .collect(joining(" AND ", "(", ")")));
                 }
 
-                List<Column> result = List.of(
-                        new ExpressionColumn(variants.stream().collect(joining(" OR ", "(", ")")), BOOL, canBeNull));
+                List<Column> result = List.of(new ExpressionColumn(
+                        variants.stream().collect(joining(" OR ", "COALESCE((", "), " + absent + ")")), BOOL,
+                        canBeNull));
 
                 return new SqlBuiltinCall(function, distinct, arguments, singletonMap(xsdBoolean, result), canBeNull);
             }
@@ -1632,58 +1642,27 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             {
                 SqlExpressionIntercode argument = arguments.get(0);
 
-                if(argument.getResourceClasses().stream().noneMatch(r -> hasTripleTerm(r)))
+                Set<ResourceClass> classes = argument.getResourceClasses().stream().filter(r -> hasTripleTerm(r))
+                        .collect(toSet());
+
+                if(classes.isEmpty())
                     return SqlNull.get();
 
-                boolean canBeNull = argument.canBeNull()
-                        || argument.getResourceClasses().stream().anyMatch(r -> !isTripleTerm(r));
+                Component component = switch(function)
+                {
+                    case "subject" -> Component.SUBJECT;
+                    case "predicate" -> Component.PREDICATE;
+                    default -> Component.OBJECT;
+                };
 
-                // the classes of the component, each with the classes of the argument delivering it
-                Map<ResourceClass, Set<ResourceClass>> components = new HashMap<>();
+                SqlValue value = SqlValue.tripleTermComponent(relations, argument, classes, component);
 
-                for(ResourceClass argumentClass : argument.getResourceClasses())
-                    if(hasTripleTerm(argumentClass))
-                        components.computeIfAbsent(getComponentClass(function, argumentClass), _ -> new HashSet<>())
-                                .add(argumentClass);
-
-                // overlapping classes of the component are delivered together in their union
                 Map<ResourceClass, List<Column>> mappings = new HashMap<>();
 
-                for(Set<ResourceClass> group : UnionFind.getDisjunctEntries(components.keySet(),
-                        (l, r) -> !areDisjunct(relations, l, r)))
-                {
-                    ResourceClass resultClass = group.size() == 1 ? group.iterator().next() : unionize(group);
+                for(Entry<ResourceClass, List<Column>> e : value.getMappings().entrySet())
+                    mappings.put(e.getKey(), restriction.contains(relations, e.getKey()) ? e.getValue() : null);
 
-                    if(!restriction.contains(relations, resultClass))
-                    {
-                        mappings.put(resultClass, null);
-                        continue;
-                    }
-
-                    List<Set<Column>> variants = new ArrayList<>(resultClass.getColumnCount());
-
-                    for(int i = 0; i < resultClass.getColumnCount(); i++)
-                        variants.add(new HashSet<>());
-
-                    for(ResourceClass componentClass : group)
-                    {
-                        for(ResourceClass argumentClass : components.get(componentClass))
-                        {
-                            List<Column> columns = getComponentColumns(function, argumentClass,
-                                    argument.get(relations, argumentClass));
-
-                            if(!componentClass.equals(resultClass))
-                                columns = componentClass.toGeneralClass(resultClass, columns, true);
-
-                            for(int i = 0; i < columns.size(); i++)
-                                variants.get(i).add(columns.get(i));
-                        }
-                    }
-
-                    mappings.put(resultClass, variants.stream().map(v -> coalesce(v)).toList());
-                }
-
-                return new SqlBuiltinCall(function, distinct, arguments, mappings, canBeNull);
+                return new SqlBuiltinCall(function, distinct, arguments, mappings, value.canBeNull());
             }
 
 
@@ -3244,56 +3223,6 @@ public final class SqlBuiltinCall extends SqlExpressionIntercode
             return "sparql.is_" + function.substring(2).replaceFirst("uri", "iri") + "_rdfbox";
 
         return "sparql." + function + "_rdfbox";
-    }
-
-
-    /**
-     * Class of the component selected by the function from the triple terms of the class: the component class of a
-     * triple term class, otherwise (the triple terms are boxed) the box for a subject or an object and the IRI class
-     * for a predicate.
-     *
-     * @param function lower-case function name ({@code subject}, {@code predicate} or {@code object})
-     * @param resClass class of the triple terms
-     * @return class of the component selected by the function from the triple terms of the class
-     */
-    private static ResourceClass getComponentClass(String function, ResourceClass resClass)
-    {
-        if(resClass.getEffectiveClass() instanceof TripleTermClass tripleClass)
-            return switch(function)
-            {
-                case "subject" -> tripleClass.getSubject();
-                case "predicate" -> tripleClass.getPredicate();
-                default -> tripleClass.getObject();
-            };
-
-        return function.equals("predicate") ? iri : box;
-    }
-
-
-    /**
-     * Columns of the component selected by the function from the triple terms represented by the given columns of the
-     * class, in the class given by {@link #getComponentClass}: a part of the columns of a triple term class, otherwise
-     * the component extracted from the box (NULL when the box holds another kind of term).
-     *
-     * @param function lower-case function name ({@code subject}, {@code predicate} or {@code object})
-     * @param resClass class of the triple terms
-     * @param columns the columns representing the triple terms
-     * @return columns of the component selected by the function from the triple terms represented by the columns
-     */
-    private static List<Column> getComponentColumns(String function, ResourceClass resClass, List<Column> columns)
-    {
-        if(resClass.getEffectiveClass() instanceof TripleTermClass tripleClass)
-            return switch(function)
-            {
-                case "subject" -> tripleClass.getSubjectColumns(columns);
-                case "predicate" -> tripleClass.getPredicateColumns(columns);
-                default -> tripleClass.getObjectColumns(columns);
-            };
-
-        SqlType type = function.equals("predicate") ? VARCHAR : RDFBOX;
-
-        return List.of(
-                new ExpressionColumn("sparql.rdfbox_get_tripleterm_" + function + "(" + columns.get(0) + ")", type));
     }
 
 

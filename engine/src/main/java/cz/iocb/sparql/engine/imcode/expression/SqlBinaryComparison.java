@@ -23,6 +23,7 @@ import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasDateTime;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasLiteral;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasNumeric;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasString;
+import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.hasTripleTerm;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isBoolean;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDate;
 import static cz.iocb.sparql.engine.mapping.classes.BuiltinClasses.isDateTime;
@@ -51,6 +52,7 @@ import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.areDisjunct;
 import static cz.iocb.sparql.engine.mapping.classes.ResourceClass.getExpressionClass;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -66,6 +68,8 @@ import cz.iocb.sparql.engine.mapping.classes.ClassRelations;
 import cz.iocb.sparql.engine.mapping.classes.DateInZone;
 import cz.iocb.sparql.engine.mapping.classes.DateInZoneClass;
 import cz.iocb.sparql.engine.mapping.classes.ResourceClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass;
+import cz.iocb.sparql.engine.mapping.classes.TripleTermClass.Component;
 import cz.iocb.sparql.engine.request.Request;
 import cz.iocb.sparql.engine.translator.VariableBindings;
 
@@ -73,8 +77,8 @@ import cz.iocb.sparql.engine.translator.VariableBindings;
 
 /**
  * Comparison of two terms following the SPARQL operator mapping: numeric, boolean, string, date and date-time
- * comparison and RDF term equality; comparing incompatible types is an error. Dates and date-times of different
- * timezones are compared through their common representation.
+ * comparison and RDF term equality, triple terms being compared by their components; comparing incompatible types is an
+ * error. Dates and date-times of different timezones are compared through their common representation.
  */
 public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanExpression
 {
@@ -251,6 +255,11 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
          * Direct SQL comparison of the columns (strings, references).
          */
         DIRECT,
+
+        /**
+         * Comparison of two triple terms by their components.
+         */
+        TRIPLE_TERM,
 
         /**
          * Comparison through the box.
@@ -457,16 +466,53 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
         if(!equalityComparison)
             return ComparisonType.NULL;
 
+        if(l.getEffectiveClass() instanceof TripleTermClass lt && r.getEffectiveClass() instanceof TripleTermClass rt)
+            return combineComponentComparisons(areComparable(relations, operator, lt.getSubject(), rt.getSubject()),
+                    areComparable(relations, operator, lt.getPredicate(), rt.getPredicate()),
+                    areComparable(relations, operator, lt.getObject(), rt.getObject()));
+
         if(isLiteral(l) && isLiteral(r) && areDisjunct(relations, l, r))
             return ComparisonType.NULL;
 
         if(hasLiteral(l) && hasLiteral(r))
             return ComparisonType.FULL;
 
+        // triple terms of disjoint classes may still have equal values (through the box, the extension compares them)
+        if(hasTripleTerm(l) && hasTripleTerm(r))
+            return ComparisonType.FULL;
+
         if(areDisjunct(relations, l, r))
             return ComparisonType.DIFFERENT;
 
         return ComparisonType.NOT_NULL;
+    }
+
+
+    /**
+     * Outcome of comparing two triple terms given the outcomes of comparing their components: an error of a component
+     * is an error of the whole, otherwise the terms are equal when all components are.
+     *
+     * @param components outcomes of comparing the components
+     * @return outcome of comparing two triple terms given the outcomes of comparing their components
+     */
+    private static ComparisonType combineComponentComparisons(ComparisonType... components)
+    {
+        boolean full = false;
+        boolean different = false;
+
+        for(ComparisonType component : components)
+        {
+            if(component == ComparisonType.NULL)
+                return ComparisonType.NULL;
+
+            full |= component == ComparisonType.FULL;
+            different |= component == ComparisonType.DIFFERENT;
+        }
+
+        if(full)
+            return ComparisonType.FULL;
+
+        return different ? ComparisonType.DIFFERENT : ComparisonType.NOT_NULL;
     }
 
 
@@ -535,6 +581,9 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
             return ComparisonMode.DIRECT;
         else if(operator != EQUAL && operator != NOT_EQUAL)
             return ComparisonMode.NULL;
+        else if(left.getEffectiveClass() instanceof TripleTermClass
+                && right.getEffectiveClass() instanceof TripleTermClass)
+            return ComparisonMode.TRIPLE_TERM;
         else if(hasNumeric(left) && hasNumeric(right))
             return ComparisonMode.BOX;
         else if(hasDateTime(left) && hasDateTime(right))
@@ -708,6 +757,41 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
                 yield "(" + cl + " " + effectiveOperator.getText() + " " + cr + ")";
             }
 
+            case TRIPLE_TERM ->
+            {
+                // the terms are compared component by component: they are equal when all components are, and an
+                // error of a component is an error of the whole, as in sameValue() of SPARQL 1.2
+                List<String> parts = new ArrayList<>();
+                boolean different = false;
+
+                for(Component component : Component.values())
+                {
+                    SqlExpressionIntercode l = SqlValue.tripleTermComponent(relations, left, lset, component);
+                    SqlExpressionIntercode r = SqlValue.tripleTermComponent(relations, right, rset, component);
+                    SqlExpressionIntercode comparison = create(relations, EQUAL, l, r);
+
+                    if(comparison.equals(SqlNull.get()))
+                        parts.add("NULL::bool");
+                    else if(comparison.equals(falseValue))
+                        different = true;
+                    else if(!comparison.equals(trueValue))
+                        parts.add(comparison.get(relations, xsdBoolean).get(0).toString());
+                }
+
+                // a sum of the parts cast to integers is NULL when a part is, which an AND would not be
+                String equality;
+
+                if(parts.isEmpty())
+                    equality = different ? "false" : "true";
+                else if(different)
+                    equality = parts.stream().map(c -> "(" + c + ")::int").collect(joining(" + ", "(", " < 0)"));
+                else
+                    equality = parts.stream().map(c -> "(" + c + ")::int")
+                            .collect(joining(" + ", "(", " = " + parts.size() + ")"));
+
+                yield operator == EQUAL ? equality : "NOT " + equality;
+            }
+
             case BOX ->
             {
                 Column cl = left.get(relations, unionize(lset, box)).get(0);
@@ -717,10 +801,16 @@ public final class SqlBinaryComparison extends SqlBinary implements SqlBooleanEx
 
             case DIFF ->
             {
+                // decided only for values of the classes compared here, the other variants cover the other classes
+                String present = Stream
+                        .of(lset.stream().map(c -> left.getIsNotNull(relations, c)),
+                                rset.stream().map(c -> right.getIsNotNull(relations, c)))
+                        .map(s -> s.collect(joining(" OR ", "(", ")"))).collect(joining(" AND "));
+
                 if(operator == EQUAL)
-                    yield "NULLIF(" + left.getIsNull() + " OR " + right.getIsNull() + ", true)";
+                    yield "CASE WHEN " + present + " THEN false END";
                 else if(operator == NOT_EQUAL)
-                    yield "NULLIF(" + left.getIsNotNull() + " AND " + right.getIsNotNull() + ", false)";
+                    yield "CASE WHEN " + present + " THEN true END";
                 else
                     throw new IllegalArgumentException();
             }
